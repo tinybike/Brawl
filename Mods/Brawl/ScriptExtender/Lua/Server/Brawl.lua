@@ -21,7 +21,7 @@ local function heartbeat(level)
         if entityUuid ~= nil then
             debugPrint("display name", Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
             local entity = Ext.Entity.Get(entityUuid)
-            --thank u force
+            --thank u focus
             if Osi.CanJoinCombat(entityUuid) == 1 then
                 Osi.SetCanJoinCombat(entityUuid, 0)
                 entity:Replicate("CombatParticipant")
