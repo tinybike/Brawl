@@ -1,7 +1,7 @@
 local GameUtils = Require("Hlib/GameUtils")
 
 local Brawlers = {}
-local ACTION_INTERVAL = 3000
+local ACTION_INTERVAL = 1500
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local DEBUG_LOGGING = true
 
@@ -29,12 +29,12 @@ local function pulseCanJoinCombat(level)
     for _, toFlag in pairs(toFlagCannotJoinCombat) do
         local entityUuid = toFlag.Guid
         if entityUuid ~= nil then
-            debugPrint("display name", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
             -- thank u focus
             if Osi.CanJoinCombat(entityUuid) == 1 then
                 Osi.SetCanJoinCombat(entityUuid, 0)
+                debugPrint("Set CanJoinCombat to 0 for", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
             end
-            if Osi.CanFight(entityUuid) == 1 then
+            if Osi.CanFight(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
                 if not Brawlers[level][entityUuid] then
                     Brawlers[level][entityUuid] = {}
                 end
@@ -42,6 +42,7 @@ local function pulseCanJoinCombat(level)
                 Brawlers[level][entityUuid].level = level
                 Brawlers[level][entityUuid].displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
                 Brawlers[level][entityUuid].entity = Ext.Entity.Get(entityUuid)
+                Brawlers[level][entityUuid].attackTarget = nil
             end
         end
     end
@@ -49,22 +50,54 @@ local function pulseCanJoinCombat(level)
     Ext.Timer.WaitFor(CAN_JOIN_COMBAT_INTERVAL, function () pulseCanJoinCombat(level) end)
 end
 
+local function getClosestPlayers(entityUuid)
+    local playerDistances = {}
+    local sortedPlayers = {}
+    for _, player in pairs(Osi.DB_Players:Get(nil)) do
+        local playerUuid = Osi.GetUUID(player[1])
+        if Osi.IsDead(playerUuid) == 0 then
+            table.insert(playerDistances, {playerUuid, Osi.GetDistanceTo(entityUuid, playerUuid)})
+        end
+    end
+    table.sort(playerDistances, function (a, b) return a[2] > b[2] end)
+    for _, pair in ipairs(playerDistances) do
+        sortedPlayers[pair[1]] = pair[2]
+    end
+    local i = 0
+    return function ()
+        i = i + 1
+        if playerDistances[i] then
+            return playerDistances[i][1], playerDistances[i][2]
+        end
+    end
+end
+
 local function pulseAction(level)
     for entityUuid, brawler in pairs(Brawlers[level]) do
         if Osi.CanFight(entityUuid) == 1 then
-            local closestAlivePlayer, distance = Osi.GetClosestAlivePlayer(entityUuid)
-            debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, distance)
-            brawler.closestAlivePlayer = closestAlivePlayer
-            brawler.distance = distance
-            -- local enterCombatRange = Osi.GetEnterCombatRange()
-            local enterCombatRange = 20
-            if distance < enterCombatRange then
-                debugPrint("Attack", entityUuid, closestAlivePlayer)
-                Osi.Attack(entityUuid, closestAlivePlayer, 0)
-                --Osi.UseSpell(entityUuid, spellID, target, target2)
-            -- elseif distance > enterCombatRange*3 then
-            --     debugPrint("stop attacking")
-            --     --do this somehow /thinking emoji
+            if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
+                debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
+                break
+            else
+                local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
+                -- debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
+                -- local enterCombatRange = Osi.GetEnterCombatRange()
+                local enterCombatRange = 20
+                if closestDistance < enterCombatRange then
+                    for playerUuid, distance in getClosestPlayers(entityUuid) do
+                        -- print("getClosestPlayers iterate", entityUuid, playerUuid, distance, Osi.HasLineOfSight(entityUuid, playerUuid), Osi.CanSee(entityUuid, playerUuid))
+                        if Osi.HasLineOfSight(entityUuid, playerUuid) == 1 and Osi.CanSee(entityUuid, playerUuid) == 1 then
+                            debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
+                            brawler.attackTarget = playerUuid
+                            Osi.Attack(entityUuid, playerUuid, 0)
+                            break
+                            -- Osi.UseSpell(entityUuid, spellID, target, target2)
+                        -- elseif closestDistance > enterCombatRange*3 then
+                        --     debugPrint("stop attacking")
+                        --     --do this somehow /thinking emoji
+                        end
+                    end
+                end
             end
         end
     end
@@ -78,6 +111,10 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         Brawlers[level] = {}
         pulseCanJoinCombat(level)
         pulseAction(level)
+    end)
+    Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
+        debugPrint("Died", entityGuid)
+        Brawlers[Osi.GetRegion(entityGuid)][Osi.GetUUID(entityGuid)] = nil
     end)
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
