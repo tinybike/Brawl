@@ -77,7 +77,7 @@ local function pulseAction(level)
         if Osi.CanFight(entityUuid) == 1 then
             if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
                 debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
-                break
+                Osi.Attack(entityUuid, brawler.attackTarget, 0)
             else
                 local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
                 -- debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
