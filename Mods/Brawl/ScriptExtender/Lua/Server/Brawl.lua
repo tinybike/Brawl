@@ -6,16 +6,23 @@ local DEBUG_LOGGING = true
 local function debugPrint(...) if DEBUG_LOGGING then print(...) end end
 local function debugDump(...) if DEBUG_LOGGING then _D(...) end end
 
+local function flagCannotJoinCombat(entity)
+    return entity.IsCharacter
+        and GameUtils.Character.IsNonPlayer(entity.Uuid.EntityUuid)
+        and not GameUtils.Object.IsOwned(entity.Uuid.EntityUuid)
+        and not entity.PartyMember
+        and not (entity.ServerCharacter and entity.ServerCharacter.Template.Name:match("Player"))
+end
+
 local function heartbeat(level)
     --thank u hippo
-    local nearby = GameUtils.Entity.GetNearby(Osi.GetHostCharacter(), 150)
-    local toFlagCannotJoinCombat = table.filter(nearby, function (v)
-        return v.Entity.IsCharacter
-            and GameUtils.Character.IsNonPlayer(v.Entity.Uuid.EntityUuid)
-            and not GameUtils.Object.IsOwned(v.Entity.Uuid.EntityUuid)
-            and not v.Entity.PartyMember
-            and not (v.Entity.ServerCharacter and v.Entity.ServerCharacter.Template.Name:match("Player"))
-    end)
+    local nearbies = GameUtils.Entity.GetNearby(Osi.GetHostCharacter(), 150)
+    local toFlagCannotJoinCombat = {}
+    for _, nearby in ipairs(nearbies) do
+        if flagCannotJoinCombat(nearby.Entity) then
+            table.insert(toFlagCannotJoinCombat, nearby)
+        end
+    end
     for _, toFlag in pairs(toFlagCannotJoinCombat) do
         local entityUuid = toFlag.Guid
         if entityUuid ~= nil then
@@ -35,22 +42,22 @@ local function heartbeat(level)
                     displayName=Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)),
                     entity=entity,
                     closestAlivePlayer=closestAlivePlayer,
-                    distance=distance
+                    distance=distance,
                 }
                 -- local enterCombatRange = Osi.GetEnterCombatRange()
                 local enterCombatRange = 15
                 if distance < enterCombatRange then
-                    debugPrint("attack!")
+                    debugPrint("attack", entityUuid, closestAlivePlayer)
                     Osi.Attack(entityUuid, closestAlivePlayer, 0)
                     --Osi.UseSpell(entityUuid, spellID, target, target2)
-                elseif distance > enterCombatRange*3 then
-                    debugPrint("stop attacking")
-                    --do this somehow /thinking emoji
+                -- elseif distance > enterCombatRange*3 then
+                --     debugPrint("stop attacking")
+                --     --do this somehow /thinking emoji
                 end
             end
         end
     end
-    Ext.Timer.WaitFor(2000, function ()
+    Ext.Timer.WaitFor(3000, function ()
         heartbeat(level)
     end)
 end
@@ -65,4 +72,10 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         debugPrint("LevelUnloading", level)
         Brawlers[level] = nil
     end)
+end)
+Ext.Events.ResetCompleted:Subscribe(function ()
+    print("ResetCompleted")
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    Brawlers[level] = {}
+    heartbeat(level)
 end)
