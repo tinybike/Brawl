@@ -77,7 +77,17 @@ local function pulseAction(level)
         if Osi.CanFight(entityUuid) == 1 then
             if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
                 debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
-                Osi.Attack(entityUuid, brawler.attackTarget, 0)
+                -- NB: create a better system than this lol
+                local randomNumber = math.random()
+                if randomNumber > 0.5 then -- attack the target
+                    Osi.Attack(entityUuid, brawler.attackTarget, 0)
+                elseif randomNumber > 0.25 then -- cast fireball at the target
+                    Osi.UseSpell(entityUuid, "Projectile_Fireball", brawler.attackTarget)
+                elseif randomNumber > 0.15 then -- cast ray of frost at the target
+                    Osi.UseSpell(entityUuid, "Projectile_RayOfFrost", brawler.attackTarget)
+                else -- run to the target and don't do anything else
+                    Osi.CharacterMoveTo(entityUuid, brawler.attackTarget, "Run", "1")
+                end
             else
                 local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
                 -- debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
@@ -89,12 +99,16 @@ local function pulseAction(level)
                         if Osi.HasLineOfSight(entityUuid, playerUuid) == 1 and Osi.CanSee(entityUuid, playerUuid) == 1 then
                             debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
                             brawler.attackTarget = playerUuid
-                            Osi.Attack(entityUuid, playerUuid, 0)
+                            -- NB: create a better system than this lol
+                            local randomNumber = math.random()
+                            if randomNumber > 0.5 then -- attack the target
+                                Osi.Attack(entityUuid, playerUuid, 0)
+                            elseif randomNumber > 0.25 then -- cast fireball at the target
+                                Osi.UseSpell(entityUuid, "Projectile_Fireball", playerUuid)
+                            else -- cast ray of frost at the target
+                                Osi.UseSpell(entityUuid, "Projectile_RayOfFrost", brawler.attackTarget)
+                            end
                             break
-                            -- Osi.UseSpell(entityUuid, spellID, target, target2)
-                        -- elseif closestDistance > enterCombatRange*3 then
-                        --     debugPrint("stop attacking")
-                        --     --do this somehow /thinking emoji
                         end
                     end
                 end
