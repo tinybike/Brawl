@@ -98,7 +98,7 @@ local function pulseAction(level)
                             elseif randomNumber > 0.25 then -- cast fireball at the target
                                 Osi.UseSpell(entityUuid, "Projectile_Fireball", playerUuid)
                             else -- cast ray of frost at the target
-                                Osi.UseSpell(entityUuid, "Projectile_RayOfFrost", brawler.attackTarget)
+                                Osi.UseSpell(entityUuid, "Projectile_RayOfFrost", playerUuid)
                             end
                             break
                         end
