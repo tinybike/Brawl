@@ -85,7 +85,8 @@ local function pulseAction(level)
                 local enterCombatRange = 20
                 if closestDistance < enterCombatRange then
                     local playersSortedByDistance = getPlayersSortedByDistance(entityUuid)
-                    for _, {playerUuid, distance}  in ipairs(playersSortedByDistance) do
+                    for _, pair in ipairs(playersSortedByDistance) do
+                        local playerUuid, distance = pair[1], pair[2]
                         -- print("getPlayersSortedByDistance iterate", entityUuid, playerUuid, distance, Osi.HasLineOfSight(entityUuid, playerUuid), Osi.CanSee(entityUuid, playerUuid))
                         if Osi.HasLineOfSight(entityUuid, playerUuid) == 1 and Osi.CanSee(entityUuid, playerUuid) == 1 then
                             debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
