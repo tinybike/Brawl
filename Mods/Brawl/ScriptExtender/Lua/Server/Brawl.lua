@@ -1,7 +1,7 @@
 local GameUtils = Require("Hlib/GameUtils")
 
 local Brawlers = {}
-local ACTION_INTERVAL = 1500
+local ACTION_INTERVAL = 5000
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local DEBUG_LOGGING = true
 
@@ -50,7 +50,7 @@ local function pulseCanJoinCombat(level)
     Ext.Timer.WaitFor(CAN_JOIN_COMBAT_INTERVAL, function () pulseCanJoinCombat(level) end)
 end
 
-local function getClosestPlayers(entityUuid)
+local function getPlayersSortedByDistance(entityUuid)
     local playerDistances = {}
     local sortedPlayers = {}
     for _, player in pairs(Osi.DB_Players:Get(nil)) do
@@ -84,8 +84,8 @@ local function pulseAction(level)
                 -- local enterCombatRange = Osi.GetEnterCombatRange()
                 local enterCombatRange = 20
                 if closestDistance < enterCombatRange then
-                    for playerUuid, distance in getClosestPlayers(entityUuid) do
-                        -- print("getClosestPlayers iterate", entityUuid, playerUuid, distance, Osi.HasLineOfSight(entityUuid, playerUuid), Osi.CanSee(entityUuid, playerUuid))
+                    for playerUuid, distance in getPlayersSortedByDistance(entityUuid) do
+                        -- print("getPlayersSortedByDistance iterate", entityUuid, playerUuid, distance, Osi.HasLineOfSight(entityUuid, playerUuid), Osi.CanSee(entityUuid, playerUuid))
                         if Osi.HasLineOfSight(entityUuid, playerUuid) == 1 and Osi.CanSee(entityUuid, playerUuid) == 1 then
                             debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
                             brawler.attackTarget = playerUuid
@@ -121,6 +121,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         Brawlers[level] = nil
     end)
 end)
+
 Ext.Events.ResetCompleted:Subscribe(function ()
     print("ResetCompleted")
     local level = Osi.GetRegion(Osi.GetHostCharacter())
