@@ -52,7 +52,6 @@ end
 
 local function getPlayersSortedByDistance(entityUuid)
     local playerDistances = {}
-    local sortedPlayers = {}
     for _, player in pairs(Osi.DB_Players:Get(nil)) do
         local playerUuid = Osi.GetUUID(player[1])
         if Osi.IsDead(playerUuid) == 0 then
@@ -60,16 +59,7 @@ local function getPlayersSortedByDistance(entityUuid)
         end
     end
     table.sort(playerDistances, function (a, b) return a[2] > b[2] end)
-    for _, pair in ipairs(playerDistances) do
-        sortedPlayers[pair[1]] = pair[2]
-    end
-    local i = 0
-    return function ()
-        i = i + 1
-        if playerDistances[i] then
-            return playerDistances[i][1], playerDistances[i][2]
-        end
-    end
+    return playerDistances
 end
 
 local function pulseAction(level)
@@ -94,7 +84,8 @@ local function pulseAction(level)
                 -- local enterCombatRange = Osi.GetEnterCombatRange()
                 local enterCombatRange = 20
                 if closestDistance < enterCombatRange then
-                    for playerUuid, distance in getPlayersSortedByDistance(entityUuid) do
+                    local playersSortedByDistance = getPlayersSortedByDistance(entityUuid)
+                    for _, {playerUuid, distance}  in ipairs(playersSortedByDistance) do
                         -- print("getPlayersSortedByDistance iterate", entityUuid, playerUuid, distance, Osi.HasLineOfSight(entityUuid, playerUuid), Osi.CanSee(entityUuid, playerUuid))
                         if Osi.HasLineOfSight(entityUuid, playerUuid) == 1 and Osi.CanSee(entityUuid, playerUuid) == 1 then
                             debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
