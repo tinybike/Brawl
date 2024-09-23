@@ -33,11 +33,11 @@ local function isSpellUsable(spellId)
     if spellId.OriginatorPrototype == "Projectile_Jump" then return false end
     if spellId.OriginatorPrototype == "Shout_Dash_NPC" then return false end
     if spellId.OriginatorPrototype == "Target_Shove" then return false end
-    if spellId.OriginatorPrototype == "Throw_Throw" then return false end
-    if spellId.OriginatorPrototype == "Target_Topple" then return false end
     if spellId.OriginatorPrototype == "Target_Dip_NPC" then return false end
     if spellId.OriginatorPrototype == "Target_MageArmor" then return false end
     if spellId.OriginatorPrototype == "Projectile_SneakAttack" then return false end
+    -- if spellId.OriginatorPrototype == "Throw_Throw" then return false end
+    -- if spellId.OriginatorPrototype == "Target_Topple" then return false end
     -- if spellId.OriginatorPrototype == "Target_MainHandAttack" then return false end
     -- if spellId.OriginatorPrototype == "Target_UnarmedAttack" then return false end
     return true
@@ -46,23 +46,23 @@ end
 -- NB: create a better system than this lol
 local function actOnTarget(entityUuid, targetUuid)
     local entity = Ext.Entity.Get(entityUuid)
-    local spellToCast = nil
-    if entity.SpellBook ~= nil then
+    local actionToTake = nil
+    if entity.SpellBookPrepares ~= nil then
         local numUsableSpells = 0
         local usableSpells = {}
-        for i, spell in pairs(entity.SpellBook.Spells) do
-            if isSpellUsable(spell.Id) then
-                table.insert(usableSpells, spell)
+        for _, preparedSpell in pairs(entity.SpellBookPrepares.PreparedSpells) do
+            if isSpellUsable(preparedSpell.Id) then
+                table.insert(usableSpells, preparedSpell)
                 numUsableSpells = numUsableSpells + 1
             end
         end
-        spellToCast = usableSpells[math.random(1, numUsableSpells)]
-        debugPrint("Spell to cast:")
-        debugDump(spellToCast)
+        actionToTake = usableSpells[math.random(1, numUsableSpells)]
+        debugPrint("Action to take:")
+        debugDump(actionToTake)
     end
-    Osi.UseSpell(entityUuid, spellToCast.Id.OriginatorPrototype, targetUuid)
+    Osi.UseSpell(entityUuid, actionToTake.Id.OriginatorPrototype, targetUuid)
     -- Osi.Attack(entityUuid, targetUuid, 0)
-    -- Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "1")
+    -- Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
 end
 
 local function pulseCanJoinCombat(level, isRepeating)
