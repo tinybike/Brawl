@@ -29,17 +29,17 @@ local function getPlayersSortedByDistance(entityUuid)
     return playerDistances
 end
 
-local function isSpellUsable(spellId)
-    if spellId.OriginatorPrototype == "Projectile_Jump" then return false end
-    if spellId.OriginatorPrototype == "Shout_Dash_NPC" then return false end
-    if spellId.OriginatorPrototype == "Target_Shove" then return false end
-    if spellId.OriginatorPrototype == "Target_Dip_NPC" then return false end
-    if spellId.OriginatorPrototype == "Target_MageArmor" then return false end
-    if spellId.OriginatorPrototype == "Projectile_SneakAttack" then return false end
-    -- if spellId.OriginatorPrototype == "Throw_Throw" then return false end
-    -- if spellId.OriginatorPrototype == "Target_Topple" then return false end
-    -- if spellId.OriginatorPrototype == "Target_MainHandAttack" then return false end
-    -- if spellId.OriginatorPrototype == "Target_UnarmedAttack" then return false end
+local function isSpellUsable(spell)
+    if spell.OriginatorPrototype == "Projectile_Jump" then return false end
+    if spell.OriginatorPrototype == "Shout_Dash_NPC" then return false end
+    if spell.OriginatorPrototype == "Target_Shove" then return false end
+    if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
+    if spell.OriginatorPrototype == "Target_MageArmor" then return false end
+    if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
+    -- if spell.OriginatorPrototype == "Throw_Throw" then return false end
+    -- if spell.OriginatorPrototype == "Target_Topple" then return false end
+    -- if spell.OriginatorPrototype == "Target_MainHandAttack" then return false end
+    -- if spell.OriginatorPrototype == "Target_UnarmedAttack" then return false end
     return true
 end
 
@@ -51,7 +51,7 @@ local function actOnTarget(entityUuid, targetUuid)
         local numUsableSpells = 0
         local usableSpells = {}
         for _, preparedSpell in pairs(entity.SpellBookPrepares.PreparedSpells) do
-            if isSpellUsable(preparedSpell.Id) then
+            if isSpellUsable(preparedSpell) then
                 table.insert(usableSpells, preparedSpell)
                 numUsableSpells = numUsableSpells + 1
             end
@@ -60,7 +60,7 @@ local function actOnTarget(entityUuid, targetUuid)
         debugPrint("Action to take:")
         debugDump(actionToTake)
     end
-    Osi.UseSpell(entityUuid, actionToTake.Id.OriginatorPrototype, targetUuid)
+    Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
     -- Osi.Attack(entityUuid, targetUuid, 0)
     -- Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
 end
