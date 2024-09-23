@@ -233,6 +233,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, instanceId)
         debugPrint("DialogEnded", dialog, instanceId)
         IsDialogActive = false
+        StopPulse[Osi.GetRegion(Osi.GetHostCharacter())] = false
         startPulse(Osi.GetRegion(Osi.GetHostCharacter()), false)
     end)
 end)
