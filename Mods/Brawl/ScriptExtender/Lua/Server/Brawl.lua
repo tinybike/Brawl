@@ -1,7 +1,7 @@
 local GameUtils = Require("Hlib/GameUtils")
 
 Brawlers = {}
-local ACTION_INTERVAL = 5000
+local ACTION_INTERVAL = 1500
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local DEBUG_LOGGING = true
 
@@ -57,6 +57,25 @@ local function actOnTarget(entityUuid, targetUuid)
     -- local archetype = Osi.GetBaseArchetype(entityUuid)
     debugPrint("ServerAiArchetype", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), archetype)
     debugDump(entity.ServerAiArchetype)
+    -- melee units should just autoattack sometimes
+    if archetype == "melee" then
+        local autoAttackRand = math.random()
+        -- 50% chance to start autoattacking if they're not already
+        if not Brawlers[Osi.GetRegion(entityUuid)][entityUuid].isAutoAttacking then
+            if autoAttackRand < 0.5 then
+                Brawlers[Osi.GetRegion(entityUuid)][entityUuid].isAutoAttacking = true
+                debugPrint("Start autoattacking", entityUuid, targetUuid)
+                return Osi.Attack(entityUuid, targetUuid, 0)
+            end
+        -- 20% chance to stop autoattacking if they're already doing it
+        else
+            if autoAttackRand > 0.2 then
+                debugDump(Brawlers[Osi.GetRegion(entityUuid)][entityUuid])
+                return Osi.Attack(entityUuid, targetUuid, 0)
+            end
+            Brawlers[Osi.GetRegion(entityUuid)][entityUuid].isAutoAttacking = false
+        end
+    end
     if entity.SpellBookPrepares ~= nil then
         local numUsableSpells = 0
         local usableSpells = {}
@@ -70,12 +89,10 @@ local function actOnTarget(entityUuid, targetUuid)
         debugPrint("Action to take:")
         debugDump(actionToTake)
     end
-    if actionToTake ~= nil then
-        Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
-    else
-        Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
+    if actionToTake == nil then
+        return Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
     end
-    -- Osi.Attack(entityUuid, targetUuid, 0)
+    Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
 end
 
 local function pulseCanJoinCombat(level, isRepeating)
@@ -159,7 +176,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         Brawlers[Osi.GetRegion(entityGuid)][Osi.GetUUID(entityGuid)] = nil
         -- Sometimes units don't appear dead when killed out-of-combat...
         -- this at least makes them lie prone (and dead-appearing units still appear dead)
-        Osi.LieOnGround(entityGuid)
+        Ext.Timer.WaitFor(500, function () Osi.LieOnGround(entityGuid) end)
     end)
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
