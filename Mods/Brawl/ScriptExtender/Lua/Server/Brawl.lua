@@ -60,9 +60,12 @@ local function actOnTarget(entityUuid, targetUuid)
         debugPrint("Action to take:")
         debugDump(actionToTake)
     end
-    Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
+    if actionToTake ~= nil then
+        Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
+    else
+        Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
+    end
     -- Osi.Attack(entityUuid, targetUuid, 0)
-    -- Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "event")
 end
 
 local function pulseCanJoinCombat(level, isRepeating)
