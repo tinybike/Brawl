@@ -3,7 +3,7 @@ local GameUtils = Require("Hlib/GameUtils")
 Brawlers = {}
 
 local IsDialogActive = false
-local ACTION_INTERVAL = 2500
+local ACTION_INTERVAL = 2000
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local ENTER_COMBAT_RANGE = 20
 local DEBUG_LOGGING = true
@@ -110,24 +110,26 @@ local function actOnTarget(entityUuid, targetUuid)
 end
 
 local function pulseAction(level, isRepeating)
-    debugPrint("pulseAction", level, isRepeating)
-    for entityUuid, brawler in pairs(Brawlers[level]) do
-        if Osi.CanFight(entityUuid) == 1 then
-            if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
-                debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
-                actOnTarget(entityUuid, brawler.attackTarget)
-            else
-                local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
-                -- debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
-                if closestDistance < ENTER_COMBAT_RANGE then
-                    local playersSortedByDistance = getPlayersSortedByDistance(entityUuid)
-                    for _, pair in ipairs(playersSortedByDistance) do
-                        local playerUuid, distance = pair[1], pair[2]
-                        if not IsDialogActive and Osi.CanSee(entityUuid, playerUuid) == 1 then
-                            debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
-                            brawler.attackTarget = playerUuid
-                            actOnTarget(entityUuid, playerUuid)
-                            break
+    debugPrint("pulseAction", level, isRepeating, IsDialogActive)
+    if not IsDialogActive then
+        for entityUuid, brawler in pairs(Brawlers[level]) do
+            if Osi.CanFight(entityUuid) == 1 then
+                if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
+                    debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
+                    actOnTarget(entityUuid, brawler.attackTarget)
+                else
+                    local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
+                    -- debugPrint("Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
+                    if closestDistance < ENTER_COMBAT_RANGE then
+                        local playersSortedByDistance = getPlayersSortedByDistance(entityUuid)
+                        for _, pair in ipairs(playersSortedByDistance) do
+                            local playerUuid, distance = pair[1], pair[2]
+                            if not IsDialogActive and Osi.CanSee(entityUuid, playerUuid) == 1 then
+                                debugPrint("Attack", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
+                                brawler.attackTarget = playerUuid
+                                actOnTarget(entityUuid, playerUuid)
+                                break
+                            end
                         end
                     end
                 end
@@ -144,7 +146,7 @@ end
 
 local function pulseCanJoinCombat(level, isRepeating)
     -- thank u hippo
-    debugPrint("pulseCanJoinCombat", level, isRepeating)
+    debugPrint("pulseCanJoinCombat", level, isRepeating, IsDialogActive)
     local nearbies = GameUtils.Entity.GetNearby(Osi.GetHostCharacter(), 150)
     local toFlagCannotJoinCombat = {}
     for _, nearby in ipairs(nearbies) do
@@ -224,5 +226,5 @@ Ext.Events.ResetCompleted:Subscribe(function ()
     print("ResetCompleted")
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     Brawlers[level] = {}
-    -- startPulse(level, true)
+    startPulse(level, true)
 end)
