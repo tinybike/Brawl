@@ -29,17 +29,23 @@ local function getPlayersSortedByDistance(entityUuid)
     return playerDistances
 end
 
-local function isSpellUsable(spell)
+local function isSpellUsable(spell, archetype)
     if spell.OriginatorPrototype == "Projectile_Jump" then return false end
     if spell.OriginatorPrototype == "Shout_Dash_NPC" then return false end
     if spell.OriginatorPrototype == "Target_Shove" then return false end
-    if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
-    if spell.OriginatorPrototype == "Target_MageArmor" then return false end
-    if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
+    if archetype == "melee" then
+        if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
+        if spell.OriginatorPrototype == "Target_MageArmor" then return false end
+        if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
+    elseif archetype == "ranged" then
+        if spell.OriginatorPrototype == "Target_UnarmedAttack" then return false end
+        if spell.OriginatorPrototype == "Target_Topple" then return false end
+        if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
+        if spell.OriginatorPrototype == "Target_MageArmor" then return false end
+        if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
+    end
     -- if spell.OriginatorPrototype == "Throw_Throw" then return false end
-    -- if spell.OriginatorPrototype == "Target_Topple" then return false end
     -- if spell.OriginatorPrototype == "Target_MainHandAttack" then return false end
-    -- if spell.OriginatorPrototype == "Target_UnarmedAttack" then return false end
     return true
 end
 
@@ -47,11 +53,15 @@ end
 local function actOnTarget(entityUuid, targetUuid)
     local entity = Ext.Entity.Get(entityUuid)
     local actionToTake = nil
+    local archetype = Osi.GetActiveArchetype(entityUuid)
+    -- local archetype = Osi.GetBaseArchetype(entityUuid)
+    debugPrint("ServerAiArchetype", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), archetype)
+    debugDump(entity.ServerAiArchetype)
     if entity.SpellBookPrepares ~= nil then
         local numUsableSpells = 0
         local usableSpells = {}
         for _, preparedSpell in pairs(entity.SpellBookPrepares.PreparedSpells) do
-            if isSpellUsable(preparedSpell) then
+            if isSpellUsable(preparedSpell, archetype) then
                 table.insert(usableSpells, preparedSpell)
                 numUsableSpells = numUsableSpells + 1
             end
@@ -147,6 +157,9 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
         debugPrint("Died", entityGuid)
         Brawlers[Osi.GetRegion(entityGuid)][Osi.GetUUID(entityGuid)] = nil
+        -- Sometimes units don't appear dead when killed out-of-combat...
+        -- this at least makes them lie prone (and dead-appearing units still appear dead)
+        Osi.LieOnGround(entityGuid)
     end)
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
