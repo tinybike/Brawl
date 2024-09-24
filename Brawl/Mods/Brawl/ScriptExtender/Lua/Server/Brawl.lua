@@ -253,8 +253,9 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     -- thank u focus
     Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", function (characterGuid, triggerGuid)
         debugPrint("PROC_Subregion_Entered", characterGuid, triggerGuid)
-        StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = false
-        startPulse(Osi.GetRegion(characterGuid), false)
+        local level = Osi.GetRegion(characterGuid)
+        StopPulseAction[level] = false
+        startPulse(level, false)
     end)
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
