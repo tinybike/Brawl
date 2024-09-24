@@ -3,7 +3,7 @@ local GameUtils = Require("Hlib/GameUtils")
 Brawlers = {}
 StopPulseAction = {}
 
-local ACTION_INTERVAL = 2000
+local ACTION_INTERVAL = 2500
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local ENTER_COMBAT_RANGE = 20
 local DEBUG_LOGGING = true
