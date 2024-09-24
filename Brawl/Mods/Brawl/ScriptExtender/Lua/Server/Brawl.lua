@@ -162,23 +162,22 @@ local function pulseCanJoinCombat(level, isRepeating)
     for _, toFlag in pairs(toFlagCannotJoinCombat) do
         local entityUuid = toFlag.Guid
         debugPrint("CanJoinCombat?", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), Osi.CanJoinCombat(entityUuid))
+        if entityUuid ~= nil and Brawlers[level][entityUuid] == nil then
+            -- thank u focus
+            if Osi.CanJoinCombat(entityUuid) == 1 then
+                Osi.SetCanJoinCombat(entityUuid, 0)
+                debugPrint("Set CanJoinCombat to 0 for", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+            end
+            if Osi.CanFight(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
+                if not Brawlers[level][entityUuid] then
+                    Brawlers[level][entityUuid] = {}
+                end
+                Brawlers[level][entityUuid].uuid = entityUuid
+                Brawlers[level][entityUuid].displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+                Brawlers[level][entityUuid].entity = Ext.Entity.Get(entityUuid)
+            end
+        end
     end
-    --     if entityUuid ~= nil and Brawlers[level][entityUuid] == nil then
-    --         -- thank u focus
-    --         if Osi.CanJoinCombat(entityUuid) == 1 then
-    --             Osi.SetCanJoinCombat(entityUuid, 0)
-    --             debugPrint("Set CanJoinCombat to 0 for", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
-    --         end
-    --         if Osi.CanFight(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
-    --             if not Brawlers[level][entityUuid] then
-    --                 Brawlers[level][entityUuid] = {}
-    --             end
-    --             Brawlers[level][entityUuid].uuid = entityUuid
-    --             Brawlers[level][entityUuid].displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
-    --             Brawlers[level][entityUuid].entity = Ext.Entity.Get(entityUuid)
-    --         end
-    --     end
-    -- end
     if isRepeating then
         -- Check for units that need to be flagged every CAN_JOIN_COMBAT_INTERVAL ms
         Ext.Timer.WaitFor(CAN_JOIN_COMBAT_INTERVAL, function ()
