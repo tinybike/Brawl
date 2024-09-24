@@ -8,6 +8,8 @@ local CAN_JOIN_COMBAT_INTERVAL = 10000
 local ENTER_COMBAT_RANGE = 20
 local DEBUG_LOGGING = true
 
+-- todo: make it so the player character sprints (instead of running) during combat
+
 local function debugPrint(...)
     if DEBUG_LOGGING then
         print(...)
