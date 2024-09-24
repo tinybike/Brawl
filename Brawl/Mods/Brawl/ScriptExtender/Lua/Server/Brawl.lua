@@ -20,8 +20,6 @@ local function debugDump(...)
     end
 end
 
--- todo: only set combat flag to false RIGHT WHEN combat starts, so it won't fuck w/ the campaign's flow too much
-
 -- thank u hippo
 local function flagCannotJoinCombat(entity)
     return entity.IsCharacter
@@ -114,10 +112,10 @@ local function actOnTarget(entityUuid, targetUuid)
 end
 
 local function pulseAction(level, isRepeating)
-    debugPrint("pulseAction", level, isRepeating, StopPulseAction[level])
+    -- debugPrint("pulseAction", level, isRepeating, StopPulseAction[level])
     if not StopPulseAction[level] then
         for entityUuid, brawler in pairs(Brawlers[level]) do
-            if Osi.CanFight(entityUuid) == 1 then
+            if Osi.IsDead(entityUuid) == 0 and Osi.CanFight(entityUuid) == 1 then
                 if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
                     debugPrint("Already attacking", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
                     actOnTarget(entityUuid, brawler.attackTarget)
@@ -152,7 +150,7 @@ end
 local function pulseCanJoinCombat(level, isRepeating)
     debugPrint("pulseCanJoinCombat", level, isRepeating)
     -- thank u hippo
-    local nearbies = GameUtils.Entity.GetNearby(Osi.GetHostCharacter(), 50)
+    local nearbies = GameUtils.Entity.GetNearby(Osi.GetHostCharacter(), 150)
     local toFlagCannotJoinCombat = {}
     for _, nearby in ipairs(nearbies) do
         if flagCannotJoinCombat(nearby.Entity) then
@@ -161,22 +159,24 @@ local function pulseCanJoinCombat(level, isRepeating)
     end
     for _, toFlag in pairs(toFlagCannotJoinCombat) do
         local entityUuid = toFlag.Guid
-        if entityUuid ~= nil and Brawlers[level][entityUuid] == nil then
-            -- thank u focus
-            if Osi.CanJoinCombat(entityUuid) == 1 then
-                Osi.SetCanJoinCombat(entityUuid, 0)
-                debugPrint("Set CanJoinCombat to 0 for", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
-            end
-            if Osi.CanFight(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
-                if not Brawlers[level][entityUuid] then
-                    Brawlers[level][entityUuid] = {}
-                end
-                Brawlers[level][entityUuid].uuid = entityUuid
-                Brawlers[level][entityUuid].displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
-                Brawlers[level][entityUuid].entity = Ext.Entity.Get(entityUuid)
-            end
-        end
+        debugPrint("CanJoinCombat?", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), Osi.CanJoinCombat(entityUuid))
     end
+    --     if entityUuid ~= nil and Brawlers[level][entityUuid] == nil then
+    --         -- thank u focus
+    --         if Osi.CanJoinCombat(entityUuid) == 1 then
+    --             Osi.SetCanJoinCombat(entityUuid, 0)
+    --             debugPrint("Set CanJoinCombat to 0 for", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)))
+    --         end
+    --         if Osi.CanFight(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
+    --             if not Brawlers[level][entityUuid] then
+    --                 Brawlers[level][entityUuid] = {}
+    --             end
+    --             Brawlers[level][entityUuid].uuid = entityUuid
+    --             Brawlers[level][entityUuid].displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+    --             Brawlers[level][entityUuid].entity = Ext.Entity.Get(entityUuid)
+    --         end
+    --     end
+    -- end
     if isRepeating then
         -- Check for units that need to be flagged every CAN_JOIN_COMBAT_INTERVAL ms
         Ext.Timer.WaitFor(CAN_JOIN_COMBAT_INTERVAL, function ()
@@ -186,7 +186,7 @@ local function pulseCanJoinCombat(level, isRepeating)
 end
 
 local function startPulse(level, isRepeating)
-    pulseCanJoinCombat(level, isRepeating)
+    -- pulseCanJoinCombat(level, isRepeating)
     pulseAction(level, isRepeating)
 end
 
@@ -197,35 +197,76 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         StopPulseAction[level] = false
         startPulse(level, true)
     end)
-    Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
-        debugPrint("Died", entityGuid)
-        Brawlers[Osi.GetRegion(entityGuid)][Osi.GetUUID(entityGuid)] = nil
-        -- Sometimes units don't appear dead when killed out-of-combat...
-        -- this at least makes them lie prone (and dead-appearing units still appear dead)
-        Ext.Timer.WaitFor(1000, function ()
-            Osi.LieOnGround(entityGuid)
-        end)
-    end)
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
         Brawlers[level] = nil
         StopPulseAction[level] = nil
     end)
-    -- Ext.Osiris.RegisterListener("Teleported", 9, "after", function (target, cause, oldX, oldY, oldZ, newX, newY, newZ, spell)
-    --     debugPrint("Teleported", target, cause, oldX, oldY, oldZ, newX, newY, newZ, spell)
-    -- end)
+    Ext.Entity.Subscribe("CombatParticipant", function (entity, _, _)
+        local entityUuid = entity.Uuid.EntityUuid
+        debugPrint("CombatParticipant", entityUuid)
+        if entityUuid ~= nil then
+            local level = Osi.GetRegion(Osi.GetHostCharacter())
+            if Brawlers[level][entityUuid] == nil then
+                local combatGuid = Osi.CombatGetGuidFor(entityUuid)
+                local displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+                if Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
+                    debugPrint("Adding Brawler", entityUuid, displayName)
+                    if not Brawlers[level][entityUuid] then
+                        Brawlers[level][entityUuid] = {}
+                    end
+                    Brawlers[level][entityUuid].uuid = entityUuid
+                    Brawlers[level][entityUuid].displayName = displayName
+                    Brawlers[level][entityUuid].entity = entity
+                    Brawlers[level][entityUuid].combatGuid = combatGuid
+                    Brawlers[level][entityUuid].canJoinCombat = Osi.CanJoinCombat(entityUuid)
+                    Osi.SetCanJoinCombat(entityUuid, 0)
+                end
+            end
+        end
+    end)
+    Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
+        debugPrint("Died", entityGuid)
+        local level = Osi.GetRegion(entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        local combatGuid = nil
+        if Brawlers[level][entityUuid] ~= nil then
+            combatGuid = Brawlers[level][entityUuid].combatGuid
+            Osi.SetCanJoinCombat(entityUuid, Brawlers[level][entityUuid].canJoinCombat)
+        end
+        Brawlers[level][entityUuid] = nil
+        local numBrawlersRemaining = 0
+        for _ in pairs(Brawlers[level]) do
+            numBrawlersRemaining = numBrawlersRemaining + 1
+        end
+        debugPrint("Number of brawlers remaining:", numBrawlersRemaining)
+        debugDump(Brawlers)
+        if combatGuid ~= nil and numBrawlersRemaining == 0 then
+            Osi.EndCombat(combatGuid)
+        end
+        -- Sometimes units don't appear dead when killed out-of-combat...
+        -- this at least makes them lie prone (and dead-appearing units still appear dead)
+        Ext.Timer.WaitFor(1200, function ()
+            Osi.LieOnGround(entityGuid)
+        end)
+    end)
     -- thank u focus
     Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", function (characterGuid, triggerGuid)
         debugPrint("PROC_Subregion_Entered", characterGuid, triggerGuid)
         StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = false
         startPulse(Osi.GetRegion(characterGuid), false)
     end)
-    Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, instanceId)
-        debugPrint("DialogStarted", dialog, instanceId)
+    Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
+        debugPrint("DialogStarted", dialog, dialogInstanceId)
         StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = true
+        local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+        for i = 1, numberOfInvolvedNpcs do
+            local involvedNpcUuid = Osi.DialogGetInvolvedNPC(dialogInstanceId, i)
+            debugPrint("involvedNpcUuid", involvedNpcUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(involvedNpcUuid)), Osi.CanJoinCombat(involvedNpcUuid))
+        end
     end)
-    Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, instanceId)
-        debugPrint("DialogEnded", dialog, instanceId)
+    Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
+        debugPrint("DialogEnded", dialog, dialogInstanceId)
         StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = false
         startPulse(Osi.GetRegion(Osi.GetHostCharacter()), false)
     end)
