@@ -72,9 +72,8 @@ local function actOnTarget(entityUuid, targetUuid)
     local entity = Ext.Entity.Get(entityUuid)
     local actionToTake = nil
     local archetype = Osi.GetActiveArchetype(entityUuid)
-    -- local archetype = Osi.GetBaseArchetype(entityUuid)
-    debugPrint("ServerAiArchetype", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), archetype)
-    debugDump(entity.ServerAiArchetype)
+    -- debugPrint("ServerAiArchetype", entityUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid)), archetype)
+    -- debugDump(entity.ServerAiArchetype)
     -- melee units should just autoattack sometimes
     if archetype == "melee" then
         local autoAttackRand = math.random()
@@ -268,8 +267,9 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
         debugPrint("DialogEnded", dialog, dialogInstanceId)
-        StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = false
-        startPulse(Osi.GetRegion(Osi.GetHostCharacter()), false)
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
+        StopPulseAction[level] = false
+        startPulse(level, false)
     end)
 end)
 
