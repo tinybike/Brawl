@@ -1,9 +1,11 @@
 local GameUtils = Require("Hlib/GameUtils")
 
 Brawlers = {}
+Players = {}
 StopPulseAction = {}
 
-local ACTION_INTERVAL = 2500
+local ACTION_INTERVAL = 6000
+local GLOBAL_COOLDOWN_INTERVAL = 2500
 local CAN_JOIN_COMBAT_INTERVAL = 10000
 local ENTER_COMBAT_RANGE = 20
 local DEBUG_LOGGING = true
@@ -112,6 +114,47 @@ local function actOnTarget(entityUuid, targetUuid)
     Osi.UseSpell(entityUuid, actionToTake.OriginatorPrototype, targetUuid)
 end
 
+local function globalCooldownOnTarget(entityUuid, targetUuid)
+    -- other stuff goes here...
+    Osi.CharacterMoveTo(entityUuid, targetUuid, "Sprint", "ignore")
+end
+
+-- for harmless stuff that isn't an "action" or "bonus action", like repositioning etc.
+local function pulseGlobalCooldown(level, isRepeating)
+    if not StopPulseAction[level] then
+        for entityUuid, brawler in pairs(Brawlers[level]) do
+            if Osi.IsDead(entityUuid) == 0 and Osi.CanFight(entityUuid) == 1 then
+                if brawler.attackTarget ~= nil and Osi.IsDead(brawler.attackTarget) == 0 then
+                    debugPrint("GCD continuation", brawler.displayName, entityUuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.attackTarget)))
+                    globalCooldownOnTarget(entityUuid, brawler.attackTarget)
+                else
+                    local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(entityUuid)
+                    debugPrint("GCD Closest alive player to", brawler.entityUuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
+                    if closestDistance < ENTER_COMBAT_RANGE then
+                        local playersSortedByDistance = getPlayersSortedByDistance(entityUuid)
+                        for _, pair in ipairs(playersSortedByDistance) do
+                            local playerUuid, distance = pair[1], pair[2]
+                            -- if Osi.CanSee(entityUuid, playerUuid) == 1 then
+                            if Osi.IsInvisible(playerUuid) == 0 then -- also check for hidden?
+                                debugPrint("GCD", brawler.displayName, entityUuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(playerUuid)))
+                                brawler.attackTarget = playerUuid
+                                globalCooldownOnTarget(entityUuid, playerUuid)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if isRepeating then
+        -- Check for nearby unit actions every ACTION_INTERVAL ms
+        Ext.Timer.WaitFor(GLOBAL_COOLDOWN_INTERVAL, function ()
+            pulseGlobalCooldown(level, true)
+        end)
+    end
+end
+
 local function pulseAction(level, isRepeating)
     -- debugPrint("pulseAction", level, isRepeating, StopPulseAction[level])
     if not StopPulseAction[level] then
@@ -187,15 +230,24 @@ end
 
 local function startPulse(level, isRepeating)
     -- pulseCanJoinCombat(level, isRepeating)
+    -- pulseGlobalCooldown(level, isRepeating)
     pulseAction(level, isRepeating)
+end
+
+local function onStarted(level)
+    for _, player in pairs(Osi.DB_Players:Get(nil)) do
+        local playerUuid = Osi.GetUUID(player[1])
+        Players[playerUuid] = {}
+    end
+    Brawlers[level] = {}
+    StopPulseAction[level] = false
+    startPulse(level, true)
 end
 
 Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", function (level, _)
         debugPrint("LevelGameplayStarted", level)
-        Brawlers[level] = {}
-        StopPulseAction[level] = false
-        startPulse(level, true)
+        onStarted(level)
     end)
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
@@ -225,6 +277,20 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             end
         end
     end)
+    Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", function (entityGuid, _)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid ~= nil and Osi.IsPlayer(entityUuid) == 1 then
+            local entity = Ext.Entity.Get(entityUuid)
+            if not Players[entityUuid] then
+                Players[entityUuid] = {}
+            end
+            Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
+            entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
+        end
+    end)
+    Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function (combatGuid)
+        debugPrint("Combat ended", combatGuid)
+    end)
     Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
         debugPrint("Died", entityGuid)
         local level = Osi.GetRegion(entityGuid)
@@ -242,7 +308,11 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         debugPrint("Number of brawlers remaining:", numBrawlersRemaining)
         debugDump(Brawlers)
         if combatGuid ~= nil and numBrawlersRemaining == 0 then
-            Osi.EndCombat(combatGuid)
+            -- Osi.EndCombat(combatGuid)
+            for playerUuid, player in pairs(Players) do
+                local entity = Ext.Entity.Get(playerUuid)
+                entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
+            end
         end
         -- Sometimes units don't appear dead when killed out-of-combat...
         -- this at least makes them lie prone (and dead-appearing units still appear dead)
@@ -260,11 +330,11 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
         StopPulseAction[Osi.GetRegion(Osi.GetHostCharacter())] = true
-        local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-        for i = 1, numberOfInvolvedNpcs do
-            local involvedNpcUuid = Osi.DialogGetInvolvedNPC(dialogInstanceId, i)
-            debugPrint("involvedNpcUuid", involvedNpcUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(involvedNpcUuid)), Osi.CanJoinCombat(involvedNpcUuid))
-        end
+        -- local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+        -- for i = 1, numberOfInvolvedNpcs do
+        --     local involvedNpcUuid = Osi.DialogGetInvolvedNPC(dialogInstanceId, i)
+        --     debugPrint("involvedNpcUuid", involvedNpcUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(involvedNpcUuid)), Osi.CanJoinCombat(involvedNpcUuid))
+        -- end
     end)
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
         debugPrint("DialogEnded", dialog, dialogInstanceId)
@@ -276,8 +346,5 @@ end)
 
 Ext.Events.ResetCompleted:Subscribe(function ()
     print("ResetCompleted")
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
-    Brawlers[level] = {}
-    StopPulseAction[level] = false
-    startPulse(level, true)
+    onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end)
