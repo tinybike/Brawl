@@ -17,8 +17,8 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 - Player fight stance vfx: unimplemented
 - Enemy death vfx: band-aided / fixed to the casual observer...
 - Enemy AI: usable but very simplistic (see below)
-- Companion AI: unimplemented
-- Tracking/targeting assist: unimplemented
+- Companion AI: usable but very simplistic (see below)
+- Tracking/targeting assist: unimplemented, but [this mod](https://www.nexusmods.com/baldursgate3/mods/10445) helps a ton
 - Multiple attacks: unimplemented
 - Initiative: unimplemented
 - Haste: unimplemented
@@ -29,10 +29,18 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 
 Many people have commented that combat seems really imbalanced, which is 100% true!  Right now, I'm just trying to see if this system fundamentally works, or if there are show-stoppers that would make RTwP impossible in BG3.  (Among other things, it's definitely true that the enemies attack too quickly in the demo videos...)
 
-The main challenge right now is that the built-in BG3 combat AI is only accessible during normal turn-based combat.  Just to test things out, I'm using a simple randomizer to decide among the enemy units' available actions, spells, etc, but this won't work well for more complicated encounters.  I'm currently digging through the Osiris APIs and Larian's goals (scripts) looking for a way to poll the built-in AI ("what would you do, hypothetically, in this situation?") outside of turn-based combat.  If anyone knows about this, please look me up on Discord (@tinybike, am in both the official Larian and the "secret" unlocked toolkit Discord) -- this stuff is mostly undocumented so it's a bit of a bear to sort through.
+The main challenge right now is that the built-in BG3 combat AI is only accessible during normal turn-based combat.  Just to test things out, I'm using some simple handrolled "AI" logic, but I suspect this won't work well for more complicated encounters.  I'm currently digging through the Osiris APIs and Larian's goals (scripts) looking for a way to poll the built-in AI ("what would you do, hypothetically, in this situation?") outside of turn-based combat.  If anyone knows about this, please look me up on Discord (@tinybike, am in both the official Larian and the "secret" unlocked toolkit Discord) -- this stuff is mostly undocumented so it's a bit of a bear to sort through.
 
 ## Videos
 
+### 1) Basic Combat
+
 [![Real time combat test (Baldur's Gate 3)](https://img.youtube.com/vi/nEBW4qIW28c/0.jpg)](https://www.youtube.com/watch?v=nEBW4qIW28c)
 
+### 2) Pausing, Dialogue, and Reactions
+
 [![Real time combat test 2 (Baldur's Gate 3)](https://img.youtube.com/vi/ikxgAcxSv50/0.jpg)](https://www.youtube.com/watch?v=ikxgAcxSv50)
+
+### 3) Companions and Timers
+
+[![Real time combat test 3 (Baldur's Gate 3)](https://img.youtube.com/vi/C0FBQknd0mU/0.jpg)](https://www.youtube.com/watch?v=C0FBQknd0mU)
