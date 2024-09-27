@@ -1,7 +1,7 @@
 Brawlers = {}
 Players = {}
-StopPulseReposition = {}
-StopPulseAction = {}
+PulseRepositions = {}
+PulseActions = {}
 PlayerCurrentTarget = nil
 BrawlActive = false
 
@@ -72,6 +72,8 @@ function dumpAllEntityKeys()
         print(k)
     end
 end
+
+local function noop(_) end
 
 local function getCurrentHp(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
@@ -222,8 +224,8 @@ local function actOnTarget(brawler, targetUuid)
             end
         end
         actionToTake = usableSpells[math.random(1, numUsableSpells)]
-        debugPrint("Action to take:")
-        debugDump(actionToTake)
+        -- debugPrint("Action to take:")
+        -- debugDump(actionToTake)
     end
     if actionToTake == nil then
         return Osi.Attack(brawler.uuid, targetUuid, 0)
@@ -236,7 +238,7 @@ local function getBrawlersSortedByDistance(entityUuid)
     local level = Osi.GetRegion(entityUuid)
     for brawlerUuid, brawler in pairs(Brawlers[level]) do
         if isAliveAndCanFight(brawlerUuid) then
-            debugPrint("distance:", brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid))
+            -- debugPrint("distance:", brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid))
             table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
         end
     end
@@ -258,46 +260,67 @@ end
 
 -- Brawlers doing dangerous stuff
 local function pulseAction(brawler)
-    if not StopPulseAction[brawler.uuid] then
-        -- Brawler is alive and able to fight: let's go!
-        if isAliveAndCanFight(brawler.uuid) then
-            -- Doesn't currently have an attack target, so let's find one
-            if brawler.targetUuid == nil then
-                findTargetToAttack(brawler)
-            else
-                -- Already attacking a target and the target isn't dead, so just keep at it
-                if isAliveAndCanFight(brawler.targetUuid) then
-                    debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.targetUuid)))
-                    actOnTarget(brawler, brawler.targetUuid)
-                -- Has an attack target but it's already dead or unable to fight, so find a new one
-                else
-                    brawler.targetUuid = nil
-                    findTargetToAttack(brawler)
-                end
-            end
-        -- If this brawler is dead or unable to fight, stop this pulse
+    -- Brawler is alive and able to fight: let's go!
+    if brawler and brawler.uuid and isAliveAndCanFight(brawler.uuid) then
+        -- Doesn't currently have an attack target, so let's find one
+        if brawler.targetUuid == nil then
+            findTargetToAttack(brawler)
         else
-            brawler.isInBrawl = false
-            StopPulseAction[brawler.uuid] = true
+            -- Already attacking a target and the target isn't dead, so just keep at it
+            if isAliveAndCanFight(brawler.targetUuid) then
+                -- debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(brawler.targetUuid)))
+                actOnTarget(brawler, brawler.targetUuid)
+            -- Has an attack target but it's already dead or unable to fight, so find a new one
+            else
+                brawler.targetUuid = nil
+                findTargetToAttack(brawler)
+            end
         end
-        -- Check for actions every ACTION_INTERVAL ms
-        Ext.Timer.WaitFor(ACTION_INTERVAL, function ()
-            pulseAction(brawler)
-        end)
+    -- If this brawler is dead or unable to fight, stop this pulse
+    else
+        -- debugPrint("Calling stopPulseAction...")
+        -- debugDump(brawler)
+        stopPulseAction(brawler)
+    end
+end
+
+-- "edd4c1c0-422f-82de-1b22-4a3d734da5c8" :                                                      {                                                                                                     "isActive" : false,                                                                        
+
+local function startPulseAction(brawler)
+    if brawler and brawler.uuid then
+        brawler.isInBrawl = true
+        PulseActions[brawler.uuid] = {isActive = true, pulse = pulseAction}
+        Ext.Timer.WaitFor(0, function ()
+            -- debugPrint("calling pulseaction timeout")
+            -- debugDump(brawler)
+            -- debugDump(PulseActions)
+            if brawler and brawler.uuid and PulseActions[brawler.uuid] and PulseActions[brawler.uuid].pulse then
+                debugDump(PulseActions[brawler.uuid])
+                debugDump(PulseActions[brawler.uuid].pulse)
+                PulseActions[brawler.uuid].pulse(brawler)
+            end
+        end, ACTION_INTERVAL)
+    end
+end
+
+local function stopPulseAction(brawler)
+    if brawler and brawler.uuid then
+        brawler.isInBrawl = false
+        PulseActions[brawler.uuid] = {isActive = false, pulse = noop}
     end
 end
 
 local function moveIntoRangedSweetSpot(brawlerUuid, targetUuid, distance)
     local xEntity, yEntity, zEntity = Osi.GetPosition(brawlerUuid)
     local xTarget, yTarget, zTarget = Osi.GetPosition(targetUuid)
-    debugPrint("Ranged/caster unit wrong distance from target", distance, xTarget, yTarget, zTarget)
+    -- debugPrint("Ranged/caster unit wrong distance from target", distance, xTarget, yTarget, zTarget)
     local ux = (xEntity - xTarget)/distance
     local uy = (yEntity - yTarget)/distance
     local uz = (zEntity - zTarget)/distance
     local xNew = xTarget + ux*RANGED_RANGE_SWEETSPOT
     local yNew = yTarget + uy*RANGED_RANGE_SWEETSPOT
     local zNew = zTarget + uz*RANGED_RANGE_SWEETSPOT
-    debugPrint("Moving into the sweet spot", brawlerUuid, xNew, yNew, zNew)
+    -- debugPrint("Moving into the sweet spot", brawlerUuid, xNew, yNew, zNew)
     Osi.CharacterMoveToPosition(brawlerUuid, xNew, yNew, zNew, getMovementSpeed(brawlerUuid), "")
 end
 
@@ -334,9 +357,8 @@ local function checkForBrawlToJoin(brawler)
             -- NB: also check for farther-away units where there's a nearby brawl happening already? hidden? line-of-sight?
             if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and Osi.IsInvisible(targetUuid) == 0 and distance < ENTER_COMBAT_RANGE then
                 -- debugPrint("Reposition", brawler.displayName, brawler.uuid, distance, "->", Osi.ResolveTranslatedString(Osi.GetDisplayName(targetUuid)))
-                brawler.isInBrawl = true
-                StopPulseAction[brawler.uuid] = false
-                return pulseAction(brawler, true)
+                BrawlActive = true
+                return startPulseAction(brawler)
             end
         end
     end
@@ -347,8 +369,13 @@ local function isBrawlingWithValidTarget(brawler)
 end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl!
-local function pulseReposition(level, isRepeating)
-    if not StopPulseReposition[level] and Brawlers[level] then
+local function pulseReposition(level)
+    if not Brawlers[level] then
+        -- How is this even possible? :/
+        debugPrint("How did we end up here?", level)
+        debugDump(Brawlers)
+        initBrawlers(level)
+    else
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             if isAliveAndCanFight(brawlerUuid) then
                 -- Enemy units are actively looking for a fight and will attack if you get too close to them
@@ -362,24 +389,21 @@ local function pulseReposition(level, isRepeating)
                 -- Player, ally, and neutral units are not actively looking for a fight
                 -- Companions and allies use the same logic
                 -- (Neutrals do nothing I guess...?)
-                elseif BrawlActive and isPlayerOrAlly(brawlerUuid) and not StopPulseAction[brawlerUuid] then
+                elseif BrawlActive and isPlayerOrAlly(brawlerUuid) then
                     if not Players[brawlerUuid] then
                         debugPrint("Late addition to the team (who is this?)", brawlerUuid)
-                        Players[brawlerUuid] = {
-                            uuid = uuid,
-                            isControllingDirectly = false,
-                            isInBrawl = false,
-                        }
+                        Players[brawlerUuid] = {uuid = brawlerUuid, isControllingDirectly = false, isInBrawl = false}
                     end
                     local partyMember = Players[brawlerUuid]
                     if partyMember.isControllingDirectly then
-                        brawler.isInBrawl = false
-                        StopPulseAction[brawlerUuid] = true
+                        debugPrint("stopping is controlling")
+                        debugDump(brawler)
+                        stopPulseAction(brawler)
                     else
-                        StopPulseAction[brawlerUuid] = false
                         if not brawler.isInBrawl then
-                            brawler.isInBrawl = true
-                            pulseAction(brawler)
+                            debugPrint("not in brawl, starting")
+                            debugDump(brawler)
+                            startPulseAction(brawler)
                         elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
                             debugPrint("Reposition party member", brawlerUuid)
                             repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
@@ -389,12 +413,23 @@ local function pulseReposition(level, isRepeating)
             end
         end
     end
-    if isRepeating then
-        -- Reposition if needed every REPOSITION_INTERVAL ms
-        Ext.Timer.WaitFor(REPOSITION_INTERVAL, function ()
-            pulseReposition(level, true)
-        end)
-    end
+end
+
+-- Reposition if needed every REPOSITION_INTERVAL ms
+local function startPulseReposition(level)
+    PulseRepositions[level] = {isActive = true, pulse = pulseReposition}
+    Ext.Timer.WaitFor(0, function ()
+        PulseRepositions[level].pulse(level)
+    end, REPOSITION_INTERVAL)
+end
+
+local function stopPulseReposition(level)
+    PulseRepositions[level] = {isActive = false, pulse = noop}
+end
+
+local function initBrawlers(level)
+    Brawlers[level] = {}
+    startPulseReposition(level)
 end
 
 local function onStarted(level)
@@ -406,92 +441,124 @@ local function onStarted(level)
             isControllingDirectly = uuid == Osi.GetHostCharacter(),
         }
     end
-    Brawlers[level] = {}
-    StopPulseReposition[level] = false
     PlayerCurrentTarget = nil
-    pulseReposition(level, true)
+    initBrawlers(level)
+end
+
+local function addBrawler(entityUuid)
+    if entityUuid ~= nil then
+        local level = Osi.GetRegion(entityUuid)
+        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil then
+            local combatGuid = Osi.CombatGetGuidFor(entityUuid)
+            local displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+            -- if Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
+            if Osi.IsDead(entityUuid) == 0 then
+                debugPrint("Adding Brawler", entityUuid, displayName)
+                local entity = Ext.Entity.Get(entityUuid)
+                Brawlers[level][entityUuid] = {
+                    uuid = entityUuid,
+                    displayName = displayName,
+                    entity = entity,
+                    combatGuid = combatGuid,
+                    isInBrawl = false,
+                    originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
+                }
+                -- Remove the CanJoinCombat flag from all non-player units (even allies)
+                if Osi.IsPlayer(entityUuid) == 0 then
+                    Osi.SetCanJoinCombat(entityUuid, 0)
+                elseif Players[entityUuid] then
+                    -- if not Players[entityUuid] then
+                    --     Players[entityUuid] = {
+                    --         uuid = entityUuid,
+                    --         isControllingDirectly = uuid == Osi.GetHostCharacter(),
+                    --     }
+                    -- end
+                    if Players[entityUuid].movementSpeedRun == nil then
+                        Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
+                    end
+                    entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
+                end
+            end
+        end
+    end
+end
+
+local function removeBrawler(level, entityUuid)
+    local combatGuid = nil
+    if Brawlers[level][entityUuid] ~= nil then
+        combatGuid = Brawlers[level][entityUuid].combatGuid
+        Osi.SetCanJoinCombat(entityUuid, Brawlers[level][entityUuid].originalCanJoinCombat)
+    end
+    Brawlers[level][entityUuid] = nil
+    local numBrawlersRemaining = 0
+    for _ in pairs(Brawlers[level]) do
+        numBrawlersRemaining = numBrawlersRemaining + 1
+    end
+    -- todo: only count ENEMY brawlers here
+    debugPrint("Number of brawlers remaining:", numBrawlersRemaining)
+    debugDump(Brawlers)
+    if combatGuid ~= nil and numBrawlersRemaining == 0 then
+        resetPlayersMovementSpeed()
+        BrawlActive = false
+    end
+end
+
+local function resetPlayersMovementSpeed()
+    for playerUuid, player in pairs(Players) do
+        local entity = Ext.Entity.Get(playerUuid)
+        if player.movementSpeedRun ~= nil then
+            entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
+        end
+    end
 end
 
 Ext.Events.SessionLoaded:Subscribe(function ()
 
     -- NB: limit this by distance or smth? lots of units in the main regions...
     Ext.Entity.Subscribe("CombatParticipant", function (entity, _, _)
-        local entityUuid = entity.Uuid.EntityUuid
-        -- debugPrint("CombatParticipant", entityUuid)
-        if entityUuid ~= nil then
-            local level = Osi.GetRegion(Osi.GetHostCharacter())
-            if Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil then
-                local combatGuid = Osi.CombatGetGuidFor(entityUuid)
-                local displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
-                -- if Osi.IsDead(entityUuid) == 0 and Osi.IsEnemy(entityUuid, Osi.GetHostCharacter()) == 1 then
-                if Osi.IsDead(entityUuid) == 0 then
-                    debugPrint("Adding Brawler", entityUuid, displayName)
-                    Brawlers[level][entityUuid] = {
-                        uuid = entityUuid,
-                        displayName = displayName,
-                        entity = entity,
-                        combatGuid = combatGuid,
-                        isInBrawl = false,
-                        originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
-                    }
-                    -- Remove the CanJoinCombat flag from all non-player units (even allies)
-                    if Osi.IsPlayer(entityUuid) == 0 then
-                        Osi.SetCanJoinCombat(entityUuid, 0)
-                    end
-                end
-            end
-        end
+        addBrawler(entity.Uuid.EntityUuid)
     end)
 
     Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function (combatGuid)
         BrawlActive = true
+        -- do we need this?  will probably cause story-related problems or at least awkwardness :/
         Ext.Timer.WaitFor(2000, function ()
             Osi.EndCombat(combatGuid)
         end)
     end)
 
-    Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", function (entityGuid, _)
+    Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", function (entityGuid)
+        debugPrint("EnteredForceTurnBased", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        if entityUuid ~= nil and Osi.IsPlayer(entityUuid) == 1 then
-            local entity = Ext.Entity.Get(entityUuid)
-            if not Players[entityUuid] then
-                Players[entityUuid] = {
-                    uuid = entityUuid,
-                    isControllingDirectly = uuid == Osi.GetHostCharacter(),
-                }
-            end
-            Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
-            entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
+        local level = Osi.GetRegion(entityUuid)
+        if Brawlers[level] and Brawlers[level][entityUuid] then
+            stopPulseAction(Brawlers[level][entityUuid])
         end
+    end)
+
+    Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", function (entityGuid)
+        debugPrint("LeftForceTurnBased", entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        local level = Osi.GetRegion(entityUuid)
+        if Brawlers[level] and Brawlers[level][entityUuid] and not PulseActions[entityUuid].isActive then
+            startPulseAction(Brawlers[level][entityUuid])
+        end
+    end)
+
+    Ext.Osiris.RegisterListener("TurnEnded", 1, "after", function (entityGuid)
+        debugPrint("TurnEnded", entityGuid)
     end)
 
     Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
         debugPrint("Died", entityGuid)
         local level = Osi.GetRegion(entityGuid)
+        if level == nil then
+            level = Osi.GetRegion(Osi.GetHostCharacter())
+        end    
         local entityUuid = Osi.GetUUID(entityGuid)
         local combatGuid = nil
         if Brawlers[level] ~= nil then
-            if Brawlers[level][entityUuid] ~= nil then
-                combatGuid = Brawlers[level][entityUuid].combatGuid
-                Osi.SetCanJoinCombat(entityUuid, Brawlers[level][entityUuid].originalCanJoinCombat)
-            end
-            Brawlers[level][entityUuid] = nil
-            local numBrawlersRemaining = 0
-            for _ in pairs(Brawlers[level]) do
-                numBrawlersRemaining = numBrawlersRemaining + 1
-            end
-            debugPrint("Number of brawlers remaining:", numBrawlersRemaining)
-            debugDump(Brawlers)
-            if combatGuid ~= nil and numBrawlersRemaining == 0 then
-                for playerUuid, player in pairs(Players) do
-                    local entity = Ext.Entity.Get(playerUuid)
-                    if player.movementSpeedRun ~= nil then
-                        entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
-                    end
-                    PlayerCurrentTarget = nil
-                    BrawlActive = false
-                end
-            end
+            removeBrawler(level, entityUuid)
             -- Sometimes units don't appear dead when killed out-of-combat...
             -- this at least makes them lie prone (and dead-appearing units still appear dead)
             Ext.Timer.WaitFor(1200, function ()
@@ -509,17 +576,52 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("AttackedBy", 7, "after", function (defenderGuid, attackerGuid, attacker2Guid, damageType, damageAmount, damageCause, storyActionID)
-        local level = Osi.GetRegion(Osi.GetHostCharacter())
+        local level = Osi.GetRegion(defenderGuid)
         local defenderUuid = Osi.GetUUID(defenderGuid)
         local attackerUuid = Osi.GetUUID(attackerGuid)
+        BrawlActive = true
         if Osi.IsPlayer(attackerUuid) == 1 then
             PlayerCurrentTarget = defenderUuid
+        end
+        if Brawlers[level] then
+            if not Brawlers[level][defenderUuid] then
+                addBrawler(defenderUuid)
+                brawler = Brawlers[level][defenderUuid]
+                brawler.isInBrawl = true
+                debugDump(brawler)
+                debugDump(Players[defenderUuid])
+                if not Players[defenderUuid] or (Players[defenderUuid] and not Players[defenderUuid].isActivelyControlling) then
+                    brawler.targetUuid = attackerUuid
+                    if not PulseActions[brawler.uuid] or not PulseActions[brawler.uuid].isActive then
+                        startPulseAction(brawler)
+                    end
+                end
+            end
+            if not Brawlers[level][attackerUuid] then
+                addBrawler(attackerUuid)
+                local brawler = Brawlers[level][attackerUuid]
+                brawler.isInBrawl = true
+                debugDump(brawler)
+                debugDump(Players[attackerUuid])
+                if not Players[attackerUuid] or (Players[attackerUuid] and not Players[attackerUuid].isActivelyControlling) then
+                    brawler.targetUuid = defenderUuid
+                    if not PulseActions[brawler.uuid] or not PulseActions[brawler.uuid].isActive then
+                        startPulseAction(brawler)
+                    end
+                end
+            end
+        else
+            -- How is this even possible? :/
+            debugPrint("Whither this nonsense?", level)
+            debugDump(Brawlers)
+            initBrawlers(level)
         end
     end)
 
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
-        StopPulseReposition[Osi.GetRegion(Osi.GetHostCharacter())] = true
+        stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
+        BrawlActive = false
         PlayerCurrentTarget = nil
         -- local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
         -- for i = 1, numberOfInvolvedNpcs do
@@ -530,19 +632,15 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
         debugPrint("DialogEnded", dialog, dialogInstanceId)
-        local level = Osi.GetRegion(Osi.GetHostCharacter())
-        StopPulseReposition[level] = false
         PlayerCurrentTarget = nil
-        pulseReposition(level, false)
+        startPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
     end)
 
     -- thank u focus
     Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", function (characterGuid, _)
         debugPrint("PROC_Subregion_Entered", characterGuid)
-        local level = Osi.GetRegion(characterGuid)
-        StopPulseReposition[level] = false
         PlayerCurrentTarget = nil
-        pulseReposition(level, false)
+        pulseReposition(Osi.GetRegion(characterGuid))
     end)
 
     Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", function (level, _)
@@ -553,8 +651,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", function (level)
         debugPrint("LevelUnloading", level)
         Brawlers[level] = nil
-        StopPulseReposition[level] = nil
         PlayerCurrentTarget = nil
+        stopPulseReposition(level)
     end)
 end)
 
