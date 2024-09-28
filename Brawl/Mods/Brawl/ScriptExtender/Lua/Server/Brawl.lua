@@ -8,7 +8,8 @@ MELEE_RANGE = 1.5
 RANGED_RANGE_MAX = 25
 RANGED_RANGE_SWEETSPOT = 10
 RANGED_RANGE_MIN = 5
-MAX_COMPANION_DISTANCE_FROM_PLAYER = 30
+MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
+BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 USABLE_COMPANION_SPELLS = {
@@ -54,10 +55,10 @@ USABLE_COMPANION_SPELLS = {
 -- NB: Is "Dash" different from "Sprint"?
 PLAYER_MOVEMENT_SPEED_DEFAULT = {Dash = 6.0, Sprint = 6.0, Run = 3.75, Walk = 2.0, Stroll = 1.4}
 MOVEMENT_SPEED_THRESHOLDS = {
-    HONOUR = {Sprint = 10, Run = 6, Walk = 3},
-    HARD = {Sprint = 12, Run = 8, Walk = 5},
-    MEDIUM = {Sprint = 15, Run = 9, Walk = 5},
-    EASY = {Sprint = 18, Run = 10, Walk = 7},
+    HONOUR = {Sprint = 5, Run = 2, Walk = 1},
+    HARD = {Sprint = 6, Run = 4, Walk = 2},
+    MEDIUM = {Sprint = 8, Run = 5, Walk = 3},
+    EASY = {Sprint = 12, Run = 9, Walk = 6},
 }
 
 -- State
@@ -65,6 +66,7 @@ Brawlers = {}
 Players = {}
 PulseRepositionTimers = {}
 PulseActionTimers = {}
+BrawlFizzler = {}
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
 PlayerCurrentTarget = nil
@@ -169,6 +171,8 @@ end
 
 function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
+    -- local xValid, yValid, zValid = Osi.FindValidPosition(x, y, z, 10, moverUuid, 1)
+    -- debugPrint("moveToDist", x, y, z, xValid, yValid, zValid)
     Osi.CharacterMoveToPosition(moverUuid, x, y, z, getMovementSpeed(moverUuid), "")
 end
 
@@ -225,34 +229,28 @@ end
 -- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
 -- (automove using UseSpell/Attack only uses the fastest possible movement speed)
 function moveThenAct(attackerUuid, targetUuid, spell)
-    -- if Players[attackerUuid] == nil or Players[attackerUuid].isDirectlyControlling == false then
-        local targetRadius = Ext.Stats.Get(spell).TargetRadius
-        debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
-        debugDump(Players[attackerUuid])
-        -- debugPrint(Players[attackerUuid].isDirectlyControlling, Players[attackerUuid].isDirectlyControlling == false)
-        if targetRadius == "MeleeMainWeaponRange" then
-            Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-        else
-            local targetRadiusNumber = tonumber(targetRadius)
-            if targetRadiusNumber ~= nil then
-                local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-                if distanceToTarget > targetRadiusNumber then
-                    debugPrint("moveThenAct distance > targetRadius, moving to...")
-                    moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-                end
+    local targetRadius = Ext.Stats.Get(spell).TargetRadius
+    debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
+    debugDump(Players[attackerUuid])
+    -- debugPrint(Players[attackerUuid].isDirectlyControlling, Players[attackerUuid].isDirectlyControlling == false)
+    if targetRadius == "MeleeMainWeaponRange" then
+        Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    else
+        local targetRadiusNumber = tonumber(targetRadius)
+        if targetRadiusNumber ~= nil then
+            local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+            if distanceToTarget > targetRadiusNumber then
+                debugPrint("moveThenAct distance > targetRadius, moving to...")
+                moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
             end
         end
-        debugPrint("moveThenAct UseSpell", attackerUuid, spell, targetUuid)
-        Osi.UseSpell(attackerUuid, spell, targetUuid)
-    -- else
-    --     debugPrint("actively controlling, skipping action...")
-    --     debugDump(Players)
-    -- end
+    end
+    debugPrint("moveThenAct UseSpell", attackerUuid, spell, targetUuid)
+    Osi.UseSpell(attackerUuid, spell, targetUuid)
 end
 
 -- NB: create a better system than this lol
 function actOnTarget(brawler, targetUuid)
-    BrawlActive = true
     local brawlerEntity = Ext.Entity.Get(brawler.uuid)
     local actionToTake = nil
     local archetype = Osi.GetActiveArchetype(brawler.uuid)
@@ -596,17 +594,27 @@ function getNumEnemiesRemaining(level)
     return numEnemiesRemaining
 end
 
+function stopBrawlFizzler(level)
+    if BrawlFizzler[level] ~= nil then
+        debugPrint("Something happened, stopping brawl fizzler...")
+        Ext.Timer.Cancel(BrawlFizzler[level])
+    end
+end
+
 function endBrawl(level)
     BrawlActive = false
     for brawlerUuid, brawler in pairs(Brawlers[level]) do
+        stopPulseAction(brawler)
         if Osi.IsPlayer(brawlerUuid) == 0 then
             Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
         end
+        Osi.FlushOsirisQueue(brawlerUuid)
     end
     debugPrint("Ended brawl")
     debugDump(Brawlers[level])
     resetPlayersMovementSpeed()
     Brawlers[level] = {}
+    stopBrawlFizzler(level)
 end
 
 function checkForEndOfBrawl(level)
@@ -615,7 +623,6 @@ function checkForEndOfBrawl(level)
     debugDump(Brawlers)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
-        initBrawlers(level)
     end
 end
 
@@ -663,6 +670,14 @@ function onStarted(level)
     debugDump(Players)
 end
 
+function startBrawlFizzler(level)
+    stopBrawlFizzler(level)
+    BrawlFizzler[level] = Ext.Timer.WaitFor(BRAWL_FIZZLER_TIMEOUT, function ()
+        debugPrint("Brawl fizzled", BRAWL_FIZZLER_TIMEOUT)
+        endBrawl(level)
+    end)
+end
+
 Ext.Events.SessionLoaded:Subscribe(function ()
 
     -- initiative: highest rolls go ASAP, everyone else gets a delay to their pulseAction initial timer?
@@ -686,8 +701,10 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         for playerUuid, player in pairs(Players) do
             addBrawler(playerUuid)
         end
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
         debugDump(Brawlers)
         BrawlActive = true
+        startBrawlFizzler(level)
         Ext.Timer.WaitFor(500, function ()
             addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
             Ext.Timer.WaitFor(1500, function ()
@@ -717,6 +734,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                 stopPulseAction(Brawlers[level][playerUuid])
             end
         end
+        stopBrawlFizzler(level)
+        Osi.FlushOsirisQueue(entityUuid)
         -- NB: should we just force a "normal" enemy turn here...?
         -- for brawlerUuid, brawler in pairs(Brawlers[level]) do
         --     if brawler.isInBrawl then
@@ -730,13 +749,18 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", function (entityGuid)
         debugPrint("LeftForceTurnBased", entityGuid)
-        local entityUuid = Osi.GetUUID(entityGuid)
-        local level = Osi.GetRegion(entityUuid)
-        local brawler = Brawlers[level][entityUuid]
-        if brawler ~= nil then
-            brawler.isPaused = false
-            if brawler.isInBrawl then
-                startPulseAction(brawler)
+        if BrawlActive then
+            local entityUuid = Osi.GetUUID(entityGuid)
+            local level = Osi.GetRegion(entityUuid)
+            startBrawlFizzler(level)
+            if Brawlers[level] ~= nil then
+                local brawler = Brawlers[level][entityUuid]
+                if brawler ~= nil then
+                    brawler.isPaused = false
+                    if brawler.isInBrawl then
+                        startPulseAction(brawler)
+                    end
+                end
             end
         end
     end)
@@ -767,6 +791,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (targetGuid)
         debugPrint("GainedControl", targetGuid)
         local targetUuid = Osi.GetUUID(targetGuid)
+        Osi.FlushOsirisQueue(targetUuid)
         for playerUuid, player in pairs(Players) do
             player.isControllingDirectly = playerUuid == targetUuid
         end
@@ -784,22 +809,31 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("AttackedBy", 7, "after", function (defenderGuid, attackerGuid, _, _, _, _, _)
-        addBrawler(Osi.GetUUID(defenderGuid))
-        addBrawler(Osi.GetUUID(attackerGuid))
-        -- BrawlActive = true
-        -- if Osi.IsPlayer(attackerGuid) == 1 then
-        --     PlayerCurrentTarget = Osi.GetUUID(defenderGuid)
-        -- end
+        BrawlActive = true
+        local attackerUuid = Osi.GetUUID(attackerGuid)
+        local defenderUuid = Osi.GetUUID(defenderGuid)
+        addBrawler(attackerUuid)
+        addBrawler(defenderUuid)
+        if Osi.IsPlayer(attackerUuid) == 1 then
+            -- PlayerCurrentTarget = Osi.GetUUID(defenderGuid)
+            addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
+        end
+        if Osi.IsPlayer(defenderUuid) == 1 then
+            addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
+        end
+        startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end)
 
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
-        local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-        for i = 1, numberOfInvolvedNpcs do
-            addBrawler(Osi.DialogGetInvolvedNPC(dialogInstanceId, i))
-        end
+        -- local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+        -- for i = 1, numberOfInvolvedNpcs do
+        --     addBrawler(Osi.DialogGetInvolvedNPC(dialogInstanceId, i))
+        -- end
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
         BrawlActive = false
-        stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
+        stopPulseReposition(level)
+        stopBrawlFizzler(level)
     end)
 
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
