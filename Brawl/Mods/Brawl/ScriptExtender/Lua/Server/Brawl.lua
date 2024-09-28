@@ -377,41 +377,39 @@ end
 
 -- NB: This should never be the first thing that happens (brawl should always kick off with an action)
 function repositionRelativeToTarget(brawlerUuid, targetUuid)
-    -- if Players[brawlerUuid] == nil or Players[brawlerUuid].isDirectlyControlling == false then
-        local archetype = Osi.GetActiveArchetype(brawlerUuid)
-        local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
-        if archetype == "melee" then
-            if distanceToTarget > MELEE_RANGE then
-                Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
-            else
-                holdPosition(brawlerUuid)
-            end
-        elseif archetype == "base" and isPlayerOrAlly(brawlerUuid) then
-            -- If we're close to melee range, then advance, even if we're too far from the player
-            local hostUuid = Osi.GetHostCharacter()
-            local targetDistanceFromHost = Osi.GetDistanceTo(targetUuid, hostUuid)
-            if distanceToTarget < MELEE_RANGE*2 then
-                debugPrint("inside melee x 2", brawlerUuid, targetUuid)
-                Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
-            -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
-            elseif targetDistanceFromHost > MAX_COMPANION_DISTANCE_FROM_PLAYER then
-                debugPrint("outside max player dist", brawlerUuid, hostUuid)
-                moveToDistanceFromTarget(brawlerUuid, hostUuid, 0.5*Osi.GetDistanceTo(brawlerUuid, hostUuid))
-            else
-                holdPosition(brawlerUuid)
-            end
+    local archetype = Osi.GetActiveArchetype(brawlerUuid)
+    local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
+    if archetype == "melee" then
+        if distanceToTarget > MELEE_RANGE then
+            Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         else
-            if distanceToTarget <= MELEE_RANGE then
-                holdPosition(brawlerUuid)
-            elseif distanceToTarget < RANGED_RANGE_MIN then
-                moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
-            elseif distanceToTarget < RANGED_RANGE_MAX then
-                holdPosition(brawlerUuid)
-            else
-                moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
-            end
+            holdPosition(brawlerUuid)
         end
-    -- end
+    elseif archetype == "base" and isPlayerOrAlly(brawlerUuid) then
+        -- If we're close to melee range, then advance, even if we're too far from the player
+        local hostUuid = Osi.GetHostCharacter()
+        local targetDistanceFromHost = Osi.GetDistanceTo(targetUuid, hostUuid)
+        if distanceToTarget < MELEE_RANGE*2 then
+            debugPrint("inside melee x 2", brawlerUuid, targetUuid)
+            Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
+        -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
+        elseif targetDistanceFromHost > MAX_COMPANION_DISTANCE_FROM_PLAYER then
+            debugPrint("outside max player dist", brawlerUuid, hostUuid)
+            moveToDistanceFromTarget(brawlerUuid, hostUuid, 0.5*Osi.GetDistanceTo(brawlerUuid, hostUuid))
+        else
+            holdPosition(brawlerUuid)
+        end
+    else
+        if distanceToTarget <= MELEE_RANGE then
+            holdPosition(brawlerUuid)
+        elseif distanceToTarget < RANGED_RANGE_MIN then
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        elseif distanceToTarget < RANGED_RANGE_MAX then
+            holdPosition(brawlerUuid)
+        else
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        end
+    end
 end
 
 -- Enemies are pugnacious jerks and looking for a fight >:(
@@ -667,27 +665,35 @@ end
 
 Ext.Events.SessionLoaded:Subscribe(function ()
 
+    -- initiative: highest rolls go ASAP, everyone else gets a delay to their pulseAction initial timer?
     -- Ext.Entity.Subscribe("CombatParticipant", function (entity, _, _)
     --     local entityUuid = entity.Uuid.EntityUuid
     --     debugPrint("CombatParticipant", entityUuid, getDisplayName(entityUuid))
-    --     addBrawler(entityUuid)
     -- end)
 
     Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function (combatGuid)
         debugPrint("CombatStarted", combatGuid)
-        addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
         for playerUuid, player in pairs(Players) do
             addBrawler(playerUuid)
         end
         debugDump(Brawlers)
         BrawlActive = true
-        -- do we need this?  will probably cause story-related problems or at least awkwardness :/
-        Ext.Timer.WaitFor(2000, function ()
+        addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
+    end)
+
+    Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", function (combatGuid, round)
+        debugPrint("CombatRoundStarted", combatGuid, round)
+        for playerUuid, player in pairs(Players) do
+            addBrawler(playerUuid)
+        end
+        debugDump(Brawlers)
+        BrawlActive = true
+        Ext.Timer.WaitFor(500, function ()
             addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
-            for playerUuid, player in pairs(Players) do
-                addBrawler(playerUuid)
-            end
-            Osi.EndCombat(combatGuid)
+            Ext.Timer.WaitFor(1500, function ()
+                -- do we need this?  will probably cause story-related problems or at least awkwardness :/
+                Osi.EndCombat(combatGuid)
+            end)
         end)
     end)
 
@@ -706,7 +712,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         --     stopPulseAction(brawler)
         -- end
         for playerUuid, player in pairs(Players) do
-            if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(Brawlers[level][playerUuid]) == 0 then
+            if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
                 Brawlers[level][playerUuid].isPaused = true
                 stopPulseAction(Brawlers[level][playerUuid])
             end
@@ -788,12 +794,12 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
-        stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
-        BrawlActive = false
         local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
         for i = 1, numberOfInvolvedNpcs do
             addBrawler(Osi.DialogGetInvolvedNPC(dialogInstanceId, i))
         end
+        BrawlActive = false
+        stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
     end)
 
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
@@ -802,17 +808,21 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         startPulseReposition(level)
     end)
 
-    -- Ext.Osiris.RegisterListener("DialogActorJoined", 4, "after", function (dialog, dialogInstanceId, actor, _)
-    --     debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
-    --     debugDump(Players[Osi.GetUUID(actor)])
-    --     NB: should dialog be allowed in some cases during a brawl? maybe if paused?
-    --     if BrawlActive and Players[Osi.GetUUID(actor)] ~= nil then
-    --         debugPrint("No dialog with party members during combat")
-    --         Osi.DialogRemoveActorFromDialog(dialogInstanceId, actor)
-    --         Osi.DialogRequestStopForDialog(dialog, actor)
-    --         Osi.DialogRequestStopForDialog(dialog, Osi.GetHostCharacter())
-    --     end
-    -- end)
+    Ext.Osiris.RegisterListener("DialogActorJoined", 4, "after", function (dialog, dialogInstanceId, actor, _)
+        debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
+        -- NB: should dialog be allowed in some cases during a brawl? maybe if paused?
+        if BrawlActive then
+            local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
+            local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+            debugPrint("Trying to brawl and talk? Questionable at best", numberOfInvolvedPlayers, numberOfInvolvedNpcs)
+            if numberOfInvolvedPlayers > 1 and numberOfInvolvedNpcs == 0 then
+                debugPrint("No dialog with party members during combat!")
+                Osi.DialogRemoveActorFromDialog(dialogInstanceId, actor)
+                Osi.DialogRequestStopForDialog(dialog, actor)
+                Osi.DialogRequestStopForDialog(dialog, Osi.GetHostCharacter())
+            end
+        end
+    end)
 
     Ext.Osiris.RegisterListener("DifficultyChanged", 1, "after", function (difficulty)
         debugPrint("DifficultyChanged", difficulty)
@@ -830,6 +840,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         onStarted(level)
     end)
 
+    -- NB: listen for Haste, if applied, make movement speed 2x for the duration?
     -- Ext.Osiris.RegisterListener("CastedSpell", 5, "after", function (casterGuid, spell, spellType, spellSchool, id)
     --     debugPrint("CastedSpell", casterGuid, spell, spellType, spellSchool, id)
     -- end)

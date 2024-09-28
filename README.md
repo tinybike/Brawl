@@ -30,7 +30,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 - Stealth: unimplemented
 - Balance: utterly borked
 
-Many people have commented that combat seems really imbalanced, which is 100% true!  Right now, I'm just trying to see if this system fundamentally works, or if there are show-stoppers that would make RTwP impossible in BG3.  (Among other things, it's definitely true that the enemies attack too quickly in the demo videos...)
+Many people have commented that combat seems really imbalanced, which is 100% true.  Right now, I'm just trying to see if this system fundamentally works, or if there are show-stoppers that would make RTwP impossible in BG3.
 
 The main challenge right now is that the built-in BG3 combat AI is only accessible during normal turn-based combat.  Just to test things out, I'm using some simple handrolled "AI" logic, but I suspect this won't work well for more complicated encounters.  I'm currently digging through the Osiris APIs and Larian's goals (scripts) looking for a way to poll the built-in AI ("what would you do, hypothetically, in this situation?") outside of turn-based combat.  If anyone knows about this, please look me up on Discord (@tinybike, am in both the official Larian and the "secret" unlocked toolkit Discord) -- this stuff is mostly undocumented so it's a bit of a bear to sort through.
 
