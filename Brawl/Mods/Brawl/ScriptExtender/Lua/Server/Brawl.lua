@@ -7,6 +7,7 @@ MELEE_RANGE = 1.5
 RANGED_RANGE_MAX = 25
 RANGED_RANGE_SWEETSPOT = 10
 RANGED_RANGE_MIN = 5
+MAX_COMPANION_DISTANCE_FROM_PLAYER = 30
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 USABLE_COMPANION_SPELLS = {
@@ -88,8 +89,7 @@ end
 
 -- NB: can hp ever dip negative?
 local function isDeadOrDying(entityUuid)
-    local hp = Osi.Gethitpoints(entityUuid)
-    return Osi.IsDead(entityUuid) == 1 or hp == nil or hp <= 0
+    return Osi.IsDead(entityUuid) == 1 or Osi.GetHitpoints(entityUuid) == 0
 end
 
 local function isAliveAndCanFight(entityUuid)
@@ -368,7 +368,6 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
         end
     elseif archetype == "base" then
         -- If we're close to melee range, then advance, even if we're too far from the player
-        MAX_COMPANION_DISTANCE_FROM_PLAYER = 30
         local hostUuid = Osi.GetHostCharacter()
         local targetDistanceFromHost = Osi.GetDistanceTo(targetUuid, hostUuid)
         if distanceToTarget < MELEE_RANGE*2 then
@@ -433,6 +432,7 @@ local function pulseReposition(level)
             -- - Companions and allies use the same logic
             -- - Neutrals just chilling
             elseif BrawlActive and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                 if Players[brawlerUuid].isControllingDirectly then
                     debugPrint("Player is controlling directly: do not take action!")
                     debugDump(Players[brawlerUuid])
@@ -440,11 +440,12 @@ local function pulseReposition(level)
                     stopPulseAction(brawler)
                 else
                     if not brawler.isInBrawl then
-                        debugPrint("not in brawl, starting")
+                        debugPrint("Not in brawl, starting pulse action for")
                         debugDump(brawler)
                         startPulseAction(brawler)
                     elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
                         debugPrint("Reposition party member", brawlerUuid)
+                        debugDump(brawler)
                         repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                     end
                 end
@@ -469,29 +470,26 @@ local function setPlayerRunToSprint(entityUuid)
     entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
 end
 
--- NB: Brawlers should probably be indexed by [combatGuid][entityUuid] instead of [level][entityUuid]
+-- NB: should we also index Brawlers by combatGuid?
 local function addBrawler(entityUuid)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
-        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil then
+        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and Osi.IsDead(entityUuid) == 0 then
             local combatGuid = Osi.CombatGetGuidFor(entityUuid)
             local displayName = Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
-            if not isDeadOrDying(entityUuid) then
-                debugPrint("Adding Brawler", entityUuid, displayName)
-                Brawlers[level][entityUuid] = {
-                    uuid = entityUuid,
-                    displayName = displayName,
-                    combatGuid = combatGuid,
-                    isInBrawl = false,
-                    isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
-                    originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
-                }
-                -- Remove the CanJoinCombat flag from all non-player units (even allies)
-                if Osi.IsPlayer(entityUuid) == 0 then
-                    Osi.SetCanJoinCombat(entityUuid, 0)
-                elseif Players[entityUuid] then
-                    setPlayerRunToSprint(entityUuid)
-                end
+            debugPrint("Adding Brawler", entityUuid, displayName)
+            Brawlers[level][entityUuid] = {
+                uuid = entityUuid,
+                displayName = displayName,
+                combatGuid = combatGuid,
+                isInBrawl = false,
+                isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
+                originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
+            }
+            if Osi.IsPlayer(entityUuid) == 0 then
+                Osi.SetCanJoinCombat(entityUuid, 0)
+            elseif Players[entityUuid] then
+                setPlayerRunToSprint(entityUuid)
             end
         end
     end
@@ -513,11 +511,12 @@ local function endBrawl(level)
         if Osi.IsPlayer(brawlerUuid) == 0 then
             Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
         end
-        Brawlers[level][brawlerUuid] = nil
+        -- Brawlers[level][brawlerUuid] = nil
     end
     debugPrint("Ended brawl")
     debugDump(Brawlers[level])
     resetPlayersMovementSpeed()
+    Brawlers[level] = {}
 end
 
 local function checkForEndOfBrawl(level)
@@ -550,6 +549,7 @@ function resetPlayersMovementSpeed()
 end
 
 local function initBrawlers(level)
+    debugPrint("initBrawlers", level)
     Brawlers[level] = {}
     startPulseReposition(level)
 end
@@ -573,6 +573,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function (combatGuid)
+        debugPrint("CombatStarted", combatGuid)
         BrawlActive = true
         -- do we need this?  will probably cause story-related problems or at least awkwardness :/
         Ext.Timer.WaitFor(2000, function ()
@@ -623,17 +624,17 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         local level = Osi.GetRegion(entityGuid)
         if level ~= nil then
             local entityUuid = Osi.GetUUID(entityGuid)
-            if Brawlers[level] then
+            if Brawlers[level] ~= nil and Brawlers[level][entityUuid] ~= nil then
                 removeBrawler(level, entityUuid)
                 checkForEndOfBrawl(level)
-                -- Sometimes units don't appear dead when killed out-of-combat...
-                -- this at least makes them lie prone (and dead-appearing units still appear dead)
-                Ext.Timer.WaitFor(1200, function ()
-                    debugPrint("LieOnGround", entityGuid)
-                    Osi.LieOnGround(entityGuid)
-                end)
             end
         end
+        -- Sometimes units don't appear dead when killed out-of-combat...
+        -- this at least makes them lie prone (and dead-appearing units still appear dead)
+        Ext.Timer.WaitFor(1200, function ()
+            debugPrint("LieOnGround", entityGuid)
+            Osi.LieOnGround(entityGuid)
+        end)
     end)
 
     Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (targetGuid)
@@ -653,20 +654,29 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
-        stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
-        BrawlActive = false
-        PlayerCurrentTarget = nil
-        -- local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-        -- for i = 1, numberOfInvolvedNpcs do
-        --     local involvedNpcUuid = Osi.DialogGetInvolvedNPC(dialogInstanceId, i)
-        --     debugPrint("involvedNpcUuid", involvedNpcUuid, Osi.ResolveTranslatedString(Osi.GetDisplayName(involvedNpcUuid)), Osi.CanJoinCombat(involvedNpcUuid))
-        -- end
+        if not BrawlActive then
+            stopPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
+            BrawlActive = false
+            PlayerCurrentTarget = nil
+        end
     end)
 
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
         debugPrint("DialogEnded", dialog, dialogInstanceId)
-        PlayerCurrentTarget = nil
-        startPulseReposition(Osi.GetRegion(Osi.GetHostCharacter()))
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
+        if not PulseRepositionTimers[level] then
+            startPulseReposition(level)
+        end
+    end)
+
+    Ext.Osiris.RegisterListener("DialogActorJoined", 4, "after", function (dialog, dialogInstanceId, actor, _)
+        debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
+        -- NB: should dialog be allowed in some cases during a brawl? maybe if paused?
+        if BrawlActive then
+            Osi.DialogRemoveActorFromDialog(dialogInstanceId, actor)
+            Osi.DialogRequestStopForDialog(dialog, actor)
+            Osi.DialogRequestStopForDialog(dialog, Osi.GetHostCharacter())
+        end
     end)
 
     Ext.Osiris.RegisterListener("DifficultyChanged", 1, "after", function (difficulty)
@@ -677,7 +687,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     -- thank u focus
     Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", function (characterGuid, _)
         debugPrint("PROC_Subregion_Entered", characterGuid)
-        PlayerCurrentTarget = nil
         pulseReposition(Osi.GetRegion(characterGuid))
     end)
 
