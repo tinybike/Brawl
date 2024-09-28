@@ -220,14 +220,18 @@ end
 -- (automove using UseSpell/Attack only uses the fastest possible movement speed)
 function moveThenAct(attackerUuid, targetUuid, spell)
     local targetRadius = Ext.Stats.Get(spell).TargetRadius
+    debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
     if targetRadius == "MeleeMainWeaponRange" then
         Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    else
+        local targetRadiusNumber = tonumber(targetRadius)
+        local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+        if distanceToTarget > targetRadiusNumber then
+            debugPrint("moveThenAct distance > targetRadius, moving to...")
+            moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+        end
     end
-    local targetRadiusNumber = tonumber(targetRadius)
-    local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-    if distanceToTarget > targetRadiusNumber then
-        moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-    end
+    debugPrint("moveThenAct UseSpell", attackerUuid, spell, targetUuid)
     Osi.UseSpell(attackerUuid, spell, targetUuid)
 end
 
@@ -285,7 +289,7 @@ local function actOnTarget(brawler, targetUuid)
         return moveThenAct(brawler.uuid, targetUuid, "Target_MainHandAttack")
         -- return Osi.Attack(brawler.uuid, targetUuid, 0)
     end
-    Osi.UseSpell(brawler.uuid, actionToTake.OriginatorPrototype, targetUuid)
+    moveThenAct(brawler.uuid, targetUuid, actionToTake.OriginatorPrototype)
 end
 
 local function getBrawlersSortedByDistance(entityUuid)
@@ -479,7 +483,7 @@ local function addBrawler(entityUuid)
                     displayName = displayName,
                     combatGuid = combatGuid,
                     isInBrawl = false,
-                    isPaused = Osi.IsInForceTurnBasedMode(entityUuid),
+                    isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                     originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
                 }
                 -- Remove the CanJoinCombat flag from all non-player units (even allies)
