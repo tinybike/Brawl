@@ -18,7 +18,9 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 - Enemy death vfx: band-aided / fixed to the casual observer...
 - Enemy AI: usable but very simplistic (see below)
 - Companion AI: usable but very simplistic (see below)
-- Weird bug where your companions don't go down at 0 hitpoints: not yet fixed
+- Companion AIs at least know to help you up if you're at 0 hitpoints: nope lol
+- Weird bug where your companions don't go down at 0 hitpoints: fixed
+- Bug where the AI takes control of your active character: fixed
 - Tracking/targeting assist: unimplemented, but [this mod](https://www.nexusmods.com/baldursgate3/mods/10445) helps a ton
 - Multiple attacks: unimplemented
 - Initiative: unimplemented
