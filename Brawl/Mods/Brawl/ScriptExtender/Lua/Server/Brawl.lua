@@ -788,6 +788,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         end)
     end)
 
+    -- NB: how's this work in multiplayer mode? maybe just disable companion AI altogether in multiplayer?
     Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (targetGuid)
         debugPrint("GainedControl", targetGuid)
         local targetUuid = Osi.GetUUID(targetGuid)
