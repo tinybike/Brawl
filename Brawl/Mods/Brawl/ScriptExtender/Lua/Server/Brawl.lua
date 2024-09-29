@@ -652,16 +652,17 @@ function initBrawlers(level)
     startPulseReposition(level)
 end
 
-function onStarted(level)
+function resetPlayers()
     Players = {}
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        Players[uuid] = {
-            uuid = uuid,
-            isControllingDirectly = uuid == Osi.GetHostCharacter(),
-            displayName = getDisplayName(uuid),
-        }
+        Players[uuid] = {uuid = uuid, displayName = getDisplayName(uuid)}
     end
+end
+
+function onStarted(level)
+    resetPlayers()
+    setIsControllingDirectly()
     PlayerCurrentTarget = nil
     setMovementSpeedThresholds()
     resetPlayersMovementSpeed() -- NB: not clear why this is needed :/
@@ -678,6 +679,34 @@ function startBrawlFizzler(level)
     end)
 end
 
+function setIsControllingDirectly()
+    if Players ~= nil and next(Players) ~= nil then
+        for _, player in pairs(Players) do
+            player.isControllingDirectly = false
+        end
+        for _, entity in ipairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
+            -- new player (client) just joined: they might not be in the Players table yet
+            if Players[entity.Uuid.EntityUuid] == nil then
+                resetPlayers()
+            end
+            Players[entity.Uuid.EntityUuid].isControllingDirectly = true
+        end
+        for playerUuid, player in pairs(Players) do
+            local level = Osi.GetRegion(playerUuid)
+            if level ~= nil then
+                local brawler = Brawlers[level]
+                if brawler ~= nil then
+                    if Brawlers[level][playerUuid] ~= nil then
+                        stopPulseAction(Brawlers[level][playerUuid])
+                    end
+                end
+            end
+        end
+        debugDump("setIsControllingDirectly")
+        debugDump(Players)
+    end
+end
+
 Ext.Events.SessionLoaded:Subscribe(function ()
 
     -- initiative: highest rolls go ASAP, everyone else gets a delay to their pulseAction initial timer?
@@ -685,6 +714,11 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     --     local entityUuid = entity.Uuid.EntityUuid
     --     debugPrint("CombatParticipant", entityUuid, getDisplayName(entityUuid))
     -- end)
+
+    Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", function (level, _)
+        debugPrint("LevelGameplayStarted", level)
+        onStarted(level)
+    end)
 
     Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function (combatGuid)
         debugPrint("CombatStarted", combatGuid)
@@ -723,11 +757,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         debugPrint("EnteredForceTurnBased", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
         local level = Osi.GetRegion(entityUuid)
-        -- local brawler = Brawlers[level][entityUuid]
-        -- if brawler ~= nil then
-        --     brawler.isPaused = true
-        --     stopPulseAction(brawler)
-        -- end
         for playerUuid, player in pairs(Players) do
             if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
                 Brawlers[level][playerUuid].isPaused = true
@@ -791,12 +820,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     -- NB: how's this work in multiplayer mode? maybe just disable companion AI altogether in multiplayer?
     Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (targetGuid)
         debugPrint("GainedControl", targetGuid)
-        local targetUuid = Osi.GetUUID(targetGuid)
-        Osi.FlushOsirisQueue(targetUuid)
-        for playerUuid, player in pairs(Players) do
-            player.isControllingDirectly = playerUuid == targetUuid
-        end
-        debugDump(Players)
+        Osi.FlushOsirisQueue(Osi.GetUUID(targetGuid))
+        setIsControllingDirectly()
     end)
 
     Ext.Osiris.RegisterListener("CharacterJoinedParty", 1, "after", function (character)
@@ -844,7 +869,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("DialogActorJoined", 4, "after", function (dialog, dialogInstanceId, actor, _)
-        debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
+        -- debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
         -- NB: should dialog be allowed in some cases during a brawl? maybe if paused?
         if BrawlActive then
             local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
@@ -868,11 +893,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", function (characterGuid, _)
         debugPrint("PROC_Subregion_Entered", characterGuid)
         pulseReposition(Osi.GetRegion(characterGuid))
-    end)
-
-    Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", function (level, _)
-        debugPrint("LevelGameplayStarted", level)
-        onStarted(level)
     end)
 
     -- NB: listen for Haste, if applied, make movement speed 2x for the duration?
