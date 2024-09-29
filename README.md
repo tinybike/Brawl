@@ -30,6 +30,7 @@ Lots of stuff unimplemented and/or maybe not feasible to implement for RTwP, but
 - Bonus actions: the same as actions :/
 - Attacks of opportunity: unimplemented
 - Stealth: unimplemented
+- Multiplayer: supported in theory but I haven't tested it yet, so probably not working? idk
 - Balance: utterly borked
 
 Many people have commented that combat seems really imbalanced, which is true.  Still in very early testing to find gamebreaking bugs etc.  Balance should hopefully improve over time as everything gets ironed out.
