@@ -10,6 +10,7 @@ RANGED_RANGE_MAX = 25
 RANGED_RANGE_SWEETSPOT = 10
 RANGED_RANGE_MIN = 5
 MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
+MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 USABLE_COMPANION_SPELLS = {
@@ -171,8 +172,6 @@ end
 
 function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
-    -- local xValid, yValid, zValid = Osi.FindValidPosition(x, y, z, 10, moverUuid, 1)
-    -- debugPrint("moveToDist", x, y, z, xValid, yValid, zValid)
     Osi.CharacterMoveToPosition(moverUuid, x, y, z, getMovementSpeed(moverUuid), "")
 end
 
@@ -330,7 +329,7 @@ function findTargetToAttack(brawler)
 end
 
 function isPlayerControllingDirectly(entityUuid)
-    return Players[entityUuid] and Players[entityUuid].isControllingDirectly
+    return Players[entityUuid] ~= nil and Players[entityUuid].isControllingDirectly == true
 end
 
 function stopPulseAction(brawler)
@@ -340,12 +339,34 @@ function stopPulseAction(brawler)
     end
 end
 
+function aiCompanionNeedsTeleport(entityUuid)
+    if Osi.IsPlayer(entityUuid) == 1 and Players[entityUuid] ~= nil then
+        local potentialCompanion = Players[entityUuid]
+        if not potentialCompanion.isControllingDirectly then
+            for playerUuid, player in pairs(Players) do
+                if playerUuid ~= potentialCompanion.uuid then
+                    if potentialCompanion.userId == player.userId and player.isControllingDirectly then
+                        if Osi.GetDistanceTo(entityUuid, playerUuid) > MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER then
+                            return playerUuid
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 -- Brawlers doing dangerous stuff
 function pulseAction(brawler)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and not isPlayerControllingDirectly(brawler.uuid) then
+        -- If this unit is extremely far from the player, and it's an AI-controlled unit, it's probably the teleport bug, so warp them back
+        local teleportBuggedAiCompanionToPlayer = aiCompanionNeedsTeleport(brawler.uuid)
+        if teleportBuggedAiCompanionToPlayer ~= nil then
+            Osi.TeleportTo(brawler.uuid, teleportBuggedAiCompanionToPlayer, "", 0, 0, 0, 0, 1)
         -- Doesn't currently have an attack target, so let's find one
-        if brawler.targetUuid == nil then
+        elseif brawler.targetUuid == nil then
             findTargetToAttack(brawler)
         else
             -- Already attacking a target and the target isn't dead, so just keep at it
@@ -383,13 +404,14 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
             holdPosition(brawlerUuid)
         end
     elseif archetype == "base" and isPlayerOrAlly(brawlerUuid) then
-        -- If we're close to melee range, then advance, even if we're too far from the player
         local hostUuid = Osi.GetHostCharacter()
         local targetDistanceFromHost = Osi.GetDistanceTo(targetUuid, hostUuid)
+        -- If we're close to melee range, then advance, even if we're too far from the player
         if distanceToTarget < MELEE_RANGE*2 then
             debugPrint("inside melee x 2", brawlerUuid, targetUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
+        -- NB: is this causing the weird teleport bug???
         elseif targetDistanceFromHost > MAX_COMPANION_DISTANCE_FROM_PLAYER then
             debugPrint("outside max player dist", brawlerUuid, hostUuid)
             moveToDistanceFromTarget(brawlerUuid, hostUuid, 0.5*Osi.GetDistanceTo(brawlerUuid, hostUuid))
