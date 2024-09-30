@@ -438,7 +438,7 @@ end
 function checkForBrawlToJoin(brawler)
     local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
     -- debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
-    if closestDistance < ENTER_COMBAT_RANGE then
+    if closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
         for _, target in ipairs(getBrawlersSortedByDistance(brawler.uuid)) do
             local targetUuid, distance = target[1], target[2]
             -- NB: also check for farther-away units where there's a nearby brawl happening already? hidden? line-of-sight?
@@ -546,21 +546,21 @@ function pulseReposition(level)
             -- - Companions and allies use the same logic
             -- - Neutrals just chilling
             elseif BrawlActive and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
+                -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                 if Players[brawlerUuid] and Players[brawlerUuid].isControllingDirectly == true then
-                    debugPrint("Player is controlling directly: do not take action!")
-                    debugDump(brawler)
-                    debugDump(Players)
+                    -- debugPrint("Player is controlling directly: do not take action!")
+                    -- debugDump(brawler)
+                    -- debugDump(Players)
                     stopPulseAction(brawler)
                 else
                     if not brawler.isInBrawl then
-                        debugPrint("Not in brawl, starting pulse action for")
-                        debugDump(brawler)
+                        debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                        -- debugDump(brawler)
                         startPulseAction(brawler)
                     elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
                         debugPrint("Reposition party member", brawlerUuid)
-                        debugDump(brawler)
-                        debugDump(Players)
+                        -- debugDump(brawler)
+                        -- debugDump(Players)
                         repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                     end
                 end
@@ -907,37 +907,42 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 
     Ext.Osiris.RegisterListener("DialogStarted", 2, "before", function (dialog, dialogInstanceId)
         debugPrint("DialogStarted", dialog, dialogInstanceId)
-        -- local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-        -- for i = 1, numberOfInvolvedNpcs do
-        --     addBrawler(Osi.DialogGetInvolvedNPC(dialogInstanceId, i))
-        -- end
+        local dialogStopped = false
         local level = Osi.GetRegion(Osi.GetHostCharacter())
-        BrawlActive = false
-        stopPulseReposition(level)
-        stopBrawlFizzler(level)
+        if BrawlActive then
+            local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
+            local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+            if numberOfInvolvedNpcs == 1 then
+                if getDisplayName(Osi.DialogGetInvolvedNPC(dialogInstanceId, 1)) == "Dream Visitor" then
+                    numberOfInvolvedNpcs = 0
+                end
+            end
+            debugPrint("DialogStarted...", numberOfInvolvedPlayers, numberOfInvolvedNpcs)
+            if numberOfInvolvedPlayers > 1 and numberOfInvolvedNpcs == 0 then
+                debugPrint("Stopping dialog...", dialogInstanceId, Osi.GetHostCharacter())
+                local involvedPlayers = {}
+                for i = 1, numberOfInvolvedPlayers do
+                    table.insert(involvedPlayers, Osi.DialogGetInvolvedPlayer(dialogInstanceId, i))
+                end
+                debugDump(involvedPlayers)
+                for _, player in ipairs(involvedPlayers) do
+                    Osi.DialogRemoveActorFromDialog(dialogInstanceId, player)
+                    Osi.DialogRequestStopForDialog(dialog, player)
+                end
+                dialogStopped = true
+            end
+        end
+        if not dialogStopped then
+            BrawlActive = false
+            stopPulseReposition(level)
+            stopBrawlFizzler(level)
+        end
     end)
 
     Ext.Osiris.RegisterListener("DialogEnded", 2, "after", function (dialog, dialogInstanceId)
         debugPrint("DialogEnded", dialog, dialogInstanceId)
         local level = Osi.GetRegion(Osi.GetHostCharacter())
         startPulseReposition(level)
-    end)
-
-    Ext.Osiris.RegisterListener("DialogActorJoined", 4, "after", function (dialog, dialogInstanceId, actor, _)
-        -- debugPrint("DialogActorJoined", dialog, dialogInstanceId, actor)
-        -- NB: should dialog be allowed in some cases during a brawl? maybe if paused?
-        if BrawlActive then
-            local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
-            local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-            debugPrint("Trying to brawl and talk? Questionable at best", numberOfInvolvedPlayers, numberOfInvolvedNpcs)
-            if numberOfInvolvedPlayers > 1 and numberOfInvolvedNpcs == 0 then
-                debugPrint("No dialog with party members during combat!")
-                Osi.DialogRemoveActorFromDialog(dialogInstanceId, actor)
-                Osi.DialogRemoveActorFromDialog(dialogInstanceId, Osi.GetHostCharacter())
-                Osi.DialogRequestStopForDialog(dialog, actor)
-                Osi.DialogRequestStopForDialog(dialog, Osi.GetHostCharacter())
-            end
-        end
     end)
 
     Ext.Osiris.RegisterListener("DifficultyChanged", 1, "after", function (difficulty)
