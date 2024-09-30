@@ -205,6 +205,9 @@ function isSpellUsable(spell, archetype)
     if spell.OriginatorPrototype == "Projectile_Jump" then return false end
     if spell.OriginatorPrototype == "Shout_Dash_NPC" then return false end
     if spell.OriginatorPrototype == "Target_Shove" then return false end
+    if spell.OriginatorPrototype == "Target_CureWounds" then return false end
+    if spell.OriginatorPrototype == "Target_HealingWord" then return false end
+    if spell.OriginatorPrototype == "Target_CureWounds_Mass" then return false end
     if archetype == "melee" then
         if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
         if spell.OriginatorPrototype == "Target_MageArmor" then return false end
@@ -705,8 +708,8 @@ function setIsControllingDirectly()
         for _, entity in ipairs(entities) do
             Players[entity.Uuid.EntityUuid].isControllingDirectly = true
         end
-        debugDump("setIsControllingDirectly")
-        debugDump(Players)
+        -- debugDump("setIsControllingDirectly")
+        -- debugDump(Players)
     end
 end
 
@@ -837,6 +840,16 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             debugPrint("LieOnGround", entityGuid)
             Osi.LieOnGround(entityGuid)
         end)
+    end)
+
+    -- New user joined (multiplayer)
+    Ext.Entity.Subscribe("UserReservedFor", function (entity, _, _)
+        setIsControllingDirectly()
+        local entityUuid = entity.Uuid.EntityUuid
+        if Players and Players[entityUuid] then
+            local userId = entity.UserReservedFor.UserID
+            Players[entityUuid].userId = entity.UserReservedFor.UserID
+        end
     end)
 
     -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
