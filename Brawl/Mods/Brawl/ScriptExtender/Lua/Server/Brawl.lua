@@ -232,7 +232,6 @@ function moveThenAct(attackerUuid, targetUuid, spell)
     local targetRadius = Ext.Stats.Get(spell).TargetRadius
     debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
     debugDump(Players[attackerUuid])
-    -- debugPrint(Players[attackerUuid].isDirectlyControlling, Players[attackerUuid].isDirectlyControlling == false)
     if targetRadius == "MeleeMainWeaponRange" then
         Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
     else
@@ -525,8 +524,8 @@ function pulseReposition(level)
                 debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                 if Players[brawlerUuid] and Players[brawlerUuid].isControllingDirectly == true then
                     debugPrint("Player is controlling directly: do not take action!")
-                    debugDump(Players[brawlerUuid])
                     debugDump(brawler)
+                    debugDump(Players)
                     stopPulseAction(brawler)
                 else
                     if not brawler.isInBrawl then
@@ -536,6 +535,7 @@ function pulseReposition(level)
                     elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
                         debugPrint("Reposition party member", brawlerUuid)
                         debugDump(brawler)
+                        debugDump(Players)
                         repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                     end
                 end
@@ -652,11 +652,39 @@ function initBrawlers(level)
     startPulseReposition(level)
 end
 
+Users = {}
+
 function resetPlayers()
     Players = {}
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        Players[uuid] = {uuid = uuid, displayName = getDisplayName(uuid)}
+        -- local playerEntity = Ext.Entity.Get(uuid)
+        Players[uuid] = {
+            uuid = uuid,
+            displayName = getDisplayName(uuid),
+            userId = Osi.GetReservedUserID(uuid),
+            -- userId = playerEntity.PartyMember.UserId,
+        }
+    end
+end
+
+function setIsControllingDirectly()
+    if Players ~= nil and next(Players) ~= nil then
+        for playerUuid, player in pairs(Players) do
+            player.isControllingDirectly = false
+        end
+        local entities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl")
+        for _, entity in ipairs(entities) do
+            -- New player (client) just joined: they might not be in the Players table yet
+            if Players[entity.Uuid.EntityUuid] == nil then
+                resetPlayers()
+            end
+        end
+        for _, entity in ipairs(entities) do
+            Players[entity.Uuid.EntityUuid].isControllingDirectly = true
+        end
+        debugDump("setIsControllingDirectly")
+        debugDump(Players)
     end
 end
 
@@ -677,34 +705,6 @@ function startBrawlFizzler(level)
         debugPrint("Brawl fizzled", BRAWL_FIZZLER_TIMEOUT)
         endBrawl(level)
     end)
-end
-
-function setIsControllingDirectly()
-    if Players ~= nil and next(Players) ~= nil then
-        for _, player in pairs(Players) do
-            player.isControllingDirectly = false
-        end
-        for _, entity in ipairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
-            -- new player (client) just joined: they might not be in the Players table yet
-            if Players[entity.Uuid.EntityUuid] == nil then
-                resetPlayers()
-            end
-            Players[entity.Uuid.EntityUuid].isControllingDirectly = true
-        end
-        for playerUuid, player in pairs(Players) do
-            local level = Osi.GetRegion(playerUuid)
-            if level ~= nil then
-                local brawler = Brawlers[level]
-                if brawler ~= nil then
-                    if Brawlers[level][playerUuid] ~= nil then
-                        stopPulseAction(Brawlers[level][playerUuid])
-                    end
-                end
-            end
-        end
-        debugDump("setIsControllingDirectly")
-        debugDump(Players)
-    end
 end
 
 Ext.Events.SessionLoaded:Subscribe(function ()
@@ -817,11 +817,32 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         end)
     end)
 
-    -- NB: how's this work in multiplayer mode? maybe just disable companion AI altogether in multiplayer?
+    -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
     Ext.Osiris.RegisterListener("GainedControl", 1, "after", function (targetGuid)
         debugPrint("GainedControl", targetGuid)
-        Osi.FlushOsirisQueue(Osi.GetUUID(targetGuid))
-        setIsControllingDirectly()
+        local targetUuid = Osi.GetUUID(targetGuid)
+        if targetUuid ~= nil then
+            Osi.FlushOsirisQueue(targetUuid)
+            -- local targetEntity = Ext.Entity.Get(targetUuid)
+            -- local targetUserId = targetEntity.UserAvatar.UserID --buggy?? doesn't match the others??
+            -- local targetUserId = targetEntity.UserReservedFor.UserID
+            -- local targetUserId = targetEntity.PartyMember.UserId
+            local targetUserId = Osi.GetReservedUserID(targetUuid)
+            debugPrint("Target user ID:", targetUserId)
+            if Players[targetUuid] ~= nil and targetUserId ~= nil then
+                Players[targetUuid].isControllingDirectly = true
+                for playerUuid, player in pairs(Players) do
+                    if player.userId == targetUserId and playerUuid ~= targetUuid then
+                        player.isControllingDirectly = false
+                    end
+                end
+                local level = Osi.GetRegion(targetUuid)
+                if level and Brawlers[level] and Brawlers[level][targetUuid] then
+                    stopPulseAction(Brawlers[level][targetUuid])
+                end
+                debugDump(Players)
+            end
+        end
     end)
 
     Ext.Osiris.RegisterListener("CharacterJoinedParty", 1, "after", function (character)
@@ -841,7 +862,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         addBrawler(attackerUuid)
         addBrawler(defenderUuid)
         if Osi.IsPlayer(attackerUuid) == 1 then
-            -- PlayerCurrentTarget = Osi.GetUUID(defenderGuid)
             addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
         end
         if Osi.IsPlayer(defenderUuid) == 1 then
@@ -878,6 +898,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             if numberOfInvolvedPlayers > 1 and numberOfInvolvedNpcs == 0 then
                 debugPrint("No dialog with party members during combat!")
                 Osi.DialogRemoveActorFromDialog(dialogInstanceId, actor)
+                Osi.DialogRemoveActorFromDialog(dialogInstanceId, Osi.GetHostCharacter())
                 Osi.DialogRequestStopForDialog(dialog, actor)
                 Osi.DialogRequestStopForDialog(dialog, Osi.GetHostCharacter())
             end
