@@ -783,6 +783,8 @@ function startBrawlFizzler(level)
     end)
 end
 
+DynamicAnimationTagsSubscription = nil
+
 Ext.Events.SessionLoaded:Subscribe(function ()
 
     -- initiative: highest rolls go ASAP, everyone else gets a delay to their pulseAction initial timer?
@@ -835,6 +837,17 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         addBrawler(Osi.GetUUID(entityGuid))
     end)
 
+    Ext.Events.NetMessage:Subscribe(function (data)
+        if data.Channel == "Toggle_TurnBased" then
+            for playerUuid, player in pairs(Players) do
+                if player.isPaused then
+                    player.isWindingUp = false
+                    Ext.Entity.Get(playerUuid).TurnBased.IsInCombat_M = true
+                end
+            end
+        end
+    end)
+
     Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", function (entityGuid)
         debugPrint("EnteredForceTurnBased", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
@@ -847,21 +860,27 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         end
         stopBrawlFizzler(level)
         Osi.FlushOsirisQueue(entityUuid)
-        -- NB: should we just force a "normal" enemy turn here...?
-        -- for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        --     if brawler.isInBrawl then
-        --         stopPulseAction(brawler)
-        --         if brawlerUuid ~= entityUuid then
-        --             Osi.ForceTurnBasedMode(brawlerUuid, 1)
-        --         end
-        --     end
-        -- end
+        if DynamicAnimationTagsSubscription == nil then
+            DynamicAnimationTagsSubscription = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
+                if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
+                    if entity.Uuid.EntityUuid and Players[entity.Uuid.EntityUuid] and not Players[entity.Uuid.EntityUuid].isWindingUp then
+                        Players[entity.Uuid.EntityUuid].isWindingUp = true
+                        entity.TurnBased.IsInCombat_M = false
+                    end
+                end
+            end)
+        end
     end)
 
     Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", function (entityGuid)
         debugPrint("LeftForceTurnBased", entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if DynamicAnimationTagsSubscription ~= nil then
+            Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+        end
+        DynamicAnimationTagsSubscription = nil
+        -- Ext.Entity.Get(entityUuid).TurnBased.IsInCombat_M = true
         if BrawlActive then
-            local entityUuid = Osi.GetUUID(entityGuid)
             local level = Osi.GetRegion(entityUuid)
             startBrawlFizzler(level)
             if Brawlers[level] ~= nil then
@@ -920,7 +939,6 @@ Ext.Events.SessionLoaded:Subscribe(function ()
             -- local targetUserId = targetEntity.UserReservedFor.UserID
             -- local targetUserId = targetEntity.PartyMember.UserId
             local targetUserId = Osi.GetReservedUserID(targetUuid)
-            debugPrint("Target user ID:", targetUserId)
             if Players[targetUuid] ~= nil and targetUserId ~= nil then
                 Players[targetUuid].isControllingDirectly = true
                 for playerUuid, player in pairs(Players) do
@@ -1035,6 +1053,8 @@ Ext.Events.SessionLoaded:Subscribe(function ()
 end)
 
 Ext.Events.GameStateChanged:Subscribe(function (e)
+    -- debugPrint("GameStateChanged")
+    -- debugDump(e)
     if e and e.ToState == "UnloadLevel" then
         for level, timer in pairs(PulseRepositionTimers) do
             Ext.Timer.Cancel(timer)
