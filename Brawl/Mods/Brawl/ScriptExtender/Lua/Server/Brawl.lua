@@ -311,13 +311,15 @@ end
 function getBrawlersSortedByDistance(entityUuid)
     local brawlersSortedByDistance = {}
     local level = Osi.GetRegion(entityUuid)
-    for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        if isAliveAndCanFight(brawlerUuid) then
-            -- debugPrint("distance:", brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid))
-            table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
+    if Brawlers[level] then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            if isAliveAndCanFight(brawlerUuid) then
+                -- debugPrint("distance:", brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid))
+                table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
+            end
         end
+        table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
     end
-    table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
     return brawlersSortedByDistance
 end
 
@@ -411,9 +413,9 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
         -- NB: is this causing the weird teleport bug???
-        elseif targetDistanceFromHost > MAX_COMPANION_DISTANCE_FROM_PLAYER then
-            debugPrint("outside max player dist", brawlerUuid, hostUuid)
-            moveToDistanceFromTarget(brawlerUuid, hostUuid, 0.5*Osi.GetDistanceTo(brawlerUuid, hostUuid))
+        -- elseif targetDistanceFromHost > MAX_COMPANION_DISTANCE_FROM_PLAYER then
+        --     debugPrint("outside max player dist", brawlerUuid, hostUuid)
+        --     moveToDistanceFromTarget(brawlerUuid, hostUuid, 0.5*Osi.GetDistanceTo(brawlerUuid, hostUuid))
         else
             holdPosition(brawlerUuid)
         end
@@ -535,49 +537,50 @@ end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl!
 function pulseReposition(level)
-    -- addNearbyToBrawlers(Osi.GetHostCharacter())
-    for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        if isAliveAndCanFight(brawlerUuid) then
-            -- Enemy units are actively looking for a fight and will attack if you get too close to them
-            if isPugnacious(brawlerUuid) then
-                if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
-                    -- debugPrint(brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
-                    repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                else
-                    checkForBrawlToJoin(brawler)
-                end
-            -- Player, ally, and neutral units are not actively looking for a fight
-            -- - Companions and allies use the same logic
-            -- - Neutrals just chilling
-            elseif BrawlActive and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
-                if Players[brawlerUuid] and Players[brawlerUuid].isControllingDirectly == true then
-                    -- debugPrint("Player is controlling directly: do not take action!")
-                    -- debugDump(brawler)
-                    -- debugDump(Players)
-                    stopPulseAction(brawler)
-                else
-                    if not brawler.isInBrawl then
-                        debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
-                        -- debugDump(brawler)
-                        startPulseAction(brawler)
-                    elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
-                        debugPrint("Reposition party member", brawlerUuid)
+    if Brawlers[level] then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            if isAliveAndCanFight(brawlerUuid) then
+                -- Enemy units are actively looking for a fight and will attack if you get too close to them
+                if isPugnacious(brawlerUuid) then
+                    if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
+                        -- debugPrint(brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
+                        repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                    else
+                        checkForBrawlToJoin(brawler)
+                    end
+                -- Player, ally, and neutral units are not actively looking for a fight
+                -- - Companions and allies use the same logic
+                -- - Neutrals just chilling
+                elseif BrawlActive and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                    -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
+                    if Players[brawlerUuid] and Players[brawlerUuid].isControllingDirectly == true then
+                        -- debugPrint("Player is controlling directly: do not take action!")
                         -- debugDump(brawler)
                         -- debugDump(Players)
-                        repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                        stopPulseAction(brawler)
+                    else
+                        if not brawler.isInBrawl then
+                            debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                            -- debugDump(brawler)
+                            startPulseAction(brawler)
+                        elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 then
+                            debugPrint("Reposition party member", brawlerUuid)
+                            -- debugDump(brawler)
+                            -- debugDump(Players)
+                            repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                        end
                     end
                 end
+            -- Check if this is a downed player unit and apply Osi.LieOnGround for the visual downed glitch
+            elseif Osi.IsPlayer(brawlerUuid) == 1 and isDowned(brawlerUuid) then
+                stopPulseReposition(brawlerUuid)
+                Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
+                    if brawler ~= nil and isDowned(brawlerUuid) then
+                        debugPrint("Player downed, applying LieOnGround to", brawlerUuid, brawler.displayName)
+                        Osi.LieOnGround(brawlerUuid)
+                    end
+                end)
             end
-        -- Check if this is a downed player unit and apply Osi.LieOnGround for the visual downed glitch
-        elseif Osi.IsPlayer(brawlerUuid) == 1 and isDowned(brawlerUuid) then
-            stopPulseReposition(brawlerUuid)
-            Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
-                if brawler ~= nil and isDowned(brawlerUuid) then
-                    debugPrint("Player downed, applying LieOnGround to", brawlerUuid, brawler.displayName)
-                    Osi.LieOnGround(brawlerUuid)
-                end
-            end)
         end
     end
 end
@@ -642,16 +645,18 @@ end
 
 function endBrawl(level)
     BrawlActive = false
-    for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        stopPulseAction(brawler)
-        -- revertHitpoints(brawlerUuid)
-        if Osi.IsPlayer(brawlerUuid) == 0 then
-            Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
+    if Brawlers[level] then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            stopPulseAction(brawler)
+            -- revertHitpoints(brawlerUuid)
+            if Osi.IsPlayer(brawlerUuid) == 0 then
+                Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
+            end
+            Osi.FlushOsirisQueue(brawlerUuid)
         end
-        Osi.FlushOsirisQueue(brawlerUuid)
+        debugPrint("Ended brawl")
+        debugDump(Brawlers[level])
     end
-    debugPrint("Ended brawl")
-    debugDump(Brawlers[level])
     resetPlayersMovementSpeed()
     Brawlers[level] = {}
     stopBrawlFizzler(level)
@@ -877,21 +882,21 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     end)
 
     Ext.Osiris.RegisterListener("Died", 1, "after", function (entityGuid)
-        debugPrint("Died", entityGuid)
+        -- debugPrint("Died", entityGuid)
         local level = Osi.GetRegion(entityGuid)
         if level ~= nil then
             local entityUuid = Osi.GetUUID(entityGuid)
             if Brawlers[level] ~= nil and Brawlers[level][entityUuid] ~= nil then
+                -- Sometimes units don't appear dead when killed out-of-combat...
+                -- this at least makes them lie prone (and dead-appearing units still appear dead)
+                Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
+                    debugPrint("LieOnGround", entityGuid)
+                    Osi.LieOnGround(entityGuid)
+                end)
                 removeBrawler(level, entityUuid)
                 checkForEndOfBrawl(level)
             end
         end
-        -- Sometimes units don't appear dead when killed out-of-combat...
-        -- this at least makes them lie prone (and dead-appearing units still appear dead)
-        Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
-            debugPrint("LieOnGround", entityGuid)
-            Osi.LieOnGround(entityGuid)
-        end)
     end)
 
     -- New user joined (multiplayer)
@@ -969,19 +974,27 @@ Ext.Events.SessionLoaded:Subscribe(function ()
                     numberOfInvolvedNpcs = 0
                 end
             end
-            debugPrint("DialogStarted...", numberOfInvolvedPlayers, numberOfInvolvedNpcs)
-            if numberOfInvolvedPlayers > 1 and numberOfInvolvedNpcs == 0 then
-                debugPrint("Stopping dialog...", dialogInstanceId, Osi.GetHostCharacter())
+            debugPrint("DialogStarted...", dialog, dialogInstanceId, numberOfInvolvedPlayers, numberOfInvolvedNpcs)
+            if numberOfInvolvedPlayers == 2 and numberOfInvolvedNpcs == 0 then
                 local involvedPlayers = {}
+                local isPartyMembersOnly = true
                 for i = 1, numberOfInvolvedPlayers do
-                    table.insert(involvedPlayers, Osi.DialogGetInvolvedPlayer(dialogInstanceId, i))
+                    local involvedPlayer = Osi.DialogGetInvolvedPlayer(dialogInstanceId, i)
+                    if Players[involvedPlayer] == nil then
+                        isPartyMembersOnly = false
+                        break
+                    end
+                    table.insert(involvedPlayers, involvedPlayer)
                 end
-                debugDump(involvedPlayers)
-                for _, player in ipairs(involvedPlayers) do
-                    Osi.DialogRemoveActorFromDialog(dialogInstanceId, player)
-                    Osi.DialogRequestStopForDialog(dialog, player)
+                if isPartyMembersOnly then
+                    debugPrint("Stopping dialog...", dialogInstanceId)
+                    debugDump(involvedPlayers)
+                    for _, player in ipairs(involvedPlayers) do
+                        Osi.DialogRemoveActorFromDialog(dialogInstanceId, player)
+                        Osi.DialogRequestStopForDialog(dialog, player)
+                    end
+                    dialogStopped = true
                 end
-                dialogStopped = true
             end
         end
         if not dialogStopped then
@@ -1019,4 +1032,21 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         PlayerCurrentTarget = nil
         stopPulseReposition(level)
     end)
+end)
+
+Ext.Events.GameStateChanged:Subscribe(function (e)
+    if e and e.ToState == "UnloadLevel" then
+        for level, timer in pairs(PulseRepositionTimers) do
+            Ext.Timer.Cancel(timer)
+        end
+        for uuid, timer in pairs(PulseActionTimers) do
+            Ext.Timer.Cancel(timer)
+        end
+        for level, timer in pairs(BrawlFizzler) do
+            endBrawl(level)
+            Ext.Timer.Cancel(timer)
+        end
+        BrawlActive = false
+        PlayerCurrentTarget = nil
+    end
 end)
