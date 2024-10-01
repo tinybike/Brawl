@@ -984,37 +984,37 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         debugPrint("DialogStarted", dialog, dialogInstanceId)
         local dialogStopped = false
         local level = Osi.GetRegion(Osi.GetHostCharacter())
-        if BrawlActive then
-            local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
-            local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
-            if numberOfInvolvedNpcs == 1 then
-                if getDisplayName(Osi.DialogGetInvolvedNPC(dialogInstanceId, 1)) == "Dream Visitor" then
-                    numberOfInvolvedNpcs = 0
-                end
-            end
-            debugPrint("DialogStarted...", dialog, dialogInstanceId, numberOfInvolvedPlayers, numberOfInvolvedNpcs)
-            if numberOfInvolvedPlayers == 2 and numberOfInvolvedNpcs == 0 then
-                local involvedPlayers = {}
-                local isPartyMembersOnly = true
-                for i = 1, numberOfInvolvedPlayers do
-                    local involvedPlayer = Osi.DialogGetInvolvedPlayer(dialogInstanceId, i)
-                    if Players[involvedPlayer] == nil then
-                        isPartyMembersOnly = false
-                        break
-                    end
-                    table.insert(involvedPlayers, involvedPlayer)
-                end
-                if isPartyMembersOnly then
-                    debugPrint("Stopping dialog...", dialogInstanceId)
-                    debugDump(involvedPlayers)
-                    for _, player in ipairs(involvedPlayers) do
-                        Osi.DialogRemoveActorFromDialog(dialogInstanceId, player)
-                        Osi.DialogRequestStopForDialog(dialog, player)
-                    end
-                    dialogStopped = true
-                end
-            end
-        end
+        -- if BrawlActive then
+        --     local numberOfInvolvedPlayers = Osi.DialogGetNumberOFInvolvedPlayers(dialogInstanceId)
+        --     local numberOfInvolvedNpcs = Osi.DialogGetNumberOfInvolvedNPCs(dialogInstanceId)
+        --     if numberOfInvolvedNpcs == 1 then
+        --         if getDisplayName(Osi.DialogGetInvolvedNPC(dialogInstanceId, 1)) == "Dream Visitor" then
+        --             numberOfInvolvedNpcs = 0
+        --         end
+        --     end
+        --     debugPrint("DialogStarted...", dialog, dialogInstanceId, numberOfInvolvedPlayers, numberOfInvolvedNpcs)
+        --     if numberOfInvolvedPlayers == 2 and numberOfInvolvedNpcs == 0 then
+        --         local involvedPlayers = {}
+        --         local isPartyMembersOnly = true
+        --         for i = 1, numberOfInvolvedPlayers do
+        --             local involvedPlayer = Osi.DialogGetInvolvedPlayer(dialogInstanceId, i)
+        --             if Players[involvedPlayer] == nil then
+        --                 isPartyMembersOnly = false
+        --                 break
+        --             end
+        --             table.insert(involvedPlayers, involvedPlayer)
+        --         end
+        --         if isPartyMembersOnly then
+        --             debugPrint("Stopping dialog...", dialogInstanceId)
+        --             debugDump(involvedPlayers)
+        --             for _, player in ipairs(involvedPlayers) do
+        --                 Osi.DialogRemoveActorFromDialog(dialogInstanceId, player)
+        --                 Osi.DialogRequestStopForDialog(dialog, player)
+        --             end
+        --             dialogStopped = true
+        --         end
+        --     end
+        -- end
         if not dialogStopped then
             BrawlActive = false
             stopPulseReposition(level)
