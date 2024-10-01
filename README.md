@@ -4,14 +4,6 @@ Just an experiment to see if I can get real time combat working in Baldur's Gate
 
 Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o) for the excellent library.
 
-## Status
-
-Lots of stuff unimplemented and/or maybe not feasible to implement for RTwP, but, I'm testing the mod out in act 1 and so far it seems okay...
-
-Many people have commented that combat seems really imbalanced, which is true.  Still in very early testing to find gamebreaking bugs etc.  Balance should hopefully improve over time as everything gets ironed out.
-
-The built-in BG3 combat AI is only accessible during normal turn-based combat, which means that sadly this mod cannot tap into it.  (If you know of a way around this, please let me know.)  I set up some very simple handrolled "AI" logic just to test things out.  I expected this to fall flat on its face for more complex encounters, but I just did the Emerald Grove fight (where you meet Wyll) and it basically seems okay.
-
 ## Videos
 
 ### 1) Basic Combat

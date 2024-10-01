@@ -2,7 +2,8 @@
 DEBUG_LOGGING = true
 ACTION_INTERVAL = 6000
 REPOSITION_INTERVAL = 2500
-BRAWL_FIZZLER_TIMEOUT = 10000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
+BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
+LIE_ON_GROUND_TIMEOUT = 2000
 ENTER_COMBAT_RANGE = 20
 NEARBY_RADIUS = 35
 MELEE_RANGE = 1.5
@@ -11,6 +12,7 @@ RANGED_RANGE_SWEETSPOT = 10
 RANGED_RANGE_MIN = 5
 MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
 MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
+HITPOINTS_MULTIPLIER = 3
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 USABLE_COMPANION_SPELLS = {
@@ -62,12 +64,13 @@ MOVEMENT_SPEED_THRESHOLDS = {
     EASY = {Sprint = 12, Run = 9, Walk = 6},
 }
 
--- State
+-- Session state
 Brawlers = {}
 Players = {}
 PulseRepositionTimers = {}
 PulseActionTimers = {}
 BrawlFizzler = {}
+ModifiedHitpoints = {}
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
 PlayerCurrentTarget = nil
@@ -92,13 +95,12 @@ function dumpAllEntityKeys()
     end
 end
 
--- NB: can hp ever dip negative?
-function isDeadOrDying(entityUuid)
-    return Osi.IsDead(entityUuid) == 1 or Osi.GetHitpoints(entityUuid) == 0
+function isDowned(entityUuid)
+    return Osi.IsDead(entityUuid) == 0 and Osi.GetHitpoints(entityUuid) == 0
 end
 
 function isAliveAndCanFight(entityUuid)
-    return not isDeadOrDying(entityUuid) and Osi.CanFight(entityUuid) == 1
+    return Osi.IsDead(entityUuid) == 0 and Osi.GetHitpoints(entityUuid) > 0 and Osi.CanFight(entityUuid) == 1
 end
 
 function isPlayerOrAlly(entityUuid)
@@ -231,22 +233,22 @@ end
 -- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
 -- (automove using UseSpell/Attack only uses the fastest possible movement speed)
 function moveThenAct(attackerUuid, targetUuid, spell)
-    local targetRadius = Ext.Stats.Get(spell).TargetRadius
-    debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
-    debugDump(Players[attackerUuid])
-    if targetRadius == "MeleeMainWeaponRange" then
-        Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-    else
-        local targetRadiusNumber = tonumber(targetRadius)
-        if targetRadiusNumber ~= nil then
-            local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-            if distanceToTarget > targetRadiusNumber then
-                debugPrint("moveThenAct distance > targetRadius, moving to...")
-                moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-            end
-        end
-    end
-    debugPrint("moveThenAct UseSpell", attackerUuid, spell, targetUuid)
+    -- local targetRadius = Ext.Stats.Get(spell).TargetRadius
+    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spell, targetRadius)
+    -- debugDump(Players[attackerUuid])
+    -- if targetRadius == "MeleeMainWeaponRange" then
+    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    -- else
+    --     local targetRadiusNumber = tonumber(targetRadius)
+    --     if targetRadiusNumber ~= nil then
+    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+    --         if distanceToTarget > targetRadiusNumber then
+    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
+    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+    --         end
+    --     end
+    -- end
+    -- debugPrint("moveThenAct UseSpell", attackerUuid, spell, targetUuid)
     Osi.UseSpell(attackerUuid, spell, targetUuid)
 end
 
@@ -400,13 +402,7 @@ end
 function repositionRelativeToTarget(brawlerUuid, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawlerUuid)
     local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
-    if archetype == "melee" then
-        if distanceToTarget > MELEE_RANGE then
-            Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
-        else
-            holdPosition(brawlerUuid)
-        end
-    elseif archetype == "base" and isPlayerOrAlly(brawlerUuid) then
+    if isPlayerOrAlly(brawlerUuid) then
         local hostUuid = Osi.GetHostCharacter()
         local targetDistanceFromHost = Osi.GetDistanceTo(targetUuid, hostUuid)
         -- If we're close to melee range, then advance, even if we're too far from the player
@@ -421,16 +417,24 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
         else
             holdPosition(brawlerUuid)
         end
-    else
-        if distanceToTarget <= MELEE_RANGE then
-            holdPosition(brawlerUuid)
-        elseif distanceToTarget < RANGED_RANGE_MIN then
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
-        elseif distanceToTarget < RANGED_RANGE_MAX then
-            holdPosition(brawlerUuid)
+    elseif archetype == "melee" then
+        if distanceToTarget > MELEE_RANGE then
+            Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         else
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+            holdPosition(brawlerUuid)
         end
+    else
+        -- debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
+        holdPosition(brawlerUuid)
+        -- if distanceToTarget <= MELEE_RANGE then
+        --     holdPosition(brawlerUuid)
+        -- elseif distanceToTarget < RANGED_RANGE_MIN then
+        --     moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        -- elseif distanceToTarget < RANGED_RANGE_MAX then
+        --     holdPosition(brawlerUuid)
+        -- else
+        --     moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        -- end
     end
 end
 
@@ -517,7 +521,7 @@ end
 
 function addNearbyToBrawlers(entityUuid, nearbyRadius)
     for _, nearby in ipairs(getNearby(entityUuid, nearbyRadius)) do
-        if nearby.Entity.IsCharacter then
+        if nearby.Entity.IsCharacter and isAliveAndCanFight(nearby.Guid) then
             addBrawler(nearby.Guid)
         end
     end
@@ -565,6 +569,15 @@ function pulseReposition(level)
                     end
                 end
             end
+        -- Check if this is a downed player unit and apply Osi.LieOnGround for the visual downed glitch
+        elseif Osi.IsPlayer(brawlerUuid) == 1 and isDowned(brawlerUuid) then
+            stopPulseReposition(brawlerUuid)
+            Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
+                if brawler ~= nil and isDowned(brawlerUuid) then
+                    debugPrint("Player downed, applying LieOnGround to", brawlerUuid, brawler.displayName)
+                    Osi.LieOnGround(brawlerUuid)
+                end
+            end)
         end
     end
 end
@@ -600,6 +613,7 @@ function addBrawler(entityUuid)
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
             }
+            -- modifyHitpoints(entityUuid)
             if Osi.IsPlayer(entityUuid) == 0 then
                 Osi.SetCanJoinCombat(entityUuid, 0)
             elseif Players[entityUuid] then
@@ -630,6 +644,7 @@ function endBrawl(level)
     BrawlActive = false
     for brawlerUuid, brawler in pairs(Brawlers[level]) do
         stopPulseAction(brawler)
+        -- revertHitpoints(brawlerUuid)
         if Osi.IsPlayer(brawlerUuid) == 0 then
             Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
         end
@@ -658,6 +673,7 @@ function removeBrawler(level, entityUuid)
     if Osi.IsPlayer(entityUuid) == 0 then
         Osi.SetCanJoinCombat(entityUuid, brawler.originalCanJoinCombat)
     end
+    -- revertHitpoints(entityUuid)
     Brawlers[level][entityUuid] = nil
 end
 
@@ -683,12 +699,10 @@ function resetPlayers()
     Players = {}
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        -- local playerEntity = Ext.Entity.Get(uuid)
         Players[uuid] = {
             uuid = uuid,
             displayName = getDisplayName(uuid),
             userId = Osi.GetReservedUserID(uuid),
-            -- userId = playerEntity.PartyMember.UserId,
         }
     end
 end
@@ -710,6 +724,38 @@ function setIsControllingDirectly()
         end
         -- debugDump("setIsControllingDirectly")
         -- debugDump(Players)
+    end
+end
+
+function revertHitpoints(entityUuid)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity.IsCharacter and ModifiedHitpoints[entityUuid] ~= nil then
+        entity.Health.MaxHp = ModifiedHitpoints[entityUuid].originalMaxHp
+        entity.Health.Hp = ModifiedHitpoints[entityUuid].originalHp
+        entity:Replicate("Health")
+        ModifiedHitpoints[entityUuid] = nil
+        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+    end
+end
+
+function modifyHitpoints(entityUuid)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity.IsCharacter and isAliveAndCanFight(entityUuid) and ModifiedHitpoints[entityUuid] == nil then
+        local originalHp = Osi.GetHitpoints(entityUuid)
+        local originalMaxHp = Osi.GetMaxHitpoints(entityUuid)
+        local modifiedMaxHp = originalMaxHp * HITPOINTS_MULTIPLIER
+        local modifiedHp = originalHp * HITPOINTS_MULTIPLIER
+        entity.Health.MaxHp = modifiedMaxHp
+        entity.Health.Hp = modifiedHp
+        entity:Replicate("Health")
+        ModifiedHitpoints[entityUuid] = {
+            originalHp = originalHp,
+            originalMaxHp = originalMaxHp,
+            modifiedHp = modifiedHp,
+            modifiedMaxHp = modifiedMaxHp,
+        }
+        debugDump(ModifiedHitpoints[entityUuid])
+        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalHp, modifiedHp, originalMaxHp, modifiedMaxHp)
     end
 end
 
@@ -740,8 +786,14 @@ Ext.Events.SessionLoaded:Subscribe(function ()
     --     debugPrint("CombatParticipant", entityUuid, getDisplayName(entityUuid))
     -- end)
 
+    Ext.Events.ResetCompleted:Subscribe(function ()
+        print("ResetCompleted")
+        onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
+    end)
+
     Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", function (level, _)
         debugPrint("LevelGameplayStarted", level)
+        -- modifyNearbyHitpoints(Osi.GetHostCharacter())
         onStarted(level)
     end)
 
@@ -836,7 +888,7 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         end
         -- Sometimes units don't appear dead when killed out-of-combat...
         -- this at least makes them lie prone (and dead-appearing units still appear dead)
-        Ext.Timer.WaitFor(1200, function ()
+        Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
             debugPrint("LieOnGround", entityGuid)
             Osi.LieOnGround(entityGuid)
         end)
@@ -967,9 +1019,4 @@ Ext.Events.SessionLoaded:Subscribe(function ()
         PlayerCurrentTarget = nil
         stopPulseReposition(level)
     end)
-end)
-
-Ext.Events.ResetCompleted:Subscribe(function ()
-    print("ResetCompleted")
-    onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end)
