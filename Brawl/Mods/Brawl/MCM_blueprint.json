@@ -1,0 +1,46 @@
+{
+    "SchemaVersion": 1,
+    "Optional": true,
+    "Tabs": [
+        {
+            "TabName": "General",
+            "TabId": "general",
+            "Sections": [
+                {
+                    "SectionId": "general_settings",
+                    "SectionName": "General Settings",
+                    "Settings": [
+                        {
+                            "Id": "mod_enabled",
+                            "Name": "Enable Mod",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "Toggle the mod on/off without uninstalling it",
+                            "Handles": {
+                                "DescriptionHandle": "h012f6360970348a09ec00cfbae32d13a078e",
+                                "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "companion_ai",
+                    "SectionName": "Companion AI",
+                    "Settings": [
+                        {
+                            "Id": "companion_ai_enabled",
+                            "Name": "Enable Companion AI",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "Toggle the companion AI on or off",
+                            "Handles": {
+                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
+                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
