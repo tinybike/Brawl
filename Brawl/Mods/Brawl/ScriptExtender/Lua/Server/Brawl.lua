@@ -79,7 +79,7 @@ Players = {}
 PulseRepositionTimers = {}
 PulseActionTimers = {}
 BrawlFizzler = {}
-ModifiedHitpoints = {}
+IsAttackingOrBeingAttackedByPlayer = {}
 -- DynamicAnimationTagsSubscription = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
@@ -122,8 +122,9 @@ function isPlayerOrAlly(entityUuid)
     return Osi.IsPlayer(entityUuid) == 1 or Osi.IsAlly(Osi.GetHostCharacter(), entityUuid) == 1
 end
 
-function isPugnacious(entityUuid)
-    return Osi.IsEnemy(Osi.GetHostCharacter(), entityUuid) == 1
+function isPugnacious(potentialEnemyUuid, uuid)
+    uuid = uuid or Osi.GetHostCharacter()
+    return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 
 function getDisplayName(entityUuid)
@@ -341,7 +342,8 @@ end
 function findTargetToAttack(brawler)
     for _, target in ipairs(getBrawlersSortedByDistance(brawler.uuid)) do
         local targetUuid, distanceToTarget = target[1], target[2]
-        if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and Osi.IsInvisible(targetUuid) == 0 and isAliveAndCanFight(targetUuid) then
+        local isEnemy = isPlayerOrAlly(brawler.uuid) and isPugnacious(targetUuid, brawler.uuid) or Osi.IsEnemy(brawler.uuid, targetUuid) == 1
+        if isEnemy and Osi.IsInvisible(targetUuid) == 0 and isAliveAndCanFight(targetUuid) then
             debugPrint("Attack", brawler.displayName, brawler.uuid, distanceToTarget, "->", getDisplayName(targetUuid))
             brawler.targetUuid = targetUuid
             return actOnTarget(brawler, targetUuid)
@@ -666,8 +668,9 @@ end
 
 function stopBrawlFizzler(level)
     if BrawlFizzler[level] ~= nil then
-        debugPrint("Something happened, stopping brawl fizzler...")
+        -- debugPrint("Something happened, stopping brawl fizzler...")
         Ext.Timer.Cancel(BrawlFizzler[level])
+        BrawlFizzler[level] = nil
     end
 end
 
@@ -1022,9 +1025,15 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     addBrawler(attackerUuid)
     addBrawler(defenderUuid)
     if Osi.IsPlayer(attackerUuid) == 1 then
+        if Osi.IsPlayer(defenderUuid) == 0 then
+            IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
+        end
         addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
     end
     if Osi.IsPlayer(defenderUuid) == 1 then
+        if Osi.IsPlayer(attackerUuid) == 0 then
+            IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
+        end
         addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
     end
     startBrawlFizzler(Osi.GetRegion(attackerUuid))
