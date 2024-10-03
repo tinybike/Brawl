@@ -7,7 +7,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -634,7 +634,7 @@ function addBrawler(entityUuid)
         -- Add a short delay so users have a second to think
         Ext.Timer.WaitFor(1500, function ()
             local level = Osi.GetRegion(entityUuid)
-            if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and Osi.IsDead(entityUuid) == 0 then
+            if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) and Osi.CanJoinCombat(entityUuid) == 1 then
                 local displayName = getDisplayName(entityUuid)
                 debugPrint("Adding Brawler", entityUuid, displayName)
                 Brawlers[level][entityUuid] = {
@@ -645,10 +645,10 @@ function addBrawler(entityUuid)
                     isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 }
                 if Osi.IsPlayer(entityUuid) == 0 then
-                    Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid),
+                    -- Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                     Osi.SetCanJoinCombat(entityUuid, 0)
                 elseif Players[entityUuid] then
-                    Brawlers[level][entityUuid].originalCanJoinCombat = 1
+                    -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
                     setPlayerRunToSprint(entityUuid)
                 end
             end
@@ -679,9 +679,10 @@ function endBrawl(level)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             stopPulseAction(brawler)
-            -- revertHitpoints(brawlerUuid)
-            Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
+            -- Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
             Osi.FlushOsirisQueue(brawlerUuid)
+            debugPrint("setCanJoinCombat to 1 for", brawlerUuid, brawler.displayName)
+            Osi.SetCanJoinCombat(brawlerUuid, 1)
         end
         debugPrint("Ended brawl")
         debugDump(Brawlers[level])
@@ -704,10 +705,7 @@ function removeBrawler(level, entityUuid)
     local combatGuid = nil
     local brawler = Brawlers[level][entityUuid]
     stopPulseAction(brawler)
-    if Osi.IsPlayer(entityUuid) == 0 then
-        Osi.SetCanJoinCombat(entityUuid, brawler.originalCanJoinCombat)
-    end
-    -- revertHitpoints(entityUuid)
+    Osi.SetCanJoinCombat(entityUuid, 1)
     Brawlers[level][entityUuid] = nil
 end
 
@@ -874,15 +872,6 @@ local function onCombatStarted(combatGuid)
         addBrawler(playerUuid)
     end
     debugDump(Brawlers)
-    BrawlActive = true
-    addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
-end
-
-local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
-    for playerUuid, player in pairs(Players) do
-        addBrawler(playerUuid)
-    end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         debugDump(Brawlers)
@@ -891,10 +880,25 @@ local function onCombatRoundStarted(combatGuid, round)
         Ext.Timer.WaitFor(500, function ()
             addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
             Ext.Timer.WaitFor(1500, function ()
-                -- do we need this?  will probably cause story-related problems or at least awkwardness :/
-                Osi.EndCombat(combatGuid)
+                if Osi.CombatIsActive(combatGuid) then
+                    Osi.EndCombat(combatGuid)
+                end
             end)
         end)
+    end
+end
+
+local function onCombatRoundStarted(combatGuid, round)
+    debugPrint("CombatRoundStarted", combatGuid, round)
+    onCombatStarted(combatGuid)
+end
+
+function checkNearby()
+    for _, nearby in ipairs(getNearby(Osi.GetHostCharacter(), 50)) do
+        if nearby.Entity.IsCharacter then
+            local uuid = nearby.Guid
+            print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
+        end
     end
 end
 
@@ -984,6 +988,7 @@ local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
+        Osi.PurgeOsirisQueue(targetUuid, 1)
         Osi.FlushOsirisQueue(targetUuid)
         -- local targetEntity = Ext.Entity.Get(targetUuid)
         -- local targetUserId = targetEntity.UserAvatar.UserID --buggy?? doesn't match the others??
@@ -991,8 +996,6 @@ local function onGainedControl(targetGuid)
         -- local targetUserId = targetEntity.PartyMember.UserId
         local targetUserId = Osi.GetReservedUserID(targetUuid)
         if Players[targetUuid] ~= nil and targetUserId ~= nil then
-            Osi.PurgeOsirisQueue(targetUuid, 1)
-            Osi.FlushOsirisQueue(targetUuid)
             Players[targetUuid].isControllingDirectly = true
             for playerUuid, player in pairs(Players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
