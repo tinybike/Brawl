@@ -1,6 +1,6 @@
 -- MCM Settings
-local ModEnabled = true
-local CompanionAIEnabled = true
+ModEnabled = true
+CompanionAIEnabled = true
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -357,7 +357,9 @@ end
 function stopPulseAction(brawler)
     brawler.isInBrawl = false
     if PulseActionTimers[brawler.uuid] ~= nil then
+        debugPrint("stop pulse action", brawler.displayName)
         Ext.Timer.Cancel(PulseActionTimers[brawler.uuid])
+        PulseActionTimers[brawler.uuid] = nil
     end
 end
 
@@ -408,7 +410,10 @@ function pulseAction(brawler)
 end
 
 function startPulseAction(brawler)
-    stopPulseAction(brawler)
+    debugPrint("start pulse action for", brawler.displayName)
+    if PulseActionTimers[brawler.uuid] ~= nil then
+        stopPulseAction(brawler)
+    end
     brawler.isInBrawl = true
     PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
         pulseAction(brawler)
@@ -547,6 +552,7 @@ end
 function stopPulseReposition(level)
     if PulseRepositionTimers[level] ~= nil then
         Ext.Timer.Cancel(PulseRepositionTimers[level])
+        PulseRepositionTimers[level] = nil
     end
 end
 
@@ -604,7 +610,9 @@ end
 
 -- Reposition if needed every REPOSITION_INTERVAL ms
 function startPulseReposition(level)
-    stopPulseReposition(level)
+    if PulseRepositionTimers[level] ~= nil then
+        stopPulseReposition(level)
+    end
     PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
         pulseReposition(level)
     end, REPOSITION_INTERVAL)
@@ -980,6 +988,8 @@ local function onGainedControl(targetGuid)
         -- local targetUserId = targetEntity.PartyMember.UserId
         local targetUserId = Osi.GetReservedUserID(targetUuid)
         if Players[targetUuid] ~= nil and targetUserId ~= nil then
+            Osi.PurgeOsirisQueue(targetUuid, 1)
+            Osi.FlushOsirisQueue(targetUuid)
             Players[targetUuid].isControllingDirectly = true
             for playerUuid, player in pairs(Players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
