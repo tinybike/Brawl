@@ -5,11 +5,11 @@ AutoPauseOnDowned = true
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
-    AutoPausedOnDowned = MCM.Get("auto_paused_on_downed")
+    AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -36,6 +36,8 @@ local USABLE_COMPANION_SPELLS = {
     Target_Topple = true,
     Target_UnarmedAttack = true,
     Target_AdvancedMeleeWeaponAction = true,
+    Target_Charger_Attack = true,
+    Target_Charger_Push = true,
     -- Target_Counterspell = true,
     -- Target_CripplingStrike = true,
     Target_CuttingWords = true,
@@ -1306,7 +1308,7 @@ local function onMCMSettingSaved(payload)
         else
             disableCompanionAI(hotkey)
         end
-    elseif payload.settingId == "auto_paused_on_downed" then
+    elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     end
 end
