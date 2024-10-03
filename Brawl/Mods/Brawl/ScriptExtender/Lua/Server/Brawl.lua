@@ -1,13 +1,15 @@
 -- MCM Settings
 ModEnabled = true
 CompanionAIEnabled = true
+AutoPauseOnDowned = true
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
+    AutoPausedOnDowned = MCM.Get("auto_paused_on_downed")
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -784,6 +786,15 @@ function modifyHitpoints(entityUuid)
     end
 end
 
+function checkNearby()
+    for _, nearby in ipairs(getNearby(Osi.GetHostCharacter(), 50)) do
+        if nearby.Entity.IsCharacter then
+            local uuid = nearby.Guid
+            print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
+        end
+    end
+end
+
 function cleanupAll()
     for level, timer in pairs(PulseRepositionTimers) do
         Ext.Timer.Cancel(timer)
@@ -822,28 +833,6 @@ local function onResetCompleted()
     debugPrint("ResetCompleted")
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
-
--- local function onNetMessage(data)
---     debugDump(data)
---     if data.Channel == "IsUsingController" then
---         -- NB: attach this to the player, rather than just a single value for all players?
---         IsUsingController = data.Payload == "1"
---         if IsUsingController and DynamicAnimationTagsSubscription ~= nil then
---             Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
---             DynamicAnimationTagsSubscription = nil
---         end
---     elseif data.Channel == "Clicked" and data.Payload == "ExitFTBButton" then
---         -- data.UserID
---         for playerUuid, player in pairs(Players) do
---             if player.isPaused then
---                 player.isWindingUp = false
---                 local entity = Ext.Entity.Get(playerUuid)
---                 entity.TurnBased.IsInCombat_M = true
---                 entity:Replicate("TurnBased")
---             end
---         end
---     end
--- end
 
 -- New user joined (multiplayer)
 local function onUserReservedFor(entity, _, _)
@@ -891,15 +880,6 @@ end
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     onCombatStarted(combatGuid)
-end
-
-function checkNearby()
-    for _, nearby in ipairs(getNearby(Osi.GetHostCharacter(), 50)) do
-        if nearby.Entity.IsCharacter then
-            local uuid = nearby.Guid
-            print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
-        end
-    end
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
@@ -1021,6 +1001,17 @@ local function onCharacterLeftParty(character)
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
+local function onDownedChanged(character, isDowned)
+    local entityUuid = Osi.GetUUID(character)
+    debugPrint("DownedChanged", character, isDowned, entityUuid)
+    if isDowned == 1 and AutoPauseOnDowned then
+        local player = Players[entityUuid]
+        if player and player.isControllingDirectly and not player.isPaused then
+            Osi.ForceTurnBasedMode(entityUuid, 1)
+        end
+    end
+end
+
 local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     BrawlActive = true
     local attackerUuid = Osi.GetUUID(attackerGuid)
@@ -1124,21 +1115,18 @@ function initBrawlers(level)
     startPulseReposition(level)
 end
 
-local function stopListeners()
+function stopListeners()
     cleanupAll()
     for _, listener in pairs(Listeners) do
         listener.stop(listener.handle)
     end
 end
 
-local function startListeners()
+function startListeners()
     debugPrint("Starting listeners...")
     Listeners.ResetCompleted = {}
     Listeners.ResetCompleted.handle = Ext.Events.ResetCompleted:Subscribe(onResetCompleted)
     Listeners.ResetCompleted.stop = function () Ext.Events.ResetCompleted:Unsubscribe(Listeners.ResetCompleted.handle) end
-    -- Listeners.NetMessage = {}
-    -- Listeners.NetMessage.handle = Ext.Events.NetMessage:Subscribe(onNetMessage)
-    -- Listeners.NetMessage.stop = function () Ext.Events.NetMessage:Unsubscribe(Listeners.NetMessage.handle) end
     Listeners.UserReservedFor = {
         handle = Ext.Entity.Subscribe("UserReservedFor", onUserReservedFor),
         stop = Ext.Entity.Unsubscribe,
@@ -1191,6 +1179,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("CharacterLeftParty", 1, "after", onCharacterLeftParty),
         stop = Ext.Osiris.UnregisterListener,
     }
+    Listeners.DownedChanged = {
+        handle = Ext.Osiris.RegisterListener("DownedChanged", 2, "after", onDownedChanged),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     Listeners.AttackedBy = {
         handle = Ext.Osiris.RegisterListener("AttackedBy", 7, "after", onAttackedBy),
         stop = Ext.Osiris.UnregisterListener,
@@ -1221,6 +1213,78 @@ local function startListeners()
     }
 end
 
+local function onGameStateChanged(e)
+    if e and e.ToState == "UnloadLevel" then
+        cleanupAll()
+    end
+end
+
+local function disableCompanionAI(hotkey)
+    debugPrint("companion ai disabled, stopping pulse actions")
+    CompanionAIEnabled = false
+    for playerUuid, player in pairs(Players) do
+        if Brawlers and Brawlers[playerUuid] then
+            stopPulseAction(Brawlers[playerUuid])
+            Osi.PurgeOsirisQueue(playerUuid, 1)
+            Osi.FlushOsirisQueue(playerUuid)
+        end
+    end
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Disabled (Press " .. hotkey .. " to Enable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
+local function enableCompanionAI(hotkey)
+    CompanionAIEnabled = true
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Enabled (Press " .. hotkey .. " to Disable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
+local function toggleCompanionAI(hotkey)
+    if CompanionAIEnabled then
+        disableCompanionAI(hotkey)
+    else
+        enableCompanionAI(hotkey)
+    end
+end
+
+local function disableMod(hotkey)
+    ModEnabled = false
+    stopListeners()
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Brawl Disabled (Press " .. hotkey .. " to Enable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
+local function enableMod(hotkey)
+    ModEnabled = true
+    startListeners()
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        onStarted(level)
+    end
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Brawl Enabled (Press " .. hotkey .. " to Disable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
+local function toggleMod(hotkey)
+    if ModEnabled then
+        disableMod(hotkey)
+    else
+        enableMod(hotkey)
+    end
+end
+
 local function onMCMSettingSaved(payload)
     _D(payload)
     if not payload or payload.modUUID ~= ModuleUUID or not payload.settingId then
@@ -1228,37 +1292,61 @@ local function onMCMSettingSaved(payload)
     end
     if payload.settingId == "mod_enabled" then
         ModEnabled = payload.value
+        local hotkey = MCM.Get("mod_toggle_hotkey")
         if ModEnabled then
-            startListeners()
-            local level = Osi.GetRegion(Osi.GetHostCharacter())
-            if level then
-                onStarted(level)
-            end
+            enableMod(hotkey)
         else
-            stopListeners()
+            disableMod(hotkey)
         end
     elseif payload.settingId == "companion_ai_enabled" then
         CompanionAIEnabled = payload.value
-        if not CompanionAIEnabled then
-            print("companion ai disabled, stopping pulse actions")
-            for playerUuid, player in pairs(Players) do
-                if Brawlers and Brawlers[playerUuid] then
-                    Osi.PurgeOsirisQueue(playerUuid, 1)
-                    Osi.FlushOsirisQueue(playerUuid)
-                    stopPulseAction(Brawlers[playerUuid])
-                end
-            end
+        local hotkey = MCM.Get("companion_ai_toggle_hotkey")
+        if CompanionAIEnabled then
+            enableCompanionAI(hotkey)
+        else
+            disableCompanionAI(hotkey)
         end
+    elseif payload.settingId == "auto_paused_on_downed" then
+        AutoPauseOnDowned = payload.value
     end
 end
 
-local function onGameStateChanged(e)
-    if e and e.ToState == "UnloadLevel" then
-        cleanupAll()
+local function onNetMessage(data)
+    if data.Channel == "ModToggle" then
+        if MCM then
+            MCM.Set("mod_enabled", not ModEnabled)
+        else
+            toggleMod(data.Payload)
+        end
+    elseif data.Channel == "CompanionAIToggle" then
+        if MCM then
+            MCM.Set("companion_ai_enabled", not CompanionAIEnabled)
+        else
+            toggleCompanionAI(data.Payload)
+        end
     end
+    -- if data.Channel == "IsUsingController" then
+    --     -- NB: attach this to the player, rather than just a single value for all players?
+    --     IsUsingController = data.Payload == "1"
+    --     if IsUsingController and DynamicAnimationTagsSubscription ~= nil then
+    --         Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+    --         DynamicAnimationTagsSubscription = nil
+    --     end
+    -- elseif data.Channel == "Clicked" and data.Payload == "ExitFTBButton" then
+    --     -- data.UserID
+    --     for playerUuid, player in pairs(Players) do
+    --         if player.isPaused then
+    --             player.isWindingUp = false
+    --             local entity = Ext.Entity.Get(playerUuid)
+    --             entity.TurnBased.IsInCombat_M = true
+    --             entity:Replicate("TurnBased")
+    --         end
+    --     end
+    -- end
 end
 
 local function onSessionLoaded()
+    Ext.Events.NetMessage:Subscribe(onNetMessage)
     if ModEnabled then
         startListeners()
     else
