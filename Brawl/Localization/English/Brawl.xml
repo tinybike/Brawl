@@ -4,4 +4,10 @@
     <content contentuid="ha00e929fg3f41g4dacg9ca0g2f26ea70ab25" version="1">Enable Mod</content>
     <content contentuid="h610d142agadb3g4d87ga5deg186ff031831c" version="1">Enable/distable companion AI control</content>
     <content contentuid="hae8f7216g6047g46adg839bga877ccbd6147" version="1">Enable Companion AI</content>
+    <content contentuid="h47678051g6e17g4844g9740gf082019d8ab0" version="1">Hotkey for toggling the mod on/off</content>
+    <content contentuid="h5de513b6g8819g43f5ga5fag90de0b66f6f2" version="1">Mod Toggle Hotkey</content>
+    <content contentuid="h9f0b74e2g0973g4847g8c88g12e26d743cb7" version="1">Hotkey for toggling the companion AI on/off</content>
+    <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>
+    <content contentuid="h358f0669gbeffg4e34g9d77g3f7d1960c100" version="1">If checked, the game will automatically pause when the character the player is controlling goes down</content>
+    <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
 </contentList>

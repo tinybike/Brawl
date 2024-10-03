@@ -20,12 +20,23 @@
                                 "DescriptionHandle": "h012f6360970348a09ec00cfbae32d13a078e",
                                 "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"
                             }
+                        },
+                        {
+                            "Id": "mod_toggle_hotkey",
+                            "Name": "Mod Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "F9",
+                            "Description": "Hotkey for toggling the mod on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0",
+                                "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"
+                            }
                         }
                     ]
                 },
                 {
-                    "SectionId": "companion_ai",
-                    "SectionName": "Companion AI",
+                    "SectionId": "features",
+                    "SectionName": "Features",
                     "Settings": [
                         {
                             "Id": "companion_ai_enabled",
@@ -33,6 +44,28 @@
                             "Type": "checkbox",
                             "Default": true,
                             "Description": "Toggle the companion AI on or off",
+                            "Handles": {
+                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
+                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                            }
+                        },
+                        {
+                            "Id": "companion_ai_toggle_hotkey",
+                            "Name": "Companion AI Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "F11",
+                            "Description": "Hotkey for toggling the companion AI on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7",
+                                "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"
+                            }
+                        },
+                        {
+                            "Id": "auto_pause_on_downed",
+                            "Name": "Automatic Pause On Downed",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If checked, the game will automatically pause when the character the player is controlling goes down",
                             "Handles": {
                                 "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
                                 "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
