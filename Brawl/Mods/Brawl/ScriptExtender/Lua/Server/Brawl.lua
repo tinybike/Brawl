@@ -9,7 +9,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -84,7 +84,7 @@ PulseRepositionTimers = {}
 PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
-DynamicAnimationTagsSubscription = nil
+-- DynamicAnimationTagsSubscription = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
 PlayerCurrentTarget = nil
@@ -652,6 +652,7 @@ function addBrawler(entityUuid)
             elseif Players[entityUuid] then
                 -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
                 setPlayerRunToSprint(entityUuid)
+                Osi.SetCanJoinCombat(entityUuid, 0)
             end
         end
     end
@@ -869,21 +870,39 @@ local function onCombatStarted(combatGuid)
     if level then
         debugDump(Brawlers)
         BrawlActive = true
-        startBrawlFizzler(level)
-        Ext.Timer.WaitFor(500, function ()
-            addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
-            Ext.Timer.WaitFor(1500, function ()
-                if Osi.CombatIsActive(combatGuid) then
-                    Osi.EndCombat(combatGuid)
-                end
+        if not Mods.ToT or not Mods.ToT.IsActive() then
+            ENTER_COMBAT_RANGE = 20
+            startBrawlFizzler(level)
+            Ext.Timer.WaitFor(500, function ()
+                addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
+                Ext.Timer.WaitFor(1500, function ()
+                    if Osi.CombatIsActive(combatGuid) then
+                        Osi.EndCombat(combatGuid)
+                    end
+                end)
             end)
-        end)
+        end
     end
 end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
-    onCombatStarted(combatGuid)
+    if not Mods.ToT or not Mods.ToT.IsActive() then
+        ENTER_COMBAT_RANGE = 20
+        onCombatStarted(combatGuid)
+    else
+        ENTER_COMBAT_RANGE = 150
+        debugPrint("Is running", Mods.ToT.PersistentVars.Scenario:IsRunning())
+        if Mods.ToT.PersistentVars.Scenario:IsRunning() then
+            Ext.Timer.WaitFor(6000, function ()
+                debugPrint("Moving ToT forward")
+                Mods.ToT.Scenario.ForwardCombat()
+                Ext.Timer.WaitFor(500, function ()
+                    addNearbyToBrawlers(Osi.GetHostCharacter(), ENTER_COMBAT_RANGE)
+                end)
+            end)
+        end
+    end
 end
 
 local function onCombatEnded(combatGuid)
@@ -903,26 +922,26 @@ local function onEnteredForceTurnBased(entityGuid)
         if level then
             for playerUuid, player in pairs(Players) do
                 if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
-                    Brawlers[level][playerUuid].isPaused = true
+                    Brawlers[level][plqayerUuid].isPaused = true
                     stopPulseAction(Brawlers[level][playerUuid])
                 end
             end
             stopBrawlFizzler(level)
             Osi.PurgeOsirisQueue(entityUuid, 1)
             Osi.FlushOsirisQueue(entityUuid)
-            if DynamicAnimationTagsSubscription == nil and not IsUsingController then
-                DynamicAnimationTagsSubscription = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
-                    if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
-                        local entityUuid = entity.Uuid.EntityUuid
-                        if entityUuid and Players[entityUuid] and not Players[entityUuid].isWindingUp then
-                            Players[entityUuid].isWindingUp = true
-                            entity.TurnBased.IsInCombat_M = false
-                            Ext.ServerNet.PostMessageToClient(entityUuid, "IsWindingUp", entityUuid)
-                            -- entity:Replicate("TurnBased")
-                        end
-                    end
-                end)
-            end
+            -- if DynamicAnimationTagsSubscription == nil and not IsUsingController then
+            --     DynamicAnimationTagsSubscription = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
+            --         if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
+            --             local entityUuid = entity.Uuid.EntityUuid
+            --             if entityUuid and Players[entityUuid] and not Players[entityUuid].isWindingUp then
+            --                 Players[entityUuid].isWindingUp = true
+            --                 entity.TurnBased.IsInCombat_M = false
+            --                 Ext.ServerNet.PostMessageToClient(entityUuid, "IsWindingUp", entityUuid)
+            --                 -- entity:Replicate("TurnBased")
+            --             end
+            --         end
+            --     end)
+            -- end
         end
     end
 end
@@ -930,10 +949,10 @@ end
 function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
-    if DynamicAnimationTagsSubscription ~= nil then
-        Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
-    end
-    DynamicAnimationTagsSubscription = nil
+    -- if DynamicAnimationTagsSubscription ~= nil then
+    --     Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+    -- end
+    -- DynamicAnimationTagsSubscription = nil
     Ext.Entity.Get(entityUuid).TurnBased.IsInCombat_M = true
     if BrawlActive then
         local level = Osi.GetRegion(entityUuid)
@@ -1341,28 +1360,28 @@ local function onNetMessage(data)
             toggleCompanionAI(data.Payload)
         end
     end
-    if data.Channel == "IsUsingController" then
-        -- NB: attach this to the player, rather than just a single value for all players?
-        IsUsingController = data.Payload == "1"
-        if IsUsingController and DynamicAnimationTagsSubscription ~= nil then
-            Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
-            DynamicAnimationTagsSubscription = nil
-        end
-    elseif data.Channel == "Clicked" and data.Payload == "ExitFTBButton" then
-        -- data.UserID
-        for playerUuid, player in pairs(Players) do
-            if player.isWindingUp then
-                if DynamicAnimationTagsSubscription ~= nil then
-                    Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
-                end
-                DynamicAnimationTagsSubscription = nil
-                player.isWindingUp = false
-                local entity = Ext.Entity.Get(playerUuid)
-                entity.TurnBased.IsInCombat_M = true
-                entity:Replicate("TurnBased")
-            end
-        end
-    end
+    -- if data.Channel == "IsUsingController" then
+    --     -- NB: attach this to the player, rather than just a single value for all players?
+    --     IsUsingController = data.Payload == "1"
+    --     if IsUsingController and DynamicAnimationTagsSubscription ~= nil then
+    --         Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+    --         DynamicAnimationTagsSubscription = nil
+    --     end
+    -- elseif data.Channel == "Clicked" and data.Payload == "ExitFTBButton" then
+    --     -- data.UserID
+    --     for playerUuid, player in pairs(Players) do
+    --         if player.isWindingUp then
+    --             if DynamicAnimationTagsSubscription ~= nil then
+    --                 Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+    --             end
+    --             DynamicAnimationTagsSubscription = nil
+    --             player.isWindingUp = false
+    --             local entity = Ext.Entity.Get(playerUuid)
+    --             entity.TurnBased.IsInCombat_M = true
+    --             entity:Replicate("TurnBased")
+    --         end
+    --     end
+    -- end
 end
 
 local function onSessionLoaded()
