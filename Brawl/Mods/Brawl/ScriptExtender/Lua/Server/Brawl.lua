@@ -5,11 +5,11 @@ AutoPauseOnDowned = true
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
-    AutoPausedOnDowned = MCM.Get("auto_paused_on_downed")
+    AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -36,6 +36,8 @@ local USABLE_COMPANION_SPELLS = {
     Target_Topple = true,
     Target_UnarmedAttack = true,
     Target_AdvancedMeleeWeaponAction = true,
+    Target_Charger_Attack = true,
+    -- Target_Charger_Push = true,
     -- Target_Counterspell = true,
     -- Target_CripplingStrike = true,
     Target_CuttingWords = true,
@@ -633,28 +635,26 @@ end
 -- NB: should we also index Brawlers by combatGuid?
 function addBrawler(entityUuid)
     if entityUuid ~= nil then
-        -- Add a short delay so users have a second to think
-        Ext.Timer.WaitFor(1500, function ()
-            local level = Osi.GetRegion(entityUuid)
-            if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) and Osi.CanJoinCombat(entityUuid) == 1 then
-                local displayName = getDisplayName(entityUuid)
-                debugPrint("Adding Brawler", entityUuid, displayName)
-                Brawlers[level][entityUuid] = {
-                    uuid = entityUuid,
-                    displayName = displayName,
-                    combatGuid = Osi.CombatGetGuidFor(entityUuid),
-                    isInBrawl = false,
-                    isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
-                }
-                if Osi.IsPlayer(entityUuid) == 0 then
-                    -- Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
-                elseif Players[entityUuid] then
-                    -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
-                    setPlayerRunToSprint(entityUuid)
-                end
+        local level = Osi.GetRegion(entityUuid)
+        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) then
+            local displayName = getDisplayName(entityUuid)
+            debugPrint("Adding Brawler", entityUuid, displayName)
+            Brawlers[level][entityUuid] = {
+                uuid = entityUuid,
+                displayName = displayName,
+                combatGuid = Osi.CombatGetGuidFor(entityUuid),
+                isInBrawl = false,
+                isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
+            }
+            if Osi.IsPlayer(entityUuid) == 0 then
+                -- Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
+                Osi.SetCanJoinCombat(entityUuid, 0)
+            elseif Players[entityUuid] then
+                -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
+                setPlayerRunToSprint(entityUuid)
+                Osi.SetCanJoinCombat(entityUuid, 0)
             end
-        end)
+        end
     end
 end
 
@@ -797,6 +797,7 @@ end
 
 function cleanupAll()
     for level, timer in pairs(PulseRepositionTimers) do
+        endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
     for uuid, timer in pairs(PulseActionTimers) do
@@ -805,6 +806,10 @@ function cleanupAll()
     for level, timer in pairs(BrawlFizzler) do
         endBrawl(level)
         Ext.Timer.Cancel(timer)
+    end
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        endBrawl(level)
     end
     BrawlActive = false
     PlayerCurrentTarget = nil
@@ -865,21 +870,43 @@ local function onCombatStarted(combatGuid)
     if level then
         debugDump(Brawlers)
         BrawlActive = true
-        startBrawlFizzler(level)
-        Ext.Timer.WaitFor(500, function ()
-            addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
-            Ext.Timer.WaitFor(1500, function ()
-                if Osi.CombatIsActive(combatGuid) then
-                    Osi.EndCombat(combatGuid)
-                end
+        if not Mods.ToT or not Mods.ToT.IsActive() then
+            ENTER_COMBAT_RANGE = 20
+            startBrawlFizzler(level)
+            Ext.Timer.WaitFor(500, function ()
+                addNearbyToBrawlers(Osi.GetHostCharacter(), NEARBY_RADIUS)
+                Ext.Timer.WaitFor(1500, function ()
+                    if Osi.CombatIsActive(combatGuid) then
+                        Osi.EndCombat(combatGuid)
+                    end
+                end)
             end)
-        end)
+        end
     end
 end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
-    onCombatStarted(combatGuid)
+    if not Mods.ToT or not Mods.ToT.IsActive() then
+        ENTER_COMBAT_RANGE = 20
+        onCombatStarted(combatGuid)
+    else
+        ENTER_COMBAT_RANGE = 150
+        debugPrint("Is running", Mods.ToT.PersistentVars.Scenario:IsRunning())
+        if Mods.ToT.PersistentVars.Scenario:IsRunning() then
+            Ext.Timer.WaitFor(6000, function ()
+                debugPrint("Moving ToT forward")
+                Mods.ToT.Scenario.ForwardCombat()
+                Ext.Timer.WaitFor(500, function ()
+                    addNearbyToBrawlers(Osi.GetHostCharacter(), ENTER_COMBAT_RANGE)
+                end)
+            end)
+        end
+    end
+end
+
+local function onCombatEnded(combatGuid)
+    debugPrint("CombatEnded", combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
@@ -895,7 +922,7 @@ local function onEnteredForceTurnBased(entityGuid)
         if level then
             for playerUuid, player in pairs(Players) do
                 if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
-                    Brawlers[level][playerUuid].isPaused = true
+                    Brawlers[level][plqayerUuid].isPaused = true
                     stopPulseAction(Brawlers[level][playerUuid])
                 end
             end
@@ -905,10 +932,12 @@ local function onEnteredForceTurnBased(entityGuid)
             -- if DynamicAnimationTagsSubscription == nil and not IsUsingController then
             --     DynamicAnimationTagsSubscription = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
             --         if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
-            --             if entity.Uuid.EntityUuid and Players[entity.Uuid.EntityUuid] and not Players[entity.Uuid.EntityUuid].isWindingUp then
-            --                 Players[entity.Uuid.EntityUuid].isWindingUp = true
+            --             local entityUuid = entity.Uuid.EntityUuid
+            --             if entityUuid and Players[entityUuid] and not Players[entityUuid].isWindingUp then
+            --                 Players[entityUuid].isWindingUp = true
             --                 entity.TurnBased.IsInCombat_M = false
-            --                 entity:Replicate("TurnBased")
+            --                 Ext.ServerNet.PostMessageToClient(entityUuid, "IsWindingUp", entityUuid)
+            --                 -- entity:Replicate("TurnBased")
             --             end
             --         end
             --     end)
@@ -917,14 +946,14 @@ local function onEnteredForceTurnBased(entityGuid)
     end
 end
 
-local function onLeftForceTurnBased(entityGuid)
+function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     -- if DynamicAnimationTagsSubscription ~= nil then
     --     Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
     -- end
     -- DynamicAnimationTagsSubscription = nil
-    -- Ext.Entity.Get(entityUuid).TurnBased.IsInCombat_M = true
+    Ext.Entity.Get(entityUuid).TurnBased.IsInCombat_M = true
     if BrawlActive then
         local level = Osi.GetRegion(entityUuid)
         startBrawlFizzler(level)
@@ -1143,10 +1172,14 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("CombatStarted", 1, "after", onCombatStarted),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- Listeners.CombatRoundStarted = {
-    --     handle = Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", onCombatRoundStarted),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    Listeners.CombatEnded = {
+        handle = Ext.Osiris.RegisterListener("CombatEnded", 1, "after", onCombatEnded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    Listeners.CombatRoundStarted = {
+        handle = Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", onCombatRoundStarted),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     Listeners.EnteredCombat = {
         handle = Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", onEnteredCombat),
         stop = Ext.Osiris.UnregisterListener,
@@ -1306,12 +1339,14 @@ local function onMCMSettingSaved(payload)
         else
             disableCompanionAI(hotkey)
         end
-    elseif payload.settingId == "auto_paused_on_downed" then
+    elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     end
 end
 
 local function onNetMessage(data)
+    -- debugPrint("Got netmessage on server")
+    -- _D(data)
     if data.Channel == "ModToggle" then
         if MCM then
             MCM.Set("mod_enabled", not ModEnabled)
@@ -1335,7 +1370,11 @@ local function onNetMessage(data)
     -- elseif data.Channel == "Clicked" and data.Payload == "ExitFTBButton" then
     --     -- data.UserID
     --     for playerUuid, player in pairs(Players) do
-    --         if player.isPaused then
+    --         if player.isWindingUp then
+    --             if DynamicAnimationTagsSubscription ~= nil then
+    --                 Ext.Entity.Unsubscribe(DynamicAnimationTagsSubscription)
+    --             end
+    --             DynamicAnimationTagsSubscription = nil
     --             player.isWindingUp = false
     --             local entity = Ext.Entity.Get(playerUuid)
     --             entity.TurnBased.IsInCombat_M = true
