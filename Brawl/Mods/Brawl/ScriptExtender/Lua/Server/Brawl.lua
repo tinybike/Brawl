@@ -635,29 +635,25 @@ end
 -- NB: should we also index Brawlers by combatGuid?
 function addBrawler(entityUuid)
     if entityUuid ~= nil then
-        -- Add a short delay so users have a second to think
-        Ext.Timer.WaitFor(1500, function ()
-            local level = Osi.GetRegion(entityUuid)
-            if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) and Osi.CanJoinCombat(entityUuid) == 1 then
-                local displayName = getDisplayName(entityUuid)
-                debugPrint("Adding Brawler", entityUuid, displayName)
-                Brawlers[level][entityUuid] = {
-                    uuid = entityUuid,
-                    displayName = displayName,
-                    combatGuid = Osi.CombatGetGuidFor(entityUuid),
-                    isInBrawl = false,
-                    isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
-                }
-                if Osi.IsPlayer(entityUuid) == 0 then
-                    -- Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
-                elseif Players[entityUuid] then
-                    -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
-                    setPlayerRunToSprint(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
-                end
+        local level = Osi.GetRegion(entityUuid)
+        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) then
+            local displayName = getDisplayName(entityUuid)
+            debugPrint("Adding Brawler", entityUuid, displayName)
+            Brawlers[level][entityUuid] = {
+                uuid = entityUuid,
+                displayName = displayName,
+                combatGuid = Osi.CombatGetGuidFor(entityUuid),
+                isInBrawl = false,
+                isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
+            }
+            if Osi.IsPlayer(entityUuid) == 0 then
+                -- Brawlers[level][entityUuid].originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
+                Osi.SetCanJoinCombat(entityUuid, 0)
+            elseif Players[entityUuid] then
+                -- Brawlers[level][entityUuid].originalCanJoinCombat = 1
+                setPlayerRunToSprint(entityUuid)
             end
-        end)
+        end
     end
 end
 
@@ -800,6 +796,7 @@ end
 
 function cleanupAll()
     for level, timer in pairs(PulseRepositionTimers) do
+        endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
     for uuid, timer in pairs(PulseActionTimers) do
@@ -808,6 +805,10 @@ function cleanupAll()
     for level, timer in pairs(BrawlFizzler) do
         endBrawl(level)
         Ext.Timer.Cancel(timer)
+    end
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        endBrawl(level)
     end
     BrawlActive = false
     PlayerCurrentTarget = nil
