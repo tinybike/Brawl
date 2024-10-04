@@ -1145,10 +1145,10 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("CombatStarted", 1, "after", onCombatStarted),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- Listeners.CombatRoundStarted = {
-    --     handle = Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", onCombatRoundStarted),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    Listeners.CombatRoundStarted = {
+        handle = Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", onCombatRoundStarted),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     Listeners.EnteredCombat = {
         handle = Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", onEnteredCombat),
         stop = Ext.Osiris.UnregisterListener,
