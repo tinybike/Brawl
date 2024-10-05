@@ -13,7 +13,7 @@ local DEBUG_LOGGING = true
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
-local LIE_ON_GROUND_TIMEOUT = 2500
+local LIE_ON_GROUND_TIMEOUT = 3500
 local ENTER_COMBAT_RANGE = 20
 local NEARBY_RADIUS = 35
 local MELEE_RANGE = 1.5
@@ -23,6 +23,8 @@ local RANGED_RANGE_MIN = 10
 local HELP_DOWNED_MAX_RANGE = 20
 local MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
 local MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
+local AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD = 30.0
+local AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
 local HITPOINTS_MULTIPLIER = 3
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 local LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
@@ -571,10 +573,12 @@ end
 
 function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
-        return 10
+        return 7
     elseif spellType == "Healing" then
-        return 10
+        return 7
     elseif spellType == "Control" then
+        return 3
+    elseif spellType == "Buff" then
         return 3
     end
     return 0
@@ -598,13 +602,34 @@ function getResistanceWeight(spell, entity)
 end
 
 function getWeightedRandomSpell(weightedSpells)
-    local totalWeight = 0
-    for _, weight in pairs(weightedSpells) do
-        totalWeight = totalWeight + weight
+    if next(weightedSpells) == nil then
+        return nil
     end
-    local rand = math.random(1, totalWeight)
+    local minWeight = nil
+    for _, weight in pairs(weightedSpells) do
+        if (minWeight == nil) or (weight < minWeight) then
+            minWeight = weight
+        end
+    end
+    local adjustedWeights = {}
+    local totalAdjustedWeight = 0
+    for key, weight in pairs(weightedSpells) do
+        local adjustedWeight = weight - minWeight
+        adjustedWeights[key] = adjustedWeight
+        totalAdjustedWeight = totalAdjustedWeight + adjustedWeight
+    end
+    debugDump(adjustedWeights)
+    if totalAdjustedWeight == 0 then
+        local spellNames = {}
+        for spellName, _ in pairs(weightedSpells) do
+            table.insert(spellNames, spellName)
+        end
+        local randomIndex = math.random(1, #spellNames)
+        return spellNames[randomIndex]
+    end
+    local rand = math.random() * totalAdjustedWeight
     local cumulativeWeight = 0
-    for spellName, weight in pairs(weightedSpells) do
+    for spellName, weight in pairs(adjustedWeights) do
         cumulativeWeight = cumulativeWeight + weight
         if rand <= cumulativeWeight then
             return spellName
@@ -615,6 +640,7 @@ end
 function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
+    local weight = 0
     if spell.targetRadius == "RangedMainWeaponRange" then
         weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeapon
         if distanceToTarget > RANGED_RANGE_MIN and distanceToTarget < RANGED_RANGE_MAX then
@@ -624,7 +650,7 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     elseif spell.targetRadius == "MeleeMainWeaponRange" then
         weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeapon
-        if ditanceToTarget <= MELEE_RANGE then
+        if distanceToTarget <= MELEE_RANGE then
             weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeaponInRange
         end
     else
@@ -664,11 +690,10 @@ function getCompanionWeightedSpells(preparedSpells, targetEntity, distanceToTarg
         local spellTableForType = SpellTable[spellType]
         for _, preparedSpell in pairs(preparedSpells) do
             local spellName = preparedSpell.OriginatorPrototype
+            local spell = spellTableForType[spellName]
             -- Exclude AoE stuff and all non-cantrip spells for companions
-            if spell.areaRadius == 0 and spell.level == 0 then
-                weightedSpells[spellName] = getSpellWeight(spellTableForType[spellName], distanceToTarget, archetype, spellType)
-            else
-                weightedSpells[spellName] = 0
+            if spell and spell.areaRadius == 0 and spell.level == 0 then
+                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
             end
         end
     end
@@ -683,33 +708,36 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs (NYI)
-function getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellType)
+function getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, spellType in ipairs(spellTypes) do
         local spellTableForType = SpellTable[spellType]
         for _, preparedSpell in pairs(preparedSpells) do
             local spellName = preparedSpell.OriginatorPrototype
-            weightedSpells[spellName] = getSpellWeight(spellTableForType[spellName], distanceToTarget, archetype, spellType)
+            local spell = spellTableForType[spellName]
+            if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
+                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
+            end
         end
     end
     return weightedSpells
 end
 
-function getCompanionActionToTake(preparedSpells, targetEntity, distanceToTarget, archetype)
+function decideCompanionActionOnTarget(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = "melee"
     end
-    local weightedSpells = getCompanionWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype)
+    local weightedSpells = getCompanionWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
     return getWeightedRandomSpell(weightedSpells)
 end
 
-function getActionToTake(preparedSpells, targetEntity, distanceToTarget, archetype, spellType)
+function decideActionOnTarget(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = "melee"
     end
-    local weightedSpells = getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype. spellType)
+    local weightedSpells = getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
     return getWeightedRandomSpell(weightedSpells)
 end
 
@@ -718,18 +746,21 @@ function actOnHostileTarget(brawler, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawler.uuid)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, targetUuid)
     local targetEntity = Ext.Entity.Get(targetUuid)
-    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity and Players then
+    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity then
         -- todo: Utility spells
         local spellTypes = {"Control", "Damage", "Summon"}
+        -- local spellTypes = {"Damage"}
         local actionToTake = nil
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = getCompanionActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
-            debugPrint("Companion action to take", actionToTake, brawler.uuid, brawler.displayName)
+            actionToTake = decideCompanionActionOnTarget(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+            debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
         else
-            actionToTake = getActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
-            debugPrint("Action to take", actionToTake, brawler.uuid, brawler.displayName)
+            actionToTake = decideActionOnTarget(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
         end
-        moveThenAct(brawler.uuid, targetUuid, actionToTake)
+        if actionToTake ~= nil then
+            moveThenAct(brawler.uuid, targetUuid, actionToTake)
+        end
     end
 end
 
@@ -738,12 +769,15 @@ function actOnFriendlyTarget(brawler, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawler.uuid)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, targetUuid)
     local targetEntity = Ext.Entity.Get(targetUuid)
-    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity and Players then
+    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity then
         -- todo: Utility spells
         local spellTypes = {"Healing"}
-        local actionToTake = getActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+        debugPrint("acting on friendly target", brawler.uuid, brawler.displayName, archetype, getDisplayName(targetUuid))
+        local actionToTake = decideActionOnTarget(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
         debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
-        moveThenAct(brawler.uuid, targetUuid, actionToTake)
+        if actionToTake ~= nil then
+            moveThenAct(brawler.uuid, targetUuid, actionToTake)
+        end
     end
 end
 
@@ -753,7 +787,6 @@ function getBrawlersSortedByDistance(entityUuid)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             if isAliveAndCanFight(brawlerUuid) then
-                -- debugPrint("distance:", brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid))
                 table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
             end
         end
@@ -762,38 +795,74 @@ function getBrawlersSortedByDistance(entityUuid)
     return brawlersSortedByDistance
 end
 
+-- Attacking targets: prioritize close targets with less remaining HP
+-- (Lowest weight = most desireable target)
+function getHostileWeightedTargets(brawler, potentialTargets)
+    local weightedTargets = {}
+    for potentialTargetUuid, _ in pairs(potentialTargets) do
+        if Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
+            local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
+            local targetHp = Osi.GetHitpoints(potentialTargetUuid)
+            local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
+            weightedTargets[potentialTargetUuid] = distanceToTarget * targetHp
+            if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
+            end
+        end
+    end
+    return weightedTargets
+end
+
+function decideOnHostileTarget(weightedTargets)
+    local targetUuid = nil
+    local minWeight = nil
+    if next(weightedTargets) ~= nil then
+        for potentialTargetUuid, targetWeight in pairs(weightedTargets) do
+            if minWeight == nil or targetWeight < minWeight then
+                minWeight = targetWeight
+                targetUuid = potentialTargetUuid
+            end
+        end
+        if targetUuid then
+            return targetUuid
+        end
+    end
+    return nil
+end
+
 function findTarget(brawler)
     local level = Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
-        -- Healing targets
+        -- Healing (non-player only)
         if Osi.IsPlayer(brawler.uuid) == 0 then
-            local minTargetHpPct = 100.0
             if Brawlers[level] then
+                local minTargetHpPct = 200.0
+                local friendlyTargetUuid = nil
                 for targetUuid, target in pairs(Brawlers[level]) do
                     if Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
+                        -- print("Enemy isally check", brawler.uuid, brawler.displayName, targetUuid, getDisplayName(targetUuid), Osi.IsAlly(brawler.uuid, targetUuid))
                         local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
                         if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
                             minTargetHpPct = targetHpPct
+                            friendlyTargetUuid = targetUuid
                         end
                     end
                 end
                 -- Arbitrary threshold for healing
-                if minTargetHpPct < 25.0 then
-                    return actOnFriendlyTarget(brawler, targetUuid)
+                if minTargetHpPct < AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD then
+                    return actOnFriendlyTarget(brawler, friendlyTargetUuid)
                 end
             end
         end
-        -- Attacking targets
-        -- NB: should do target selection more intelligently than just "attack closest"
-        for _, target in ipairs(brawlersSortedByDistance) do
-            local targetUuid, distanceToTarget = target[1], target[2]
-            -- local isEnemy = isPlayerOrAlly(brawler.uuid) and isPugnacious(targetUuid, brawler.uuid) or Osi.IsEnemy(brawler.uuid, targetUuid) == 1
-            if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and Osi.IsInvisible(targetUuid) == 0 and isAliveAndCanFight(targetUuid) then
-                debugPrint("Attack", brawler.displayName, brawler.uuid, distanceToTarget, "->", getDisplayName(targetUuid))
-                brawler.targetUuid = targetUuid
-                return actOnHostileTarget(brawler, targetUuid)
-            end
+        -- Attacking
+        local weightedTargets = getHostileWeightedTargets(brawler, Brawlers[level])
+        debugPrint("got weighted targets")
+        debugDump(weightedTargets)
+        local targetUuid = decideOnHostileTarget(weightedTargets)
+        debugPrint("decided on target", targetUuid)
+        if targetUuid then
+            return actOnHostileTarget(brawler, targetUuid)
         end
         holdPosition(brawler.uuid)
     end
@@ -1270,20 +1339,65 @@ function cleanupAll()
     PlayerCurrentTarget = nil
 end
 
+function split(inputstr, sep)
+    if sep == nil then
+        sep = "%s" -- whitespace
+    else
+        sep = string.gsub(sep, "([^%w])", "%%%1")
+    end
+    local t = {}
+    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+        table.insert(t, str)
+    end
+    return t
+end
+
+local function getSpellInfo(spellType, spellName)
+    local spell = Ext.Stats.Get(spellName)
+    if spell and spell.VerbalIntent == spellType then
+        local spellInfo = {
+            level = spell.Level,
+            areaRadius = spell.AreaRadius,
+            targetConditions = spell.TargetConditions,
+            damageType = spell.DamageType,
+            isSpell = spell.SpellSchool ~= "None",
+            targetRadius = spell.TargetRadius,
+            useCosts = spell.UseCosts,
+        }
+        if spellType == "Healing" then
+            spellInfo.isDirectHeal = false
+            local spellProperties = spell.SpellProperties
+            if spellProperties then
+                for _, spellProperty in ipairs(spellProperties) do
+                    local functors = spellProperty.Functors
+                    if functors then
+                        for _, functor in ipairs(functors) do
+                            if functor.TypeId == "RegainHitPoints" then
+                                spellInfo.isDirectHeal = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return spellInfo
+    end
+    return nil
+end
+
 local function getAllSpellsOfType(spellType)
     local allSpellsOfType = {}
     for _, spellName in ipairs(ALL_SPELLS) do
         local spell = Ext.Stats.Get(spellName)
         if spell and spell.VerbalIntent == spellType then
-            allSpellsOfType[spellName] = {
-                level = spell.Level,
-                areaRadius = spell.AreaRadius,
-                targetConditions = spell.TargetConditions,
-                damageType = spell.DamageType,
-                isSpell = spell.SpellSchool ~= "None",
-                targetRadius = spell.TargetRadius,
-                useCosts = spell.UseCosts,
-            }
+            if spell.ContainerSpells and spell.ContainerSpells ~= "" then
+                local containerSpellNames = split(spell.ContainerSpells, ";")
+                for _, containerSpellName in ipairs(containerSpellNames) do
+                    allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName)
+                end
+            else
+                allSpellsOfType[spellName] = getSpellInfo(spellType, spellName)
+            end
         end
     end
     return allSpellsOfType
@@ -1303,7 +1417,7 @@ function onStarted(level)
     setIsControllingDirectly()
     PlayerCurrentTarget = nil
     setMovementSpeedThresholds()
-    resetPlayersMovementSpeed() -- NB: not clear why this is needed :/
+    resetPlayersMovementSpeed()
     initBrawlers(level)
     debugPrint("onStarted")
     debugDump(Players)
@@ -1530,19 +1644,20 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     BrawlActive = true
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
-    addBrawler(attackerUuid)
-    addBrawler(defenderUuid)
+    -- TODO can we get rid of?
+    -- addBrawler(attackerUuid)
+    -- addBrawler(defenderUuid)
     if Osi.IsPlayer(attackerUuid) == 1 then
         if Osi.IsPlayer(defenderUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
         end
-        addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
+        -- addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
     end
     if Osi.IsPlayer(defenderUuid) == 1 then
         if Osi.IsPlayer(attackerUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
         end
-        addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
+        -- addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
     end
     startBrawlFizzler(Osi.GetRegion(attackerUuid))
 end
@@ -1603,7 +1718,11 @@ end
 -- thank u focus
 local function onPROC_Subregion_Entered(characterGuid, _)
     debugPrint("PROC_Subregion_Entered", characterGuid)
-    pulseReposition(Osi.GetRegion(characterGuid))
+    local uuid = Osi.GetUUID(characterGuid)
+    local level = Osi.GetRegion(uuid)
+    if level and Players and Players[uuid] then
+        pulseReposition(level)
+    end
 end
 
 -- local function onCastedSpell(casterGuid, spell, spellType, spellSchool, id)
