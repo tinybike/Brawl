@@ -1,16 +1,18 @@
 -- MCM Settings
-ModEnabled = true
-CompanionAIEnabled = true
-AutoPauseOnDowned = true
+local ModEnabled = true
+local CompanionAIEnabled = true
+local AutoPauseOnDowned = true
+local ActionInterval = 6000
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
+    ActionInterval = MCM.Get("action_interval")
+    print("MCM action interval setting", ActionInterval)
 end
 
 -- Constants
 local DEBUG_LOGGING = true
-local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -947,7 +949,7 @@ function startPulseAction(brawler)
     PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
         debugPrint("pulse action", brawler.uuid, brawler.displayName)
         pulseAction(brawler)
-    end, ACTION_INTERVAL)
+    end, ActionInterval)
 end
 
 -- NB: This should never be the first thing that happens (brawl should always kick off with an action)
@@ -1950,6 +1952,8 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
+    elseif payload.settingId == "action_interval" then
+        ActionInterval = payload.value
     end
 end
 

@@ -70,6 +70,17 @@
                                 "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
                                 "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
                             }
+                        },
+                        {
+                            "Id": "action_interval",
+                            "Name": "AI Turn Length",
+                            "Type": "int",
+                            "Default": 6000,
+                            "Description": "The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Higher values make combat easier, lower values make combat harder.",
+                            "Handles": {
+                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
+                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                            }
                         }
                     ]
                 }
