@@ -9,7 +9,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local ACTION_INTERVAL = 6000
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
@@ -19,53 +19,380 @@ local NEARBY_RADIUS = 35
 local MELEE_RANGE = 1.5
 local RANGED_RANGE_MAX = 25
 local RANGED_RANGE_SWEETSPOT = 10
-local RANGED_RANGE_MIN = 5
+local RANGED_RANGE_MIN = 10
+local HELP_DOWNED_MAX_RANGE = 20
 local MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
 local MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 local HITPOINTS_MULTIPLIER = 3
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 local LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
-local USABLE_COMPANION_SPELLS = {
-    Shout_BladeWard = true,
-    Projectile_RayOfFrost = true,
-    Projectile_FireBolt = true,
-    Projectile_EldritchBlast = true,
-    -- Projectile_MagicMissile = true,
-    Target_MainHandAttack = true,
-    Target_OffhandAttack = true,
-    Target_Topple = true,
-    Target_UnarmedAttack = true,
-    Target_AdvancedMeleeWeaponAction = true,
-    Target_Charger_Attack = true,
-    -- Target_Charger_Push = true,
-    -- Target_Counterspell = true,
-    -- Target_CripplingStrike = true,
-    Target_CuttingWords = true,
-    -- Target_DisarmingAttack = true,
-    -- Target_DisarmingStrike = true,
-    -- Target_Flurry = true,
-    Target_LungingAttack = true,
-    Target_OpeningAttack = true,
-    Target_PiercingThrust = true,
-    -- Target_PommelStrike = true,
-    Target_PushingAttack = true,
-    Target_RecklessAttack = true,
-    -- Target_Riposte = true,
-    Target_SacredFlame = true,
-    Target_ShockingGrasp = true,
-    -- Target_Shove = true,
-    Target_Slash = true,
-    Target_Smash = true,
-    Target_ThornWhip = true,
-    -- Target_TripAttack = true,
-    Target_TrueStrike = true,
-    Target_ViciousMockery = true,
-    -- Target_FlurryOfBlows = true,
-    -- Target_StunningStrike = true,
-    Rush_Rush = true,
-    Rush_WEAPON_ACTION_RUSH = true,
-    Rush_Aggressive = true,
-    -- Rush_ForceTunnel = true,
+-- Spell list from https://fearlessrevolution.com/viewtopic.php?t=13996&start=3420
+-- NB: doesn't include spells from mods, find a way to look those up at runtime?
+local ALL_SPELLS = {
+    "Projectile_MainHandAttack",
+    "Projectile_OffhandAttack",
+    "Target_MainHandAttack",
+    "Target_OffhandAttack",
+    "Target_Topple",
+    "Target_UnarmedAttack",
+    "Target_AdvancedMeleeWeaponAction",
+    "Target_Charger_Attack",
+    "Target_Charger_Push",
+    "Target_CripplingStrike",
+    "Target_DisarmingStrike",
+    "Target_Flurry",
+    "Target_LungingAttack",
+    "Target_OpeningAttack",
+    "Target_PiercingThrust",
+    "Target_PommelStrike",
+    "Target_Riposte",
+    "Target_Shove",
+    "Target_Slash",
+    "Target_Smash",
+    "Target_ThornWhip",
+    "Target_FlurryOfBlows",
+    "Target_StunningStrike",
+    "Rush_Rush",
+    "Rush_WEAPON_ACTION_RUSH",
+    "Rush_Aggressive",
+    "Rush_ForceTunnel",
+    "Projectile_AcidArrow",
+    "Projectile_AcidSplash",
+    "Projectile_C",
+    "Projectile_ChainLightning",
+    "Projectile_ChromaticOrb",
+    "Projectile_DisarmingAttack",
+    "Projectile_Disintegrate",
+    "Projectile_EldritchBlast",
+    "Projectile_EnsnaringStrike_Container",
+    "Projectile_FireBolt",
+    "Projectile_Fireball",
+    "Projectile_GuidingBolt",
+    "Projectile_HailOfThorns",
+    "Projectile_HordeBreaker",
+    "Projectile_IceKnife",
+    "Projectile_LightningArrow",
+    "Projectile_MagicMissile",
+    "Projectile_MenacingAttack",
+    "Projectile_PoisonSpray",
+    "Projectile_PushingAttack",
+    "Projectile_RayOfEnfeeblement",
+    "Projectile_RayOfFrost",
+    "Projectile_RayOfSickness",
+    "Projectile_ScorchingRay",
+    "Projectile_SneakAttack",
+    "Projectile_TripAttack",
+    "Projectile_WitchBolt",
+    "Shout_ActionSurge",
+    "Shout_Aid",
+    "Shout_ArcaneRecovery",
+    "Shout_ArmorOfAgathys",
+    "Shout_ArmsOfHadar",
+    "Shout_AuraOfVitality",
+    "Shout_BeaconOfHope",
+    "Shout_BladeWard",
+    "Shout_Blink",
+    "Shout_Blur",
+    "Shout_CreateSorceryPoints",
+    "Shout_CreateSpellSlot",
+    "Shout_CrusadersMantle",
+    "Shout_Dash_CunningAction",
+    "Shout_DestructiveWave",
+    "Shout_DetectThoughts",
+    "Shout_Disengage_CunningAction",
+    "Shout_DisguiseSelf",
+    "Shout_DispelEvilAndGood",
+    "Shout_DivineFavor",
+    "Shout_DivineSense",
+    "Shout_Dreadful_Aspect",
+    "Shout_ExpeditiousRetreat",
+    "Shout_FalseLife",
+    "Shout_FeatherFall",
+    "Shout_FireShield",
+    "Shout_FlameBlade",
+    "Shout_FlameBlade_MephistophelesTiefling",
+    "Shout_HealingRadiance",
+    "Shout_HealingWord_Mass",
+    "Shout_HellishRebuke",
+    "Shout_HellishRebuke_AsmodeusTiefling",
+    "Shout_HellishRebuke_WarlockMI",
+    "Shout_HeroesFeast",
+    "Shout_Hide_BonusAction",
+    "Shout_MirrorImage",
+    "Shout_NaturalRecovery",
+    "Shout_PassWithoutTrace",
+    "Shout_PrayerOfHealing",
+    "Shout_ProduceFlame",
+    "Shout_RadianceOfTheDawn",
+    "Shout_SacredWeapon",
+    "Shout_SecondWind",
+    "Shout_SeeInvisibility",
+    "Shout_Shield_Sorcerer",
+    "Shout_Shield_Wizard",
+    "Shout_Shillelagh",
+    "Shout_SongOfRest",
+    "Shout_SpeakWithAnimals",
+    "Shout_SpeakWithAnimals_Barbarian",
+    "Shout_SpeakWithAnimals_ForestGnome",
+    "Shout_SpiritGuardians",
+    "Shout_Thaumaturgy",
+    "Shout_TurnTheFaithless",
+    "Shout_TurnTheUnholy",
+    "Shout_TurnUndead",
+    "Shout_WildShape",
+    "Shout_WildShape_Badger",
+    "Shout_WildShape_Cat",
+    "Shout_WildShape_Combat",
+    "Shout_WildShape_Combat_Badger",
+    "Shout_WildShape_Combat_Bear_Polar",
+    "Shout_WildShape_Combat_Cat",
+    "Shout_WildShape_Combat_DeepRothe",
+    "Shout_WildShape_Combat_Raven",
+    "Shout_WildShape_Combat_Spider",
+    "Shout_WildShape_Combat_Wolf_Dire",
+    "Shout_WildShape_DeepRothe",
+    "Shout_WildShape_Spider",
+    "Shout_WildShape_Wolf_Dire",
+    "Shout_WindWalk",
+    "Target_AnimalFriendship",
+    "Target_AnimateDead",
+    "Target_ArcaneEye",
+    "Target_ArcaneLock",
+    "Target_Bane",
+    "Target_Banishment",
+    "Target_Barkskin",
+    "Target_BestowCurse",
+    "Target_BlackTentacles",
+    "Target_Bless",
+    "Target_BlessingOfTheTrickster",
+    "Target_Blight",
+    "Target_Blindness",
+    "Target_CallLightning",
+    "Target_CalmEmotions",
+    "Target_CharmPerson",
+    "Target_ChillTouch",
+    "Target_CircleOfDeath",
+    "Target_CloudOfDaggers",
+    "Target_Cloudkill",
+    "Target_Command_Container",
+    "Target_CompelledDuel",
+    "Target_Confusion",
+    "Target_ConjureElemental_Container",
+    "Target_ConjureElementals_Minor_Container",
+    "Target_ConjureWoodlandBeings",
+    "Target_Contagion",
+    "Target_ControlUndead",
+    "Target_Counterspell",
+    "Target_CreateDestroyWater",
+    "Target_CreateUndead",
+    "Target_CrownOfMadness",
+    "Target_CureWounds",
+    "Target_CureWounds_Mass",
+    "Target_CuttingWords",
+    "Target_DancingLights",
+    "Target_Darkness",
+    "Target_Darkness_DrowMagic",
+    "Target_Darkvision",
+    "Target_Daylight_Container",
+    "Target_DeathWard",
+    "Target_DisarmingAttack",
+    "Target_DissonantWhispers",
+    "Target_DominateBeast",
+    "Target_DominatePerson",
+    "Target_ElementalWeapon",
+    "Target_EnhanceAbility",
+    "Target_EnlargeReduce",
+    "Target_Entangle",
+    "Target_Enthrall",
+    "Target_Eyebite",
+    "Target_FaerieFire",
+    "Target_FaerieFire_DrowMagic",
+    "Target_FeignDeath",
+    "Target_FindFamiliar",
+    "Target_FlameStrike",
+    "Target_FlamingSphere",
+    "Target_FleshToStone",
+    "Target_Fly",
+    "Target_FogCloud",
+    "Target_FreedomOfMovement",
+    "Target_FrenziedStrike",
+    "Target_Friends",
+    "Target_GaseousForm",
+    "Target_GlobeOfInvulnerability",
+    "Target_GlyphOfWarding",
+    "Target_Goodberry",
+    "Target_GraspingVine",
+    "Target_Grease",
+    "Target_GreaterRestoration",
+    "Target_GuardianOfFaith",
+    "Target_Guidance",
+    "Target_Harm",
+    "Target_Haste",
+    "Target_Heal",
+    "Target_HealingWord",
+    "Target_HeatMetal",
+    "Target_Heroism",
+    "Target_Hex",
+    "Target_HideousLaughter",
+    "Target_HoldMonster",
+    "Target_HoldPerson",
+    "Target_HolyRebuke",
+    "Target_HordeBreaker",
+    "Target_HungerOfHadar",
+    "Target_HuntersMark",
+    "Target_HypnoticGaze",
+    "Target_HypnoticPattern",
+    "Target_IceStorm",
+    "Target_InflictWounds",
+    "Target_InsectPlague",
+    "Target_Invisibility",
+    "Target_Invisibility_Greater",
+    "Target_InvokeDuplicity",
+    "Target_IrresistibleDance",
+    "Target_Jump",
+    "Target_Jump_Githyanki",
+    "Target_Knock",
+    "Target_LayOnHands",
+    "Target_LesserRestoration",
+    "Target_Light",
+    "Target_Longstrider",
+    "Target_MageArmor",
+    "Target_MageHand",
+    "Target_MageHand_GithyankiPsionics",
+    "Target_MagicWeapon",
+    "Target_MenacingAttack",
+    "Target_MinorIllusion",
+    "Target_MistyStep",
+    "Target_MistyStep_Githyanki",
+    "Target_Moonbeam",
+    "Target_NaturesWrath",
+    "Target_PhantasmalForce",
+    "Target_PhantasmalKiller",
+    "Target_PlanarBinding",
+    "Target_PlantGrowth",
+    "Target_Polymorph",
+    "Target_ProtectionFromEnergy",
+    "Target_ProtectionFromEvilAndGood",
+    "Target_ProtectionFromPoison",
+    "Target_PushingAttack",
+    "Target_Rally",
+    "Target_RangersCompanion",
+    "Target_RecklessAttack",
+    "Target_RemoveCurse",
+    "Target_ResilientSphere",
+    "Target_Resistance",
+    "Target_SacredFlame",
+    "Target_Sanctuary",
+    "Target_Seeming",
+    "Target_Shatter",
+    "Target_ShieldOfFaith",
+    "Target_ShockingGrasp",
+    "Target_Silence",
+    "Target_Sleep",
+    "Target_SleetStorm",
+    "Target_Slow",
+    "Target_Smite_Blinding",
+    "Target_Smite_Branding_Container",
+    "Target_Smite_Branding_ZarielTiefling_Container",
+    "Target_Smite_Divine",
+    "Target_Smite_Divine_Critical_Unlock",
+    "Target_Smite_Divine_Unlock",
+    "Target_Smite_Searing",
+    "Target_Smite_Searing_ZarielTiefling",
+    "Target_Smite_Thunderous",
+    "Target_Smite_Wrathful",
+    "Target_SneakAttack",
+    "Target_SpeakWithDead",
+    "Target_SpikeGrowth",
+    "Target_SpiritualWeapon",
+    "Target_SpitefulSuffering",
+    "Target_StinkingCloud",
+    "Target_Stoneskin",
+    "Target_ThornWhip",
+    "Target_TripAttack",
+    "Target_TrueStrike",
+    "Target_VampiricTouch",
+    "Target_ViciousMockery",
+    "Target_WardingBond",
+    "Target_Web",
+    "Teleportation_ArcaneGate",
+    "Teleportation_DimensionDoor",
+    "Teleportation_Revivify",
+    "Throw_FrenziedThrow",
+    "Throw_Telekinesis",
+    "Wall_WallOfFire",
+    "Wall_WallOfStone",
+    "Zone_BurningHands",
+    "Zone_BurningHands_MephistophelesTiefling",
+    "Zone_ColorSpray",
+    "Zone_ConeOfCold",
+    "Zone_ConjureBarrage",
+    "Zone_Fear",
+    "Zone_GustOfWind",
+    "Zone_LightningBolt",
+    "Zone_Sunbeam",
+    "Zone_Thunderwave",
+}
+local ALL_SPELL_TYPES = {
+    "Buff",
+    "Control",
+    "Damage",
+    "Healing",
+    "Summon",
+    "Utility",
+}
+local ARCHETYPE_WEIGHTS = {
+    caster = {
+        rangedWeapon = -5,
+        rangedWeaponInRange = 5,
+        rangedWeaponOutOfRange = -5,
+        meleeWeapon = -5,
+        meleeWeaponInRange = 5,
+        isSpell = 10,
+        spellInRange = 10,
+    },
+    ranged = {
+        rangedWeapon = 10,
+        rangedWeaponInRange = 10,
+        rangedWeaponOutOfRange = 5,
+        meleeWeapon = -2,
+        meleeWeaponInRange = 5,
+        isSpell = -5,
+        spellInRange = 5,
+    },
+    healer_melee = {
+        rangedWeapon = -5,
+        rangedWeaponInRange = 5,
+        rangedWeaponOutOfRange = -5,
+        meleeWeapon = 2,
+        meleeWeaponInRange = 8,
+        isSpell = 4,
+        spellInRange = 8,
+    },
+    melee = {
+        rangedWeapon = -5,
+        rangedWeaponInRange = 5,
+        rangedWeaponOutOfRange = -5,
+        meleeWeapon = 5,
+        meleeWeaponInRange = 10,
+        isSpell = -10,
+        spellInRange = 5,
+    },
+}
+local DAMAGE_TYPES = {
+    Slashing = 2,
+    Piercing = 3,
+    Bludgeoning = 4,
+    Acid = 5,
+    Thunder = 6,
+    Necrotic = 7,
+    Fire = 8,
+    Lightning = 9,
+    Cold = 10,
+    Psychic = 11,
+    Poison = 12,
+    Radiant = 13,
+    Force = 14,
 }
 -- NB: Is "Dash" different from "Sprint"?
 local PLAYER_MOVEMENT_SPEED_DEFAULT = {Dash = 6.0, Sprint = 6.0, Run = 3.75, Walk = 2.0, Stroll = 1.4}
@@ -77,6 +404,7 @@ local MOVEMENT_SPEED_THRESHOLDS = {
 }
 
 -- Session state
+SpellTable = {}
 Listeners = {}
 Brawlers = {}
 Players = {}
@@ -84,11 +412,11 @@ PulseRepositionTimers = {}
 PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
--- DynamicAnimationTagsSubscription = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
 PlayerCurrentTarget = nil
-IsUsingController = false
+-- DynamicAnimationTagsSubscription = nil
+-- IsUsingController = false
 
 function debugPrint(...)
     if DEBUG_LOGGING then
@@ -219,37 +547,6 @@ function getPlayersSortedByDistance(entityUuid)
     return playerDistances
 end
 
-function isCompanionSpellUsable(spell)
-    return USABLE_COMPANION_SPELLS[spell.OriginatorPrototype]
-end
-
-function isSpellUsable(spell, archetype)
-    if spell.OriginatorPrototype == "Projectile_Jump" then return false end
-    if spell.OriginatorPrototype == "Shout_Dash_NPC" then return false end
-    if spell.OriginatorPrototype == "Target_Shove" then return false end
-    if spell.OriginatorPrototype == "Target_CureWounds" then return false end
-    if spell.OriginatorPrototype == "Target_HealingWord" then return false end
-    if spell.OriginatorPrototype == "Target_CureWounds_Mass" then return false end
-    if archetype == "melee" then
-        if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
-        if spell.OriginatorPrototype == "Target_MageArmor" then return false end
-        if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
-    elseif archetype == "ranged" then
-        if spell.OriginatorPrototype == "Target_UnarmedAttack" then return false end
-        if spell.OriginatorPrototype == "Target_Topple" then return false end
-        if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
-        if spell.OriginatorPrototype == "Target_MageArmor" then return false end
-        if spell.OriginatorPrototype == "Projectile_SneakAttack" then return false end
-    elseif archetype == "mage" then
-        if spell.OriginatorPrototype == "Target_UnarmedAttack" then return false end
-        if spell.OriginatorPrototype == "Target_Topple" then return false end
-        if spell.OriginatorPrototype == "Target_Dip_NPC" then return false end
-    end
-    -- if spell.OriginatorPrototype == "Throw_Throw" then return false end
-    -- if spell.OriginatorPrototype == "Target_MainHandAttack" then return false end
-    return true
-end
-
 -- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
 -- (automove using UseSpell/Attack only uses the fastest possible movement speed)
 function moveThenAct(attackerUuid, targetUuid, spell)
@@ -272,60 +569,182 @@ function moveThenAct(attackerUuid, targetUuid, spell)
     Osi.UseSpell(attackerUuid, spell, targetUuid)
 end
 
--- NB: create a better system than this lol
-function actOnTarget(brawler, targetUuid)
-    local brawlerEntity = Ext.Entity.Get(brawler.uuid)
-    local actionToTake = nil
-    local archetype = Osi.GetActiveArchetype(brawler.uuid)
-    -- melee units should just autoattack sometimes
-    if archetype == "melee" then
-        local autoAttackRand = math.random()
-        -- 50% chance to start autoattacking if they're not already
-        if not brawler.isAutoAttacking then
-            if autoAttackRand < 0.5 then
-                brawler.isAutoAttacking = true
-                debugPrint("Start autoattacking", brawler.uuid, targetUuid)
-                -- return Osi.Attack(brawler.uuid, targetUuid, 0)
-                return moveThenAct(brawler.uuid, targetUuid, "Target_MainHandAttack")
+function getSpellTypeWeight(spellType)
+    if spellType == "Damage" then
+        return 10
+    elseif spellType == "Healing" then
+        return 10
+    elseif spellType == "Control" then
+        return 3
+    end
+    return 0
+end
+
+function getResistanceWeight(spell, entity)
+    if entity and entity.Resistances and entity.Resistances.Resistances then
+        local resistances = entity.Resistances.Resistances
+        if spell.damageType ~= "None" and resistances[DAMAGE_TYPES[spell.damageType]] and resistances[DAMAGE_TYPES[spell.damageType]][1] then
+            local resistance = resistances[DAMAGE_TYPES[spell.damageType]][1]
+            if resistance == "ImmuneToNonMagical" or resistance == "ImmuneToMagical" then
+                return -1000
+            elseif resistance == "ResistantToNonMagical" or resistance == "ResistantToMagical" then
+                return -5
+            elseif resistance == "VulnerableToNonMagical" or resistance == "VulnerableToMagical" then
+                return 5
             end
-        -- 20% chance to stop autoattacking if they're already doing it
+        end
+    end
+    return 0
+end
+
+function getWeightedRandomSpell(weightedSpells)
+    local totalWeight = 0
+    for _, weight in pairs(weightedSpells) do
+        totalWeight = totalWeight + weight
+    end
+    local rand = math.random(1, totalWeight)
+    local cumulativeWeight = 0
+    for spellName, weight in pairs(weightedSpells) do
+        cumulativeWeight = cumulativeWeight + weight
+        if rand <= cumulativeWeight then
+            return spellName
+        end
+    end
+end
+
+function getSpellWeight(spell, distanceToTarget, archetype, spellType)
+    -- Special target radius labels (NB: are there others besides these two?)
+    -- Maybe should weight proportional to distance required to get there...?
+    if spell.targetRadius == "RangedMainWeaponRange" then
+        weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeapon
+        if distanceToTarget > RANGED_RANGE_MIN and distanceToTarget < RANGED_RANGE_MAX then
+            weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeaponInRange
         else
-            if autoAttackRand > 0.2 then
-                debugDump(brawler)
-                -- return Osi.Attack(brawler.uuid, targetUuid, 0)
-                return moveThenAct(brawler.uuid, targetUuid, "Target_MainHandAttack")
+            weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeaponOutOfRange
+        end
+    elseif spell.targetRadius == "MeleeMainWeaponRange" then
+        weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeapon
+        if ditanceToTarget <= MELEE_RANGE then
+            weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeaponInRange
+        end
+    else
+        local targetRadius = tonumber(spell.targetRadius)
+        if targetRadius then
+            if distanceToTarget <= targetRadius then
+                weight = weight + ARCHETYPE_WEIGHTS[archetype].spellInRange
             end
-            brawler.isAutoAttacking = false
+        else
+            debugPrint("Target radius didn't convert to number, what is this?", spell.targetRadius)
         end
     end
-    if brawlerEntity.SpellBookPrepares ~= nil then
-        -- if they're already in melee range, they should do melee stuff
-        local numUsableSpells = 0
-        local usableSpells = {}
-        for _, preparedSpell in pairs(brawlerEntity.SpellBookPrepares.PreparedSpells) do
-            -- local spellStats = Ext.Stats.Get(preparedSpell.OriginatorPrototype)
-            -- local useCosts = spellStats.UseCosts
-            if Osi.IsPlayer(brawler.uuid) == 1 then
-                if isCompanionSpellUsable(preparedSpell) then
-                    table.insert(usableSpells, preparedSpell)
-                    numUsableSpells = numUsableSpells + 1
-                end
+    -- Favor using spells or non-spells?
+    if spell.isSpell then
+        weight = weight + ARCHETYPE_WEIGHTS[archetype].isSpell
+    end
+    -- If this spell has a damage type, favor vulnerable enemies
+    -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
+    weight = weight + getResistanceWeight(spell, targetEntity)
+    -- Adjust by spell type (damage and healing spells are somewhat favored in general)
+    weight = weight + getSpellTypeWeight(spellType)
+    return weight
+end
+
+-- What to do?  In all cases, give extra weight to spells that you're already within range for
+-- 1. Check if any players are downed and nearby, if so, help them up.
+-- 2? Check if any players are badly wounded and in-range, if so, heal them? (...but this will consume resources...)
+-- 3. Attack an enemy.
+-- 3a. If primarily a caster class, favor spell attacks (cantrips).
+-- 3b. If primarily a ranged class, favor ranged attacks.
+-- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
+-- 3d. If primarily a melee (or other) class, favor melee attacks.
+-- 4. Status effects/buffs (NYI)
+function getCompanionWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = {}
+    for _, spellType in ipairs(spellTypes) do
+        local spellTableForType = SpellTable[spellType]
+        for _, preparedSpell in pairs(preparedSpells) do
+            local spellName = preparedSpell.OriginatorPrototype
+            -- Exclude AoE stuff and all non-cantrip spells for companions
+            if spell.areaRadius == 0 and spell.level == 0 then
+                weightedSpells[spellName] = getSpellWeight(spellTableForType[spellName], distanceToTarget, archetype, spellType)
             else
-                if isSpellUsable(preparedSpell, archetype) then
-                    table.insert(usableSpells, preparedSpell)
-                    numUsableSpells = numUsableSpells + 1
-                end
+                weightedSpells[spellName] = 0
             end
         end
-        actionToTake = usableSpells[math.random(1, numUsableSpells)]
-        -- debugPrint("Action to take:")
-        -- debugDump(actionToTake)
     end
-    if actionToTake == nil then
-        return moveThenAct(brawler.uuid, targetUuid, "Target_MainHandAttack")
-        -- return Osi.Attack(brawler.uuid, targetUuid, 0)
+    return weightedSpells
+end
+
+-- What to do?  In all cases, give extra weight to spells that you're already within range for
+-- 1. Check if any friendlies are badly wounded and in-range, if so, heal them.
+-- 2. Attack an enemy.
+-- 2a. If primarily a caster class, favor spell attacks (cantrips).
+-- 2b. If primarily a ranged class, favor ranged attacks.
+-- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
+-- 2d. If primarily a melee (or other) class, favor melee attacks.
+-- 3. Status effects/buffs (NYI)
+function getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype, spellType)
+    local weightedSpells = {}
+    for _, spellType in ipairs(spellTypes) do
+        local spellTableForType = SpellTable[spellType]
+        for _, preparedSpell in pairs(preparedSpells) do
+            local spellName = preparedSpell.OriginatorPrototype
+            weightedSpells[spellName] = getSpellWeight(spellTableForType[spellName], distanceToTarget, archetype, spellType)
+        end
     end
-    moveThenAct(brawler.uuid, targetUuid, actionToTake.OriginatorPrototype)
+    return weightedSpells
+end
+
+function getCompanionActionToTake(preparedSpells, targetEntity, distanceToTarget, archetype)
+    if not ARCHETYPE_WEIGHTS[archetype] then
+        debugPrint("Archetype missing from the list, using melee for now", archetype)
+        archetype = "melee"
+    end
+    local weightedSpells = getCompanionWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype)
+    return getWeightedRandomSpell(weightedSpells)
+end
+
+function getActionToTake(preparedSpells, targetEntity, distanceToTarget, archetype, spellType)
+    if not ARCHETYPE_WEIGHTS[archetype] then
+        debugPrint("Archetype missing from the list, using melee for now", archetype)
+        archetype = "melee"
+    end
+    local weightedSpells = getWeightedSpells(preparedSpells, targetEntity, distanceToTarget, archetype. spellType)
+    return getWeightedRandomSpell(weightedSpells)
+end
+
+function actOnHostileTarget(brawler, targetUuid)
+    local brawlerEntity = Ext.Entity.Get(brawler.uuid)
+    local archetype = Osi.GetActiveArchetype(brawler.uuid)
+    local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, targetUuid)
+    local targetEntity = Ext.Entity.Get(targetUuid)
+    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity and Players then
+        -- todo: Utility spells
+        local spellTypes = {"Control", "Damage", "Summon"}
+        local actionToTake = nil
+        if Osi.IsPlayer(brawler.uuid) == 1 then
+            actionToTake = getCompanionActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+            debugPrint("Companion action to take", actionToTake, brawler.uuid, brawler.displayName)
+        else
+            actionToTake = getActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+            debugPrint("Action to take", actionToTake, brawler.uuid, brawler.displayName)
+        end
+        moveThenAct(brawler.uuid, targetUuid, actionToTake)
+    end
+end
+
+function actOnFriendlyTarget(brawler, targetUuid)
+    local brawlerEntity = Ext.Entity.Get(brawler.uuid)
+    local archetype = Osi.GetActiveArchetype(brawler.uuid)
+    local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, targetUuid)
+    local targetEntity = Ext.Entity.Get(targetUuid)
+    if brawlerEntity and brawlerEntity.SpellBookPrepares ~= nil and targetEntity and Players then
+        -- todo: Utility spells
+        local spellTypes = {"Healing"}
+        local actionToTake = getActionToTake(brawlerEntity.SpellBookPrepares.PreparedSpells, targetEntity, distanceToTarget, archetype, spellTypes)
+        debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
+        moveThenAct(brawler.uuid, targetUuid, actionToTake)
+    end
 end
 
 function getBrawlersSortedByDistance(entityUuid)
@@ -343,17 +762,41 @@ function getBrawlersSortedByDistance(entityUuid)
     return brawlersSortedByDistance
 end
 
-function findTargetToAttack(brawler)
-    for _, target in ipairs(getBrawlersSortedByDistance(brawler.uuid)) do
-        local targetUuid, distanceToTarget = target[1], target[2]
-        local isEnemy = isPlayerOrAlly(brawler.uuid) and isPugnacious(targetUuid, brawler.uuid) or Osi.IsEnemy(brawler.uuid, targetUuid) == 1
-        if isEnemy and Osi.IsInvisible(targetUuid) == 0 and isAliveAndCanFight(targetUuid) then
-            debugPrint("Attack", brawler.displayName, brawler.uuid, distanceToTarget, "->", getDisplayName(targetUuid))
-            brawler.targetUuid = targetUuid
-            return actOnTarget(brawler, targetUuid)
+function findTarget(brawler)
+    local level = Osi.GetRegion(brawler.uuid)
+    if level then
+        local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
+        -- Healing targets
+        if Osi.IsPlayer(brawler.uuid) == 0 then
+            local minTargetHpPct = 100.0
+            if Brawlers[level] then
+                for targetUuid, target in pairs(Brawlers[level]) do
+                    if Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
+                        local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
+                        if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
+                            minTargetHpPct = targetHpPct
+                        end
+                    end
+                end
+                -- Arbitrary threshold for healing
+                if minTargetHpPct < 25.0 then
+                    return actOnFriendlyTarget(brawler, targetUuid)
+                end
+            end
         end
+        -- Attacking targets
+        -- NB: should do target selection more intelligently than just "attack closest"
+        for _, target in ipairs(brawlersSortedByDistance) do
+            local targetUuid, distanceToTarget = target[1], target[2]
+            -- local isEnemy = isPlayerOrAlly(brawler.uuid) and isPugnacious(targetUuid, brawler.uuid) or Osi.IsEnemy(brawler.uuid, targetUuid) == 1
+            if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and Osi.IsInvisible(targetUuid) == 0 and isAliveAndCanFight(targetUuid) then
+                debugPrint("Attack", brawler.displayName, brawler.uuid, distanceToTarget, "->", getDisplayName(targetUuid))
+                brawler.targetUuid = targetUuid
+                return actOnHostileTarget(brawler, targetUuid)
+            end
+        end
+        holdPosition(brawler.uuid)
     end
-    holdPosition(brawler.uuid)
 end
 
 function isPlayerControllingDirectly(entityUuid)
@@ -369,6 +812,7 @@ function stopPulseAction(brawler)
     end
 end
 
+-- NB: this sucks :/
 function aiCompanionNeedsTeleport(entityUuid)
     if Osi.IsPlayer(entityUuid) == 1 and Players[entityUuid] ~= nil then
         local potentialCompanion = Players[entityUuid]
@@ -392,27 +836,37 @@ function pulseAction(brawler)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and not isPlayerControllingDirectly(brawler.uuid) then
         -- If this unit is extremely far from the player, and it's an AI-controlled unit, it's probably the teleport bug, so warp them back
-        local teleportBuggedAiCompanionToPlayer = aiCompanionNeedsTeleport(brawler.uuid)
-        if teleportBuggedAiCompanionToPlayer ~= nil then
-            Osi.TeleportTo(brawler.uuid, teleportBuggedAiCompanionToPlayer, "", 0, 0, 0, 0, 1)
-        -- Doesn't currently have an attack target, so let's find one
-        elseif brawler.targetUuid == nil then
-            findTargetToAttack(brawler)
-        else
-            -- Already attacking a target and the target isn't dead, so just keep at it
-            if isAliveAndCanFight(brawler.targetUuid) then
-                -- debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                actOnTarget(brawler, brawler.targetUuid)
-            -- Has an attack target but it's already dead or unable to fight, so find a new one
-            else
-                brawler.targetUuid = nil
-                findTargetToAttack(brawler)
+        -- NB: this code is horrible and causes its own problems, can we get by without it...?
+        -- local teleportBuggedAiCompanionToPlayer = aiCompanionNeedsTeleport(brawler.uuid)
+        -- if teleportBuggedAiCompanionToPlayer ~= nil then
+        --     return Osi.TeleportTo(brawler.uuid, teleportBuggedAiCompanionToPlayer, "", 0, 0, 0, 0, 1)
+        -- end
+        -- NB: if we allow healing spells etc used by companions, roll this code in, instead of special-casing it here...
+        if isPlayerOrAlly(brawler.uuid) then
+            for playerUuid, player in pairs(Players) do
+                if brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < HELP_DOWNED_MAX_RANGE then
+                    brawler.isAutoAttacking = false
+                    brawler.targetUuid = nil
+                    debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
+                    return moveThenAct(brawler.uuid, playerUuid, "Target_Help")
+                end
             end
         end
-    -- If this brawler is dead or unable to fight, stop this pulse
-    else
-        stopPulseAction(brawler)
+        -- Doesn't currently have an attack target, so let's find one
+        if brawler.targetUuid == nil then
+            return findTarget(brawler)
+        end
+        -- Already attacking a target and the target isn't dead, so just keep at it
+        if isAliveAndCanFight(brawler.targetUuid) then
+            -- debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+            return actOnHostileTarget(brawler, brawler.targetUuid)
+        end
+        -- Has an attack target but it's already dead or unable to fight, so find a new one
+        brawler.targetUuid = nil
+        return findTarget(brawler)
     end
+    -- If this brawler is dead or unable to fight, stop this pulse
+    stopPulseAction(brawler)
 end
 
 function startPulseAction(brawler)
@@ -422,6 +876,7 @@ function startPulseAction(brawler)
     end
     brawler.isInBrawl = true
     PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
+        debugPrint("pulse action", brawler.uuid, brawler.displayName)
         pulseAction(brawler)
     end, ACTION_INTERVAL)
 end
@@ -815,7 +1270,35 @@ function cleanupAll()
     PlayerCurrentTarget = nil
 end
 
+local function getAllSpellsOfType(spellType)
+    local allSpellsOfType = {}
+    for _, spellName in ipairs(ALL_SPELLS) do
+        local spell = Ext.Stats.Get(spellName)
+        if spell and spell.VerbalIntent == spellType then
+            allSpellsOfType[spellName] = {
+                level = spell.Level,
+                areaRadius = spell.AreaRadius,
+                targetConditions = spell.TargetConditions,
+                damageType = spell.DamageType,
+                isSpell = spell.SpellSchool ~= "None",
+                targetRadius = spell.TargetRadius,
+                useCosts = spell.UseCosts,
+            }
+        end
+    end
+    return allSpellsOfType
+end
+
+local function buildSpellTable()
+    local spellTable = {}
+    for _, spellType in pairs(ALL_SPELL_TYPES) do
+        spellTable[spellType] = getAllSpellsOfType(spellType)
+    end
+    return spellTable
+end
+
 function onStarted(level)
+    SpellTable = buildSpellTable()
     resetPlayers()
     setIsControllingDirectly()
     PlayerCurrentTarget = nil
@@ -922,7 +1405,7 @@ local function onEnteredForceTurnBased(entityGuid)
         if level then
             for playerUuid, player in pairs(Players) do
                 if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
-                    Brawlers[level][plqayerUuid].isPaused = true
+                    Brawlers[level][playerUuid].isPaused = true
                     stopPulseAction(Brawlers[level][playerUuid])
                 end
             end
@@ -1033,10 +1516,12 @@ end
 local function onDownedChanged(character, isDowned)
     local entityUuid = Osi.GetUUID(character)
     debugPrint("DownedChanged", character, isDowned, entityUuid)
-    if isDowned == 1 and AutoPauseOnDowned then
-        local player = Players[entityUuid]
-        if player and player.isControllingDirectly and not player.isPaused then
-            Osi.ForceTurnBasedMode(entityUuid, 1)
+    local player = Players[entityUuid]
+    if player then
+        if isDowned == 1 and AutoPauseOnDowned then
+            if player and player.isControllingDirectly and not player.isPaused then
+                Osi.ForceTurnBasedMode(entityUuid, 1)
+            end
         end
     end
 end
@@ -1384,7 +1869,7 @@ local function onNetMessage(data)
     -- end
 end
 
-local function onSessionLoaded()
+function onSessionLoaded()
     Ext.Events.NetMessage:Subscribe(onNetMessage)
     if ModEnabled then
         startListeners()

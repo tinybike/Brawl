@@ -11,10 +11,6 @@ local function onKeyInput(e)
         Ext.ClientNet.PostMessageToServer("ModToggle", tostring(e.Key))
     elseif e.Key == CompanionAIToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
         Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
-    elseif e.Key == "LSHIFT" or e.Key == "RSHIFT" then
-        IsShiftPressed = e.Event == "KeyDown"
-    elseif e.Key == "SPACE" then
-        IsSpacePressed = e.Event == "KeyDown"
     end
 end
 
