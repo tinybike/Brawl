@@ -1644,20 +1644,25 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     BrawlActive = true
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
-    -- TODO can we get rid of?
-    -- addBrawler(attackerUuid)
-    -- addBrawler(defenderUuid)
+    if Mods.ToT and Mods.ToT.IsActive() then
+        addBrawler(attackerUuid)
+        addBrawler(defenderUuid)
+    end
     if Osi.IsPlayer(attackerUuid) == 1 then
         if Osi.IsPlayer(defenderUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
         end
-        -- addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
+        if Mods.ToT and Mods.ToT.IsActive() then
+            addNearbyToBrawlers(attackerUuid, NEARBY_RADIUS)
+        end
     end
     if Osi.IsPlayer(defenderUuid) == 1 then
         if Osi.IsPlayer(attackerUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
         end
-        -- addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
+        if Mods.ToT and Mods.ToT.IsActive() then
+            addNearbyToBrawlers(defenderUuid, NEARBY_RADIUS)
+        end
     end
     startBrawlFizzler(Osi.GetRegion(attackerUuid))
 end
