@@ -1333,9 +1333,12 @@ function cleanupAll()
         endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
-        endBrawl(level)
+    local hostCharacter = Osi.GetHostCharacter()
+    if hostCharacter then
+        local level = Osi.GetRegion(hostCharacter)
+        if level then
+            endBrawl(level)
+        end
     end
     BrawlActive = false
     PlayerCurrentTarget = nil
