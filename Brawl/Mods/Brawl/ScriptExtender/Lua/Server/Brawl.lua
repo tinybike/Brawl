@@ -418,6 +418,7 @@ PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
 ToTTimer = nil
+ToTRoundTimer = nil
 FinalToTChargeTimer = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
@@ -672,6 +673,21 @@ function getWeightedRandomSpell(weightedSpells)
     end
 end
 
+function getHighestWeightSpell(weightedSpells)
+    if next(weightedSpells) == nil then
+        return nil
+    end
+    local maxWeight = nil
+    local selectedSpell = nil
+    for spellName, weight in pairs(weightedSpells) do
+        if (maxWeight == nil) or (weight > maxWeight) then
+            maxWeight = weight
+            selectedSpell = spellName
+        end
+    end
+    return selectedSpell
+end
+
 function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
@@ -772,7 +788,8 @@ function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archety
         archetype = "melee"
     end
     local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
-    return getWeightedRandomSpell(weightedSpells)
+    -- return getWeightedRandomSpell(weightedSpells)
+    return getHighestWeightSpell(weightedSpells)
 end
 
 function decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
@@ -781,7 +798,8 @@ function decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spell
         archetype = "melee"
     end
     local weightedSpells = getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
-    return getWeightedRandomSpell(weightedSpells)
+    -- return getWeightedRandomSpell(weightedSpells)
+    return getHighestWeightSpell(weightedSpells)
 end
 
 function actOnHostileTarget(brawler, target)
@@ -1537,49 +1555,57 @@ local function onLevelGameplayStarted(level, _)
     onStarted(level)
 end
 
-function finalToTCharge()
-    addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
-    Ext.Timer.WaitFor(3000, function ()
-        local level = Osi.GetRegion(Osi.GetHostCharacter())
-        if Brawlers[level] then
-            for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                if isPugnacious(brawlerUuid) then
-                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                    Osi.FlushOsirisQueue(brawlerUuid)
-                    Osi.Attack(brawlerUuid, Osi.GetHostCharacter(), 0)
-                end
-            end
-        end
-    end)
+local function isToT()
+    return Mods.ToT ~= nil and Mods.ToT.IsActive()
 end
+
+-- function finalToTCharge()
+--     addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+--     Ext.Timer.WaitFor(3000, function ()
+--         local level = Osi.GetRegion(Osi.GetHostCharacter())
+--         if Brawlers[level] then
+--             for brawlerUuid, brawler in pairs(Brawlers[level]) do
+--                 if isPugnacious(brawlerUuid) then
+--                     Osi.PurgeOsirisQueue(brawlerUuid, 1)
+--                     Osi.FlushOsirisQueue(brawlerUuid)
+--                     Osi.Attack(brawlerUuid, Osi.GetHostCharacter(), 0)
+--                 end
+--             end
+--         end
+--     end)
+-- end
 
 local function startToTTimer()
     debugPrint("startToTTimer")
+    if ToTRoundTimer ~= nil then
+        Ext.Timer.Cancel(ToTRoundTimer)
+        ToTRoundTimer = nil
+    end
     if ToTTimer ~= nil then
-        debugPrint("Cancel the old one first...")
         Ext.Timer.Cancel(ToTTimer)
         ToTTimer = nil
-        FinalToTChargeTimer = nil
     end
-    if Mods.ToT.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-        ToTTimer = Ext.Timer.WaitFor(6000, function ()
-            debugPrint("Moving ToT forward")
-            Mods.ToT.Scenario.ForwardCombat()
-            Ext.Timer.WaitFor(1500, function ()
-                debugPrint("adding nearby ToT")
-                addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
-            end)
+    if not Mods.ToT.Player.InCamp() then
+        ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
+            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+                debugPrint("Moving ToT forward")
+                Mods.ToT.Scenario.ForwardCombat()
+                Ext.Timer.WaitFor(1500, function ()
+                    addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+                end)
+            end
             startToTTimer()
         end)
-        FinalToTChargeTimer = Ext.Timer.WaitFor(90000, function ()
-            finalToTCharge()
-        end)
+        if Mods.ToT.PersistentVars.Scenario then
+            local isPrepRound = (Mods.ToT.PersistentVars.Scenario.Round == 0) and (next(Mods.ToT.PersistentVars.Scenario.SpawnedEnemies) == nil)
+            if isPrepRound then
+                ToTTimer = Ext.Timer.WaitFor(0, function ()
+                    debugPrint("adding nearby...")
+                    addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+                end, 8500)
+            end
+        end
     end
-end
-
-local function isToT()
-    return Mods.ToT ~= nil
-    -- return Mods.ToT ~= nil and Mods.ToT.IsActive()
 end
 
 local function onCombatStarted(combatGuid)
@@ -1604,6 +1630,7 @@ local function onCombatStarted(combatGuid)
                 end)
             end)
         else
+            ENTER_COMBAT_RANGE = 150
             startToTTimer()
         end
     end
