@@ -12,7 +12,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 15000 -- if 10 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -25,7 +25,7 @@ local RANGED_RANGE_MIN = 10
 local HELP_DOWNED_MAX_RANGE = 20
 local MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
 local MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
-local AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD = 10.0
+local AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD = 20.0
 local AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
 local HITPOINTS_MULTIPLIER = 3
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
@@ -336,6 +336,7 @@ local ALL_SPELLS = {
     "Zone_LightningBolt",
     "Zone_Sunbeam",
     "Zone_Thunderwave",
+    "Target_LOW_RamazithsTower_Nightsong_Globe_1",
 }
 local ALL_SPELL_TYPES = {
     "Buff",
@@ -408,7 +409,7 @@ local MOVEMENT_SPEED_THRESHOLDS = {
 }
 
 -- Session state
-SpellTable = {}
+-- SpellTable = {}
 Listeners = {}
 Brawlers = {}
 Players = {}
@@ -417,6 +418,7 @@ PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
 ToTTimer = nil
+FinalToTChargeTimer = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 BrawlActive = false
 PlayerCurrentTarget = nil
@@ -513,6 +515,9 @@ function isBackupSpellUsable(spell, archetype)
     if spell == "Target_CureWounds" then return false end
     if spell == "Target_HealingWord" then return false end
     if spell == "Target_CureWounds_Mass" then return false end
+    if spell == "Target_Devour_Ghoul" then return false end
+    if spell == "Target_Devour_ShadowMound" then return false end
+    if spell == "Target_LOW_RamazithsTower_Nightsong_Globe_1" then return false end
     if archetype == "melee" then
         if spell == "Target_Dip_NPC" then return false end
         if spell == "Target_MageArmor" then return false end
@@ -640,33 +645,29 @@ function getWeightedRandomSpell(weightedSpells)
         return nil
     end
     local minWeight = nil
-    for _, weight in pairs(weightedSpells) do
+    local totalOriginalWeight = 0
+    local N = 0
+    local spellList = {}
+    for spellName, weight in pairs(weightedSpells) do
+        totalOriginalWeight = totalOriginalWeight + weight
+        N = N + 1
         if (minWeight == nil) or (weight < minWeight) then
             minWeight = weight
         end
+        spellList[N] = {name = spellName, weight = weight}
     end
-    local adjustedWeights = {}
-    local totalAdjustedWeight = 0
-    for key, weight in pairs(weightedSpells) do
-        local adjustedWeight = weight - minWeight
-        adjustedWeights[key] = adjustedWeight
-        totalAdjustedWeight = totalAdjustedWeight + adjustedWeight
-    end
-    debugDump(adjustedWeights)
+    local totalAdjustedWeight = totalOriginalWeight - (minWeight * N)
     if totalAdjustedWeight == 0 then
-        local spellNames = {}
-        for spellName, _ in pairs(weightedSpells) do
-            table.insert(spellNames, spellName)
-        end
-        local randomIndex = math.random(1, #spellNames)
-        return spellNames[randomIndex]
+        local randomIndex = math.random(1, N)
+        return spellList[randomIndex].name
     end
     local rand = math.random() * totalAdjustedWeight
     local cumulativeWeight = 0
-    for spellName, weight in pairs(adjustedWeights) do
-        cumulativeWeight = cumulativeWeight + weight
+    for i = 1, N do
+        local adjustedWeight = spellList[i].weight - minWeight
+        cumulativeWeight = cumulativeWeight + adjustedWeight
         if rand <= cumulativeWeight then
-            return spellName
+            return spellList[i].name
         end
     end
 end
@@ -722,14 +723,18 @@ end
 -- 4. Status effects/buffs (NYI)
 function getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
-    for _, spellType in ipairs(spellTypes) do
-        local spellTableForType = SpellTable[spellType]
-        for _, spellName in pairs(preparedSpells) do
-            local spell = spellTableForType[spellName]
-            -- Exclude AoE stuff and all non-cantrip spells for companions
-            if spell and spell.areaRadius == 0 and spell.level == 0 then
-                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
+    for _, preparedSpell in pairs(preparedSpells) do
+        local spellName = preparedSpell.OriginatorPrototype
+        local spell = nil
+        for _, spellType in ipairs(spellTypes) do
+            spell = SpellTable[spellType][spellName]
+            if spell ~= nil then
+                break
             end
+        end
+        -- Exclude AoE stuff and all non-cantrip spells for companions
+        if spell and spell.areaRadius == 0 and spell.level == 0 then
+            weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
     return weightedSpells
@@ -745,13 +750,17 @@ end
 -- 3. Status effects/buffs (NYI)
 function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
-    for _, spellType in ipairs(spellTypes) do
-        local spellTableForType = SpellTable[spellType]
-        for _, spellName in pairs(preparedSpells) do
-            local spell = spellTableForType[spellName]
-            if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
-                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
+    for _, preparedSpell in pairs(preparedSpells) do
+        local spellName = preparedSpell.OriginatorPrototype
+        local spell = nil
+        for _, spellType in ipairs(spellTypes) do
+            spell = SpellTable[spellType][spellName]
+            if spell ~= nil then
+                break
             end
+        end
+        if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
+            weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
     return weightedSpells
@@ -778,29 +787,30 @@ end
 function actOnHostileTarget(brawler, target)
     local archetype = Osi.GetActiveArchetype(brawler.uuid)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
-    if brawler.preparedSpells then
+    if brawler and target then
         -- todo: Utility spells
-        local spellTypes = {"Control", "Damage", "Summon"}
+        local spellTypes = {"Control", "Damage"}
         local actionToTake = nil
+        local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(brawler.preparedSpells, distanceToTarget, archetype, spellTypes)
+            actionToTake = decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
         else
-            actionToTake = decideActionOnTarget(brawler.preparedSpells, distanceToTarget, archetype, spellTypes)
+            actionToTake = decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
             local numUsableSpells = 0
             local usableSpells = {}
-            for _, preparedSpell in pairs(brawler.preparedSpells) do
-                if isBackupSpellUsable(preparedSpell, archetype) then
-                    if not SpellTable.Healing[preparedSpell] and not SpellTable.Buff[preparedSpell] and not SpellTable.Utility[preparedSpell] then
-                        table.insert(usableSpells, preparedSpell)
+            for _, preparedSpell in pairs(preparedSpells) do
+                local spellName = preparedSpell.OriginatorPrototype
+                if isBackupSpellUsable(spellName, archetype) then
+                    if not SpellTable.Healing[spellName] and not SpellTable.Buff[spellName] and not SpellTable.Utility[spellName] then
+                        table.insert(usableSpells, spellName)
                         numUsableSpells = numUsableSpells + 1
                     end
                 end
             end
-            -- debugDump(usableSpells)
             if numUsableSpells > 1 then
                 actionToTake = usableSpells[math.random(1, numUsableSpells)]
             elseif numUsableSpells == 1 then
@@ -1221,20 +1231,20 @@ function addBrawler(entityUuid)
                 combatGuid = Osi.CombatGetGuidFor(entityUuid),
                 isInBrawl = false,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
-                preparedSpells = {},
+                -- preparedSpells = {},
             }
-            local entity = Ext.Entity.Get(entityUuid)
-            if entity then
-                local spellBookPrepares = entity.SpellBookPrepares
-                if spellBookPrepares and spellBookPrepares.PreparedSpells then
-                    for _, preparedSpell in ipairs(spellBookPrepares.PreparedSpells) do
-                        if preparedSpell.OriginatorPrototype then
-                            table.insert(brawler.preparedSpells, preparedSpell.OriginatorPrototype)
-                        end
-                    end
-                    debugDump(brawler.preparedSpells)
-                end
-            end
+            -- local entity = Ext.Entity.Get(entityUuid)
+            -- if entity then
+            --     local spellBookPrepares = entity.SpellBookPrepares
+            --     if spellBookPrepares and spellBookPrepares.PreparedSpells then
+            --         for _, preparedSpell in ipairs(spellBookPrepares.PreparedSpells) do
+            --             if preparedSpell.OriginatorPrototype then
+            --                 table.insert(brawler.preparedSpells, preparedSpell.OriginatorPrototype)
+            --             end
+            --         end
+            --         debugDump(brawler.preparedSpells)
+            --     end
+            -- end
             if Osi.IsPlayer(entityUuid) == 0 then
                 -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                 Osi.SetCanJoinCombat(entityUuid, 0)
@@ -1427,11 +1437,11 @@ local function getSpellInfo(spellType, spellName)
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
-            targetConditions = spell.TargetConditions,
-            damageType = spell.DamageType,
+            -- targetConditions = spell.TargetConditions,
+            -- damageType = spell.DamageType,
             isSpell = spell.SpellSchool ~= "None",
             targetRadius = spell.TargetRadius,
-            useCosts = spell.UseCosts,
+            -- useCosts = spell.UseCosts,
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -1472,7 +1482,7 @@ local function getAllSpellsOfType(spellType)
     return allSpellsOfType
 end
 
-local function buildSpellTable()
+function buildSpellTable()
     local spellTable = {}
     for _, spellType in pairs(ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType)
@@ -1482,6 +1492,7 @@ end
 
 function onStarted(level)
     SpellTable = buildSpellTable()
+    -- SpellTable = Ext.Json.Parse(Ext.IO.LoadFile("SpellTable.json"))
     resetPlayers()
     setIsControllingDirectly()
     PlayerCurrentTarget = nil
@@ -1526,12 +1537,29 @@ local function onLevelGameplayStarted(level, _)
     onStarted(level)
 end
 
+function finalToTCharge()
+    addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+    Ext.Timer.WaitFor(3000, function ()
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
+        if Brawlers[level] then
+            for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                if isPugnacious(brawlerUuid) then
+                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                    Osi.FlushOsirisQueue(brawlerUuid)
+                    Osi.Attack(brawlerUuid, Osi.GetHostCharacter(), 0)
+                end
+            end
+        end
+    end)
+end
+
 local function startToTTimer()
     debugPrint("startToTTimer")
     if ToTTimer ~= nil then
         debugPrint("Cancel the old one first...")
         Ext.Timer.Cancel(ToTTimer)
         ToTTimer = nil
+        FinalToTChargeTimer = nil
     end
     if Mods.ToT.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
         ToTTimer = Ext.Timer.WaitFor(6000, function ()
@@ -1543,12 +1571,15 @@ local function startToTTimer()
             end)
             startToTTimer()
         end)
+        FinalToTChargeTimer = Ext.Timer.WaitFor(90000, function ()
+            finalToTCharge()
+        end)
     end
 end
 
 local function isToT()
-    -- return Mods.ToT ~= nil
-    return Mods.ToT ~= nil and Mods.ToT.IsActive()
+    return Mods.ToT ~= nil
+    -- return Mods.ToT ~= nil and Mods.ToT.IsActive()
 end
 
 local function onCombatStarted(combatGuid)
@@ -1603,16 +1634,19 @@ local function onEnteredForceTurnBased(entityGuid)
     if entityUuid then
         local level = Osi.GetRegion(entityUuid)
         if level then
-            for playerUuid, player in pairs(Players) do
-                if Brawlers[level][playerUuid] ~= nil and Osi.IsDead(playerUuid) == 0 then
-                    Brawlers[level][playerUuid].isPaused = true
-                    stopPulseAction(Brawlers[level][playerUuid])
+            stopPulseReposition(level)
+            stopBrawlFizzler(level)
+            if Brawlers[level] then
+                for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                    stopPulseAction(brawler)
                     Osi.PurgeOsirisQueue(entityUuid, 1)
                     Osi.FlushOsirisQueue(entityUuid)
-                    Osi.ForceTurnBasedMode(entityUuid, 1)
+                    if Players and Players[brawlerUuid] then
+                        Brawlers[level][brawlerUuid].isPaused = true
+                        Osi.ForceTurnBasedMode(entityUuid, 1)
+                    end
                 end
             end
-            stopBrawlFizzler(level)
         end
     end
 end
@@ -1620,15 +1654,20 @@ end
 function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
-    if BrawlActive then
+    if BrawlActive and entityUuid then
         local level = Osi.GetRegion(entityUuid)
-        startBrawlFizzler(level)
-        if Brawlers[level] ~= nil then
-            local brawler = Brawlers[level][entityUuid]
-            if brawler ~= nil then
-                brawler.isPaused = false
-                if brawler.isInBrawl then
+        if level then
+            startPulseReposition(level)
+            startBrawlFizzler(level)
+            if Brawlers[level] then
+                for brawlerUuid, brawler in pairs(Brawlers[level]) do
                     startPulseAction(brawler)
+                    Osi.PurgeOsirisQueue(entityUuid, 1)
+                    Osi.FlushOsirisQueue(entityUuid)
+                    if Players and Players[brawlerUuid] then
+                        Brawlers[level][brawlerUuid].isPaused = false
+                        Osi.ForceTurnBasedMode(entityUuid, 0)
+                    end
                 end
             end
         end
