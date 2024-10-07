@@ -409,7 +409,7 @@ local MOVEMENT_SPEED_THRESHOLDS = {
 }
 
 -- Session state
--- SpellTable = {}
+SpellTable = {}
 Listeners = {}
 Brawlers = {}
 Players = {}
