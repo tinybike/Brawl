@@ -26,7 +26,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 
 [![Real time combat test 5](https://img.youtube.com/vi/F76YCIRVWUg/0.jpg)](https://www.youtube.com/watch?v=F76YCIRVWUg)
 
-### 6) Trials of Tav
+### 6) Multiplayer & Trials of Tav
 
 [![Real time combat test 6](https://img.youtube.com/vi/rAbMkWfui-I/0.jpg)](https://www.youtube.com/watch?v=rAbMkWfui-I)
 
