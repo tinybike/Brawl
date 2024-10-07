@@ -1676,9 +1676,6 @@ local function onEnteredForceTurnBased(entityGuid)
                         if Players[brawlerUuid] then
                             Brawlers[level][brawlerUuid].isPaused = true
                             Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                        else
-                            debugPrint("Freezing", brawlerUuid, getDisplayName(brawlerUuid))
-                            Osi.Freeze(brawlerUuid)
                         end
                     end
                 end
@@ -1708,9 +1705,6 @@ function onLeftForceTurnBased(entityGuid)
                         if Players[brawlerUuid] then
                             Brawlers[level][brawlerUuid].isPaused = false
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                        else
-                            debugPrint("Unfreezing", brawlerUuid, getDisplayName(brawlerUuid))
-                            Osi.Unfreeze(brawlerUuid)
                         end
                     end
                 end

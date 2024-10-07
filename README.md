@@ -29,3 +29,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 ### 6) Trials of Tav
 
 [![Real time combat test 6](https://img.youtube.com/vi/rAbMkWfui-I/0.jpg)](https://www.youtube.com/watch?v=rAbMkWfui-I)
+
+### 7) Improved AI
+
+[![Real time combat test 7](https://img.youtube.com/vi/zehZKax_CTE/0.jpg)](https://www.youtube.com/watch?v=zehZKax_CTE)
