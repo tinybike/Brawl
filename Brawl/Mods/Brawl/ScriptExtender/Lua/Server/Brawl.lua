@@ -12,7 +12,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -884,7 +884,7 @@ function getHostileWeightedTargets(brawler, potentialTargets)
         if Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-            weightedTargets[potentialTargetUuid] = distanceToTarget * targetHp
+            weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
             -- NB: this is too intense of a request and will crash the game :/
             -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
             -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
@@ -998,7 +998,7 @@ function pulseAction(brawler)
                 return findTarget(brawler)
             end
             -- Already attacking a target and the target isn't dead, so just keep at it
-            if isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 then
+            if isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
                 debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
                 local level = Osi.GetRegion(brawler.uuid)
                 return actOnHostileTarget(brawler, Brawlers[level][brawler.targetUuid])
