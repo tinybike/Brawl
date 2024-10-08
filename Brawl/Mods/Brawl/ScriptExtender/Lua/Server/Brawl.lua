@@ -724,6 +724,8 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     weight = weight + getSpellTypeWeight(spellType)
     -- Adjust by spell level (higher level spells are disfavored)
     weight = weight - spell.level*2
+    -- Randomize weight by +/- 30% to keep it interesting
+    weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
     return weight
 end
 
@@ -829,11 +831,11 @@ function actOnHostileTarget(brawler, target)
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
-            debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
+            actionToTake = decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, {"Damage"})
+            debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
             actionToTake = decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
-            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName)
+            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
             local numUsableSpells = 0
@@ -1025,9 +1027,9 @@ function pulseAction(brawler)
                 return findTarget(brawler)
             end
             -- Already attacking a target and the target isn't dead, so just keep at it
-            if isOnSameLevel(brawler.uuid, brawler.targetUuid) and isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
+            local level = Osi.GetRegion(brawler.uuid)
+            if level and isOnSameLevel(brawler.uuid, brawler.targetUuid) and isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 and Brawlers[level][brawler.targetUuid] then
                 debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                local level = Osi.GetRegion(brawler.uuid)
                 return actOnHostileTarget(brawler, Brawlers[level][brawler.targetUuid])
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one
@@ -1079,8 +1081,8 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
             Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
-        else
-            holdPosition(brawlerUuid)
+        -- else
+        --     holdPosition(brawlerUuid)
         end
     else
         -- debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
@@ -1105,8 +1107,8 @@ function checkForBrawlToJoin(brawler)
         for _, target in ipairs(getBrawlersSortedByDistance(brawler.uuid)) do
             local targetUuid, distance = target[1], target[2]
             -- NB: also check for farther-away units where there's a nearby brawl happening already? hidden? line-of-sight?
-            if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and Osi.IsInvisible(targetUuid) == 0 and distance < ENTER_COMBAT_RANGE then
-                debugPrint("Reposition", brawler.displayName, brawler.uuid, distance, "->", getDisplayName(targetUuid))
+            if Osi.IsEnemy(brawler.uuid, targetUuid) == 1 and distance < ENTER_COMBAT_RANGE then
+                debugPrint("Start pulse for", brawler.displayName, brawler.uuid, distance, "->", getDisplayName(targetUuid))
                 return startPulseAction(brawler)
             end
         end
@@ -1206,7 +1208,7 @@ function pulseReposition(level)
                 if isPugnacious(brawlerUuid) then
                     if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
                         debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
-                        repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                        -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                     else
                         debugPrint("Checking for a brawl to join", brawler.displayNAme, brawlerUuid)
                         checkForBrawlToJoin(brawler)
@@ -1232,19 +1234,10 @@ function pulseReposition(level)
                             debugPrint("Reposition party member", brawlerUuid)
                             -- debugDump(brawler)
                             -- debugDump(Players)
-                            repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                            -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                         end
                     end
                 end
-            -- Check if this is a downed player unit and apply Osi.LieOnGround for the visual downed glitch
-            elseif Osi.IsPlayer(brawlerUuid) == 1 and isDowned(brawlerUuid) then
-                stopPulseReposition(brawlerUuid)
-                Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
-                    if brawler ~= nil and isDowned(brawlerUuid) then
-                        debugPrint("Player downed, applying LieOnGround to", brawlerUuid, brawler.displayName)
-                        Osi.LieOnGround(brawlerUuid)
-                    end
-                end)
             end
         end
     end
