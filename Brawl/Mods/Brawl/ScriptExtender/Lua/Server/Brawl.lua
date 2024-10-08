@@ -911,7 +911,13 @@ end
 function getHostileWeightedTargets(brawler, potentialTargets)
     local weightedTargets = {}
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        if Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
+        local isHostile = false
+        if isPlayerOrAlly(brawler.uuid) then
+            isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] ~= nil
+        else
+            isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[brawler.uuid] ~= nil
+        end
+        if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local targetHp = Osi.GetHitpoints(potentialTargetUuid)
             weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
@@ -1081,8 +1087,8 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
             Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
-        -- else
-        --     holdPosition(brawlerUuid)
+        else
+            holdPosition(brawlerUuid)
         end
     else
         -- debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
@@ -1179,13 +1185,13 @@ function getNearby(source, radius, ignoreHeight, withComponent)
     return nearby
 end
 
-function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid)
+function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
     for _, nearby in ipairs(getNearby(entityUuid, nearbyRadius)) do
         if nearby.Entity.IsCharacter and isAliveAndCanFight(nearby.Guid) then
             if combatGuid == nil or Osi.CombatGetGuidFor(nearby.Guid) == combatGuid then
-                addBrawler(nearby.Guid, true)
+                addBrawler(nearby.Guid, true, replaceExistingBrawler)
             else
-                addBrawler(nearby.Guid, false)
+                addBrawler(nearby.Guid, false, replaceExistingBrawler)
             end
         end
     end
@@ -1210,7 +1216,7 @@ function pulseReposition(level)
                         debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
                         -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                     else
-                        debugPrint("Checking for a brawl to join", brawler.displayNAme, brawlerUuid)
+                        debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
                         checkForBrawlToJoin(brawler)
                     end
                 -- Player, ally, and neutral units are not actively looking for a fight
@@ -1262,10 +1268,16 @@ function setPlayerRunToSprint(entityUuid)
 end
 
 -- NB: should we also index Brawlers by combatGuid?
-function addBrawler(entityUuid, isInBrawl)
+function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
-        if level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid) then
+        local okToAdd = false
+        if replaceExistingBrawler then
+            okToAdd = level and Brawlers[level] ~= nil and isAliveAndCanFight(entityUuid)
+        else
+            okToAdd = level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
+        end
+        if okToAdd then
             local displayName = getDisplayName(entityUuid)
             debugPrint("Adding Brawler", entityUuid, displayName)
             local brawler = {
@@ -1286,7 +1298,7 @@ function addBrawler(entityUuid, isInBrawl)
                 Osi.SetCanJoinCombat(entityUuid, 0)
             end
             Brawlers[level][entityUuid] = brawler
-            if isInBrawl then
+            if isInBrawl and PulseActionTimers[entityUuid] == nil then
                 startPulseAction(brawler)
             end
         end
@@ -1784,12 +1796,15 @@ local function onGainedControl(targetGuid)
         local targetUserId = Osi.GetReservedUserID(targetUuid)
         if Players[targetUuid] ~= nil and targetUserId ~= nil then
             Players[targetUuid].isControllingDirectly = true
+            local level = Osi.GetRegion(targetUuid)
             for playerUuid, player in pairs(Players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
                     player.isControllingDirectly = false
+                    if level and Brawlers[level] and Brawlers[level][playerUuid] and Brawlers[level][playerUuid].isInBrawl then
+                        startPulseAction(Brawlers[level][targetUuid])
+                    end
                 end
             end
-            local level = Osi.GetRegion(targetUuid)
             if level and Brawlers[level] and Brawlers[level][targetUuid] then
                 stopPulseAction(Brawlers[level][targetUuid], true)
             end
@@ -1857,17 +1872,19 @@ end
 local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
+    -- if not Osi.IsEnemy(attackerUuid, defenderUuid) and (Osi.IsPlayer(attackerUuid) == 0 or Osi.IsPlayer(defenderUuid) == 0) then
+    --     Osi.SetRelationTemporaryHostile(attackerUuid, defenderUuid)
+    -- end
     if isToT() then
         addBrawler(attackerUuid, true)
         addBrawler(defenderUuid, true)
     end
-    addNearbyToBrawlers(attackerUuid, 100)
     if Osi.IsPlayer(attackerUuid) == 1 then
         if Osi.IsPlayer(defenderUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
         end
         if isToT() then
-            addNearbyToBrawlers(attackerUuid, 100)
+            addNearbyToBrawlers(attackerUuid, 30, nil, true)
         end
     end
     if Osi.IsPlayer(defenderUuid) == 1 then
@@ -1875,7 +1892,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
             IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
         end
         if isToT() then
-            addNearbyToBrawlers(defenderUuid, 100)
+            addNearbyToBrawlers(defenderUuid, 30, nil, true)
         end
     end
     startBrawlFizzler(Osi.GetRegion(attackerUuid))
