@@ -56,6 +56,8 @@ local ALL_SPELLS = {
     "Target_ThornWhip",
     "Target_FlurryOfBlows",
     "Target_StunningStrike",
+    "Rush_Charger_Attack",
+    "Rush_Charger_Push",
     "Rush_Rush",
     "Rush_WEAPON_ACTION_RUSH",
     "Rush_Aggressive",
@@ -410,6 +412,7 @@ local MOVEMENT_SPEED_THRESHOLDS = {
 
 -- Session state
 SpellTable = {}
+SpellsNotInSpellTable = {}
 Listeners = {}
 Brawlers = {}
 Players = {}
@@ -774,6 +777,25 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
         if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
+        if DEBUG_LOGGING and spell == nil then
+            local isSpellInSpellTable = true
+            local isAlreadyFound = true
+            for _, spellType in ipairs(ALL_SPELL_TYPES) do
+                if SpellTable[spellType][spellName] ~= nil then
+                    isSpellInSpellTable = false
+                    break
+                end
+            end
+            for _, spellNotInSpellTable in ipairs(SpellsNotInSpellTable) do
+                if spellNotInSpellTable == spellName then
+                    isAlreadyFound = false
+                end
+            end
+            if not isAlreadyFound then
+                table.insert(SpellsNotInSpellTable, spellName)
+                debugPrint("Spell not in SpellTable", spellName)
+            end
+        end
     end
     return weightedSpells
 end
@@ -862,12 +884,18 @@ function actOnFriendlyTarget(brawler, target)
     return false
 end
 
+function isOnSameLevel(uuid1, uuid2)
+    local level1 = Osi.GetRegion(uuid1)
+    local level2 = Osi.GetRegion(uuid2)
+    return level1 ~= nil and level2 ~= nil and level1 == level2
+end
+
 function getBrawlersSortedByDistance(entityUuid)
     local brawlersSortedByDistance = {}
     local level = Osi.GetRegion(entityUuid)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if isAliveAndCanFight(brawlerUuid) then
+            if isOnSameLevel(brawlerUuid, entityUuid) and isAliveAndCanFight(brawlerUuid) then
                 table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
             end
         end
@@ -922,7 +950,7 @@ function findTarget(brawler)
                 local minTargetHpPct = 200.0
                 local friendlyTargetUuid = nil
                 for targetUuid, target in pairs(Brawlers[level]) do
-                    if Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
+                    if isOnSameLevel(brawler.uuid, targetUuid) and Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
                         -- print("Enemy isally check", brawler.uuid, brawler.displayName, targetUuid, getDisplayName(targetUuid), Osi.IsAlly(brawler.uuid, targetUuid))
                         local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
                         if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
@@ -985,7 +1013,6 @@ function pulseAction(brawler)
                 for playerUuid, player in pairs(Players) do
                     if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < HELP_DOWNED_MAX_RANGE then
                         player.isBeingHelped = true
-                        brawler.isAutoAttacking = false
                         brawler.targetUuid = nil
                         debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
                         return moveThenAct(brawler.uuid, playerUuid, "Target_Help")
@@ -998,7 +1025,7 @@ function pulseAction(brawler)
                 return findTarget(brawler)
             end
             -- Already attacking a target and the target isn't dead, so just keep at it
-            if isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
+            if isOnSameLevel(brawler.uuid, brawler.targetUuid) and isAliveAndCanFight(brawler.targetUuid) and Osi.IsInvisible(brawler.targetUuid) == 0 and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
                 debugPrint("Already attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
                 local level = Osi.GetRegion(brawler.uuid)
                 return actOnHostileTarget(brawler, Brawlers[level][brawler.targetUuid])
@@ -1072,9 +1099,9 @@ end
 
 -- Enemies are pugnacious jerks and looking for a fight >:(
 function checkForBrawlToJoin(brawler)
-    local closestAlivePlayer, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
-    debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestAlivePlayer, closestDistance)
-    if closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
+    local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
+    debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", playerUuid, closestDistance)
+    if isOnSameLevel(Osi.GetRegion(brawler.uuid), Osi.GetRegion(playerUuid)) and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
         for _, target in ipairs(getBrawlersSortedByDistance(brawler.uuid)) do
             local targetUuid, distance = target[1], target[2]
             -- NB: also check for farther-away units where there's a nearby brawl happening already? hidden? line-of-sight?
@@ -1254,11 +1281,12 @@ function addBrawler(entityUuid, isInBrawl)
                 combatGuid = Osi.CombatGetGuidFor(entityUuid),
                 isInBrawl = isInBrawl,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
-                -- preparedSpells = {},
             }
             if Osi.IsPlayer(entityUuid) == 0 then
                 -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                 Osi.SetCanJoinCombat(entityUuid, 0)
+                -- thank u lunisole/ghostboats
+                Osi.PROC_SelfHealing_Disable(entityUuid)
             elseif Players[entityUuid] then
                 -- brawler.originalCanJoinCombat = 1
                 setPlayerRunToSprint(entityUuid)
@@ -1318,10 +1346,23 @@ end
 
 function removeBrawler(level, entityUuid)
     local combatGuid = nil
-    local brawler = Brawlers[level][entityUuid]
-    stopPulseAction(brawler)
-    Osi.SetCanJoinCombat(entityUuid, 1)
-    Brawlers[level][entityUuid] = nil
+    if Brawlers[level] ~= nil then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            if brawler.targetUuid == entityUuid then
+                brawler.targetUuid = nil
+                Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                Osi.FlushOsirisQueue(brawlerUuid)
+            end
+        end
+        if Brawlers[level][entityUuid] then
+            stopPulseAction(Brawlers[level][entityUuid])
+            Brawlers[level][entityUuid] = nil
+        end
+        Osi.SetCanJoinCombat(entityUuid, 1)
+        -- if Osi.IsPlayer(entityUuid) == 0 then
+        --     Osi.PROC_SelfHealing_Enable(entityUuid)
+        -- end
+    end
 end
 
 function resetPlayersMovementSpeed()
@@ -1719,20 +1760,20 @@ local function onTurnEnded(entityGuid)
 end
 
 local function onDied(entityGuid)
-    -- debugPrint("Died", entityGuid)
+    debugPrint("Died", entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level ~= nil then
-        local entityUuid = Osi.GetUUID(entityGuid)
-        if Brawlers[level] ~= nil and Brawlers[level][entityUuid] ~= nil then
-            -- Sometimes units don't appear dead when killed out-of-combat...
-            -- this at least makes them lie prone (and dead-appearing units still appear dead)
-            Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
-                debugPrint("LieOnGround", entityGuid)
-                Osi.LieOnGround(entityGuid)
-            end)
-            removeBrawler(level, entityUuid)
-            checkForEndOfBrawl(level)
-        end
+    local entityUuid = Osi.GetUUID(entityGuid)
+    if level ~= nil and entityUuid ~= nil and Brawlers[level] ~= nil and Brawlers[level][entityUuid] ~= nil then
+        -- Sometimes units don't appear dead when killed out-of-combat...
+        -- this at least makes them lie prone (and dead-appearing units still appear dead)
+        Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
+            debugPrint("LieOnGround", entityUuid)
+            Osi.PurgeOsirisQueue(entityUuid, 1)
+            Osi.FlushOsirisQueue(entityUuid)
+            Osi.LieOnGround(entityUuid)
+        end)
+        removeBrawler(level, entityUuid)
+        checkForEndOfBrawl(level)
     end
 end
 
@@ -1827,6 +1868,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
         addBrawler(attackerUuid, true)
         addBrawler(defenderUuid, true)
     end
+    addNearbyToBrawlers(attackerUuid, 100)
     if Osi.IsPlayer(attackerUuid) == 1 then
         if Osi.IsPlayer(defenderUuid) == 0 then
             IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
@@ -1874,6 +1916,25 @@ end
 local function onDifficultyChanged(difficulty)
     debugPrint("DifficultyChanged", difficulty)
     setMovementSpeedThresholds()
+end
+
+local function onTeleportedToCamp(character)
+    local entityUuid = Osi.GetUUID(character)
+    if entityUuid ~= nil and Brawlers ~= nil then
+        for level, brawlersInLevel in pairs(Brawlers) do
+            if brawlersInLevel[entityUuid] ~= nil then
+                removeBrawler(level, entityUuid)
+                checkForEndOfBrawl(level)
+            end
+        end
+    end
+end
+
+local function onTeleportedFromCamp(character)
+    local entityUuid = Osi.GetUUID(character)
+    if entityUuid ~= nil and areAnyPlayersBrawling() then
+        addBrawler(entityUuid, false)
+    end
 end
 
 -- thank u focus
@@ -1994,6 +2055,14 @@ function startListeners()
     }
     Listeners.DifficultyChanged = {
         handle = Ext.Osiris.RegisterListener("DifficultyChanged", 1, "after", onDifficultyChanged),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    Listeners.TeleportedToCamp = {
+        handle = Ext.Osiris.RegisterListener("TeleportedToCamp", 1, "after", onTeleportedToCamp),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    Listeners.TeleportedFromCamp = {
+        handle = Ext.Osiris.RegisterListener("TeleportedFromCamp", 1, "after", onTeleportedFromCamp),
         stop = Ext.Osiris.UnregisterListener,
     }
     Listeners.PROC_Subregion_Entered = {
