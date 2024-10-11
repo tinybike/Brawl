@@ -413,9 +413,8 @@ local CONTROLLER_TO_SLOT = {
     B = 2,
     X = 4,
     Y = 6,
-    DPadDown = 8,
-    DPadLeft = 10,
-    DPadRight = 12,
+    DPadLeft = 8,
+    DPadRight = 10,
     -- DPadUp = nil,
     -- Back = nil,
     -- Start = nil,
@@ -2283,18 +2282,22 @@ local function onNetMessage(data)
             if brawler then
                 if not brawler.isPaused and CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
                     debugPrint("use spell")
+                    Osi.PurgeOsirisQueue(player.uuid, 1)
+                    Osi.FlushOsirisQueue(player.uuid)
                     return useSpellOnClosestEnemyTarget(player.uuid, getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload]))
                 end
                 if not brawler.isPaused and (data.Payload == "RightTrigger" or data.Payload == "RightShoulder" or data.Payload == "LeftShoulder" or data.Payload == "LeftTrigger") then
                     debugPrint("pausing")
-                    brawler.isPaused = true
+                    Osi.PurgeOsirisQueue(player.uuid, 1)
+                    Osi.FlushOsirisQueue(player.uuid)
                     return Osi.ForceTurnBasedMode(player.uuid, 1)
                 end
-                if (data.Payload == "A" or data.Payload == "B") and brawler.isPaused then
-                    debugPrint("unpausing")
-                    brawler.isPaused = false
-                    return Osi.ForceTurnBasedMode(player.uuid, 0)
-                end
+                -- if data.Payload == "B" and brawler.isPaused then
+                --     debugPrint("unpausing")
+                --     Osi.PurgeOsirisQueue(player.uuid, 1)
+                --     Osi.FlushOsirisQueue(player.uuid)
+                --     return Osi.ForceTurnBasedMode(player.uuid, 0)
+                -- end
             end
         end
     end
