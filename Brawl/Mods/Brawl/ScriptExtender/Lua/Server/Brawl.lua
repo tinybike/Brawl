@@ -11,7 +11,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -1348,6 +1348,12 @@ function endBrawl(level)
         debugPrint("Ended brawl")
         debugDump(Brawlers[level])
     end
+    for playerUuid, player in pairs(Players) do
+        if player.isPaused then
+            Osi.ForceTurnBasedMode(playerUuid, 0)
+            break
+        end
+    end
     resetPlayersMovementSpeed()
     Brawlers[level] = {}
     stopBrawlFizzler(level)
@@ -2270,24 +2276,24 @@ local function onNetMessage(data)
             toggleCompanionAI(data.Payload)
         end
     elseif data.Channel == "ControllerButtonPressed" then
+        _D(data)
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
-            if data.Payload == "RightTrigger" or data.Payload == "RightShoulder" or data.Payload == "LeftShoulder" or data.Payload == "LeftTrigger" then
-                local brawler = getBrawlerByUuid(player.uuid)
-                if brawler then
-                    if brawler.isPaused then
-                        brawler.isPaused = false
-                        Osi.ForceTurnBasedMode(player.uuid, 0)
-                    else
-                        brawler.isPaused = true
-                        Osi.ForceTurnBasedMode(player.uuid, 1)
-                    end
+            local brawler = getBrawlerByUuid(player.uuid)
+            if brawler then
+                if not brawler.isPaused and CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
+                    debugPrint("use spell")
+                    return useSpellOnClosestEnemyTarget(player.uuid, getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload]))
                 end
-            else
-                local slot = CONTROLLER_TO_SLOT[data.Payload]
-                local brawler = getBrawlerByUuid(player.uuid)
-                if slot ~= nil and brawler and not brawler.isPaused and isAliveAndCanFight(player.uuid) then
-                    useSpellOnClosestEnemyTarget(player.uuid, getSpellNameBySlot(player.uuid, slot))
+                if not brawler.isPaused and (data.Payload == "RightTrigger" or data.Payload == "RightShoulder" or data.Payload == "LeftShoulder" or data.Payload == "LeftTrigger") then
+                    debugPrint("pausing")
+                    brawler.isPaused = true
+                    return Osi.ForceTurnBasedMode(player.uuid, 1)
+                end
+                if (data.Payload == "A" or data.Payload == "B") and brawler.isPaused then
+                    debugPrint("unpausing")
+                    brawler.isPaused = false
+                    return Osi.ForceTurnBasedMode(player.uuid, 0)
                 end
             end
         end
