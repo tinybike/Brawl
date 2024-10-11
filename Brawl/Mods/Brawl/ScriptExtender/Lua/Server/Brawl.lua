@@ -29,9 +29,29 @@ local AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
 local HITPOINTS_MULTIPLIER = 3
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 local LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
+local ACTION_RESOURCES = {
+    ActionPoint = "734cbcfb-8922-4b6d-8330-b2a7e4c14b6a",
+    BonusActionPoint = "420c8df5-45c2-4253-93c2-7ec44e127930",
+    ReactionActionPoint = "45ff0f48-b210-4024-972f-b64a44dc6985",
+    SpellSlot = "d136c5d9-0ff0-43da-acce-a74a07f8d6bf",
+    ChannelDivinity = "028304ef-e4b7-4dfb-a7ec-cd87865cdb16",
+    ChannelOath = "c0503ecf-c3cd-4719-fd9c-46051d0a5ab9",
+    KiPoint = "46d3d228-04e0-4a43-9a2e-78137e858c14",
+    DeflectMissiles_Charge = "2b8021f4-99ac-42d4-87ce-96a7c5505aee",
+    SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
+    Movement = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185",
+}
 -- Spell list from https://fearlessrevolution.com/viewtopic.php?t=13996&start=3420
 -- NB: doesn't include spells from mods, find a way to look those up at runtime?
 local ALL_SPELLS = {
+    "Target_MAG_HuntersMark",
+    "Shout_Disengage_StepOfTheWind",
+    "Shout_PatientDefense",
+    "Shout_Dash_StepOfTheWind",
+    "Target_OpenHandTechnique_Push",
+    "Target_OpenHandTechnique_Knock",
+    "Target_OpenHandTechnique_NoReactions",
+    "Shout_QuickenedHealing",
     "Projectile_MainHandAttack",
     "Projectile_OffhandAttack",
     "Target_MainHandAttack",
@@ -341,6 +361,7 @@ local ALL_SPELLS = {
 }
 local ALL_SPELL_TYPES = {
     "Buff",
+    "Debuff",
     "Control",
     "Damage",
     "Healing",
@@ -769,7 +790,7 @@ end
 -- 2b. If primarily a ranged class, favor ranged attacks.
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
--- 3. Status effects/buffs (NYI)
+-- 3. Status effects/buffs/debuffs (NYI)
 function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
@@ -785,17 +806,17 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
         if DEBUG_LOGGING and spell == nil then
-            local isSpellInSpellTable = true
-            local isAlreadyFound = true
+            local isSpellInSpellTable = false
+            local isAlreadyFound = false
             for _, spellType in ipairs(ALL_SPELL_TYPES) do
                 if SpellTable[spellType][spellName] ~= nil then
-                    isSpellInSpellTable = false
+                    isSpellInSpellTable = true
                     break
                 end
             end
             for _, spellNotInSpellTable in ipairs(SpellsNotInSpellTable) do
                 if spellNotInSpellTable == spellName then
-                    isAlreadyFound = false
+                    isAlreadyFound = true
                 end
             end
             if not isAlreadyFound then
@@ -813,7 +834,6 @@ function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archety
         archetype = "melee"
     end
     local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
-    -- return getWeightedRandomSpell(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -823,7 +843,6 @@ function decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spell
         archetype = "melee"
     end
     local weightedSpells = getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
-    -- return getWeightedRandomSpell(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -1544,6 +1563,24 @@ end
 local function getSpellInfo(spellType, spellName)
     local spell = Ext.Stats.Get(spellName)
     if spell and spell.VerbalIntent == spellType then
+        local useCosts = split(spell.UseCosts, ";")
+        local costs = {
+            ShortRest = spell.Cooldown == "OncePerShortRest",
+            LongRest = spell.Cooldown == "OncePerRest",
+        }
+        -- local hitCost = nil -- divine smite only..?
+        for _, useCost in ipairs(useCosts) do
+            local useCostTable = split(useCost, ":")
+            local useCostLabel = useCostTable[1]
+            local useCostAmount = tonumber(useCostTable[#useCostTable])
+            if useCostLabel == "SpellSlotsGroup" then
+                -- e.g. SpellSlotsGroup:1:1:2
+                -- NB: what are the first two numbers?
+                costs.SpellSlot = useCostAmount
+            else
+                costs[useCostLabel] = useCostAmount
+            end
+        end
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -1551,7 +1588,7 @@ local function getSpellInfo(spellType, spellName)
             -- damageType = spell.DamageType,
             isSpell = spell.SpellSchool ~= "None",
             targetRadius = spell.TargetRadius,
-            -- useCosts = spell.UseCosts,
+            costs = costs,
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -2252,11 +2289,82 @@ local function getSpellNameBySlot(uuid, slot)
     end
 end
 
+function getSpellByName(name)
+    for spellType, spellsOfType in pairs(SpellTable) do
+        debugPrint("Checking", spellType)
+        for spellName, spell in pairs(spellsOfType) do
+            debugPrint(spellName, name)
+            if spellName == name then
+                return spell
+            end
+        end
+    end
+    return nil
+end
+
+function useSpellAndResources(casterUuid, targetUuid, spellName)
+    local entity = Ext.Entity.Get(casterUuid)
+    local spell = getSpellByName(spellName)
+    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName, "on", targetUuid, getDisplayName(targetUuid))
+    debugDump(spell.costs)
+    local isSpellPrepared = false
+    for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+        if preparedSpell.OriginatorPrototype == spellName then
+            isSpellPrepared = true
+            break
+        end
+    end
+    if not isSpellPrepared then
+        debugPrint("Caster does not have spell", spellName, "prepared")
+        return false
+    end
+    for costType, costValue in pairs(spell.costs) do
+        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            if costType == "SpellSlot" then
+                local spellLevel = costValue
+                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
+                debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
+                if availableResourceValue < 1 then
+                    debugPrint("Insufficient resources", costType)
+                    return false
+                end
+            else
+                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
+                debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
+                if availableResourceValue < costValue then
+                    debugPrint("Insufficient resources", costType)
+                    return false
+                end
+            end
+        end
+    end
+    for costType, costValue in pairs(spell.costs) do
+        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            if costType == "SpellSlot" then
+                local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                for _, spellSlot in ipairs(spellSlots) do
+                    if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+                        spellSlot.Amount = spellSlot.Amount - 1
+                        break
+                    end
+                end
+            else
+                local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
+                _D(resource)
+                resource.Amount = resource.Amount - costValue
+            end
+        end
+    end
+    entity:Replicate("ActionResources")
+    Osi.UseSpell(casterUuid, spellName, targetUuid)
+    return true
+end
+
 local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
     if spellName then
         local targetUuid = getClosestEnemyBrawler(playerUuid, 40)
         if targetUuid then
-            Osi.UseSpell(playerUuid, spellName, targetUuid)
+            return useSpellAndResources(playerUuid, targetUuid, spellName)
         end
     end
 end
