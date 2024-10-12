@@ -12,4 +12,6 @@
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
     <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Decreasing this will make the game substantially harder.</content>
     <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
+    <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>
+    <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
 </contentList>

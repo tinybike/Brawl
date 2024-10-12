@@ -3,11 +3,13 @@ local ModEnabled = true
 local CompanionAIEnabled = true
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
+local FullAuto = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
+    FullAuto = MCM.Get("full_auto")
 end
 
 -- Constants
@@ -1340,7 +1342,7 @@ function pulseReposition(level)
                 -- - Neutrals just chilling
                 elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                     -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
-                    if Players[brawlerUuid] and Players[brawlerUuid].isControllingDirectly == true then
+                    if Players[brawlerUuid] and (Players[brawlerUuid].isControllingDirectly == true and not FullAuto) then
                         -- debugPrint("Player is controlling directly: do not take action!")
                         -- debugDump(brawler)
                         -- debugDump(Players)
@@ -2329,7 +2331,7 @@ local function toggleMod(hotkey)
 end
 
 local function onMCMSettingSaved(payload)
-    _D(payload)
+    debugDump(payload)
     if not payload or payload.modUUID ~= ModuleUUID or not payload.settingId then
         return
     end
@@ -2353,6 +2355,8 @@ local function onMCMSettingSaved(payload)
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
         ActionInterval = payload.value
+    elseif payload.settingId == "full_auto" then
+        FullAuto = payload.value
     end
 end
 
@@ -2435,7 +2439,7 @@ function useSpellAndResources(casterUuid, targetUuid, spellName)
                 end
             else
                 local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
-                _D(resource)
+                debugDump(resource)
                 resource.Amount = resource.Amount - costValue
             end
         end
@@ -2468,7 +2472,7 @@ local function onNetMessage(data)
             toggleCompanionAI(data.Payload)
         end
     elseif data.Channel == "ControllerButtonPressed" then
-        _D(data)
+        debugDump(data)
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
             local brawler = getBrawlerByUuid(player.uuid)
@@ -2479,6 +2483,7 @@ local function onNetMessage(data)
                     Osi.FlushOsirisQueue(player.uuid)
                     return useSpellOnClosestEnemyTarget(player.uuid, getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload]))
                 end
+                -- NB: use dpadright/left to switch targets?  get list of enemies, toggle between them, maybe use announcement text to show which one you've selected?
                 if not brawler.isPaused and (data.Payload == "RightTrigger" or data.Payload == "RightShoulder" or data.Payload == "LeftShoulder" or data.Payload == "LeftTrigger") then
                     debugPrint("pausing")
                     Osi.PurgeOsirisQueue(player.uuid, 1)

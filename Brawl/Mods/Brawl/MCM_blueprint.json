@@ -81,6 +81,17 @@
                                 "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
                                 "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
                             }
+                        },
+                        {
+                            "Id": "full_auto",
+                            "Name": "Fully Automated Brawls",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, the companion AI will control ALL player characters, including the active character.",
+                            "Handles": {
+                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
+                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                            }
                         }
                     ]
                 }
