@@ -1416,6 +1416,8 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             if Osi.IsPlayer(entityUuid) == 0 then
                 -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                 Osi.SetCanJoinCombat(entityUuid, 0)
+                -- thank u lunisole/ghostboats
+                Osi.PROC_SelfHealing_Disable(entityUuid)
             elseif Players[entityUuid] then
                 -- brawler.originalCanJoinCombat = 1
                 setPlayerRunToSprint(entityUuid)
