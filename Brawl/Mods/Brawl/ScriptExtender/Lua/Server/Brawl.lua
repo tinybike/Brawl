@@ -13,7 +13,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -42,415 +42,6 @@ local ACTION_RESOURCES = {
     DeflectMissiles_Charge = "2b8021f4-99ac-42d4-87ce-96a7c5505aee",
     SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
     Movement = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185",
-}
--- Spell list from https://fearlessrevolution.com/viewtopic.php?t=13996&start=3420
--- NB: doesn't include spells from mods, find a way to look those up at runtime?
-local ALL_SPELLS = {
-    "Projectile_Jump",
-    "Target_Shove",
-    "Shout_Dash_NPC",
-    "Throw_Throw",
-    "Projectile_HamstringShot",
-    "Target_MageArmor",
-    "Target_Dip_NPC",
-    "Shout_Rage",
-    "Target_ConcussiveSmash",
-    "Projectile_Jump",
-    "Target_Shove",
-    "Shout_Dash_NPC",
-    "Throw_Throw",
-    "Target_HuntersMark",
-    "Projectile_HamstringShot",
-    "Target_LayOnHands_BigHeal",
-    "Target_PLA_ShieldOfFaith_SwordOfJustice",
-    "Target_Slash_New",
-    "Zone_Cleave",
-    "Shout_Dash_NPC",
-    "Target_IronboundPursuit_RedCap",
-    "Projectile_Jump",
-    "Target_Slash_New",
-    "Target_BloodLust_RedCap",
-    "Target_OpenWounds_Redcap",
-    "Target_HoldPerson_Redcap",
-    "Projectile_Jump",
-    "Target_Shove",
-    "Shout_Dash_NPC",
-    "Throw_Throw",
-    "Shout_ProduceFlame",
-    "Shout_WildShape_Bear_Polar_NPC_Moon",
-    "Target_Resistance",
-    "Target_CureWounds",
-    "Shout_WildShape_Bear_NPC",
-    "Shout_Blur",
-    "Target_Silence",
-    "Projectile_HamstringShot",
-    "Target_Claws_Bear_Brown",
-    "Target_ConcussiveSmash",
-    "Shout_WildShape_Wolf_White_NPC_Moon",
-    "Target_Moonbeam",
-    "Shout_WildShape_Bear_Polar_NPC",
-    "Target_HealingWord",
-    "Target_LesserRestoration",
-    "Shout_Shillelagh",
-    "Target_MistyStep",
-    "Shout_WildShape_Wolf_Dire_NPC",
-    "Target_HuntersMark",
-    "Target_OpeningAttack",
-    "Projectile_PiercingShot",
-    "Projectile_MobileShooting",
-    "Shout_SteadyRanged",
-    "Zone_Cleave",
-    "Target_Slash_New",
-    "Shout_FullSwing",
-    "Target_DisarmingAttack_NPC",
-    "Projectile_Jump",
-    "Target_Shove",
-    "Shout_Dash_NPC",
-    "Throw_Throw",
-    "Projectile_StoneThrow",
-    "Target_OpeningAttack",
-    "Target_Slash_New",
-    "Projectile_HamstringShot",
-    "Shout_SteadyRanged",
-    "Shout_ActionSurge",
-    "Target_ConcussiveSmash",
-    -- "Shout_Disengage_Goblin",
-    -- "Target_Dip",
-    -- "Shout_Hide",
-    "Throw_ImprovisedWeapon",
-    -- "Shout_Dash",
-    -- "Target_Help",
-    "Shout_Disengage",
-    "Target_HinderingSmash",
-    "Projectile_MobileShooting",
-    "Projectile_PiercingShot",
-    "Shout_GoblinWarcry",
-    "Target_HeartStopper",
-    "Target_Bite_Wolf",
-    "Target_LayOnHands_BigHeal",
-    "Target_LayOnHands_Cure",
-    "Shout_SteadyRangedCrossbow",
-    "Rush_SpringAttack",
-    "Target_MAG_HuntersMark",
-    "Shout_Disengage_StepOfTheWind",
-    "Shout_PatientDefense",
-    "Shout_Dash_StepOfTheWind",
-    "Target_OpenHandTechnique_Push",
-    "Target_OpenHandTechnique_Knock",
-    "Target_OpenHandTechnique_NoReactions",
-    "Target_KiResonation_Punch",
-    "Target_KiResonation_Blast",
-    "Target_KiResonation_Punch_BonusAction",
-    "Target_StunningStrike",
-    "Target_StunningStrike_Unarmed",
-    "Target_QuiveringPalm",
-    "Shout_QuickenedHealing",
-    "Projectile_MainHandAttack",
-    "Projectile_OffhandAttack",
-    "Target_MainHandAttack",
-    "Target_OffhandAttack",
-    "Target_Topple",
-    "Target_UnarmedAttack",
-    "Target_AdvancedMeleeWeaponAction",
-    "Target_Charger_Attack",
-    "Target_Charger_Push",
-    "Target_CripplingStrike",
-    "Target_DisarmingStrike",
-    "Target_Flurry",
-    "Target_LungingAttack",
-    "Target_OpeningAttack",
-    "Target_PiercingThrust",
-    "Target_PommelStrike",
-    "Target_Riposte",
-    "Target_Shove",
-    "Target_Slash",
-    "Target_Smash",
-    "Target_ThornWhip",
-    "Target_FlurryOfBlows",
-    "Target_StunningStrike",
-    "Rush_Charger_Attack",
-    "Rush_Charger_Push",
-    "Rush_Rush",
-    "Rush_WEAPON_ACTION_RUSH",
-    "Rush_Aggressive",
-    "Rush_ForceTunnel",
-    "Projectile_AcidArrow",
-    "Projectile_AcidSplash",
-    "Projectile_C",
-    "Projectile_ChainLightning",
-    "Projectile_ChromaticOrb",
-    "Projectile_DisarmingAttack",
-    "Projectile_Disintegrate",
-    "Projectile_EldritchBlast",
-    "Projectile_EnsnaringStrike_Container",
-    "Projectile_FireBolt",
-    "Projectile_Fireball",
-    "Projectile_GuidingBolt",
-    "Projectile_HailOfThorns",
-    "Projectile_HordeBreaker",
-    "Projectile_IceKnife",
-    "Projectile_LightningArrow",
-    "Projectile_MagicMissile",
-    "Projectile_MenacingAttack",
-    "Projectile_PoisonSpray",
-    "Projectile_PushingAttack",
-    "Projectile_RayOfEnfeeblement",
-    "Projectile_RayOfFrost",
-    "Projectile_RayOfSickness",
-    "Projectile_ScorchingRay",
-    "Projectile_SneakAttack",
-    "Projectile_TripAttack",
-    "Projectile_WitchBolt",
-    "Shout_ActionSurge",
-    "Shout_Aid",
-    "Shout_ArcaneRecovery",
-    "Shout_ArmorOfAgathys",
-    "Shout_ArmsOfHadar",
-    "Shout_AuraOfVitality",
-    "Shout_BeaconOfHope",
-    "Shout_BladeWard",
-    "Shout_Blink",
-    "Shout_Blur",
-    "Shout_CreateSorceryPoints",
-    "Shout_CreateSpellSlot",
-    "Shout_CrusadersMantle",
-    "Shout_Dash_CunningAction",
-    "Shout_DestructiveWave",
-    "Shout_DetectThoughts",
-    "Shout_Disengage_CunningAction",
-    "Shout_DisguiseSelf",
-    "Shout_DispelEvilAndGood",
-    "Shout_DivineFavor",
-    "Shout_DivineSense",
-    "Shout_Dreadful_Aspect",
-    "Shout_ExpeditiousRetreat",
-    "Shout_FalseLife",
-    "Shout_FeatherFall",
-    "Shout_FireShield",
-    "Shout_FlameBlade",
-    "Shout_FlameBlade_MephistophelesTiefling",
-    "Shout_HealingRadiance",
-    "Shout_HealingWord_Mass",
-    "Shout_HellishRebuke",
-    "Shout_HellishRebuke_AsmodeusTiefling",
-    "Shout_HellishRebuke_WarlockMI",
-    "Shout_HeroesFeast",
-    "Shout_Hide_BonusAction",
-    "Shout_MirrorImage",
-    "Shout_NaturalRecovery",
-    "Shout_PassWithoutTrace",
-    "Shout_PrayerOfHealing",
-    "Shout_ProduceFlame",
-    "Shout_RadianceOfTheDawn",
-    "Shout_SacredWeapon",
-    "Shout_SecondWind",
-    "Shout_SeeInvisibility",
-    "Shout_Shield_Sorcerer",
-    "Shout_Shield_Wizard",
-    "Shout_Shillelagh",
-    "Shout_SongOfRest",
-    "Shout_SpeakWithAnimals",
-    "Shout_SpeakWithAnimals_Barbarian",
-    "Shout_SpeakWithAnimals_ForestGnome",
-    "Shout_SpiritGuardians",
-    "Shout_Thaumaturgy",
-    "Shout_TurnTheFaithless",
-    "Shout_TurnTheUnholy",
-    "Shout_TurnUndead",
-    "Shout_WildShape",
-    "Shout_WildShape_Badger",
-    "Shout_WildShape_Cat",
-    "Shout_WildShape_Combat",
-    "Shout_WildShape_Combat_Badger",
-    "Shout_WildShape_Combat_Bear_Polar",
-    "Shout_WildShape_Combat_Cat",
-    "Shout_WildShape_Combat_DeepRothe",
-    "Shout_WildShape_Combat_Raven",
-    "Shout_WildShape_Combat_Spider",
-    "Shout_WildShape_Combat_Wolf_Dire",
-    "Shout_WildShape_DeepRothe",
-    "Shout_WildShape_Spider",
-    "Shout_WildShape_Wolf_Dire",
-    "Shout_WindWalk",
-    "Target_AnimalFriendship",
-    "Target_AnimateDead",
-    "Target_ArcaneEye",
-    "Target_ArcaneLock",
-    "Target_Bane",
-    "Target_Banishment",
-    "Target_Barkskin",
-    "Target_BestowCurse",
-    "Target_BlackTentacles",
-    "Target_Bless",
-    "Target_BlessingOfTheTrickster",
-    "Target_Blight",
-    "Target_Blindness",
-    "Target_CallLightning",
-    "Target_CalmEmotions",
-    "Target_CharmPerson",
-    "Target_ChillTouch",
-    "Target_CircleOfDeath",
-    "Target_CloudOfDaggers",
-    "Target_Cloudkill",
-    "Target_Command_Container",
-    "Target_CompelledDuel",
-    "Target_Confusion",
-    "Target_ConjureElemental_Container",
-    "Target_ConjureElementals_Minor_Container",
-    "Target_ConjureWoodlandBeings",
-    "Target_Contagion",
-    "Target_ControlUndead",
-    "Target_Counterspell",
-    "Target_CreateDestroyWater",
-    "Target_CreateUndead",
-    "Target_CrownOfMadness",
-    "Target_CureWounds",
-    "Target_CureWounds_Mass",
-    "Target_CuttingWords",
-    "Target_DancingLights",
-    "Target_Darkness",
-    "Target_Darkness_DrowMagic",
-    "Target_Darkvision",
-    "Target_Daylight_Container",
-    "Target_DeathWard",
-    "Target_DisarmingAttack",
-    "Target_DissonantWhispers",
-    "Target_DominateBeast",
-    "Target_DominatePerson",
-    "Target_ElementalWeapon",
-    "Target_EnhanceAbility",
-    "Target_EnlargeReduce",
-    "Target_Entangle",
-    "Target_Enthrall",
-    "Target_Eyebite",
-    "Target_FaerieFire",
-    "Target_FaerieFire_DrowMagic",
-    "Target_FeignDeath",
-    "Target_FindFamiliar",
-    "Target_FlameStrike",
-    "Target_FlamingSphere",
-    "Target_FleshToStone",
-    "Target_Fly",
-    "Target_FogCloud",
-    "Target_FreedomOfMovement",
-    "Target_FrenziedStrike",
-    "Target_Friends",
-    "Target_GaseousForm",
-    "Target_GlobeOfInvulnerability",
-    "Target_GlyphOfWarding",
-    "Target_Goodberry",
-    "Target_GraspingVine",
-    "Target_Grease",
-    "Target_GreaterRestoration",
-    "Target_GuardianOfFaith",
-    "Target_Guidance",
-    "Target_Harm",
-    "Target_Haste",
-    "Target_Heal",
-    "Target_HealingWord",
-    "Target_HeatMetal",
-    "Target_Heroism",
-    "Target_Hex",
-    "Target_HideousLaughter",
-    "Target_HoldMonster",
-    "Target_HoldPerson",
-    "Target_HolyRebuke",
-    "Target_HordeBreaker",
-    "Target_HungerOfHadar",
-    "Target_HuntersMark",
-    "Target_HypnoticGaze",
-    "Target_HypnoticPattern",
-    "Target_IceStorm",
-    "Target_InflictWounds",
-    "Target_InsectPlague",
-    "Target_Invisibility",
-    "Target_Invisibility_Greater",
-    "Target_InvokeDuplicity",
-    "Target_IrresistibleDance",
-    "Target_Jump",
-    "Target_Jump_Githyanki",
-    "Target_Knock",
-    "Target_LayOnHands",
-    "Target_LesserRestoration",
-    "Target_Light",
-    "Target_Longstrider",
-    "Target_MageArmor",
-    "Target_MageHand",
-    "Target_MageHand_GithyankiPsionics",
-    "Target_MagicWeapon",
-    "Target_MenacingAttack",
-    "Target_MinorIllusion",
-    "Target_MistyStep",
-    "Target_MistyStep_Githyanki",
-    "Target_Moonbeam",
-    "Target_NaturesWrath",
-    "Target_PhantasmalForce",
-    "Target_PhantasmalKiller",
-    "Target_PlanarBinding",
-    "Target_PlantGrowth",
-    "Target_Polymorph",
-    "Target_ProtectionFromEnergy",
-    "Target_ProtectionFromEvilAndGood",
-    "Target_ProtectionFromPoison",
-    "Target_PushingAttack",
-    "Target_Rally",
-    "Target_RangersCompanion",
-    "Target_RecklessAttack",
-    "Target_RemoveCurse",
-    "Target_ResilientSphere",
-    "Target_Resistance",
-    "Target_SacredFlame",
-    "Target_Sanctuary",
-    "Target_Seeming",
-    "Target_Shatter",
-    "Target_ShieldOfFaith",
-    "Target_ShockingGrasp",
-    "Target_Silence",
-    "Target_Sleep",
-    "Target_SleetStorm",
-    "Target_Slow",
-    "Target_Smite_Blinding",
-    "Target_Smite_Branding_Container",
-    "Target_Smite_Branding_ZarielTiefling_Container",
-    "Target_Smite_Divine",
-    "Target_Smite_Divine_Critical_Unlock",
-    "Target_Smite_Divine_Unlock",
-    "Target_Smite_Searing",
-    "Target_Smite_Searing_ZarielTiefling",
-    "Target_Smite_Thunderous",
-    "Target_Smite_Wrathful",
-    "Target_SneakAttack",
-    "Target_SpeakWithDead",
-    "Target_SpikeGrowth",
-    "Target_SpiritualWeapon",
-    "Target_SpitefulSuffering",
-    "Target_StinkingCloud",
-    "Target_Stoneskin",
-    "Target_ThornWhip",
-    "Target_TripAttack",
-    "Target_TrueStrike",
-    "Target_VampiricTouch",
-    "Target_ViciousMockery",
-    "Target_WardingBond",
-    "Target_Web",
-    "Teleportation_ArcaneGate",
-    "Teleportation_DimensionDoor",
-    "Teleportation_Revivify",
-    "Throw_FrenziedThrow",
-    "Throw_Telekinesis",
-    "Wall_WallOfFire",
-    "Wall_WallOfStone",
-    "Zone_BurningHands",
-    "Zone_BurningHands_MephistophelesTiefling",
-    "Zone_ColorSpray",
-    "Zone_ConeOfCold",
-    "Zone_ConjureBarrage",
-    "Zone_Fear",
-    "Zone_GustOfWind",
-    "Zone_LightningBolt",
-    "Zone_Sunbeam",
-    "Zone_Thunderwave",
-    "Target_LOW_RamazithsTower_Nightsong_Globe_1",
 }
 local ALL_SPELL_TYPES = {
     "Buff",
@@ -1708,7 +1299,7 @@ end
 
 local function getAllSpellsOfType(spellType)
     local allSpellsOfType = {}
-    for _, spellName in ipairs(ALL_SPELLS) do
+    for _, spellName in ipairs(Ext.Stats.GetStats("SpellData")) do
         local spell = Ext.Stats.Get(spellName)
         if spell and spell.VerbalIntent == spellType then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
@@ -1884,24 +1475,25 @@ end
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
-    if entityUuid then
-        local level = Osi.GetRegion(entityUuid)
-        if level then
-            stopPulseReposition(level)
-            stopBrawlFizzler(level)
-            if isToT() then
-                stopToTTimers()
-            end
-            if Brawlers[level] then
-                for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                    if brawlerUuid ~= entityUuid then
-                        Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                        Osi.FlushOsirisQueue(brawlerUuid)
-                        stopPulseAction(brawler, true)
-                        if Players[brawlerUuid] then
-                            Brawlers[level][brawlerUuid].isPaused = true
-                            Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                        end
+    local level = Osi.GetRegion(entityGuid)
+    if level and entityUuid then
+        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+            Brawlers[level][entityUuid].isInBrawl = false
+        end
+        stopPulseReposition(level)
+        stopBrawlFizzler(level)
+        if isToT() then
+            stopToTTimers()
+        end
+        if Brawlers[level] then
+            for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                if brawlerUuid ~= entityUuid then
+                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                    Osi.FlushOsirisQueue(brawlerUuid)
+                    stopPulseAction(brawler, true)
+                    if Players[brawlerUuid] then
+                        Brawlers[level][brawlerUuid].isPaused = true
+                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
                     end
                 end
             end
@@ -1912,23 +1504,28 @@ end
 function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
-    if areAnyPlayersBrawling() and entityUuid then
-        debugPrint("players are brawling")
-        local level = Osi.GetRegion(entityUuid)
-        if level then
-            startPulseReposition(level)
+    local level = Osi.GetRegion(entityGuid)
+    if level and entityUuid then
+        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+            Brawlers[level][entityUuid].isInBrawl = true
+        end
+        startPulseReposition(level)
+        if areAnyPlayersBrawling() then
+            debugPrint("players are brawling")
             startBrawlFizzler(level)
             if isToT() then
                 startToTTimers()
             end
             if Brawlers[level] then
                 for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                    if brawlerUuid ~= entityUuid then
+                    if not isPlayerControllingDirectly(brawlerUuid) then
                         Osi.PurgeOsirisQueue(brawlerUuid, 1)
                         Osi.FlushOsirisQueue(brawlerUuid)
                         startPulseAction(brawler)
-                        if Players[brawlerUuid] then
-                            Brawlers[level][brawlerUuid].isPaused = false
+                    end
+                    if Players[brawlerUuid] then
+                        Brawlers[level][brawlerUuid].isPaused = false
+                        if brawlerUuid ~= entityUuid then
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
                     end
@@ -2387,14 +1984,9 @@ local function getSpellNameBySlot(uuid, slot)
 end
 
 function getSpellByName(name)
-    for spellType, spellsOfType in pairs(SpellTable) do
-        debugPrint("Checking", spellType)
-        for spellName, spell in pairs(spellsOfType) do
-            debugPrint(spellName, name)
-            if spellName == name then
-                return spell
-            end
-        end
+    local spellType = Ext.Stats.Get(name).VerbalIntent
+    if spellType and SpellTable[spellType] then
+        return SpellTable[spellType][name]
     end
     return nil
 end
@@ -2484,7 +2076,8 @@ function buildClosestEnemyBrawlers(playerUuid)
     debugPrint("closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
     debugDump(ClosestEnemyBrawlers)
     debugPrint("current target:", PlayerCurrentTarget[playerUuid])
-    Ext.Timer.WaitFor(5000, function ()
+    Ext.Timer.WaitFor(3000, function ()
+        debugPrint("clearing closest brawlers list")
         ClosestEnemyBrawlers[playerUuid] = nil
     end)
 end
