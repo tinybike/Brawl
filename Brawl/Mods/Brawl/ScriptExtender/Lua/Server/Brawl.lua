@@ -521,8 +521,8 @@ local CONTROLLER_TO_SLOT = {
     B = 2,
     X = 4,
     Y = 6,
-    DPadLeft = 8,
-    DPadRight = 10,
+    -- DPadLeft = 8,
+    -- DPadRight = 10,
     -- DPadUp = nil,
     -- Back = nil,
     -- Start = nil,
@@ -541,6 +541,8 @@ PulseRepositionTimers = {}
 PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
+ClosestEnemyBrawlers = {}
+PlayerCurrentTarget = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -1126,7 +1128,7 @@ end
 function pulseAction(brawler)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid then
-        if not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and not isPlayerControllingDirectly(brawler.uuid) then
+        if not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and (not isPlayerControllingDirectly(brawler.uuid) or FullAuto) then
             -- NB: if we allow healing spells etc used by companions, roll this code in, instead of special-casing it here...
             if isPlayerOrAlly(brawler.uuid) then
                 for playerUuid, player in pairs(Players) do
@@ -1343,7 +1345,7 @@ function pulseReposition(level)
                 elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                     -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                     if Players[brawlerUuid] and (Players[brawlerUuid].isControllingDirectly == true and not FullAuto) then
-                        -- debugPrint("Player is controlling directly: do not take action!")
+                        debugPrint("Player is controlling directly: do not take action!")
                         -- debugDump(brawler)
                         -- debugDump(Players)
                         stopPulseAction(brawler, true)
@@ -1408,8 +1410,6 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             if Osi.IsPlayer(entityUuid) == 0 then
                 -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                 Osi.SetCanJoinCombat(entityUuid, 0)
-                -- thank u lunisole/ghostboats
-                Osi.PROC_SelfHealing_Disable(entityUuid)
             elseif Players[entityUuid] then
                 -- brawler.originalCanJoinCombat = 1
                 setPlayerRunToSprint(entityUuid)
@@ -1976,7 +1976,7 @@ local function onGainedControl(targetGuid)
                     end
                 end
             end
-            if level and Brawlers[level] and Brawlers[level][targetUuid] then
+            if level and Brawlers[level] and Brawlers[level][targetUuid] and not FullAuto then
                 stopPulseAction(Brawlers[level][targetUuid], true)
             end
             debugDump(Players)
@@ -2458,6 +2458,52 @@ local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
     end
 end
 
+local function buildClosestEnemyBrawlers(playerUuid)
+    ClosestEnemyBrawlers[playerUuid] = {}
+    for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
+        local targetUuid, distance = target[1], target[2]
+        if Osi.IsEnemy(playerUuid, targetUuid) == 1 and distance < 40 then
+            table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
+            local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
+            if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
+                PlayerCurrentTarget[playerUuid] = targetUuid
+            elseif numEnemyBrawlers > 10 then
+                break
+            end
+        end
+    end
+    Ext.Timer.WaitFor(10000, function ()
+        ClosestEnemyBrawlers[playerUuid] = nil
+    end)
+end
+
+local function selectNextEnemyBrawler(playerUuid, isNext)
+    local nextTargetIndex = nil
+    local nextTargetUuid = nil
+    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[player.uuid]) do
+        if PlayerCurrentTarget[player.uuid] == enemyBrawlerUuid then
+            if isNext then
+                if enemyBrawlerIndex < #ClosestEnemyBrawlers[player.uuid] then
+                    nextTargetIndex = enemyBrawlerIndex + 1
+                else
+                    nextTargetIndex = 1
+                end
+            else
+                if enemyBrawlerIndex > 1 then
+                    nextTargetIndex = enemyBrawlerIndex - 1
+                else
+                    nextTargetIndex = #ClosestEnemyBrawlers[player.uuid]
+                end
+            end
+            nextTargetUuid = ClosestEnemyBrawlers[nextTargetIndex]
+            break
+        end
+    end
+    local x, y, z = Osi.GetPosition(nextTargetUuid)
+    Osi.RequestPing(x, y, z, nextTargetUuid, player.uuid)
+    PlayerCurrentTarget[player.uuid] = nextTargetUuid
+end
+
 local function onNetMessage(data)
     if data.Channel == "ModToggle" then
         if MCM then
@@ -2479,11 +2525,24 @@ local function onNetMessage(data)
             if brawler then
                 if not brawler.isPaused and CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
                     debugPrint("use spell")
+                    local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
                     Osi.PurgeOsirisQueue(player.uuid, 1)
                     Osi.FlushOsirisQueue(player.uuid)
-                    return useSpellOnClosestEnemyTarget(player.uuid, getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload]))
+                    if PlayerCurrentTarget[player.uuid] == nil then
+                        return useSpellOnClosestEnemyTarget(player.uuid, spellName)
+                    else
+                        return useSpellAndResources(playerUuid, PlayerCurrentTarget[player.uuid], spellName)
+                    end
                 end
-                -- NB: use dpadright/left to switch targets?  get list of enemies, toggle between them, maybe use announcement text to show which one you've selected?
+                -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
+                if not brawler.isPaused and (data.Payload == "DPadLeft" or data.Payload == "DPadRight") then
+                    if ClosestEnemyBrawlers[player.uuid] == nil then
+                        buildClosestEnemyBrawlers(player.uuid)
+                    end
+                    if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
+                        selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
+                    end
+                end
                 if not brawler.isPaused and (data.Payload == "RightTrigger" or data.Payload == "RightShoulder" or data.Payload == "LeftShoulder" or data.Payload == "LeftTrigger") then
                     debugPrint("pausing")
                     Osi.PurgeOsirisQueue(player.uuid, 1)
