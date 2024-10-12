@@ -2480,10 +2480,10 @@ end
 local function selectNextEnemyBrawler(playerUuid, isNext)
     local nextTargetIndex = nil
     local nextTargetUuid = nil
-    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[player.uuid]) do
-        if PlayerCurrentTarget[player.uuid] == enemyBrawlerUuid then
+    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[playerUuid]) do
+        if PlayerCurrentTarget[playerUuid] == enemyBrawlerUuid then
             if isNext then
-                if enemyBrawlerIndex < #ClosestEnemyBrawlers[player.uuid] then
+                if enemyBrawlerIndex < #ClosestEnemyBrawlers[playerUuid] then
                     nextTargetIndex = enemyBrawlerIndex + 1
                 else
                     nextTargetIndex = 1
@@ -2492,7 +2492,7 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
                 if enemyBrawlerIndex > 1 then
                     nextTargetIndex = enemyBrawlerIndex - 1
                 else
-                    nextTargetIndex = #ClosestEnemyBrawlers[player.uuid]
+                    nextTargetIndex = #ClosestEnemyBrawlers[playerUuid]
                 end
             end
             nextTargetUuid = ClosestEnemyBrawlers[nextTargetIndex]
@@ -2500,8 +2500,8 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
         end
     end
     local x, y, z = Osi.GetPosition(nextTargetUuid)
-    Osi.RequestPing(x, y, z, nextTargetUuid, player.uuid)
-    PlayerCurrentTarget[player.uuid] = nextTargetUuid
+    Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
+    PlayerCurrentTarget[playerUuid] = nextTargetUuid
 end
 
 local function onNetMessage(data)
