@@ -13,7 +13,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -138,6 +138,12 @@ local ALL_SPELLS = {
     "Target_OpenHandTechnique_Push",
     "Target_OpenHandTechnique_Knock",
     "Target_OpenHandTechnique_NoReactions",
+    "Target_KiResonation_Punch",
+    "Target_KiResonation_Blast",
+    "Target_KiResonation_Punch_BonusAction",
+    "Target_StunningStrike",
+    "Target_StunningStrike_Unarmed",
+    "Target_QuiveringPalm",
     "Shout_QuickenedHealing",
     "Projectile_MainHandAttack",
     "Projectile_OffhandAttack",
@@ -2458,11 +2464,12 @@ local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
     end
 end
 
-local function buildClosestEnemyBrawlers(playerUuid)
+function buildClosestEnemyBrawlers(playerUuid)
     ClosestEnemyBrawlers[playerUuid] = {}
     for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
         local targetUuid, distance = target[1], target[2]
-        if Osi.IsEnemy(playerUuid, targetUuid) == 1 and distance < 40 then
+        debugPrint("got", targetUuid, distance)
+        if isPugnacious(targetUuid, playerUuid) and distance < 40 then
             table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
             local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
             if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
@@ -2472,36 +2479,48 @@ local function buildClosestEnemyBrawlers(playerUuid)
             end
         end
     end
-    Ext.Timer.WaitFor(10000, function ()
+    debugPrint("closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
+    debugDump(ClosestEnemyBrawlers)
+    debugPrint("current target:", PlayerCurrentTarget[playerUuid])
+    Ext.Timer.WaitFor(5000, function ()
         ClosestEnemyBrawlers[playerUuid] = nil
     end)
 end
 
-local function selectNextEnemyBrawler(playerUuid, isNext)
+function selectNextEnemyBrawler(playerUuid, isNext)
     local nextTargetIndex = nil
     local nextTargetUuid = nil
     for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[playerUuid]) do
         if PlayerCurrentTarget[playerUuid] == enemyBrawlerUuid then
+            debugPrint("found current target", PlayerCurrentTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
             if isNext then
+                debugPrint("getting NEXT target")
                 if enemyBrawlerIndex < #ClosestEnemyBrawlers[playerUuid] then
                     nextTargetIndex = enemyBrawlerIndex + 1
                 else
                     nextTargetIndex = 1
                 end
             else
+                debugPrint("getting PREVIOUS target")
                 if enemyBrawlerIndex > 1 then
                     nextTargetIndex = enemyBrawlerIndex - 1
                 else
                     nextTargetIndex = #ClosestEnemyBrawlers[playerUuid]
                 end
             end
-            nextTargetUuid = ClosestEnemyBrawlers[nextTargetIndex]
+            debugPrint("target index", nextTargetIndex)
+            debugDump(ClosestEnemyBrawlers)
+            nextTargetUuid = ClosestEnemyBrawlers[playerUuid][nextTargetIndex]
+            debugPrint("target uuid", nextTargetUuid)
             break
         end
     end
-    local x, y, z = Osi.GetPosition(nextTargetUuid)
-    Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
-    PlayerCurrentTarget[playerUuid] = nextTargetUuid
+    if nextTargetUuid then
+        debugPrint("pinging next target", nextTargetUuid)
+        local x, y, z = Osi.GetPosition(nextTargetUuid)
+        Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
+        PlayerCurrentTarget[playerUuid] = nextTargetUuid
+    end
 end
 
 local function onNetMessage(data)
@@ -2531,7 +2550,7 @@ local function onNetMessage(data)
                     if PlayerCurrentTarget[player.uuid] == nil then
                         return useSpellOnClosestEnemyTarget(player.uuid, spellName)
                     else
-                        return useSpellAndResources(playerUuid, PlayerCurrentTarget[player.uuid], spellName)
+                        return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
                     end
                 end
                 -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
