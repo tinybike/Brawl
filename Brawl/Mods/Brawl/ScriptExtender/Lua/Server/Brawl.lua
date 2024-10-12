@@ -13,7 +13,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -118,6 +118,7 @@ local CONTROLLER_TO_SLOT = {
     B = 2,
     X = 4,
     Y = 6,
+    RightStick = 8,
     -- DPadLeft = 8,
     -- DPadRight = 10,
     -- DPadUp = nil,
@@ -125,7 +126,6 @@ local CONTROLLER_TO_SLOT = {
     -- Start = nil,
     -- Touchpad = nil,
     -- LeftStick = nil,
-    -- RightStick = nil,
 }
 
 -- Session state
@@ -1275,6 +1275,7 @@ local function getSpellInfo(spellType, spellName)
             isSpell = spell.SpellSchool ~= "None",
             targetRadius = spell.TargetRadius,
             costs = costs,
+            type = spellType,
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -1984,9 +1985,12 @@ local function getSpellNameBySlot(uuid, slot)
 end
 
 function getSpellByName(name)
-    local spellType = Ext.Stats.Get(name).VerbalIntent
-    if spellType and SpellTable[spellType] then
-        return SpellTable[spellType][name]
+    local spellStats = Ext.Stats.Get(name)
+    if spellStats then
+        local spellType = spellStats.VerbalIntent
+        if spellType and SpellTable[spellType] then
+            return SpellTable[spellType][name]
+        end
     end
     return nil
 end
@@ -2063,7 +2067,7 @@ function buildClosestEnemyBrawlers(playerUuid)
     for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
         local targetUuid, distance = target[1], target[2]
         debugPrint("got", targetUuid, distance)
-        if isPugnacious(targetUuid, playerUuid) and distance < 40 then
+        if isPugnacious(targetUuid, playerUuid) and isAliveAndCanFight(targetUuid) and distance < 40 then
             table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
             local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
             if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
@@ -2139,9 +2143,13 @@ local function onNetMessage(data)
             if brawler then
                 if not brawler.isPaused and CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
                     debugPrint("use spell")
-                    local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
                     Osi.PurgeOsirisQueue(player.uuid, 1)
                     Osi.FlushOsirisQueue(player.uuid)
+                    local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
+                    local spell = getSpellByName(spellName)
+                    if spell.type == "Buff" or spell.type == "Healing" then
+                        return useSpellAndResources(player.uuid, player.uuid, spellName)
+                    end
                     if PlayerCurrentTarget[player.uuid] == nil then
                         return useSpellOnClosestEnemyTarget(player.uuid, spellName)
                     else
