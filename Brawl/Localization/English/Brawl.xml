@@ -8,6 +8,8 @@
     <content contentuid="h5de513b6g8819g43f5ga5fag90de0b66f6f2" version="1">Mod Toggle Hotkey</content>
     <content contentuid="h9f0b74e2g0973g4847g8c88g12e26d743cb7" version="1">Hotkey for toggling the companion AI on/off</content>
     <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>
+    <content contentuid="h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0" version="1">The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)</content>
+    <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level (NYI)</content>
     <content contentuid="h358f0669gbeffg4e34g9d77g3f7d1960c100" version="1">If checked, the game will automatically pause when the character the player is controlling goes down</content>
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
     <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Decreasing this will make the game substantially harder.</content>

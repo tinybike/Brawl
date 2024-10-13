@@ -61,6 +61,17 @@
                             }
                         },
                         {
+                            "Id": "companion_ai_max_spell_level",
+                            "Name": "Companion AI Maximum Allowed Spell Level (NYI)",
+                            "Type": "int",
+                            "Default": 0,
+                            "Description": "The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)",
+                            "Handles": {
+                                "DescriptionHandle": "h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0",
+                                "NameHandle": "hfeb61696ga4bfg4f53g8fd6g4a123be02832"
+                            }
+                        },
+                        {
                             "Id": "auto_pause_on_downed",
                             "Name": "Automatic Pause On Downed",
                             "Type": "checkbox",
@@ -78,8 +89,8 @@
                             "Default": 6000,
                             "Description": "The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Higher values make combat easier, lower values make combat harder.",
                             "Handles": {
-                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
-                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                                "DescriptionHandle": "h4c13f868gad03g469ag9ce3g69560b7b3467",
+                                "NameHandle": "h63988dd4gbad9g405fgbb73gdefece90bbba"
                             }
                         },
                         {
@@ -89,8 +100,8 @@
                             "Default": false,
                             "Description": "If checked, the companion AI will control ALL player characters, including the active character.",
                             "Handles": {
-                                "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
-                                "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
+                                "DescriptionHandle": "h0c4f4c12g54a4g4d43g9dd9g0f61857119d9",
+                                "NameHandle": "hd6431cb2g76b4g497bgaccbg202b25c375c7"
                             }
                         }
                     ]

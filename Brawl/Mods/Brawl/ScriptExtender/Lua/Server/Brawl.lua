@@ -1,12 +1,14 @@
 -- MCM Settings
 local ModEnabled = true
 local CompanionAIEnabled = true
+local CompanionAIMaxSpellLevel = 0
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
+    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
@@ -140,6 +142,7 @@ BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
 ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
+-- ActionsInProgress = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -1957,6 +1960,8 @@ local function onMCMSettingSaved(payload)
         else
             disableCompanionAI(hotkey)
         end
+    elseif payload.settingId == "companion_ai_max_spell_level" then
+        CompanionAIMaxSpellLevel = payload.value
     elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
@@ -2031,6 +2036,8 @@ function useSpellAndResources(casterUuid, targetUuid, spellName)
             end
         end
     end
+    -- ActionsInProgress
+    -- NB: this part needs to go in the listener for spell casted
     for costType, costValue in pairs(spell.costs) do
         if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
             if costType == "SpellSlot" then
