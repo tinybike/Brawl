@@ -15,7 +15,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -333,6 +333,20 @@ function getPlayersSortedByDistance(entityUuid)
     return playerDistances
 end
 
+function getBrawlersSortedByDistance(entityUuid)
+    local brawlersSortedByDistance = {}
+    local level = Osi.GetRegion(entityUuid)
+    if Brawlers[level] then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            if isOnSameLevel(brawlerUuid, entityUuid) and isAliveAndCanFight(brawlerUuid) then
+                table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
+            end
+        end
+        table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
+    end
+    return brawlersSortedByDistance
+end
+
 -- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
 -- (automove using UseSpell/Attack only uses the fastest possible movement speed)
 function moveThenAct(attackerUuid, targetUuid, spellName)
@@ -355,6 +369,149 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     Osi.PurgeOsirisQueue(attackerUuid, 1)
     Osi.FlushOsirisQueue(attackerUuid)
     Osi.UseSpell(attackerUuid, spellName, targetUuid)
+end
+
+local function getSpellNameBySlot(uuid, slot)
+    local entity = Ext.Entity.Get(uuid)
+    -- NB: is this always index 6?
+    if entity and entity.HotbarContainer and entity.HotbarContainer.Containers and entity.HotbarContainer.Containers.DefaultBarContainer then
+        local customBar = entity.HotbarContainer.Containers.DefaultBarContainer[6]
+        local spellName = nil
+        for _, element in ipairs(customBar.Elements) do
+            if element.Slot == slot then
+                if element.SpellId then
+                    return element.SpellId.OriginatorPrototype
+                else
+                    return nil
+                end
+            end
+        end
+    end
+end
+
+function getSpellByName(name)
+    local spellStats = Ext.Stats.Get(name)
+    if spellStats then
+        local spellType = spellStats.VerbalIntent
+        if spellType and SpellTable[spellType] then
+            return SpellTable[spellType][name]
+        end
+    end
+    return nil
+end
+
+function useSpellAndResources(casterUuid, targetUuid, spellName)
+    local entity = Ext.Entity.Get(casterUuid)
+    local spell = getSpellByName(spellName)
+    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName, "on", targetUuid, getDisplayName(targetUuid))
+    debugDump(spell.costs)
+    local isSpellPrepared = false
+    for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+        if preparedSpell.OriginatorPrototype == spellName then
+            isSpellPrepared = true
+            break
+        end
+    end
+    if not isSpellPrepared then
+        debugPrint("Caster does not have spell", spellName, "prepared")
+        return false
+    end
+    for costType, costValue in pairs(spell.costs) do
+        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            if costType == "SpellSlot" then
+                local spellLevel = costValue
+                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
+                debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
+                if availableResourceValue < 1 then
+                    debugPrint("Insufficient resources", costType)
+                    return false
+                end
+            else
+                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
+                debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
+                if availableResourceValue < costValue then
+                    debugPrint("Insufficient resources", costType)
+                    return false
+                end
+            end
+        end
+    end
+    if ActionsInProgress[casterUuid] ~= nil then
+        Osi.PurseOsirisQueue(casterUuid, 1)
+        Osi.FlushOsirisQueue(casterUuid)
+    end
+    ActionsInProgress[casterUuid] = spellName
+    Osi.UseSpell(casterUuid, spellName, targetUuid)
+    return true
+end
+
+local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
+    if spellName then
+        local targetUuid = getClosestEnemyBrawler(playerUuid, 40)
+        if targetUuid then
+            return useSpellAndResources(playerUuid, targetUuid, spellName)
+        end
+    end
+end
+
+function buildClosestEnemyBrawlers(playerUuid)
+    ClosestEnemyBrawlers[playerUuid] = {}
+    for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
+        local targetUuid, distance = target[1], target[2]
+        debugPrint("got", targetUuid, distance)
+        if isPugnacious(targetUuid, playerUuid) and isAliveAndCanFight(targetUuid) and distance < 40 then
+            table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
+            local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
+            if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
+                PlayerCurrentTarget[playerUuid] = targetUuid
+            elseif numEnemyBrawlers > 10 then
+                break
+            end
+        end
+    end
+    debugPrint("closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
+    debugDump(ClosestEnemyBrawlers)
+    debugPrint("current target:", PlayerCurrentTarget[playerUuid])
+    Ext.Timer.WaitFor(3000, function ()
+        debugPrint("clearing closest brawlers list")
+        ClosestEnemyBrawlers[playerUuid] = nil
+    end)
+end
+
+function selectNextEnemyBrawler(playerUuid, isNext)
+    local nextTargetIndex = nil
+    local nextTargetUuid = nil
+    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[playerUuid]) do
+        if PlayerCurrentTarget[playerUuid] == enemyBrawlerUuid then
+            debugPrint("found current target", PlayerCurrentTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
+            if isNext then
+                debugPrint("getting NEXT target")
+                if enemyBrawlerIndex < #ClosestEnemyBrawlers[playerUuid] then
+                    nextTargetIndex = enemyBrawlerIndex + 1
+                else
+                    nextTargetIndex = 1
+                end
+            else
+                debugPrint("getting PREVIOUS target")
+                if enemyBrawlerIndex > 1 then
+                    nextTargetIndex = enemyBrawlerIndex - 1
+                else
+                    nextTargetIndex = #ClosestEnemyBrawlers[playerUuid]
+                end
+            end
+            debugPrint("target index", nextTargetIndex)
+            debugDump(ClosestEnemyBrawlers)
+            nextTargetUuid = ClosestEnemyBrawlers[playerUuid][nextTargetIndex]
+            debugPrint("target uuid", nextTargetUuid)
+            break
+        end
+    end
+    if nextTargetUuid then
+        debugPrint("pinging next target", nextTargetUuid)
+        local x, y, z = Osi.GetPosition(nextTargetUuid)
+        Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
+        PlayerCurrentTarget[playerUuid] = nextTargetUuid
+    end
 end
 
 function getSpellTypeWeight(spellType)
@@ -603,20 +760,6 @@ function isOnSameLevel(uuid1, uuid2)
     local level1 = Osi.GetRegion(uuid1)
     local level2 = Osi.GetRegion(uuid2)
     return level1 ~= nil and level2 ~= nil and level1 == level2
-end
-
-function getBrawlersSortedByDistance(entityUuid)
-    local brawlersSortedByDistance = {}
-    local level = Osi.GetRegion(entityUuid)
-    if Brawlers[level] then
-        for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if isOnSameLevel(brawlerUuid, entityUuid) and isAliveAndCanFight(brawlerUuid) then
-                table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
-            end
-        end
-        table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
-    end
-    return brawlersSortedByDistance
 end
 
 -- Attacking targets: prioritize close targets with less remaining HP
@@ -1676,6 +1819,33 @@ local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
     startBrawlFizzler(Osi.GetRegion(attackerUuid))
 end
 
+local function onCastedSpell(casterUuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint("CastedSpell", casterUuid, spellName, spellType, spellElement, storyActionID)
+    local entity = Ext.Entity.Get(casterUuid)
+    if entity and ActionsInProgress[casterUuid] == spellName then
+        local spell = getSpellByName(spellName)
+        for costType, costValue in pairs(spell.costs) do
+            if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+                if costType == "SpellSlot" then
+                    local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                    for _, spellSlot in ipairs(spellSlots) do
+                        if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+                            spellSlot.Amount = spellSlot.Amount - 1
+                            break
+                        end
+                    end
+                else
+                    local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
+                    debugDump(resource)
+                    resource.Amount = resource.Amount - costValue
+                end
+            end
+        end
+        entity:Replicate("ActionResources")
+        ActionsInProgress[casterUuid] = nil
+    end
+end
+
 local function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
@@ -1734,10 +1904,6 @@ local function onPROC_Subregion_Entered(characterGuid, _)
         pulseReposition(level)
     end
 end
-
--- local function onCastedSpell(casterGuid, spell, spellType, spellSchool, id)
---     debugPrint("CastedSpell", casterGuid, spell, spellType, spellSchool, id)
--- end
 
 local function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
@@ -1833,6 +1999,10 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("AttackedBy", 7, "after", onAttackedBy),
         stop = Ext.Osiris.UnregisterListener,
     }
+    Listeners.CastedSpell = {
+        handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     Listeners.DialogStarted = {
         handle = Ext.Osiris.RegisterListener("DialogStarted", 2, "before", onDialogStarted),
         stop = Ext.Osiris.UnregisterListener,
@@ -1857,10 +2027,6 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", onPROC_Subregion_Entered),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- Listeners.CastedSpell = {
-    --     handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
     Listeners.LevelUnloading = {
         handle = Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", onLevelUnloading),
         stop = Ext.Osiris.UnregisterListener,
@@ -1968,164 +2134,6 @@ local function onMCMSettingSaved(payload)
         ActionInterval = payload.value
     elseif payload.settingId == "full_auto" then
         FullAuto = payload.value
-    end
-end
-
-local function getSpellNameBySlot(uuid, slot)
-    local entity = Ext.Entity.Get(uuid)
-    -- NB: is this always index 6?
-    if entity and entity.HotbarContainer and entity.HotbarContainer.Containers and entity.HotbarContainer.Containers.DefaultBarContainer then
-        local customBar = entity.HotbarContainer.Containers.DefaultBarContainer[6]
-        local spellName = nil
-        for _, element in ipairs(customBar.Elements) do
-            if element.Slot == slot then
-                if element.SpellId then
-                    return element.SpellId.OriginatorPrototype
-                else
-                    return nil
-                end
-            end
-        end
-    end
-end
-
-function getSpellByName(name)
-    local spellStats = Ext.Stats.Get(name)
-    if spellStats then
-        local spellType = spellStats.VerbalIntent
-        if spellType and SpellTable[spellType] then
-            return SpellTable[spellType][name]
-        end
-    end
-    return nil
-end
-
-function useSpellAndResources(casterUuid, targetUuid, spellName)
-    local entity = Ext.Entity.Get(casterUuid)
-    local spell = getSpellByName(spellName)
-    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName, "on", targetUuid, getDisplayName(targetUuid))
-    debugDump(spell.costs)
-    local isSpellPrepared = false
-    for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
-        if preparedSpell.OriginatorPrototype == spellName then
-            isSpellPrepared = true
-            break
-        end
-    end
-    if not isSpellPrepared then
-        debugPrint("Caster does not have spell", spellName, "prepared")
-        return false
-    end
-    for costType, costValue in pairs(spell.costs) do
-        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
-            if costType == "SpellSlot" then
-                local spellLevel = costValue
-                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
-                debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
-                if availableResourceValue < 1 then
-                    debugPrint("Insufficient resources", costType)
-                    return false
-                end
-            else
-                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
-                debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
-                if availableResourceValue < costValue then
-                    debugPrint("Insufficient resources", costType)
-                    return false
-                end
-            end
-        end
-    end
-    -- ActionsInProgress
-    -- NB: this part needs to go in the listener for spell casted
-    for costType, costValue in pairs(spell.costs) do
-        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
-            if costType == "SpellSlot" then
-                local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
-                for _, spellSlot in ipairs(spellSlots) do
-                    if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
-                        spellSlot.Amount = spellSlot.Amount - 1
-                        break
-                    end
-                end
-            else
-                local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
-                debugDump(resource)
-                resource.Amount = resource.Amount - costValue
-            end
-        end
-    end
-    entity:Replicate("ActionResources")
-    Osi.UseSpell(casterUuid, spellName, targetUuid)
-    return true
-end
-
-local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
-    if spellName then
-        local targetUuid = getClosestEnemyBrawler(playerUuid, 40)
-        if targetUuid then
-            return useSpellAndResources(playerUuid, targetUuid, spellName)
-        end
-    end
-end
-
-function buildClosestEnemyBrawlers(playerUuid)
-    ClosestEnemyBrawlers[playerUuid] = {}
-    for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
-        local targetUuid, distance = target[1], target[2]
-        debugPrint("got", targetUuid, distance)
-        if isPugnacious(targetUuid, playerUuid) and isAliveAndCanFight(targetUuid) and distance < 40 then
-            table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
-            local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
-            if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
-                PlayerCurrentTarget[playerUuid] = targetUuid
-            elseif numEnemyBrawlers > 10 then
-                break
-            end
-        end
-    end
-    debugPrint("closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
-    debugDump(ClosestEnemyBrawlers)
-    debugPrint("current target:", PlayerCurrentTarget[playerUuid])
-    Ext.Timer.WaitFor(3000, function ()
-        debugPrint("clearing closest brawlers list")
-        ClosestEnemyBrawlers[playerUuid] = nil
-    end)
-end
-
-function selectNextEnemyBrawler(playerUuid, isNext)
-    local nextTargetIndex = nil
-    local nextTargetUuid = nil
-    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[playerUuid]) do
-        if PlayerCurrentTarget[playerUuid] == enemyBrawlerUuid then
-            debugPrint("found current target", PlayerCurrentTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
-            if isNext then
-                debugPrint("getting NEXT target")
-                if enemyBrawlerIndex < #ClosestEnemyBrawlers[playerUuid] then
-                    nextTargetIndex = enemyBrawlerIndex + 1
-                else
-                    nextTargetIndex = 1
-                end
-            else
-                debugPrint("getting PREVIOUS target")
-                if enemyBrawlerIndex > 1 then
-                    nextTargetIndex = enemyBrawlerIndex - 1
-                else
-                    nextTargetIndex = #ClosestEnemyBrawlers[playerUuid]
-                end
-            end
-            debugPrint("target index", nextTargetIndex)
-            debugDump(ClosestEnemyBrawlers)
-            nextTargetUuid = ClosestEnemyBrawlers[playerUuid][nextTargetIndex]
-            debugPrint("target uuid", nextTargetUuid)
-            break
-        end
-    end
-    if nextTargetUuid then
-        debugPrint("pinging next target", nextTargetUuid)
-        local x, y, z = Osi.GetPosition(nextTargetUuid)
-        Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
-        PlayerCurrentTarget[playerUuid] = nextTargetUuid
     end
 end
 
