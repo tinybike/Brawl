@@ -1309,10 +1309,9 @@ end
 function resetPlayersMovementSpeed()
     for playerUuid, player in pairs(Players) do
         local entity = Ext.Entity.Get(playerUuid)
-        entity.ServerCharacter.Template.MovementSpeedRun = PLAYER_MOVEMENT_SPEED_DEFAULT.Run
-        -- if player.movementSpeedRun ~= nil then
-        --     entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
-        -- end
+        if player.movementSpeedRun ~= nil then
+            entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
+        end
     end
 end
 
