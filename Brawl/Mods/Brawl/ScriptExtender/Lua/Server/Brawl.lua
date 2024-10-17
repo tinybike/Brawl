@@ -371,7 +371,7 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     Osi.UseSpell(attackerUuid, spellName, targetUuid)
 end
 
-local function getForwardVector(entityUuid)
+function getForwardVector(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
     local rotationQuat = entity.Transform.Transform.RotationQuat
     local x = rotationQuat[1]
@@ -484,29 +484,75 @@ local function useSpellOnClosestEnemyTarget(playerUuid, spellName)
     end
 end
 
+function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwardY, sourceForwardZ)
+    local deltaX = targetPos[1] - sourcePos[1]
+    local deltaY = targetPos[2] - sourcePos[2]
+    local deltaZ = targetPos[3] - sourcePos[3]
+    local squaredDistance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+    if squaredDistance < 1600 then -- 40^2 = 1600
+        local distance = math.sqrt(squaredDistance)
+        local vecToTargetX = deltaX/distance
+        local vecToTargetY = deltaY/distance
+        local vecToTargetZ = deltaZ/distance
+        local dotProduct = sourceForwardX*vecToTargetX + sourceForwardY*vecToTargetY + sourceForwardZ*vecToTargetZ
+        local weight = 0.5 -- on (0, 1)
+        local adjustedDistance = distance*(1 + dotProduct*weight)
+        if adjustedDistance < 0 then
+            adjustedDistance = 0
+        end
+        debugPrint("Raw distance", distance, "dotProduct", dotProduct, "adjustedDistance", adjustedDistance)
+        return adjustedDistance
+    end
+    return nil
+end
+
 function buildClosestEnemyBrawlers(playerUuid)
     if PlayerCurrentTarget[playerUuid] and not isAliveAndCanFight(PlayerCurrentTarget[playerUuid]) then
         PlayerCurrentTarget[playerUuid] = nil
     end
-    ClosestEnemyBrawlers[playerUuid] = {}
-    for _, target in ipairs(getBrawlersSortedByDistance(playerUuid)) do
-        local targetUuid, distance = target[1], target[2]
-        debugPrint("got", targetUuid, distance)
-        if isPugnacious(targetUuid, playerUuid) and isAliveAndCanFight(targetUuid) and distance < 40 then
-            table.insert(ClosestEnemyBrawlers[playerUuid], targetUuid)
-            local numEnemyBrawlers = #ClosestEnemyBrawlers[playerUuid]
-            if numEnemyBrawlers == 1 and PlayerCurrentTarget[playerUuid] == nil then
-                PlayerCurrentTarget[playerUuid] = targetUuid
-            elseif numEnemyBrawlers > 10 then
-                break
+    local playerEntity = Ext.Entity.Get(playerUuid)
+    local playerPos = playerEntity.Transform.Transform.Translate
+    local playerForwardX, playerForwardY, playerForwardZ = getForwardVector(playerUuid)
+    local maxTargets = 10
+    local topTargets = {}
+    local level = Osi.GetRegion(playerUuid)
+    if Brawlers[level] then
+        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+            if isOnSameLevel(brawlerUuid, playerUuid) and isAliveAndCanFight(brawlerUuid) and isPugnacious(brawlerUuid, playerUuid) then
+                local brawlerEntity = Ext.Entity.Get(brawlerUuid)
+                if brawlerEntity then
+                    local adjustedDistance = getAdjustedDistanceTo(playerPos, brawlerEntity.Transform.Transform.Translate, playerForwardX, playerForwardY, playerForwardZ)
+                    if adjustedDistance ~= nil then
+                        local inserted = false
+                        for i = 1, #topTargets do
+                            if adjustedDistance < topTargets[i].adjustedDistance then
+                                table.insert(topTargets, i, {uuid = brawlerUuid, adjustedDistance = adjustedDistance})
+                                inserted = true
+                                break
+                            end
+                        end
+                        if not inserted and #topTargets < maxTargets then
+                            table.insert(topTargets, {uuid = brawlerUuid, adjustedDistance = adjustedDistance})
+                        end
+                        if #topTargets > maxTargets then
+                            topTargets[#topTargets] = nil
+                        end
+                    end
+                end
             end
         end
     end
-    debugPrint("closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
+    ClosestEnemyBrawlers[playerUuid] = {}
+    for i, target in ipairs(topTargets) do
+        ClosestEnemyBrawlers[playerUuid][i] = target.uuid
+    end
+    if #ClosestEnemyBrawlers[playerUuid] > 0 and PlayerCurrentTarget[playerUuid] == nil then
+        PlayerCurrentTarget[playerUuid] = ClosestEnemyBrawlers[playerUuid][1]
+    end
+    debugPrint("Closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
     debugDump(ClosestEnemyBrawlers)
-    debugPrint("current target:", PlayerCurrentTarget[playerUuid])
+    debugPrint("Current target:", PlayerCurrentTarget[playerUuid])
     Ext.Timer.WaitFor(3000, function ()
-        debugPrint("clearing closest brawlers list")
         ClosestEnemyBrawlers[playerUuid] = nil
     end)
 end
@@ -540,6 +586,9 @@ function selectNextEnemyBrawler(playerUuid, isNext)
         end
     end
     if nextTargetUuid then
+        if PlayerCurrentTarget[playerUuid] ~= nil then
+            Osi.RemoveStatus(PlayerCurrentTarget[playerUuid], "LOW_HAG_MUSHROOM_VFX")
+        end
         debugPrint("pinging next target", nextTargetUuid)
         local x, y, z = Osi.GetPosition(nextTargetUuid)
         Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
@@ -801,21 +850,31 @@ end
 function getHostileWeightedTargets(brawler, potentialTargets)
     local weightedTargets = {}
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        local isHostile = false
-        if isPlayerOrAlly(brawler.uuid) then
-            isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] ~= nil
-        else
-            isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[brawler.uuid] ~= nil
-        end
-        if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
-            local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
-            local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-            weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
-            -- NB: this is too intense of a request and will crash the game :/
-            -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
-            -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
-            --     weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
-            -- end
+        if brawler.uuid ~= potentialTargetUuid then
+            local isBrawlerPlayerOrAlly = isPlayerOrAlly(brawler.uuid)
+            local isPotentialTargetPlayerOrAlly = isPlayerOrAlly(potentialTargetUuid)
+            local isHostile = false
+            if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
+                isHostile = false
+            elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
+                isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] ~= nil
+            elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
+                isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[brawler.uuid] ~= nil
+            elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
+                isHostile = Osi.IsEnemy(brawler.uuid, potentialTargetUuid) == 1
+            else
+                debugPrint("getHostileWeightedTargets: what happened here?", brawler.uuid, potentialTargetUuid, brawler.displayName, getDisplayName(potentialTargetUuid))
+            end
+            if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
+                local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
+                local targetHp = Osi.GetHitpoints(potentialTargetUuid)
+                weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                -- NB: this is too intense of a request and will crash the game :/
+                -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
+                -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                --     weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
+                -- end
+            end
         end
     end
     return weightedTargets
@@ -862,9 +921,7 @@ function findTarget(brawler)
                     debugPrint("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
                     local result = actOnFriendlyTarget(brawler, Brawlers[level][friendlyTargetUuid])
                     debugPrint("result", result)
-                    if result == true then
-                        return
-                    end
+                    return result
                 end
             end
         end
@@ -916,6 +973,9 @@ function pulseAction(brawler)
                         return moveThenAct(brawler.uuid, playerUuid, "Target_Help")
                     end
                 end
+            else
+                -- NB: is this too resource intensive?
+                addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
             end
             -- Doesn't currently have an attack target, so let's find one
             if brawler.targetUuid == nil then
@@ -939,6 +999,9 @@ function pulseAction(brawler)
 end
 
 function startPulseAction(brawler)
+    if Osi.IsPlayer(brawler.uuid) == 1 and not CompanionAIEnabled then
+        return false
+    end
     debugPrint("start pulse action for", brawler.displayName)
     if PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
@@ -1005,16 +1068,30 @@ function getClosestEnemyBrawler(brawlerUuid, maxDistance)
     return nil
 end
 
+function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
+    for playerUuid, player in pairs(Players) do
+        local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
+        if distanceTo < ENTER_COMBAT_RANGE then
+            addBrawler(playerUuid)
+        end
+    end
+end
+
 -- Enemies are pugnacious jerks and looking for a fight >:(
 function checkForBrawlToJoin(brawler)
-    local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
-    debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", playerUuid, closestDistance)
-    if isOnSameLevel(Osi.GetRegion(brawler.uuid), Osi.GetRegion(playerUuid)) and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
-        local targetUuid = getClosestEnemyBrawler(brawler.uuid, ENTER_COMBAT_RANGE)
-        if targetUuid then
-            debugPrint("Start pulse for", brawler.displayName, brawler.uuid, "->", getDisplayName(targetUuid))
-            return startPulseAction(brawler)
+    local closestPlayerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
+    debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestPlayerUuid, closestDistance)
+    if isOnSameLevel(brawler.uuid, closestPlayerUuid) and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
+        addBrawler(closestPlayerUuid)
+        for playerUuid, player in pairs(Players) do
+            if playerUuid ~= closestPlayerUuid then
+                local distanceTo = Osi.GetDistanceTo(brawler.uuid, playerUuid)
+                if distanceTo < ENTER_COMBAT_RANGE then
+                    addBrawler(playerUuid)
+                end
+            end
         end
+        startPulseAction(brawler)
     end
 end
 
@@ -1145,6 +1222,11 @@ function pulseReposition(level)
                     if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
                         debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
                         -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                        local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
+                        if closestDistance > 2*ENTER_COMBAT_RANGE then
+                            debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
+                            removeBrawler(brawlerUuid)
+                        end
                     else
                         debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
                         checkForBrawlToJoin(brawler)
@@ -1358,66 +1440,6 @@ function setIsControllingDirectly()
     end
 end
 
-function revertHitpoints(entityUuid)
-    local entity = Ext.Entity.Get(entityUuid)
-    if entity.IsCharacter and ModifiedHitpoints[entityUuid] ~= nil then
-        entity.Health.MaxHp = ModifiedHitpoints[entityUuid].originalMaxHp
-        entity.Health.Hp = ModifiedHitpoints[entityUuid].originalHp
-        entity:Replicate("Health")
-        ModifiedHitpoints[entityUuid] = nil
-        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
-    end
-end
-
--- function modifyHitpoints(entityUuid)
---     local entity = Ext.Entity.Get(entityUuid)
---     if entity.IsCharacter and isAliveAndCanFight(entityUuid) and ModifiedHitpoints[entityUuid] == nil then
---         local originalHp = Osi.GetHitpoints(entityUuid)
---         local originalMaxHp = Osi.GetMaxHitpoints(entityUuid)
---         local modifiedMaxHp = originalMaxHp * HITPOINTS_MULTIPLIER
---         local modifiedHp = originalHp * HITPOINTS_MULTIPLIER
---         entity.Health.MaxHp = modifiedMaxHp
---         entity.Health.Hp = modifiedHp
---         entity:Replicate("Health")
---         ModifiedHitpoints[entityUuid] = {
---             originalHp = originalHp,
---             originalMaxHp = originalMaxHp,
---             modifiedHp = modifiedHp,
---             modifiedMaxHp = modifiedMaxHp,
---         }
---         debugDump(ModifiedHitpoints[entityUuid])
---         debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalHp, modifiedHp, originalMaxHp, modifiedMaxHp)
---     end
--- end
-
--- function modifyHitpoints(entity)
---     local uuid = entity.Uuid.EntityUuid
---     if entity.IsCharacter and isAliveAndCanFight(uuid) and PersistentVars.ModifiedHitpoints[uuid] == nil then
---         debugDump(PersistentVars.ModifiedHitpoints[uuid])
---         debugPrint(PersistentVars.ModifiedHitpoints[uuid])
---         local originalHp = Osi.GetHitpoints(uuid)
---         local originalMaxHp = Osi.GetMaxHitpoints(uuid)
---         local modifiedMaxHp = originalMaxHp*HITPOINTS_MULTIPLIER
---         local modifiedHp = originalHp*HITPOINTS_MULTIPLIER
---         entity.Health.MaxHp = modifiedMaxHp
---         entity.Health.Hp = modifiedHp
---         PersistentVars.ModifiedHitpoints[uuid] = {
---             originalHp = originalHp,
---             originalMaxHp = originalMaxHp,
---             modifiedHp = modifiedHp,
---             modifiedMaxHp = modifiedMaxHp,
---         }
---         debugDump(PersistentVars.ModifiedHitpoints[uuid])
---         debugPrint("Modified hitpoints:", uuid, getDisplayName(uuid), originalHp, modifiedHp, originalMaxHp, modifiedMaxHp)
---     end
--- end
-
--- function modifyNearbyHitpoints(entityUuid)
---     for _, nearby in ipairs(getNearby(entityUuid, MODIFY_HITPOINTS_NEARBY_RANGE)) do
---         modifyHitpoints(nearby.Guid)
---     end
--- end
-
 function checkNearby()
     for _, nearby in ipairs(getNearby(Osi.GetHostCharacter(), 50)) do
         if nearby.Entity.IsCharacter then
@@ -1560,7 +1582,6 @@ end
 
 function onStarted(level)
     SpellTable = buildSpellTable()
-    -- SpellTable = Ext.Json.Parse(Ext.IO.LoadFile("SpellTable.json"))
     resetPlayers()
     setIsControllingDirectly()
     setMovementSpeedThresholds()
@@ -1801,7 +1822,8 @@ local function onGainedControl(targetGuid)
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
                     player.isControllingDirectly = false
                     if level and Brawlers[level] and Brawlers[level][playerUuid] and Brawlers[level][playerUuid].isInBrawl then
-                        startPulseAction(Brawlers[level][targetUuid])
+                        stopPulseAddNearby(playerUuid)
+                        startPulseAction(Brawlers[level][playerUuid])
                     end
                 end
             end
@@ -1817,7 +1839,7 @@ function areAnyPlayersBrawling()
     if Players then
         for playerUuid, player in pairs(Players) do
             local level = Osi.GetRegion(playerUuid)
-            if level and Brawlers[level] and Brawlers[level][playerUuid] and Brawlers[level][playerUuid].isInBrawl then
+            if level and Brawlers[level] and Brawlers[level][playerUuid] then -- and Brawlers[level][playerUuid].isInBrawl then
                 return true
             end
         end
@@ -1942,7 +1964,7 @@ local function onDialogEnded(dialog, dialogInstanceId)
     startPulseReposition(level)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if brawler.isInBrawl then
+            if brawler.isInBrawl and not isPlayerControllingDirectly(brawlerUuid) then
                 startPulseAction(brawler)
             end
         end
@@ -2121,13 +2143,14 @@ local function onGameStateChanged(e)
 end
 
 local function disableCompanionAI(hotkey)
-    debugPrint("companion ai disabled, stopping pulse actions")
+    debugPrint("companion ai disabled")
     CompanionAIEnabled = false
     for playerUuid, player in pairs(Players) do
-        if Brawlers and Brawlers[playerUuid] then
-            stopPulseAction(Brawlers[playerUuid])
+        local level = Osi.GetRegion(playerUuid)
+        if level and Brawlers and Brawlers[level] and Brawlers[level][playerUuid] then
             Osi.PurgeOsirisQueue(playerUuid, 1)
             Osi.FlushOsirisQueue(playerUuid)
+            stopPulseAction(Brawlers[level][playerUuid])
         end
     end
     Osi.QuestMessageHide("ModStatusMessage")
@@ -2138,7 +2161,15 @@ local function disableCompanionAI(hotkey)
 end
 
 local function enableCompanionAI(hotkey)
+    debugPrint("companion ai enabled")
     CompanionAIEnabled = true
+    if Players and areAnyPlayersBrawling() then
+        for playerUuid, player in pairs(Players) do
+            if not isPlayerControllingDirectly(playerUuid) then
+                addBrawler(playerUuid, true, true)
+            end
+        end
+    end
     Osi.QuestMessageHide("ModStatusMessage")
     Osi.QuestMessageShow("ModStatusMessage", "Companion AI Enabled (Press " .. hotkey .. " to Disable)")
     Ext.Timer.WaitFor(3000, function ()
