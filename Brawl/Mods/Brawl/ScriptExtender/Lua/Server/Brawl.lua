@@ -1091,6 +1091,10 @@ function checkForBrawlToJoin(brawler)
                 end
             end
         end
+        local level = Osi.GetRegion(brawler.uuid)
+        if level and BrawlFizzler[level] == nil then
+            startBrawlFizzler(level)
+        end
         startPulseAction(brawler)
     end
 end
@@ -1225,7 +1229,7 @@ function pulseReposition(level)
                         local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
                         if closestDistance > 2*ENTER_COMBAT_RANGE then
                             debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
-                            removeBrawler(brawlerUuid)
+                            removeBrawler(level, brawlerUuid)
                         end
                     else
                         debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
@@ -1393,6 +1397,7 @@ function resetPlayersMovementSpeed()
         local entity = Ext.Entity.Get(playerUuid)
         if player.movementSpeedRun ~= nil then
             entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
+            player.movementSpeedRun = nil
         end
     end
 end
@@ -1593,6 +1598,7 @@ end
 
 function startBrawlFizzler(level)
     stopBrawlFizzler(level)
+    debugPrint("Starting BrawlFizzler", level)
     BrawlFizzler[level] = Ext.Timer.WaitFor(BRAWL_FIZZLER_TIMEOUT, function ()
         debugPrint("Brawl fizzled", BRAWL_FIZZLER_TIMEOUT)
         endBrawl(level)
@@ -1891,31 +1897,33 @@ local function onDownedChanged(character, isDowned)
     end
 end
 
-local function onAttackedBy(defenderGuid, attackerGuid, _, _, _, _, _)
-    -- debugPrint("Attacked By:", defenderGuid, attackerGuid)
+local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
-    if isToT() then
-        addBrawler(attackerUuid, true)
-        addBrawler(defenderUuid, true)
-    end
-    if Osi.IsPlayer(attackerUuid) == 1 then
-        if Osi.IsPlayer(defenderUuid) == 0 then
-            IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
-        end
+    if Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
         if isToT() then
-            addNearbyToBrawlers(attackerUuid, 30, nil, true)
+            addBrawler(attackerUuid, true)
+            addBrawler(defenderUuid, true)
         end
+        if Osi.IsPlayer(attackerUuid) == 1 then
+            if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
+                IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
+            end
+            if isToT() then
+                addNearbyToBrawlers(attackerUuid, 30, nil, true)
+            end
+        end
+        if Osi.IsPlayer(defenderUuid) == 1 then
+            if Osi.IsPlayer(attackerUuid) == 0 and damageAmount > 0 then
+                IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
+            end
+            if isToT() then
+                addNearbyToBrawlers(defenderUuid, 30, nil, true)
+            end
+        end
+        startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
-    if Osi.IsPlayer(defenderUuid) == 1 then
-        if Osi.IsPlayer(attackerUuid) == 0 then
-            IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
-        end
-        if isToT() then
-            addNearbyToBrawlers(defenderUuid, 30, nil, true)
-        end
-    end
-    startBrawlFizzler(Osi.GetRegion(attackerUuid))
 end
 
 local function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID)
