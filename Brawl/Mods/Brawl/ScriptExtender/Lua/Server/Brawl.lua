@@ -15,7 +15,7 @@ if MCM then
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
