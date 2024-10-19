@@ -148,6 +148,9 @@ ToTRoundTimer = nil
 FinalToTChargeTimer = nil
 MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 
+-- Persistent state
+Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Client = false, SyncToClient = false})
+
 function debugPrint(...)
     if DEBUG_LOGGING then
         print(...)
@@ -807,7 +810,7 @@ function actOnHostileTarget(brawler, target)
             elseif numUsableSpells == 1 then
                 actionToTake = usableSpells[1]
             end
-            print("backup ActionToTake", actionToTake, numUsableSpells)
+            debugPrint("backup ActionToTake", actionToTake, numUsableSpells)
         end
         if actionToTake ~= nil then
             moveThenAct(brawler.uuid, target.uuid, actionToTake)
@@ -1480,6 +1483,21 @@ function stopAllBrawlFizzlers()
     end
 end
 
+function resetSpellData()
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars and modVars.SpellRequirements then
+        local spellReqs = modVars.SpellRequirements
+        for spellName, req in pairs(spellReqs) do
+            local spell = Ext.Stats.Get(spellName)
+            local requirements = spell.Requirements
+            table.insert(requirements, {Requirement = req.Requirement, Param = req.Param, Not = req.Not})
+            spell.Requirements = requirements
+            spell:Sync()
+        end
+        modVars.SpellRequirements = nil
+    end
+end
+
 function cleanupAll()
     stopAllPulseAddNearbyTimers()
     stopAllPulseRepositionTimers()
@@ -1492,6 +1510,7 @@ function cleanupAll()
             endBrawl(level)
         end
     end
+    resetSpellData()
 end
 
 function split(inputstr, sep)
@@ -1571,6 +1590,25 @@ local function getAllSpellsOfType(spellType)
                 end
             else
                 allSpellsOfType[spellName] = getSpellInfo(spellType, spellName)
+                if spell.Requirements and #spell.Requirements ~= 0 then
+                    local requirements = spell.Requirements
+                    local removeIndex = 0
+                    for i, req in ipairs(requirements) do
+                        if req.Requirement == "Combat" and req.Not == false then
+                            removeIndex = i
+                            local removedReq = {Requirement = req.Requirement, Param = req.Param, Not = req.Not, index = i}
+                            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+                            modVars.SpellRequirements = modVars.SpellRequirements or {}
+                            modVars.SpellRequirements[spellName] = removedReq
+                            break
+                        end
+                    end
+                    if removeIndex ~= 0 then
+                        table.remove(requirements, removeIndex)
+                    end
+                    spell.Requirements = requirements
+                    spell:Sync()
+                end
             end
         end
     end
@@ -1586,13 +1624,14 @@ function buildSpellTable()
 end
 
 function onStarted(level)
+    debugPrint("onStarted")
+    resetSpellData()
     SpellTable = buildSpellTable()
     resetPlayers()
     setIsControllingDirectly()
     setMovementSpeedThresholds()
     resetPlayersMovementSpeed()
     initBrawlers(level)
-    debugPrint("onStarted")
     debugDump(Players)
 end
 
@@ -2185,11 +2224,54 @@ local function enableCompanionAI(hotkey)
     end)
 end
 
+local function disableFullAuto(hotkey)
+    debugPrint("full auto disabled")
+    FullAuto = false
+    for playerUuid, player in pairs(Players) do
+        if isPlayerControllingDirectly(playerUuid) then
+            local level = Osi.GetRegion(playerUuid)
+            if level and Brawlers and Brawlers[level] and Brawlers[level][playerUuid] then
+                Osi.PurgeOsirisQueue(playerUuid, 1)
+                Osi.FlushOsirisQueue(playerUuid)
+                stopPulseAction(Brawlers[level][playerUuid])
+            end
+        end
+    end
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Disabled (Press " .. hotkey .. " to Enable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
+local function enableFullAuto(hotkey)
+    debugPrint("full auto enabled")
+    FullAuto = true
+    if Players and areAnyPlayersBrawling() then
+        for playerUuid, player in pairs(Players) do
+            addBrawler(playerUuid, true, true)
+        end
+    end
+    Osi.QuestMessageHide("ModStatusMessage")
+    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Enabled (Press " .. hotkey .. " to Disable)")
+    Ext.Timer.WaitFor(3000, function ()
+        Osi.QuestMessageHide("ModStatusMessage")
+    end)
+end
+
 local function toggleCompanionAI(hotkey)
     if CompanionAIEnabled then
         disableCompanionAI(hotkey)
     else
         enableCompanionAI(hotkey)
+    end
+end
+
+local function toggleFullAuto(hotkey)
+    if FullAuto then
+        disableFullAuto(hotkey)
+    else
+        enableFullAuto(hotkey)
     end
 end
 
@@ -2254,6 +2336,12 @@ local function onMCMSettingSaved(payload)
         ActionInterval = payload.value
     elseif payload.settingId == "full_auto" then
         FullAuto = payload.value
+        local hotkey = MCM.Get("full_auto_toggle_hotkey")
+        if FullAuto then
+            enableFullAuto(hotkey)
+        else
+            disableFullAuto(hotkey)
+        end
     end
 end
 
@@ -2269,6 +2357,12 @@ local function onNetMessage(data)
             MCM.Set("companion_ai_enabled", not CompanionAIEnabled)
         else
             toggleCompanionAI(data.Payload)
+        end
+    elseif data.Channel == "FullAutoToggle" then
+        if MCM then
+            MCM.Set("full_auto", not FullAuto)
+        else
+            toggleFullAuto(data.Payload)
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
@@ -2305,7 +2399,7 @@ local function onNetMessage(data)
                             buildClosestEnemyBrawlers(player.uuid)
                         -- end
                         if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
-                            print("Selecting next enemy brawler")
+                            debugPrint("Selecting next enemy brawler")
                             selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
                         end
                     end

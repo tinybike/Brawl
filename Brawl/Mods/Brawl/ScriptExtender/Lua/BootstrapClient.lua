@@ -1,8 +1,10 @@
 local ModToggleHotkey = "F9"
 local CompanionAIToggleHotkey = "F11"
+local FullAutoToggleHotkey = "F6"
 if MCM then
     ModToggleHotkey = string.upper(MCM.Get("mod_toggle_hotkey"))
     CompanionAIToggleHotkey = string.upper(MCM.Get("companion_ai_toggle_hotkey"))
+    FullAutoToggleHotkey = string.upper(MCM.Get("full_auto_toggle_hotkey"))
 end
 local IsRightTriggerPressed = false
 local IsLeftTriggerPressed = false
@@ -136,6 +138,8 @@ local function onKeyInput(e)
         Ext.ClientNet.PostMessageToServer("ModToggle", tostring(e.Key))
     elseif e.Key == CompanionAIToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
         Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
+    elseif e.Key == FullAutoToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
+        Ext.ClientNet.PostMessageToServer("FullAutoToggle", tostring(e.Key))
     end
 end
 
