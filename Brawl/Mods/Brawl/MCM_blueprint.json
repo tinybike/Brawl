@@ -114,6 +114,17 @@
                                 "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
                                 "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
                             }
+                        },
+                        {
+                            "Id": "hitpoints_multiplier",
+                            "Name": "Hitpoints Multiplier",
+                            "Type": "float",
+                            "Default": 1.0,
+                            "Description": "Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.",
+                            "Handles": {
+                                "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
+                                "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
+                            }
                         }
                     ]
                 }

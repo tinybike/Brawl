@@ -18,4 +18,6 @@
     <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
     <content contentuid="hc26cac3bg1de2g4808g852fga815daf697bd" version="1">Hotkey for toggling Full Auto on and off</content>
     <content contentuid="hd2d7dc1ag806eg4339gb306g679658313ab2" version="1">Fully Automated Brawls Toggle Hotkey</content>
+    <content contentuid="h5d6a4c77g02edg4c96gacc3g8b5adda5dde7" version="1">Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.</content>
+    <content contentuid="h41ad2ed5g77dfg45c7g83f9g43fcf62e2376" version="1">Hitpoints Multiplier</content>
 </contentList>

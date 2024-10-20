@@ -5,6 +5,7 @@ local CompanionAIMaxSpellLevel = 0
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
+local HitpointsMultiplier = 1.0
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -12,10 +13,11 @@ if MCM then
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
+    HitpointsMultipler = MCM.Get("hitpoints_multiplier")
 end
 
 -- Constants
-local DEBUG_LOGGING = false
+local DEBUG_LOGGING = true
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -30,7 +32,6 @@ local MAX_COMPANION_DISTANCE_FROM_PLAYER = 20
 local MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 local AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD = 20.0
 local AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
-local HITPOINTS_MULTIPLIER = 3
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 local LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 local ACTION_RESOURCES = {
@@ -150,6 +151,7 @@ MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 
 -- Persistent state
 Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 
 function debugPrint(...)
     if DEBUG_LOGGING then
@@ -1286,6 +1288,45 @@ function setPlayerRunToSprint(entityUuid)
     entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
 end
 
+function revertHitpoints(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.ModifiedHitpoints and modVars.ModifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+        local entity = Ext.Entity.Get(entityUuid)
+        local currentMaxHp = entity.Health.MaxHp
+        local currentHp = entity.Health.Hp
+        local originalMaxHp = modVars.ModifiedHitpoints[entityUuid].originalMaxHp
+        entity.Health.MaxHp = originalMaxHp
+        entity.Health.Hp = math.ceil(originalMaxHp * currentHp / currentMaxHp)
+        entity:Replicate("Health")
+        modVars.ModifiedHitpoints[entityUuid] = nil
+        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+    end
+end
+
+function modifyHitpoints(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.ModifiedHitpoints == nil then
+        modVars.ModifiedHitpoints = {}
+    end
+    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modVars.ModifiedHitpoints[entityUuid] == nil then
+        local originalHp = Osi.GetHitpoints(entityUuid)
+        local originalMaxHp = Osi.GetMaxHitpoints(entityUuid)
+        local modifiedMaxHp = math.floor(originalMaxHp*HitpointsMultiplier)
+        local modifiedHp = math.floor(originalHp*HitpointsMultiplier)
+        local entity = Ext.Entity.Get(entityUuid)
+        entity.Health.MaxHp = modifiedMaxHp
+        entity.Health.Hp = modifiedHp
+        modVars.ModifiedHitpoints[entityUuid] = {
+            originalHp = originalHp,
+            originalMaxHp = originalMaxHp,
+            modifiedHp = modifiedHp,
+            modifiedMaxHp = modifiedMaxHp,
+        }
+        entity:Replicate("Health")
+        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalHp, modifiedHp, originalMaxHp, modifiedMaxHp)
+    end
+end
+
 -- NB: should we also index Brawlers by combatGuid?
 function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
@@ -1306,6 +1347,10 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 isInBrawl = isInBrawl,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
             }
+            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
+            revertHitpoints(entityUuid)
+            modifyHitpoints(entityUuid)
             if Osi.IsPlayer(entityUuid) == 0 then
                 -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                 Osi.SetCanJoinCombat(entityUuid, 0)
@@ -1345,11 +1390,7 @@ end
 function endBrawl(level)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            stopPulseAction(brawler)
-            -- Osi.SetCanJoinCombat(brawlerUuid, brawler.originalCanJoinCombat)
-            Osi.FlushOsirisQueue(brawlerUuid)
-            debugPrint("setCanJoinCombat to 1 for", brawlerUuid, brawler.displayName)
-            Osi.SetCanJoinCombat(brawlerUuid, 1)
+            removeBrawler(level, brawlerUuid)
         end
         debugPrint("Ended brawl")
         debugDump(Brawlers[level])
@@ -1392,6 +1433,9 @@ function removeBrawler(level, entityUuid)
         --     Ext.ServerNet.PostMessageToClient(entityUuid, "UseCombatControllerControls", "0")
         -- end
         Osi.SetCanJoinCombat(entityUuid, 1)
+        if Osi.IsPartyMember(entityUuid, 1) == 0 then
+            revertHitpoints(entityUuid)
+        end
     end
 end
 
@@ -1498,6 +1542,16 @@ function resetSpellData()
     end
 end
 
+function revertAllModifiedHitpoints()
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.ModifiedHitpoints and next(modVars.ModifiedHitpoints) ~= nil then
+        for uuid, _ in pairs(modVars.ModifiedHitpoints) do
+            debugPrint("Revert modified hp for", uuid, getDisplayName(uuid))
+            revertHitpoints(uuid)
+        end
+    end
+end
+
 function cleanupAll()
     stopAllPulseAddNearbyTimers()
     stopAllPulseRepositionTimers()
@@ -1510,6 +1564,7 @@ function cleanupAll()
             endBrawl(level)
         end
     end
+    revertAllModifiedHitpoints()
     resetSpellData()
 end
 
@@ -1623,6 +1678,14 @@ function buildSpellTable()
     return spellTable
 end
 
+function setupPartyMembersHitpoints()
+    for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
+        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        revertHitpoints(partyMemberUuid)
+        modifyHitpoints(partyMemberUuid)
+    end
+end
+
 function onStarted(level)
     debugPrint("onStarted")
     resetSpellData()
@@ -1631,6 +1694,7 @@ function onStarted(level)
     setIsControllingDirectly()
     setMovementSpeedThresholds()
     resetPlayersMovementSpeed()
+    setupPartyMembersHitpoints()
     initBrawlers(level)
     debugDump(Players)
 end
@@ -2334,6 +2398,17 @@ local function onMCMSettingSaved(payload)
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
         ActionInterval = payload.value
+    elseif payload.settingId == "hitpoints_multiplier" then
+        HitpointsMultiplier = payload.value
+        debugPrint("reverting/changing health")
+        setupPartyMembersHitpoints()
+        local level = Osi.GetRegion(Osi.GetHostCharacter())
+        if Brawlers and Brawlers[level] then
+            for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                revertHitpoints(brawlerUuid)
+                modifyHitpoints(brawlerUuid)
+            end
+        end
     elseif payload.settingId == "full_auto" then
         FullAuto = payload.value
         local hotkey = MCM.Get("full_auto_toggle_hotkey")
