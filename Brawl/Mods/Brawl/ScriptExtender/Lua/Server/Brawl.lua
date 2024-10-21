@@ -5,7 +5,7 @@ local CompanionAIMaxSpellLevel = 0
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
-local HitpointsMultiplier = 1.0
+local HitpointsMultiplier = 2.0
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -13,7 +13,7 @@ if MCM then
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
-    HitpointsMultipler = MCM.Get("hitpoints_multiplier")
+    HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
 end
 
 -- Constants
@@ -1288,45 +1288,6 @@ function setPlayerRunToSprint(entityUuid)
     entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
 end
 
-function revertHitpoints(entityUuid)
-    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-    if modVars.ModifiedHitpoints and modVars.ModifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
-        local entity = Ext.Entity.Get(entityUuid)
-        local currentMaxHp = entity.Health.MaxHp
-        local currentHp = entity.Health.Hp
-        local originalMaxHp = modVars.ModifiedHitpoints[entityUuid].originalMaxHp
-        entity.Health.MaxHp = originalMaxHp
-        entity.Health.Hp = math.ceil(originalMaxHp * currentHp / currentMaxHp)
-        entity:Replicate("Health")
-        modVars.ModifiedHitpoints[entityUuid] = nil
-        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
-    end
-end
-
-function modifyHitpoints(entityUuid)
-    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-    if modVars.ModifiedHitpoints == nil then
-        modVars.ModifiedHitpoints = {}
-    end
-    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modVars.ModifiedHitpoints[entityUuid] == nil then
-        local originalHp = Osi.GetHitpoints(entityUuid)
-        local originalMaxHp = Osi.GetMaxHitpoints(entityUuid)
-        local modifiedMaxHp = math.floor(originalMaxHp*HitpointsMultiplier)
-        local modifiedHp = math.floor(originalHp*HitpointsMultiplier)
-        local entity = Ext.Entity.Get(entityUuid)
-        entity.Health.MaxHp = modifiedMaxHp
-        entity.Health.Hp = modifiedHp
-        modVars.ModifiedHitpoints[entityUuid] = {
-            originalHp = originalHp,
-            originalMaxHp = originalMaxHp,
-            modifiedHp = modifiedHp,
-            modifiedMaxHp = modifiedMaxHp,
-        }
-        entity:Replicate("Health")
-        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalHp, modifiedHp, originalMaxHp, modifiedMaxHp)
-    end
-end
-
 -- NB: should we also index Brawlers by combatGuid?
 function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
@@ -1678,11 +1639,71 @@ function buildSpellTable()
     return spellTable
 end
 
+function revertHitpoints(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    local modifiedHitpoints = modVars.ModifiedHitpoints
+    if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+        print("got modified hitpoints for", entityUuid)
+        print(modifiedHitpoints[entityUuid])
+        local entity = Ext.Entity.Get(entityUuid)
+        local currentMaxHp = entity.Health.MaxHp
+        local currentHp = entity.Health.Hp
+        local multiplier = modifiedHitpoints[entityUuid].multiplier
+        entity.Health.MaxHp = math.floor(currentMaxHp/multiplier + 0.5)
+        entity.Health.Hp = math.floor(currentHp/multiplier + 0.5)
+        entity:Replicate("Health")
+        modifiedHitpoints[entityUuid] = nil
+        modVars.ModifiedHitpoints = modifiedHitpoints
+        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+    end
+end
+
+function modifyHitpoints(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.ModifiedHitpoints == nil then
+        modVars.ModifiedHitpoints = {}
+    end
+    local modifiedHitpoints = modVars.ModifiedHitpoints
+    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
+        print("modify hitpoints", entityUuid, HitpointsMultiplier)
+        local entity = Ext.Entity.Get(entityUuid)
+        local originalMaxHp = entity.Health.MaxHp
+        local originalHp = entity.Health.Hp
+        entity.Health.MaxHp = math.floor(originalMaxHp*HitpointsMultiplier + 0.5)
+        entity.Health.Hp = math.floor(originalHp*HitpointsMultiplier + 0.5)
+        entity:Replicate("Health")
+        modifiedHitpoints[entityUuid] = {originalMaxHp = originalMaxHp, multiplier = HitpointsMultiplier}
+        modVars.ModifiedHitpoints = modifiedHitpoints
+        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, entity.Health.MaxHp, entity.Health.Hp)
+    end
+end
+
 function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
         local partyMemberUuid = Osi.GetUUID(partyMember[1])
         revertHitpoints(partyMemberUuid)
         modifyHitpoints(partyMemberUuid)
+        Ext.Entity.Subscribe("Health", function (entity, _, _)
+            local uuid = entity.Uuid.EntityUuid
+            debugPrint("Entity health changed for", uuid)
+            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            local modifiedHitpoints = modVars.ModifiedHitpoints
+            if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil then
+                local maxHp = entity.Health.MaxHp
+                debugPrint("current max hp", maxHp)
+                debugDump(modifiedHitpoints[uuid])
+                local originalMaxHp = modifiedHitpoints[uuid].originalMaxHp
+                local multiplier = modifiedHitpoints[uuid].multiplier
+                debugPrint(math.floor(originalMaxHp*multiplier + 0.5))
+                -- make sure the change wasn't from calling modifyHitpoints
+                if maxHp ~= originalMaxHp and maxHp ~= math.floor(originalMaxHp*multiplier + 0.5) then
+                    debugPrint("max hp changed! re-modifying")
+                    modifiedHitpoints[uuid] = nil
+                    modVars.ModifiedHitpoints = modifiedHitpoints
+                    modifyHitpoints(uuid)
+                end
+            end
+        end, Ext.Entity.Get(partyMemberUuid))
     end
 end
 
@@ -2400,7 +2421,6 @@ local function onMCMSettingSaved(payload)
         ActionInterval = payload.value
     elseif payload.settingId == "hitpoints_multiplier" then
         HitpointsMultiplier = payload.value
-        debugPrint("reverting/changing health")
         setupPartyMembersHitpoints()
         local level = Osi.GetRegion(Osi.GetHostCharacter())
         if Brawlers and Brawlers[level] then
