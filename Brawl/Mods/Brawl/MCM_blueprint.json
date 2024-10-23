@@ -119,7 +119,7 @@
                             "Id": "hitpoints_multiplier",
                             "Name": "Hitpoints Multiplier",
                             "Type": "slider_float",
-                            "Default": 2.0,
+                            "Default": 1.0,
                             "Options": {
                                 "Min": 0.1,
                                 "Max": 10.0
