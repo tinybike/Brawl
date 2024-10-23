@@ -1688,6 +1688,7 @@ function modifyHitpoints(entityUuid)
         entity:Replicate("Health")
         modifiedHitpoints = Ext.Vars.GetModVariables(ModuleUUID).ModifiedHitpoints
         modifiedHitpoints[entityUuid].originalMaxHp = originalMaxHp
+        modifiedHitpoints[entityUuid].maxHp = entity.Health.MaxHp
         modifiedHitpoints[entityUuid].multiplier = HitpointsMultiplier
         modVars.ModifiedHitpoints = modifiedHitpoints
         debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, entity.Health.MaxHp, entity.Health.Hp)
@@ -1707,8 +1708,8 @@ function setupPartyMembersHitpoints()
             debugPrint("Entity health changed for", uuid)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local modifiedHitpoints = modVars.ModifiedHitpoints
-            debugDump(modifiedHitpoints)
-            if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil then
+            if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil and modifiedHitpoints[uuid].maxHp ~= entity.Health.MaxHp then
+                debugDump(modifiedHitpoints[uuid])
                 if modifiedHitpoints[uuid].updating then
                     -- Reset updating flag and do nothing
                     modifiedHitpoints[uuid].updating = false
