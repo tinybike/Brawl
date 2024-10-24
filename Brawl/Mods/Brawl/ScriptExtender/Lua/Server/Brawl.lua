@@ -1647,7 +1647,7 @@ function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
     if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
-        debugPrint("got modified hitpoints for", entityUuid)
+        debugPrint("Reverting hitpoints", entityUuid)
         debugDump(modifiedHitpoints[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
         local currentMaxHp = entity.Health.MaxHp
@@ -1687,11 +1687,10 @@ function modifyHitpoints(entityUuid)
         entity.Health.Hp = math.floor(originalHp*HitpointsMultiplier + 0.5)
         entity:Replicate("Health")
         modifiedHitpoints = Ext.Vars.GetModVariables(ModuleUUID).ModifiedHitpoints
-        modifiedHitpoints[entityUuid].originalMaxHp = originalMaxHp
         modifiedHitpoints[entityUuid].maxHp = entity.Health.MaxHp
         modifiedHitpoints[entityUuid].multiplier = HitpointsMultiplier
         modVars.ModifiedHitpoints = modifiedHitpoints
-        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, entity.Health.MaxHp, entity.Health.Hp)
+        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
@@ -1705,29 +1704,24 @@ function setupPartyMembersHitpoints()
         end
         PartyMembersHitpointsListeners[partyMemberUuid] = Ext.Entity.Subscribe("Health", function (entity, _, _)
             local uuid = entity.Uuid.EntityUuid
-            debugPrint("Entity health changed for", uuid)
+            debugPrint("Health changed", uuid)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local modifiedHitpoints = modVars.ModifiedHitpoints
             if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil and modifiedHitpoints[uuid].maxHp ~= entity.Health.MaxHp then
                 debugDump(modifiedHitpoints[uuid])
-                if modifiedHitpoints[uuid].updating then
-                    -- Reset updating flag and do nothing
-                    modifiedHitpoints[uuid].updating = false
+                if modifiedHitpoints[uuid].updating == false then
+                    -- External change detected; re-apply modifications
+                    debugPrint("External MaxHp change detected for", uuid, ". Re-applying hitpoint modifications.")
+                    modifiedHitpoints[uuid] = nil
                     modVars.ModifiedHitpoints = modifiedHitpoints
-                    debugPrint("Change detected from our own modification; no action needed.")
-                    return
+                    modifyHitpoints(uuid)
                 end
-                -- External change detected; re-apply modifications
-                debugPrint("External MaxHp change detected for", uuid, ". Re-applying hitpoint modifications.")
-                modifiedHitpoints[uuid] = nil
-                modVars.ModifiedHitpoints = modifiedHitpoints
-                modifyHitpoints(uuid)
-                modVars = Ext.Vars.GetModVariables(ModuleUUID)
-                modifiedHitpoints = modVars.ModifiedHitpoints
-                modifiedHitpoints[uuid] = modifiedHitpoints[uuid] or {}
-                modifiedHitpoints[uuid].updating = false
-                modVars.ModifiedHitpoints = modifiedHitpoints
             end
+            modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            modifiedHitpoints = modVars.ModifiedHitpoints
+            modifiedHitpoints[uuid] = modifiedHitpoints[uuid] or {}
+            modifiedHitpoints[uuid].updating = false
+            modVars.ModifiedHitpoints = modifiedHitpoints
         end, Ext.Entity.Get(partyMemberUuid))
     end
 end
