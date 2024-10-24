@@ -261,7 +261,7 @@ function playerMovementDistanceToSpeed(movementDistance)
     end
 end
 
-function isBackupSpellUsable(spell, archetype)
+function isNpcSpellUsable(spell, archetype)
     if spell == "Projectile_Jump" then return false end
     if spell == "Shout_Dash_NPC" then return false end
     if spell == "Target_Shove" then return false end
@@ -730,33 +730,35 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
-        local spell = nil
-        for _, spellType in ipairs(spellTypes) do
-            spell = SpellTable[spellType][spellName]
-            if spell ~= nil then
-                break
-            end
-        end
-        if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
-            weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
-        end
-        if DEBUG_LOGGING and spell == nil then
-            local isSpellInSpellTable = false
-            local isAlreadyFound = false
-            for _, spellType in ipairs(ALL_SPELL_TYPES) do
-                if SpellTable[spellType][spellName] ~= nil then
-                    isSpellInSpellTable = true
+        if isNpcSpellUsable(spellName, archetype) then
+            local spell = nil
+            for _, spellType in ipairs(spellTypes) do
+                spell = SpellTable[spellType][spellName]
+                if spell ~= nil then
                     break
                 end
             end
-            for _, spellNotInSpellTable in ipairs(SpellsNotInSpellTable) do
-                if spellNotInSpellTable == spellName then
-                    isAlreadyFound = true
-                end
+            if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
+                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
             end
-            if not isAlreadyFound then
-                table.insert(SpellsNotInSpellTable, spellName)
-                debugPrint("Spell not in SpellTable", spellName)
+            if DEBUG_LOGGING and spell == nil then
+                local isSpellInSpellTable = false
+                local isAlreadyFound = false
+                for _, spellType in ipairs(ALL_SPELL_TYPES) do
+                    if SpellTable[spellType][spellName] ~= nil then
+                        isSpellInSpellTable = true
+                        break
+                    end
+                end
+                for _, spellNotInSpellTable in ipairs(SpellsNotInSpellTable) do
+                    if spellNotInSpellTable == spellName then
+                        isAlreadyFound = true
+                    end
+                end
+                if not isAlreadyFound then
+                    table.insert(SpellsNotInSpellTable, spellName)
+                    debugPrint("Spell not in SpellTable", spellName)
+                end
             end
         end
     end
@@ -801,7 +803,7 @@ function actOnHostileTarget(brawler, target)
             local usableSpells = {}
             for _, preparedSpell in pairs(preparedSpells) do
                 local spellName = preparedSpell.OriginatorPrototype
-                if isBackupSpellUsable(spellName, archetype) then
+                if isNpcSpellUsable(spellName, archetype) then
                     if not SpellTable.Healing[spellName] and not SpellTable.Buff[spellName] and not SpellTable.Utility[spellName] then
                         table.insert(usableSpells, spellName)
                         numUsableSpells = numUsableSpells + 1
