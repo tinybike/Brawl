@@ -132,7 +132,6 @@ local CONTROLLER_TO_SLOT = {
 
 -- Session state
 SpellTable = {}
-SpellsNotInSpellTable = {}
 Listeners = {}
 Brawlers = {}
 Players = {}
@@ -740,25 +739,6 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
             end
             if spell and (spellType ~= "Healing" or spell.isDirectHeal) then
                 weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
-            end
-            if DEBUG_LOGGING and spell == nil then
-                local isSpellInSpellTable = false
-                local isAlreadyFound = false
-                for _, spellType in ipairs(ALL_SPELL_TYPES) do
-                    if SpellTable[spellType][spellName] ~= nil then
-                        isSpellInSpellTable = true
-                        break
-                    end
-                end
-                for _, spellNotInSpellTable in ipairs(SpellsNotInSpellTable) do
-                    if spellNotInSpellTable == spellName then
-                        isAlreadyFound = true
-                    end
-                end
-                if not isAlreadyFound then
-                    table.insert(SpellsNotInSpellTable, spellName)
-                    debugPrint("Spell not in SpellTable", spellName)
-                end
             end
         end
     end
