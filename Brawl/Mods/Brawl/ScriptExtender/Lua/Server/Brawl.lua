@@ -1986,6 +1986,7 @@ local function onCharacterJoinedParty(character)
     if uuid then
         if Players and not Players[uuid] then
             setupPlayer(uuid)
+            setupPartyMembersHitpoints()
         end
         if areAnyPlayersBrawling() then
             addBrawler(uuid, true)
