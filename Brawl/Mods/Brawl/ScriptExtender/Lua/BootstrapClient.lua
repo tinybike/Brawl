@@ -6,36 +6,6 @@ if MCM then
     CompanionAIToggleHotkey = string.upper(MCM.Get("companion_ai_toggle_hotkey"))
     FullAutoToggleHotkey = string.upper(MCM.Get("full_auto_toggle_hotkey"))
 end
-local IsRightTriggerPressed = false
-local IsLeftTriggerPressed = false
-
-local function onControllerAxisInput(e)
-    if e.Axis == "TriggerRight" then
-        if IsRightTriggerPressed then
-            if e.Value == 0.0 then
-                IsRightTriggerPressed = false
-            end
-            return
-        end
-        if not IsRightTriggerPressed then
-            IsRightTriggerPressed = true
-            Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", "RightTrigger")
-            return
-        end
-    elseif e.Axis == "TriggerLeft" then
-        if IsLeftTriggerPressed then
-            if e.Value == 0.0 then
-                IsLeftTriggerPressed = false
-            end
-            return
-        end
-        if not IsLeftTriggerPressed then
-            IsLeftTriggerPressed = true
-            Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", "LeftTrigger")
-            return
-        end
-    end
-end
 
 -- thank u focus
 local function safeGetProperty(obj, propName)
@@ -151,4 +121,3 @@ end
 Ext.Events.KeyInput:Subscribe(onKeyInput)
 Ext.Events.ControllerButtonInput:Subscribe(onControllerButtonInput)
 -- Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)
-ControllerAxisInputSubscription = Ext.Events.ControllerAxisInput:Subscribe(onControllerAxisInput)
