@@ -6,6 +6,7 @@ local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
+local TavArchetype = "melee"
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -14,6 +15,7 @@ if MCM then
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
+    TavArchetype = string.lower(MCM.Get("tav_archetype"))
 end
 
 -- Constants
@@ -2438,6 +2440,8 @@ local function onMCMSettingSaved(payload)
         else
             disableFullAuto(hotkey)
         end
+    elseif payload.settingId == "tav_archetype" then
+        TavArchetype = string.lower(payload.value)
     end
 end
 

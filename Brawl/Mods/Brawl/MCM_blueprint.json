@@ -129,6 +129,25 @@
                                 "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
                                 "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
                             }
+                        },
+                        {
+                            "Id": "tav_archetype",
+                            "Name": "Tav Archetype",
+                            "Type": "enum",
+                            "Default": "Melee",
+                            "Options": {
+                                "Choices": [
+                                    "Melee",
+                                    "Caster",
+                                    "Ranged",
+                                    "Healer"
+                                ]
+                            },
+                            "Description": "Tav's archetype for the AI",
+                            "Handles": {
+                                "DescriptionHandle": "h5fba396bg3ea9g42c8g99f7gd52fad9d7c46",
+                                "NameHandle": "h08b6adc8ge129g45a0ga62bgdd4a013d0e2b"
+                            }
                         }
                     ]
                 }
