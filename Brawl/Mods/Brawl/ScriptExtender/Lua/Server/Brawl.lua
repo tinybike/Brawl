@@ -146,6 +146,7 @@ ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
 PartyMembersHitpointsListeners = {}
+ActionQueue = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -1880,6 +1881,15 @@ function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
+        if ActionQueue and ActionQueue[entityUuid] then
+            if ActionQueue[entityUuid].target and ActionQueue[entityUuid].target.uuid then
+                useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, spellName)
+            else
+                -- useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, spellName)
+            end
+            ActionQueue[entityUuid] = nil
+            Ext.ClientNet.PostMessageToClient(entityUuid, "ClearActionQueue", "")
+        end
         if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
             if isPlayerControllingDirectly(entityUuid) then
@@ -2464,6 +2474,23 @@ local function onNetMessage(data)
             MCM.Set("full_auto", not FullAuto)
         else
             toggleFullAuto(data.Payload)
+        end
+    elseif data.Channel == "ActionQueue" then
+        _D(data)
+        ActionQueue = Ext.Json.Parse(data.Payload)
+    elseif data.Channel == "ClickedOn" then
+        _D(data)
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player and player.uuid then
+            local clickedOn = Ext.Json.Parse(data.Payload)
+            if clickedOn.uuid then
+                debugPrint("clicked on target", clickedOn.uuid, getDisplayName(clickedOn.uuid))
+                Osi.RequestPing(clickedOn.position[1], clickedOn.position[2], clickedOn.position[3], clickedOn.uuid, player.uuid)
+            else
+                debugPrint("clicked on")
+                _D(clickedOn)
+                Osi.RequestPing(clickedOn.position[1], clickedOn.position[2], clickedOn.position[3], "", player.uuid)
+            end
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
