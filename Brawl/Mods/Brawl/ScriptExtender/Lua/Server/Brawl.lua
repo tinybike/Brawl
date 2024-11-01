@@ -430,7 +430,7 @@ function getSpellByName(name)
     return nil
 end
 
-function useSpellAndResources(casterUuid, targetUuid, spellName)
+function checkSpellResources(casterUuid, spellName)
     local entity = Ext.Entity.Get(casterUuid)
     local spell = getSpellByName(spellName)
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
@@ -468,6 +468,24 @@ function useSpellAndResources(casterUuid, targetUuid, spellName)
                 end
             end
         end
+    end
+    return true
+end
+
+function useSpellAndResourcesAtPosition(casterUuid, position, spellName)
+    if not checkSpellResources(casterUuid, spellName) then
+        return false
+    end
+    Osi.PurgeOsirisQueue(casterUuid, 1)
+    Osi.FlushOsirisQueue(casterUuid)
+    ActionsInProgress[casterUuid] = spellName
+    Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
+    return true
+end
+
+function useSpellAndResources(casterUuid, targetUuid, spellName)
+    if not checkSpellResources(casterUuid, spellName) then
+        return false
     end
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
@@ -1434,6 +1452,7 @@ function setIsControllingDirectly()
         for _, entity in ipairs(entities) do
             Players[entity.Uuid.EntityUuid].isControllingDirectly = true
         end
+        syncPlayers()
         -- debugDump("setIsControllingDirectly")
         -- debugDump(Players)
     end
@@ -1722,6 +1741,7 @@ function onStarted(level)
     setupPartyMembersHitpoints()
     initBrawlers(level)
     debugDump(Players)
+    Ext.ServerNet.BroadcastMessage("Started", level)
 end
 
 function startBrawlFizzler(level)
@@ -1846,6 +1866,9 @@ local function onEnteredCombat(entityGuid, combatGuid)
     addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
+DynamicAnimationTagsListeners = {}
+DynamicAnimationTagsCounts = {}
+
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
@@ -1873,6 +1896,18 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and DynamicAnimationTagsListeners[entityUuid] == nil then
+            DynamicAnimationTagsCounts[entityUuid] = 0
+            DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
+                print("DynamicAnimationTags", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID, DynamicAnimationTagsCounts[entityUuid])
+                if entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
+                    if DynamicAnimationTagsCounts[entityUuid] > 1 then
+                        Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "DynamicAnimationTags", entity.Uuid.EntityUuid)
+                    end
+                    DynamicAnimationTagsCounts[entityUuid] = DynamicAnimationTagsCounts[entityUuid] + 1
+                end
+            end, Ext.Entity.Get(entityUuid))
+        end
     end
 end
 
@@ -1881,14 +1916,15 @@ function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
-        if ActionQueue and ActionQueue[entityUuid] then
+        if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
+            _D(ActionQueue)
             if ActionQueue[entityUuid].target and ActionQueue[entityUuid].target.uuid then
-                useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, spellName)
+                useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, ActionQueue[entityUuid].spellName)
             else
-                -- useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, spellName)
+                useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, ActionQueue[entityUuid].spellName)
             end
             ActionQueue[entityUuid] = nil
-            Ext.ClientNet.PostMessageToClient(entityUuid, "ClearActionQueue", "")
+            Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)
         end
         if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
@@ -1919,6 +1955,10 @@ function onLeftForceTurnBased(entityGuid)
                 end
             end
         end
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and DynamicAnimationTagsListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(DynamicAnimationTagsListeners[entityUuid])
+            DynamicAnimationTagsListeners[entityUuid] = nil
+        end
     end
 end
 
@@ -1943,6 +1983,10 @@ local function onDied(entityGuid)
         removeBrawler(level, entityUuid)
         checkForEndOfBrawl(level)
     end
+end
+
+function syncPlayers()
+    Ext.ServerNet.BroadcastMessage("SyncPlayers", Ext.Json.Stringify(Players))
 end
 
 -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
@@ -1973,7 +2017,9 @@ local function onGainedControl(targetGuid)
             if level and Brawlers[level] and Brawlers[level][targetUuid] and not FullAuto then
                 stopPulseAction(Brawlers[level][targetUuid], true)
             end
+            syncPlayers()
             debugDump(Players)
+            Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
 end
@@ -2497,7 +2543,7 @@ local function onNetMessage(data)
         if player then
             local brawler = getBrawlerByUuid(player.uuid)
             if brawler then
-                Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
+                -- Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
                 if not brawler.isPaused then
                     if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
                         debugPrint("use spell")

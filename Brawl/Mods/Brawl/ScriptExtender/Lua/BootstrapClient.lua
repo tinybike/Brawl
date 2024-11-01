@@ -7,9 +7,10 @@ if MCM then
     FullAutoToggleHotkey = string.upper(MCM.Get("full_auto_toggle_hotkey"))
 end
 
--- placeholder
-local PlayerDirectlyControlling = "6529bb2f-1866-56fd-d039-e0025fc5311c"
 local ActionQueue = {}
+local Players = {}
+local ShouldPreventAction = {}
+local ListenersAttached = {}
 
 -- thank u focus
 local function safeGetProperty(obj, propName)
@@ -75,7 +76,7 @@ end
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
-        _D(pickingHelper)
+        -- _D(pickingHelper)
         local clickedOn = {position = pickingHelper.Inner.Position}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
             local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
@@ -117,11 +118,20 @@ local function onKeyInput(e)
     end
 end
 
+-- thank u aahz
+local function getLocalControlledCharacter()
+    for _, entity in pairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
+        if entity.UserReservedFor.UserID == 1 then
+            return entity.Uuid.EntityUuid
+        end
+    end
+end
+
 local function isInFTB(entity)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
-local function exploreTree(node, visited)
+local function attachListenersToButtons(node, visited, uuid)
     if not visited then
         visited = {}
     end
@@ -141,30 +151,30 @@ local function exploreTree(node, visited)
         print("type=" .. tostring(node.Type) .. ", name=" .. tostring(name))
         node:Subscribe("GotMouseCapture", function (e, t)
             print("GotMouseCapture", e, t, tostring(name))
-            local entity = Ext.Entity.Get(PlayerDirectlyControlling)
+            local entity = Ext.Entity.Get(uuid)
             if isInFTB(entity) then
                 local spellProperties = e:Child(1):GetAllProperties().Spell:GetAllProperties()
                 _D(spellProperties)
                 local spellName = spellProperties.PrototypeID
                 print(spellName)
                 -- todo: action & bonus action
-                -- ActionQueue[PlayerDirectlyControlling] = ActionQueue[PlayerDirectlyControlling] or {}
+                -- ActionQueue[uuid] = ActionQueue[uuid] or {}
                 -- for _, cost in ipairs(spellProperties.CostSummary) do
                 --     -- _D(cost:GetAllProperties())
                 --     if cost.TypeId == "ActionPoint" then
-                --         if next(ActionQueue[PlayerDirectlyControlling]) ~= nil then
-                --             for i, action in ipairs(ActionQueue[PlayerDirectlyControlling]) do
+                --         if next(ActionQueue[uuid]) ~= nil then
+                --             for i, action in ipairs(ActionQueue[uuid]) do
                 --             end
                 --         end
-                --         table.insert(ActionQueue[PlayerDirectlyControlling], {spellName = spellName, target = nil})
+                --         table.insert(ActionQueue[uuid], {spellName = spellName, target = nil})
                 --     elseif cost.TypeId == "BonusActionPoint" then
                 --     end
                 -- end
-                ActionQueue[PlayerDirectlyControlling] = {spellName = spellName, target = nil}
+                ActionQueue[uuid] = {spellName = spellName, target = nil}
                 _D(ActionQueue)
             end
             -- _D(e:GetAllProperties())
-            -- local entity = Ext.Entity.Get(PlayerDirectlyControlling)
+            -- local entity = Ext.Entity.Get(uuid)
             -- local defaultBarContainer = entity.HotbarContainer.Containers.DefaultBarContainer
             -- _D(defaultBarContainer[6].Elements[1])
         end)
@@ -173,47 +183,86 @@ local function exploreTree(node, visited)
     for i = 1, childrenCount do
         local childNode = node:Child(i)
         if childNode then
-            exploreTree(childNode, visited)
+            attachListenersToButtons(childNode, visited, uuid)
         end
     end
     local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
     for i = 1, visualChildrenCount do
         local visualChildNode = node:VisualChild(i)
         if visualChildNode then
-            exploreTree(visualChildNode, visited)
+            attachListenersToButtons(visualChildNode, visited, uuid)
         end
     end
 end
 
+-- thank u volitio
+local function checkForHotBar(uuid)
+    Ext.Timer.WaitFor(1000, function ()
+        local hotBar = getHotBar()
+        if hotBar == nil then
+            return checkForHotBar(uuid)
+        end
+        attachListenersToButtons(hotBar, false, uuid)
+        ListenersAttached[uuid] = true
+    end)
+end
+
 local function onNetMessage(data)
-    if data.Channel == "ClearActionQueue" then
-        ActionQueue[PlayerDirectlyControlling] = nil
+    if data.Channel == "Started" then
+        print("started client")
+        local uuid = getLocalControlledCharacter()
+        if not ListenersAttached[uuid] then
+            checkForHotBar(uuid)
+        end
+    elseif data.Channel == "GainedControl" then
+        print("gained control")
+        local uuid = data.Payload
+        print(uuid, ListenersAttached[uuid])
+        if not ListenersAttached[uuid] then
+            checkForHotBar(uuid)
+        end
+    elseif data.Channel == "ClearActionQueue" then
+        local uuid = data.Payload
+        ActionQueue[data.Payload] = nil
+    elseif data.Channel == "SyncPlayers" then
+        Players = Ext.Json.Parse(data.Payload)
+    elseif data.Channel == "DynamicAnimationTags" then
+        print("Client got DAT", data.Payload)
+        local uuid = data.Payload
+        ShouldPreventAction[uuid] = true
     end
 end
 
 local function onMouseButtonInput(e)
-    -- if e.Pressed and e.Button == 1 then
-    -- end
+    if e.Pressed and e.Button == 1 then
+        local uuid = getLocalControlledCharacter()
+        print("MB input 1", uuid, ShouldPreventAction[uuid])
+        local entity = Ext.Entity.Get(uuid)
+        if isInFTB(entity) and ShouldPreventAction[uuid] then
+            local positionInfo = getPositionInfo()
+            ActionQueue[uuid] = ActionQueue[uuid] or {}
+            if ActionQueue[uuid] == nil then
+                print("No spell name found")
+                return
+            end
+            ActionQueue[uuid].target = positionInfo
+            _D(ActionQueue)
+            Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
+            e:PreventAction()
+            ShouldPreventAction[uuid] = false
+            if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
+                entity.TurnBased.CanAct_M = false
+                entity.TurnBased.HadTurnInCombat = false
+                entity.TurnBased.IsInCombat_M = false
+            end
+        end
+    end
     if e.Pressed and e.Button == 3 then
-        _D(e)
-        local hotBar = getHotBar()
-        exploreTree(hotBar)
-        -- put in game level loaded from server, net message cb
-        -- nb: visual "wind up"
-        local partyMemberEntities = Ext.Entity.GetAllEntitiesWithComponent("PartyMember")
-        for _, partyMemberEntity in ipairs(partyMemberEntities) do
-            print(_, partyMemberEntity)
-            Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
-                local uuid = entity.Uuid.EntityUuid
-                print("DynamicAnimationTags", entity, uuid)
-                if isInFTB(entity) then
-                    local positionInfo = getPositionInfo()
-                    ActionQueue[uuid].target = positionInfo
-                    _D(ActionQueue)
-                    Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
-                    e:PreventAction()
-                end
-            end, partyMemberEntity)
+        local uuid = getLocalControlledCharacter()
+        if isInFTB(Ext.Entity.Get(uuid)) and ShouldPreventAction[uuid] then
+            ShouldPreventAction[uuid] = false
+            ActionQueue[uuid] = {}
+            print("Reset action queue")
         end
         -- Ext.ClientNet.PostMessageToServer("ClickedOn", Ext.Json.Stringify(getPositionInfo()))
     end
