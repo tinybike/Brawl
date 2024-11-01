@@ -6,7 +6,8 @@ if MCM then
     CompanionAIToggleHotkey = string.upper(MCM.Get("companion_ai_toggle_hotkey"))
     FullAutoToggleHotkey = string.upper(MCM.Get("full_auto_toggle_hotkey"))
 end
-
+local IsShiftPressed = false
+local IsSpacePressed = false
 local ActionQueue = {}
 local Players = {}
 local ShouldPreventAction = {}
@@ -115,13 +116,25 @@ local function onKeyInput(e)
         Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
     elseif e.Key == FullAutoToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
         Ext.ClientNet.PostMessageToServer("FullAutoToggle", tostring(e.Key))
+    elseif e.Key == "LSHIFT" or e.Key == "RSHIFT" then
+        IsShiftPressed = e.Event == "KeyDown"
+    elseif e.Key == "SPACE" then
+        IsSpacePressed = e.Event == "KeyDown"
+    end
+    if IsShiftPressed and IsSpacePressed then
+        Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     end
 end
 
 -- thank u aahz
-local function getLocalControlledCharacter()
+local function getDirectlyControlledCharacter()
+    if DirectlyControlledCharacter ~= nil then
+        return DirectlyControlledCharacter
+    end
+    -- nb: this is NOT reliably updated when changing control, just use for initial setup
     for _, entity in pairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
         if entity.UserReservedFor.UserID == 1 then
+            DirectlyControlledCharacter = entity.Uuid.EntityUuid
             return entity.Uuid.EntityUuid
         end
     end
@@ -207,58 +220,63 @@ local function checkForHotBar(uuid)
     end)
 end
 
+DirectlyControlledCharacter = nil
+
 local function onNetMessage(data)
     if data.Channel == "Started" then
         print("started client")
-        local uuid = getLocalControlledCharacter()
+        local uuid = getDirectlyControlledCharacter()
         if not ListenersAttached[uuid] then
             checkForHotBar(uuid)
         end
     elseif data.Channel == "GainedControl" then
         print("gained control")
-        local uuid = data.Payload
-        print(uuid, ListenersAttached[uuid])
-        if not ListenersAttached[uuid] then
-            checkForHotBar(uuid)
+        DirectlyControlledCharacter = data.Payload
+        print(DirectlyControlledCharacter, ListenersAttached[DirectlyControlledCharacter])
+        if not ListenersAttached[DirectlyControlledCharacter] then
+            checkForHotBar(DirectlyControlledCharacter)
         end
     elseif data.Channel == "ClearActionQueue" then
-        local uuid = data.Payload
         ActionQueue[data.Payload] = nil
     elseif data.Channel == "SyncPlayers" then
         Players = Ext.Json.Parse(data.Payload)
-    elseif data.Channel == "DynamicAnimationTags" then
-        print("Client got DAT", data.Payload)
-        local uuid = data.Payload
-        ShouldPreventAction[uuid] = true
+    elseif data.Channel == "SpellCastIsCasting" then
+        print("Client got SpellCastIsCasting", data.Payload)
+        ShouldPreventAction[data.Payload] = true
     end
 end
 
 local function onMouseButtonInput(e)
     if e.Pressed and e.Button == 1 then
-        local uuid = getLocalControlledCharacter()
-        print("MB input 1", uuid, ShouldPreventAction[uuid])
+        local positionInfo = getPositionInfo()
+        local uuid = getDirectlyControlledCharacter()
         local entity = Ext.Entity.Get(uuid)
+        print(uuid)
+        _D(ShouldPreventAction)
+        print(isInFTB(entity))
         if isInFTB(entity) and ShouldPreventAction[uuid] then
             local positionInfo = getPositionInfo()
             ActionQueue[uuid] = ActionQueue[uuid] or {}
-            if ActionQueue[uuid] == nil then
+            if ActionQueue[uuid] == nil or ActionQueue[uuid].spellName == nil then
                 print("No spell name found")
+                _D(ActionQueue)
                 return
             end
             ActionQueue[uuid].target = positionInfo
             _D(ActionQueue)
             Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
-            e:PreventAction()
             ShouldPreventAction[uuid] = false
-            if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
-                entity.TurnBased.CanAct_M = false
-                entity.TurnBased.HadTurnInCombat = false
-                entity.TurnBased.IsInCombat_M = false
-            end
+            -- entity.TurnBased.IsInCombat_M = false
+            -- if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
+            --     -- entity.TurnBased.CanAct_M = false
+            --     -- entity.TurnBased.HadTurnInCombat = false
+            --     entity.TurnBased.IsInCombat_M = false
+            -- end
+            e:PreventAction()
         end
     end
     if e.Pressed and e.Button == 3 then
-        local uuid = getLocalControlledCharacter()
+        local uuid = getDirectlyControlledCharacter()
         if isInFTB(Ext.Entity.Get(uuid)) and ShouldPreventAction[uuid] then
             ShouldPreventAction[uuid] = false
             ActionQueue[uuid] = {}

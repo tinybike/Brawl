@@ -374,7 +374,7 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     --     end
     -- end
     debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
-    Osi.PurgeOsirisQueue(attackerUuid, 1)
+    -- Osi.PurgeOsirisQueue(attackerUuid, 1)
     Osi.FlushOsirisQueue(attackerUuid)
     Osi.UseSpell(attackerUuid, spellName, targetUuid)
 end
@@ -433,6 +433,10 @@ end
 function checkSpellResources(casterUuid, spellName)
     local entity = Ext.Entity.Get(casterUuid)
     local spell = getSpellByName(spellName)
+    if not spell then
+        debugPrint("Error: spell not found")
+        return false
+    end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
     if targetUuid then
         debugPrint("on", targetUuid, getDisplayName(targetUuid))
@@ -1033,7 +1037,7 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
         -- If we're close to melee range, then advance, even if we're too far from the player
         if distanceToTarget < MELEE_RANGE*2 then
             debugPrint("inside melee x 2", brawlerUuid, targetUuid)
-            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
@@ -1046,7 +1050,7 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
         end
     elseif archetype == "melee" then
         if distanceToTarget > MELEE_RANGE then
-            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         else
@@ -1866,8 +1870,7 @@ local function onEnteredCombat(entityGuid, combatGuid)
     addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
-DynamicAnimationTagsListeners = {}
-DynamicAnimationTagsCounts = {}
+SpellCastIsCastingListeners = {}
 
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
@@ -1896,15 +1899,13 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and DynamicAnimationTagsListeners[entityUuid] == nil then
-            DynamicAnimationTagsCounts[entityUuid] = 0
-            DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
-                print("DynamicAnimationTags", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID, DynamicAnimationTagsCounts[entityUuid])
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] == nil then
+            SpellCastIsCastingListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastIsCasting", function (entity, _, _)
+                print("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
                 if entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
-                    if DynamicAnimationTagsCounts[entityUuid] > 1 then
-                        Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "DynamicAnimationTags", entity.Uuid.EntityUuid)
-                    end
-                    DynamicAnimationTagsCounts[entityUuid] = DynamicAnimationTagsCounts[entityUuid] + 1
+                    Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "SpellCastIsCasting", entity.Uuid.EntityUuid)
+                    -- entity.TurnBased.IsInCombat_M = false
+                    -- entity:Replicate("TurnBased")
                 end
             end, Ext.Entity.Get(entityUuid))
         end
@@ -1917,48 +1918,52 @@ function onLeftForceTurnBased(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
         if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
+            print("ActionQueue (server)")
             _D(ActionQueue)
             if ActionQueue[entityUuid].target and ActionQueue[entityUuid].target.uuid then
                 useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, ActionQueue[entityUuid].spellName)
             else
+                print("use spell at position")
                 useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, ActionQueue[entityUuid].spellName)
             end
             ActionQueue[entityUuid] = nil
             Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)
         end
-        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
-            Brawlers[level][entityUuid].isInBrawl = true
-            if isPlayerControllingDirectly(entityUuid) then
-                startPulseAddNearby(entityUuid)
-            end
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(SpellCastIsCastingListeners[entityUuid])
+            SpellCastIsCastingListeners[entityUuid] = nil
         end
-        startPulseReposition(level)
-        if areAnyPlayersBrawling() then
-            debugPrint("players are brawling")
-            startBrawlFizzler(level)
-            if isToT() then
-                startToTTimers()
+        Ext.Timer.WaitFor(2000, function ()
+            if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+                Brawlers[level][entityUuid].isInBrawl = true
+                if isPlayerControllingDirectly(entityUuid) then
+                    startPulseAddNearby(entityUuid)
+                end
             end
-            if Brawlers[level] then
-                for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                    if not isPlayerControllingDirectly(brawlerUuid) then
-                        Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                        Osi.FlushOsirisQueue(brawlerUuid)
-                        startPulseAction(brawler)
-                    end
-                    if Players[brawlerUuid] then
-                        Brawlers[level][brawlerUuid].isPaused = false
-                        if brawlerUuid ~= entityUuid then
-                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
+            startPulseReposition(level)
+            if areAnyPlayersBrawling() then
+                debugPrint("players are brawling")
+                startBrawlFizzler(level)
+                if isToT() then
+                    startToTTimers()
+                end
+                if Brawlers[level] then
+                    for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                        if not isPlayerControllingDirectly(brawlerUuid) then
+                            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                            Osi.FlushOsirisQueue(brawlerUuid)
+                            startPulseAction(brawler)
+                        end
+                        if Players[brawlerUuid] then
+                            Brawlers[level][brawlerUuid].isPaused = false
+                            if brawlerUuid ~= entityUuid then
+                                Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                            end
                         end
                     end
                 end
             end
-        end
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and DynamicAnimationTagsListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(DynamicAnimationTagsListeners[entityUuid])
-            DynamicAnimationTagsListeners[entityUuid] = nil
-        end
+        end)
     end
 end
 
@@ -2524,6 +2529,15 @@ local function onNetMessage(data)
     elseif data.Channel == "ActionQueue" then
         _D(data)
         ActionQueue = Ext.Json.Parse(data.Payload)
+        local entity = Ext.Entity.Get(GetHostCharacter())
+        -- entity.TurnBased.CanAct_M = false
+        -- entity.TurnBased.HadTurnInCombat = false
+        entity.TurnBased.IsInCombat_M = false
+        entity:Replicate("TurnBased")
+    elseif data.Channel == "ExitFTB" then
+        for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+            Osi.ForceTurnBasedMode(Osi.GetUUID(player[1]), 0)
+        end
     elseif data.Channel == "ClickedOn" then
         _D(data)
         local player = getPlayerByUserId(peerToUserId(data.UserID))
