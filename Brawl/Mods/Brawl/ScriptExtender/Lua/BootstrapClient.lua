@@ -8,10 +8,11 @@ if MCM then
 end
 local IsShiftPressed = false
 local IsSpacePressed = false
+local DirectlyControlledCharacter = nil
+-- local UseCombatControllerControls = false
 local ActionQueue = {}
 local Players = {}
 local ShouldPreventAction = {}
-local ListenersAttached = {}
 
 -- thank u focus
 local function safeGetProperty(obj, propName)
@@ -90,7 +91,26 @@ local function getPositionInfo()
     return nil
 end
 
--- UseCombatControllerControls = false
+-- -- thank u laughingleader
+-- ---@param entity EntityHandle
+-- ---@param component EocHotbarContainerComponent
+-- local function OnHotbarContainer(entity, component)
+--     Ext.Utils.PrintError("OnHotbarContainer", entity.Uuid.EntityUuid, component)
+-- end
+
+-- -- Covers post-reloading
+-- Ext.Events.SessionLoaded:Subscribe(function (e)
+--     for _,v in pairs(Ext.Entity.GetAllEntitiesWithComponent("HotbarContainer")) do
+--         OnHotbarContainer(v, v.HotbarContainer)
+--     end
+-- end)
+
+-- ---@param entity EntityHandle
+-- ---@param component EocHotbarContainerComponent
+-- ---@diagnostic disable-next-line:param-type-mismatch
+-- Ext.Entity.OnCreateDeferred("HotbarContainer", function (entity, typeName, component)
+--     OnHotbarContainer(entity, component)
+-- end)
 
 -- Ext.Events.NetMessage:Subscribe(function (data)
 --     if data.Channel == "UseCombatControllerControls" then
@@ -152,45 +172,42 @@ local function attachListenersToButtons(node, visited, uuid)
         return
     end
     visited[node] = true
-    local properties = node:GetAllProperties()
-    local name = properties and properties.Name or "nil"
     local nodeType = tostring(node.Type)
-    local nodeName = tostring(name)
-    local isRegularActionButton = nodeType == "ls.LSButton" and nodeName == "contentContainer"
-    local isMainAttackButton = nodeType == "ls.LSButton" and nodeName == "MainAttack"
-    local isMeleeWeaponButton = nodeType == "Button" and nodeName == "MeleeWeapon"
-    local isRangedWeaponButton = nodeType == "Button" and nodeName == "RangedWeapon"
-    if isRegularActionButton or isMainAttackButton or isMeleeWeaponButton or isRangedWeaponButton then
-        print("type=" .. tostring(node.Type) .. ", name=" .. tostring(name))
-        node:Subscribe("GotMouseCapture", function (e, t)
-            print("GotMouseCapture", e, t, tostring(name))
-            local entity = Ext.Entity.Get(uuid)
-            if isInFTB(entity) then
-                local spellProperties = e:Child(1):GetAllProperties().Spell:GetAllProperties()
-                _D(spellProperties)
-                local spellName = spellProperties.PrototypeID
-                print(spellName)
-                -- todo: action & bonus action
-                -- ActionQueue[uuid] = ActionQueue[uuid] or {}
-                -- for _, cost in ipairs(spellProperties.CostSummary) do
-                --     -- _D(cost:GetAllProperties())
-                --     if cost.TypeId == "ActionPoint" then
-                --         if next(ActionQueue[uuid]) ~= nil then
-                --             for i, action in ipairs(ActionQueue[uuid]) do
-                --             end
-                --         end
-                --         table.insert(ActionQueue[uuid], {spellName = spellName, target = nil})
-                --     elseif cost.TypeId == "BonusActionPoint" then
-                --     end
-                -- end
-                ActionQueue[uuid] = {spellName = spellName, target = nil}
-                _D(ActionQueue)
+    if nodeType == "ls.LSButton" or nodeType == "Button" then
+        local name = node:GetProperty("Name")
+        if name ~= nil then
+            local nodeName = tostring(name)
+            local isRegularActionButton = nodeType == "ls.LSButton" and nodeName == "contentContainer"
+            local isMainAttackButton = nodeType == "ls.LSButton" and nodeName == "MainAttack"
+            local isMeleeWeaponButton = nodeType == "Button" and nodeName == "MeleeWeapon"
+            local isRangedWeaponButton = nodeType == "Button" and nodeName == "RangedWeapon"
+            if isRegularActionButton or isMainAttackButton or isMeleeWeaponButton or isRangedWeaponButton then
+                node:Subscribe("GotMouseCapture", function (e, _)
+                    print("GotMouseCapture", e, nodeType, nodeName)
+                    if isInFTB(Ext.Entity.Get(uuid)) then
+                        local spell = e:Child(1):GetProperty("Spell")
+                        local spellName = spell:GetProperty("PrototypeID")
+                        -- todo: action & bonus action
+                        -- local costSummary = spell:GetProperty("CostSummary")
+                        -- ActionQueue[uuid] = ActionQueue[uuid] or {}
+                        -- for _, cost in ipairs(costSummary) do
+                        --     -- _D(cost:GetAllProperties())
+                        --     if cost.TypeId == "ActionPoint" then
+                        --         if next(ActionQueue[uuid]) ~= nil then
+                        --             for i, action in ipairs(ActionQueue[uuid]) do
+                        --             end
+                        --         end
+                        --         table.insert(ActionQueue[uuid], {spellName = spellName, target = nil})
+                        --     elseif cost.TypeId == "BonusActionPoint" then
+                        --     end
+                        -- end
+                        ActionQueue[uuid] = {spellName = spellName, target = nil}
+                        print("Added to action queue", spellName)
+                        _D(ActionQueue)
+                    end
+                end)
             end
-            -- _D(e:GetAllProperties())
-            -- local entity = Ext.Entity.Get(uuid)
-            -- local defaultBarContainer = entity.HotbarContainer.Containers.DefaultBarContainer
-            -- _D(defaultBarContainer[6].Elements[1])
-        end)
+        end
     end
     local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
     for i = 1, childrenCount do
@@ -210,32 +227,25 @@ end
 
 -- thank u volitio
 local function checkForHotBar(uuid)
+    -- nb: use OnCreateDeferred instead?
     Ext.Timer.WaitFor(1000, function ()
         local hotBar = getHotBar()
         if hotBar == nil then
             return checkForHotBar(uuid)
         end
         attachListenersToButtons(hotBar, false, uuid)
-        ListenersAttached[uuid] = true
     end)
 end
-
-DirectlyControlledCharacter = nil
 
 local function onNetMessage(data)
     if data.Channel == "Started" then
         print("started client")
         local uuid = getDirectlyControlledCharacter()
-        if not ListenersAttached[uuid] then
-            checkForHotBar(uuid)
-        end
+        checkForHotBar(uuid)
     elseif data.Channel == "GainedControl" then
-        print("gained control")
+        print("gained control", data.Payload)
         DirectlyControlledCharacter = data.Payload
-        print(DirectlyControlledCharacter, ListenersAttached[DirectlyControlledCharacter])
-        if not ListenersAttached[DirectlyControlledCharacter] then
-            checkForHotBar(DirectlyControlledCharacter)
-        end
+        checkForHotBar(DirectlyControlledCharacter)
     elseif data.Channel == "ClearActionQueue" then
         ActionQueue[data.Payload] = nil
     elseif data.Channel == "SyncPlayers" then
