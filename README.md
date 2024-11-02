@@ -33,3 +33,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 ### 7) Improved AI
 
 [![Real time combat test 7](https://img.youtube.com/vi/zehZKax_CTE/0.jpg)](https://www.youtube.com/watch?v=zehZKax_CTE)
+
+### 8) True Pause
+
+[![Real time combat test 8](https://img.youtube.com/vi/eExf2d7W4o4/0.jpg)](https://www.youtube.com/watch?v=eExf2d7W4o4)
