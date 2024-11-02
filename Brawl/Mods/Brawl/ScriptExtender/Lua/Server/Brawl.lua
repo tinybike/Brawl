@@ -1456,7 +1456,6 @@ function setIsControllingDirectly()
         for _, entity in ipairs(entities) do
             Players[entity.Uuid.EntityUuid].isControllingDirectly = true
         end
-        syncPlayers()
         -- debugDump("setIsControllingDirectly")
         -- debugDump(Players)
     end
@@ -1990,10 +1989,6 @@ local function onDied(entityGuid)
     end
 end
 
-function syncPlayers()
-    Ext.ServerNet.BroadcastMessage("SyncPlayers", Ext.Json.Stringify(Players))
-end
-
 -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
 local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
@@ -2022,7 +2017,6 @@ local function onGainedControl(targetGuid)
             if level and Brawlers[level] and Brawlers[level][targetUuid] and not FullAuto then
                 stopPulseAction(Brawlers[level][targetUuid], true)
             end
-            syncPlayers()
             debugDump(Players)
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end

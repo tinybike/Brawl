@@ -11,7 +11,7 @@ local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
 -- local UseCombatControllerControls = false
 local ActionQueue = {}
-local Players = {}
+-- local Players = {}
 local ShouldPreventAction = {}
 
 -- thank u focus
@@ -186,23 +186,8 @@ local function attachListenersToButtons(node, visited, uuid)
                     print("GotMouseCapture", e, nodeType, nodeName)
                     if isInFTB(Ext.Entity.Get(uuid)) then
                         local spell = e:Child(1):GetProperty("Spell")
-                        local spellName = spell:GetProperty("PrototypeID")
-                        -- todo: action & bonus action
-                        -- local costSummary = spell:GetProperty("CostSummary")
-                        -- ActionQueue[uuid] = ActionQueue[uuid] or {}
-                        -- for _, cost in ipairs(costSummary) do
-                        --     -- _D(cost:GetAllProperties())
-                        --     if cost.TypeId == "ActionPoint" then
-                        --         if next(ActionQueue[uuid]) ~= nil then
-                        --             for i, action in ipairs(ActionQueue[uuid]) do
-                        --             end
-                        --         end
-                        --         table.insert(ActionQueue[uuid], {spellName = spellName, target = nil})
-                        --     elseif cost.TypeId == "BonusActionPoint" then
-                        --     end
-                        -- end
-                        ActionQueue[uuid] = {spellName = spellName, target = nil}
-                        print("Added to action queue", spellName)
+                        ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
+                        print("Updated ActionQueue")
                         _D(ActionQueue)
                     end
                 end)
@@ -239,17 +224,13 @@ end
 
 local function onNetMessage(data)
     if data.Channel == "Started" then
-        print("started client")
-        local uuid = getDirectlyControlledCharacter()
-        checkForHotBar(uuid)
+        checkForHotBar(getDirectlyControlledCharacter())
     elseif data.Channel == "GainedControl" then
         print("gained control", data.Payload)
         DirectlyControlledCharacter = data.Payload
         checkForHotBar(DirectlyControlledCharacter)
     elseif data.Channel == "ClearActionQueue" then
         ActionQueue[data.Payload] = nil
-    elseif data.Channel == "SyncPlayers" then
-        Players = Ext.Json.Parse(data.Payload)
     elseif data.Channel == "SpellCastIsCasting" then
         print("Client got SpellCastIsCasting", data.Payload)
         ShouldPreventAction[data.Payload] = true
@@ -261,28 +242,24 @@ local function onMouseButtonInput(e)
         local positionInfo = getPositionInfo()
         local uuid = getDirectlyControlledCharacter()
         local entity = Ext.Entity.Get(uuid)
+        print("mouse button input 1")
         print(uuid)
+        print("should prevent action?")
         _D(ShouldPreventAction)
-        print(isInFTB(entity))
+        print("is in FTB", isInFTB(entity))
         if isInFTB(entity) and ShouldPreventAction[uuid] then
-            local positionInfo = getPositionInfo()
             ActionQueue[uuid] = ActionQueue[uuid] or {}
-            if ActionQueue[uuid] == nil or ActionQueue[uuid].spellName == nil then
-                print("No spell name found")
+            if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
+                ActionQueue[uuid].target = getPositionInfo()
+                print("updated ActionQueue with target")
                 _D(ActionQueue)
-                return
+                Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
+                ShouldPreventAction[uuid] = false
+                e:PreventAction()
+            else
+                print("No spell name found - what happened?")
+                _D(ActionQueue)
             end
-            ActionQueue[uuid].target = positionInfo
-            _D(ActionQueue)
-            Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
-            ShouldPreventAction[uuid] = false
-            -- entity.TurnBased.IsInCombat_M = false
-            -- if entity.SpellCastIsCasting ~= nil and entity.SpellCastIsCasting.Cast ~= nil then
-            --     -- entity.TurnBased.CanAct_M = false
-            --     -- entity.TurnBased.HadTurnInCombat = false
-            --     entity.TurnBased.IsInCombat_M = false
-            -- end
-            e:PreventAction()
         end
     end
     if e.Pressed and e.Button == 3 then
@@ -290,7 +267,7 @@ local function onMouseButtonInput(e)
         if isInFTB(Ext.Entity.Get(uuid)) and ShouldPreventAction[uuid] then
             ShouldPreventAction[uuid] = false
             ActionQueue[uuid] = {}
-            print("Reset action queue")
+            print("Right clicked, reset action queue", uuid)
         end
         -- Ext.ClientNet.PostMessageToServer("ClickedOn", Ext.Json.Stringify(getPositionInfo()))
     end
