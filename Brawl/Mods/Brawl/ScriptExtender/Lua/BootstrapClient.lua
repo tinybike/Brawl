@@ -74,6 +74,25 @@ local function getExitFTBButton()
     return button
 end
 
+-- thank u aahz
+local function getDirectlyControlledCharacter()
+    if DirectlyControlledCharacter ~= nil then
+        return DirectlyControlledCharacter
+    end
+    -- nb: this is NOT reliably updated when changing control, just use for initial setup
+    for _, entity in pairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
+        if entity.UserReservedFor.UserID == 1 then
+            DirectlyControlledCharacter = entity.Uuid.EntityUuid
+            return entity.Uuid.EntityUuid
+        end
+    end
+end
+
+local function isInFTB(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
@@ -127,41 +146,35 @@ local function onControllerButtonInput(e)
     end
 end
 
-local function onKeyInput(e)
-    if e.Key == ModToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
-        Ext.ClientNet.PostMessageToServer("ModToggle", tostring(e.Key))
-    elseif e.Key == CompanionAIToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
-        Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
-    elseif e.Key == FullAutoToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
-        Ext.ClientNet.PostMessageToServer("FullAutoToggle", tostring(e.Key))
-    -- nb: what about rebindings? is there a way to look these up in SE?
-    elseif e.Key == "LSHIFT" or e.Key == "RSHIFT" then
-        IsShiftPressed = e.Event == "KeyDown"
-    elseif e.Key == "SPACE" then
-        IsSpacePressed = e.Event == "KeyDown"
-    end
-    if IsShiftPressed and IsSpacePressed and isInFTB(getDirectlyControlledCharacter()) then
-        Ext.ClientNet.PostMessageToServer("ExitFTB", "")
+local function checkCancelMidAction()
+    local uuid = getDirectlyControlledCharacter()
+    if ShouldPreventAction[uuid] and isInFTB(uuid) then
+        ShouldPreventAction[uuid] = false
+        ActionQueue[uuid] = {}
+        print("Reset action queue", uuid)
     end
 end
 
--- thank u aahz
-local function getDirectlyControlledCharacter()
-    if DirectlyControlledCharacter ~= nil then
-        return DirectlyControlledCharacter
-    end
-    -- nb: this is NOT reliably updated when changing control, just use for initial setup
-    for _, entity in pairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
-        if entity.UserReservedFor.UserID == 1 then
-            DirectlyControlledCharacter = entity.Uuid.EntityUuid
-            return entity.Uuid.EntityUuid
+local function onKeyInput(e)
+    if e.Repeat == false then
+        if e.Key == ModToggleHotkey and e.Event == "KeyDown" then
+            Ext.ClientNet.PostMessageToServer("ModToggle", tostring(e.Key))
+        elseif e.Key == CompanionAIToggleHotkey and e.Event == "KeyDown" then
+            Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
+        elseif e.Key == FullAutoToggleHotkey and e.Event == "KeyDown" then
+            Ext.ClientNet.PostMessageToServer("FullAutoToggle", tostring(e.Key))
+        elseif e.Key == "ESCAPE" and e.Event == "KeyDown" then
+            checkCancelMidAction()
+        -- nb: what about rebindings? is there a way to look these up in SE?
+        elseif e.Key == "LSHIFT" or e.Key == "RSHIFT" then
+            IsShiftPressed = e.Event == "KeyDown"
+        elseif e.Key == "SPACE" then
+            IsSpacePressed = e.Event == "KeyDown"
+        end
+        if IsShiftPressed and IsSpacePressed and isInFTB(getDirectlyControlledCharacter()) then
+            Ext.ClientNet.PostMessageToServer("ExitFTB", "")
         end
     end
-end
-
-local function isInFTB(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
 local function attachListenersToButtons(node, visited, uuid)
@@ -182,10 +195,10 @@ local function attachListenersToButtons(node, visited, uuid)
             local isMeleeWeaponButton = nodeType == "Button" and nodeName == "MeleeWeapon"
             local isRangedWeaponButton = nodeType == "Button" and nodeName == "RangedWeapon"
             if isRegularActionButton or isMainAttackButton or isMeleeWeaponButton or isRangedWeaponButton then
-                node:Subscribe("GotMouseCapture", function (e, _)
-                    print("GotMouseCapture", e, nodeType, nodeName)
+                node:Subscribe("GotMouseCapture", function (n, _)
+                    print("GotMouseCapture", n, nodeType, nodeName)
                     if isInFTB(uuid) then
-                        local spell = e:Child(1):GetProperty("Spell")
+                        local spell = n:Child(1):GetProperty("Spell")
                         ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
                         print("Updated ActionQueue")
                         _D(ActionQueue)
@@ -260,12 +273,7 @@ local function onMouseButtonInput(e)
                 end
             end
         elseif e.Button == 3 then
-            local uuid = getDirectlyControlledCharacter()
-            if ShouldPreventAction[uuid] and isInFTB(uuid) then
-                ShouldPreventAction[uuid] = false
-                ActionQueue[uuid] = {}
-                print("Right clicked, reset action queue", uuid)
-            end
+            checkCancelMidAction()
         end
     end
 end
