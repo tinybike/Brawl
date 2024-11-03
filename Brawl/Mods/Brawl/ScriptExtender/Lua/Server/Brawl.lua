@@ -774,7 +774,7 @@ end
 function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
-        archetype = "melee"
+        archetype = archetype == "base" and TavArchetype or "melee"
     end
     local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
