@@ -11,7 +11,6 @@ local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
 -- local UseCombatControllerControls = false
 local ActionQueue = {}
--- local Players = {}
 local ShouldPreventAction = {}
 
 -- thank u focus
@@ -78,7 +77,6 @@ end
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
-        -- _D(pickingHelper)
         local clickedOn = {position = pickingHelper.Inner.Position}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
             local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
@@ -136,12 +134,13 @@ local function onKeyInput(e)
         Ext.ClientNet.PostMessageToServer("CompanionAIToggle", tostring(e.Key))
     elseif e.Key == FullAutoToggleHotkey and e.Event == "KeyDown" and e.Repeat == false then
         Ext.ClientNet.PostMessageToServer("FullAutoToggle", tostring(e.Key))
+    -- nb: what about rebindings? is there a way to look these up in SE?
     elseif e.Key == "LSHIFT" or e.Key == "RSHIFT" then
         IsShiftPressed = e.Event == "KeyDown"
     elseif e.Key == "SPACE" then
         IsSpacePressed = e.Event == "KeyDown"
     end
-    if IsShiftPressed and IsSpacePressed then
+    if IsShiftPressed and IsSpacePressed and isInFTB(getDirectlyControlledCharacter()) then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     end
 end
@@ -160,7 +159,8 @@ local function getDirectlyControlledCharacter()
     end
 end
 
-local function isInFTB(entity)
+local function isInFTB(uuid)
+    local entity = Ext.Entity.Get(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
@@ -184,7 +184,7 @@ local function attachListenersToButtons(node, visited, uuid)
             if isRegularActionButton or isMainAttackButton or isMeleeWeaponButton or isRangedWeaponButton then
                 node:Subscribe("GotMouseCapture", function (e, _)
                     print("GotMouseCapture", e, nodeType, nodeName)
-                    if isInFTB(Ext.Entity.Get(uuid)) then
+                    if isInFTB(uuid) then
                         local spell = e:Child(1):GetProperty("Spell")
                         ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
                         print("Updated ActionQueue")
@@ -238,38 +238,35 @@ local function onNetMessage(data)
 end
 
 local function onMouseButtonInput(e)
-    if e.Pressed and e.Button == 1 then
-        local positionInfo = getPositionInfo()
-        local uuid = getDirectlyControlledCharacter()
-        local entity = Ext.Entity.Get(uuid)
-        print("mouse button input 1")
-        print(uuid)
-        print("should prevent action?")
-        _D(ShouldPreventAction)
-        print("is in FTB", isInFTB(entity))
-        if isInFTB(entity) and ShouldPreventAction[uuid] then
-            ActionQueue[uuid] = ActionQueue[uuid] or {}
-            if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
-                ActionQueue[uuid].target = getPositionInfo()
-                print("updated ActionQueue with target")
-                _D(ActionQueue)
-                Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
+    if e.Pressed then
+        if e.Button == 1 then
+            local positionInfo = getPositionInfo()
+            local uuid = getDirectlyControlledCharacter()
+            print("mouse button input 1")
+            print(uuid)
+            print("should prevent action?")
+            _D(ShouldPreventAction)
+            if ShouldPreventAction[uuid] and isInFTB(uuid) then
+                if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
+                    ActionQueue[uuid].target = getPositionInfo()
+                    print("updated ActionQueue with target")
+                    _D(ActionQueue)
+                    Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
+                    ShouldPreventAction[uuid] = false
+                    e:PreventAction()
+                else
+                    print("No spell name found - what happened?")
+                    _D(ActionQueue)
+                end
+            end
+        elseif e.Button == 3 then
+            local uuid = getDirectlyControlledCharacter()
+            if ShouldPreventAction[uuid] and isInFTB(uuid) then
                 ShouldPreventAction[uuid] = false
-                e:PreventAction()
-            else
-                print("No spell name found - what happened?")
-                _D(ActionQueue)
+                ActionQueue[uuid] = {}
+                print("Right clicked, reset action queue", uuid)
             end
         end
-    end
-    if e.Pressed and e.Button == 3 then
-        local uuid = getDirectlyControlledCharacter()
-        if isInFTB(Ext.Entity.Get(uuid)) and ShouldPreventAction[uuid] then
-            ShouldPreventAction[uuid] = false
-            ActionQueue[uuid] = {}
-            print("Right clicked, reset action queue", uuid)
-        end
-        -- Ext.ClientNet.PostMessageToServer("ClickedOn", Ext.Json.Stringify(getPositionInfo()))
     end
 end
 

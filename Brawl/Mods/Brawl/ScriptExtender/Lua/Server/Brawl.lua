@@ -146,6 +146,7 @@ ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
 PartyMembersHitpointsListeners = {}
+SpellCastIsCastingListeners = {}
 ActionQueue = {}
 ToTTimer = nil
 ToTRoundTimer = nil
@@ -1869,8 +1870,6 @@ local function onEnteredCombat(entityGuid, combatGuid)
     addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
-SpellCastIsCastingListeners = {}
-
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
@@ -1903,8 +1902,6 @@ local function onEnteredForceTurnBased(entityGuid)
                 print("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
                 if entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
                     Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "SpellCastIsCasting", entity.Uuid.EntityUuid)
-                    -- entity.TurnBased.IsInCombat_M = false
-                    -- entity:Replicate("TurnBased")
                 end
             end, Ext.Entity.Get(entityUuid))
         end
@@ -1917,12 +1914,9 @@ function onLeftForceTurnBased(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
         if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
-            print("ActionQueue (server)")
-            _D(ActionQueue)
             if ActionQueue[entityUuid].target and ActionQueue[entityUuid].target.uuid then
                 useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, ActionQueue[entityUuid].spellName)
             else
-                print("use spell at position")
                 useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, ActionQueue[entityUuid].spellName)
             end
             ActionQueue[entityUuid] = nil
@@ -1932,6 +1926,7 @@ function onLeftForceTurnBased(entityGuid)
             Ext.Entity.Unsubscribe(SpellCastIsCastingListeners[entityUuid])
             SpellCastIsCastingListeners[entityUuid] = nil
         end
+        -- nb: is there a better way to do this than just adding a delay?
         Ext.Timer.WaitFor(2000, function ()
             if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
                 Brawlers[level][entityUuid].isInBrawl = true
@@ -2531,20 +2526,6 @@ local function onNetMessage(data)
     elseif data.Channel == "ExitFTB" then
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             Osi.ForceTurnBasedMode(Osi.GetUUID(player[1]), 0)
-        end
-    elseif data.Channel == "ClickedOn" then
-        _D(data)
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player and player.uuid then
-            local clickedOn = Ext.Json.Parse(data.Payload)
-            if clickedOn.uuid then
-                debugPrint("clicked on target", clickedOn.uuid, getDisplayName(clickedOn.uuid))
-                Osi.RequestPing(clickedOn.position[1], clickedOn.position[2], clickedOn.position[3], clickedOn.uuid, player.uuid)
-            else
-                debugPrint("clicked on")
-                _D(clickedOn)
-                Osi.RequestPing(clickedOn.position[1], clickedOn.position[2], clickedOn.position[3], "", player.uuid)
-            end
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
