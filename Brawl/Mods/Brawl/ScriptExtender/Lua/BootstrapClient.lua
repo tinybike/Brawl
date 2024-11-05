@@ -95,6 +95,7 @@ end
 
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
+    -- _D(pickingHelper)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
         local clickedOn = {position = pickingHelper.Inner.Position}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
@@ -112,7 +113,7 @@ end
 -- ---@param entity EntityHandle
 -- ---@param component EocHotbarContainerComponent
 -- local function OnHotbarContainer(entity, component)
---     Ext.Utils.PrintError("OnHotbarContainer", entity.Uuid.EntityUuid, component)
+--     print("OnHotbarContainer", entity.Uuid.EntityUuid, component)
 -- end
 
 -- -- Covers post-reloading
@@ -126,7 +127,7 @@ end
 -- ---@param component EocHotbarContainerComponent
 -- ---@diagnostic disable-next-line:param-type-mismatch
 -- Ext.Entity.OnCreateDeferred("HotbarContainer", function (entity, typeName, component)
---     OnHotbarContainer(entity, component)
+--     OnHotbarContainer(entity.Uuid.EntityUuid, component)
 -- end)
 
 -- Ext.Events.NetMessage:Subscribe(function (data)
@@ -177,14 +178,55 @@ local function onKeyInput(e)
     end
 end
 
-local function attachListenersToButtons(node, visited, uuid)
-    if not visited then
-        visited = {}
+local function mapHotBarButtons(node, uuid, attachListeners, visited)
+    visited = visited or {}
+    if not visited[node] then
+        visited[node] = true
+        attachListeners(node, uuid, visited)
+        local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
+        local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
+        if childrenCount > 0 then
+            for i = 1, childrenCount do
+                local childNode = node:Child(i)
+                if childNode then
+                    mapHotBarButtons(childNode, uuid, attachListeners, visited)
+                end
+            end
+        end
+        if visualChildrenCount > 0 then
+            for i = 1, visualChildrenCount do
+                local visualChildNode = node:VisualChild(i)
+                if visualChildNode then
+                    mapHotBarButtons(visualChildNode, uuid, attachListeners, visited)
+                end
+            end
+        end
     end
-    if visited[node] then
-        return
+end
+
+local function attachListenersToUpcastButtons(node, uuid, visited)
+    local nodeType = tostring(node.Type)
+    if nodeType == "ls.LSButton" then
+        local name = node:GetProperty("Name")
+        if tostring(name) == "HotbarslotBtn" then
+            print("upcast buttons", nodeType, name)
+            node:Subscribe("GotMouseCapture", function (n, t)
+                print("Upcast GotMouseCapture", n, t, nodeType)
+                -- _D(n)
+                -- _D(n:GetAllProperties())
+                local dataContext = n:GetProperty("DataContext")
+                local isFake = dataContext:GetProperty("IsFake")
+                local slotLevel = dataContext:GetProperty("SlotLevel")
+                local isUpcasted = dataContext:GetProperty("IsUpcasted")
+                local resourceName = dataContext:GetProperty("ResourceName") -- "SpellSlot"
+                _D(dataContext)
+                _D(dataContext:GetAllProperties())
+            end)
+        end
     end
-    visited[node] = true
+end
+
+local function attachListenersToButtons(node, uuid, visited)
     local nodeType = tostring(node.Type)
     if nodeType == "ls.LSButton" or nodeType == "Button" then
         local name = node:GetProperty("Name")
@@ -198,7 +240,24 @@ local function attachListenersToButtons(node, visited, uuid)
                 node:Subscribe("GotMouseCapture", function (n, _)
                     print("GotMouseCapture", n, nodeType, nodeName)
                     if isInFTB(uuid) then
-                        local spell = n:Child(1):GetProperty("Spell")
+                        Ext.Timer.WaitFor(1000, function ()
+                            mapHotBarButtons(getHotBar(), uuid, attachListenersToUpcastButtons)
+                        end)
+                        -- local spell = n:Child(1):GetProperty("Spell")
+                        -- local spellSlotLevel = spell:GetProperty("SpellSlotLevel")
+                        -- if spellSlotLevel > 0 then
+                        --     local spellUpcast = spell:GetProperty("SpellUpcast")
+                        --     for _, upcast in ipairs(spellUpcast) do
+                        --         if not upcast.IsFake then
+                        --             print(_, upcast)
+                        --             _D(upcast)
+                        --             _D(upcast:GetAllProperties())
+                        --             -- upcast:Subscribe("GotMouseCapture", function (upcastNode, _)
+                        --             --     print("GotMouseCapture", upcastNode)
+                        --             -- end)
+                        --         end
+                        --     end
+                        -- end
                         ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
                         print("Updated ActionQueue")
                         _D(ActionQueue)
@@ -207,31 +266,18 @@ local function attachListenersToButtons(node, visited, uuid)
             end
         end
     end
-    local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
-    for i = 1, childrenCount do
-        local childNode = node:Child(i)
-        if childNode then
-            attachListenersToButtons(childNode, visited, uuid)
-        end
-    end
-    local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
-    for i = 1, visualChildrenCount do
-        local visualChildNode = node:VisualChild(i)
-        if visualChildNode then
-            attachListenersToButtons(visualChildNode, visited, uuid)
-        end
-    end
 end
 
 -- thank u volitio
-local function checkForHotBar(uuid)
+function checkForHotBar(uuid)
     -- nb: use OnCreateDeferred instead?
     Ext.Timer.WaitFor(1000, function ()
         local hotBar = getHotBar()
         if hotBar == nil then
             return checkForHotBar(uuid)
         end
-        attachListenersToButtons(hotBar, false, uuid)
+        mapHotBarButtons(hotBar, uuid, attachListenersToButtons)
+        -- attachListenersToButtons(hotBar, uuid, nil)
     end)
 end
 
@@ -251,6 +297,7 @@ local function onNetMessage(data)
 end
 
 local function onMouseButtonInput(e)
+    print("clicked!")
     if e.Pressed then
         if e.Button == 1 then
             local positionInfo = getPositionInfo()
