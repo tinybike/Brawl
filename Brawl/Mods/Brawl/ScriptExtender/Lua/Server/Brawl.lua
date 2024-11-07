@@ -2516,11 +2516,10 @@ local function onNetMessage(data)
             toggleFullAuto(data.Payload)
         end
     elseif data.Channel == "ActionQueue" then
+        print("server action queue updated")
         _D(data)
         ActionQueue = Ext.Json.Parse(data.Payload)
         local entity = Ext.Entity.Get(GetHostCharacter())
-        -- entity.TurnBased.CanAct_M = false
-        -- entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.IsInCombat_M = false
         entity:Replicate("TurnBased")
     elseif data.Channel == "ExitFTB" then

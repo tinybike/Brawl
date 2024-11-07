@@ -10,6 +10,9 @@ local IsShiftPressed = false
 local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
 -- local UseCombatControllerControls = false
+local IsMouseOverHotBar = false
+local HotBarMouseEnterHandler = nil
+local HotBarMouseLeaveHandler = nil
 local ActionQueue = {}
 local ShouldPreventAction = {}
 
@@ -109,27 +112,6 @@ local function getPositionInfo()
     return nil
 end
 
--- -- thank u laughingleader
--- ---@param entity EntityHandle
--- ---@param component EocHotbarContainerComponent
--- local function OnHotbarContainer(entity, component)
---     print("OnHotbarContainer", entity.Uuid.EntityUuid, component)
--- end
-
--- -- Covers post-reloading
--- Ext.Events.SessionLoaded:Subscribe(function (e)
---     for _,v in pairs(Ext.Entity.GetAllEntitiesWithComponent("HotbarContainer")) do
---         OnHotbarContainer(v, v.HotbarContainer)
---     end
--- end)
-
--- ---@param entity EntityHandle
--- ---@param component EocHotbarContainerComponent
--- ---@diagnostic disable-next-line:param-type-mismatch
--- Ext.Entity.OnCreateDeferred("HotbarContainer", function (entity, typeName, component)
---     OnHotbarContainer(entity.Uuid.EntityUuid, component)
--- end)
-
 -- Ext.Events.NetMessage:Subscribe(function (data)
 --     if data.Channel == "UseCombatControllerControls" then
 --         print("got msg from client")
@@ -210,17 +192,16 @@ local function attachListenersToUpcastButtons(node, uuid, visited)
         local name = node:GetProperty("Name")
         if tostring(name) == "HotbarslotBtn" then
             print("upcast buttons", nodeType, name)
-            node:Subscribe("GotMouseCapture", function (n, t)
-                print("Upcast GotMouseCapture", n, t, nodeType)
-                -- _D(n)
-                -- _D(n:GetAllProperties())
-                local dataContext = n:GetProperty("DataContext")
-                local isFake = dataContext:GetProperty("IsFake")
-                local slotLevel = dataContext:GetProperty("SlotLevel")
-                local isUpcasted = dataContext:GetProperty("IsUpcasted")
-                local resourceName = dataContext:GetProperty("ResourceName") -- "SpellSlot"
-                _D(dataContext)
-                _D(dataContext:GetAllProperties())
+            node:Subscribe("GotMouseCapture", function (upcastNode, _)
+                print("Upcast GotMouseCapture", upcastNode, nodeType, name)
+                local dataContext = upcastNode:GetProperty("DataContext")
+                if not dataContext:GetProperty("IsFake") then
+                    ActionQueue[uuid].isUpcasted = dataContext:GetProperty("IsUpcasted")
+                    ActionQueue[uuid].slotLevel = dataContext:GetProperty("SlotLevel")
+                    -- ActionQueue[uuid].resourceName = dataContext:GetProperty("ResourceName")
+                    print("Updated ActionQueue with upcasted spell")
+                    _D(ActionQueue)
+                end
             end)
         end
     end
@@ -237,28 +218,15 @@ local function attachListenersToButtons(node, uuid, visited)
             local isMeleeWeaponButton = nodeType == "Button" and nodeName == "MeleeWeapon"
             local isRangedWeaponButton = nodeType == "Button" and nodeName == "RangedWeapon"
             if isRegularActionButton or isMainAttackButton or isMeleeWeaponButton or isRangedWeaponButton then
-                node:Subscribe("GotMouseCapture", function (n, _)
-                    print("GotMouseCapture", n, nodeType, nodeName)
+                node:Subscribe("GotMouseCapture", function (buttonNode, _)
+                    print("GotMouseCapture", buttonNode, nodeType, nodeName)
                     if isInFTB(uuid) then
+                        -- nb: use OnCreateDeferred instead? what is the component type to listen for?
                         Ext.Timer.WaitFor(1000, function ()
                             mapHotBarButtons(getHotBar(), uuid, attachListenersToUpcastButtons)
                         end)
-                        -- local spell = n:Child(1):GetProperty("Spell")
-                        -- local spellSlotLevel = spell:GetProperty("SpellSlotLevel")
-                        -- if spellSlotLevel > 0 then
-                        --     local spellUpcast = spell:GetProperty("SpellUpcast")
-                        --     for _, upcast in ipairs(spellUpcast) do
-                        --         if not upcast.IsFake then
-                        --             print(_, upcast)
-                        --             _D(upcast)
-                        --             _D(upcast:GetAllProperties())
-                        --             -- upcast:Subscribe("GotMouseCapture", function (upcastNode, _)
-                        --             --     print("GotMouseCapture", upcastNode)
-                        --             -- end)
-                        --         end
-                        --     end
-                        -- end
-                        ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
+                        local spell = buttonNode:Child(1):GetProperty("Spell")
+                        ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID"), isUpcasted = false}
                         print("Updated ActionQueue")
                         _D(ActionQueue)
                     end
@@ -276,8 +244,19 @@ function checkForHotBar(uuid)
         if hotBar == nil then
             return checkForHotBar(uuid)
         end
+        if HotBarMouseEnterHandler ~= nil then
+            hotBar:Unsubscribe(HotBarMouseEnterHandler)
+            hotBar:Unsubscribe(HotBarMouseLeaveHandler)
+        end
+        HotBarMouseEnterHandler = hotBar:Subscribe("MouseEnter", function (node, _)
+            print("MouseEnter", node)
+            IsMouseOverHotBar = true
+        end)
+        HotBarMouseLeaveHandler = hotBar:Subscribe("MouseLeave", function (node, _)
+            print("MouseLeave", node)
+            IsMouseOverHotBar = false
+        end)
         mapHotBarButtons(hotBar, uuid, attachListenersToButtons)
-        -- attachListenersToButtons(hotBar, uuid, nil)
     end)
 end
 
@@ -297,26 +276,26 @@ local function onNetMessage(data)
 end
 
 local function onMouseButtonInput(e)
-    print("clicked!")
     if e.Pressed then
         if e.Button == 1 then
-            local positionInfo = getPositionInfo()
-            local uuid = getDirectlyControlledCharacter()
-            print("mouse button input 1")
-            print(uuid)
-            print("should prevent action?")
-            _D(ShouldPreventAction)
-            if ShouldPreventAction[uuid] and isInFTB(uuid) then
-                if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
-                    ActionQueue[uuid].target = getPositionInfo()
-                    print("updated ActionQueue with target")
-                    _D(ActionQueue)
-                    Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
-                    ShouldPreventAction[uuid] = false
-                    e:PreventAction()
-                else
-                    print("No spell name found - what happened?")
-                    _D(ActionQueue)
+            if not IsMouseOverHotBar then
+                print("mouse button input 1")
+                local uuid = getDirectlyControlledCharacter()
+                print(uuid)
+                print("should prevent action?")
+                _D(ShouldPreventAction)
+                if ShouldPreventAction[uuid] and isInFTB(uuid) then
+                    if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
+                        ActionQueue[uuid].target = getPositionInfo()
+                        print("updated ActionQueue with target")
+                        _D(ActionQueue)
+                        Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
+                        ShouldPreventAction[uuid] = false
+                        e:PreventAction()
+                    else
+                        print("No spell name found - what happened?")
+                        _D(ActionQueue)
+                    end
                 end
             end
         elseif e.Button == 3 then
