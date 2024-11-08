@@ -192,6 +192,8 @@ local function attachListenersToUpcastButtons(node, uuid, visited)
             node:Subscribe("GotMouseCapture", function (upcastNode, _)
                 print("Upcast GotMouseCapture", upcastNode, nodeType, name)
                 local dataContext = upcastNode:GetProperty("DataContext")
+                _D(dataContext)
+                _D(dataContext:GetAllProperties())
                 if not dataContext:GetProperty("IsFake") then
                     ActionQueue[uuid].isUpcasted = dataContext:GetProperty("IsUpcasted")
                     ActionQueue[uuid].slotLevel = dataContext:GetProperty("SlotLevel")

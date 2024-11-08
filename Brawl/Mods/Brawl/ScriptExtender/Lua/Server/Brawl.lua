@@ -148,6 +148,7 @@ ActionsInProgress = {}
 PartyMembersHitpointsListeners = {}
 SpellCastIsCastingListeners = {}
 ActionQueue = {}
+FTBLockedIn = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -2496,6 +2497,21 @@ local function onMCMSettingSaved(payload)
     end
 end
 
+local function isFTBAllLockedIn()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        if not FTBLockedIn[Osi.GetUUID(player[1])] then
+            return false
+        end
+    end
+    return true
+end
+
+local function allExitFTB()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        Osi.ForceTurnBasedMode(Osi.GetUUID(player[1]), 0)
+    end
+end
+
 local function onNetMessage(data)
     if data.Channel == "ModToggle" then
         if MCM then
@@ -2526,11 +2542,13 @@ local function onNetMessage(data)
             -- entity.TurnBased.HadTurnInCombat = false
             entity.TurnBased.IsInCombat_M = false
             entity:Replicate("TurnBased")
+            FTBLockedIn[player.uuid] = true
+            if isFTBAllLockedIn() then
+                allExitFTB()
+            end
         end
     elseif data.Channel == "ExitFTB" then
-        for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            Osi.ForceTurnBasedMode(Osi.GetUUID(player[1]), 0)
-        end
+        allExitFTB()
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
