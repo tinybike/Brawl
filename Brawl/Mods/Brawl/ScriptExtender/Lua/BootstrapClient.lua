@@ -11,8 +11,7 @@ local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
 -- local UseCombatControllerControls = false
 local IsMouseOverHotBar = false
-local HotBarMouseEnterHandler = nil
-local HotBarMouseLeaveHandler = nil
+local HotBarListeners = nil
 local ActionQueue = {}
 local ShouldPreventAction = {}
 
@@ -72,9 +71,7 @@ local function getEnterFTBButton()
 end
 
 local function getExitFTBButton()
-    local button = findNodeByName(getHotBar(), "ExitFTBButton")
-    print("ftb exit main", button)
-    return button
+    return findNodeByName(getHotBar(), "ExitFTBButton")
 end
 
 -- thank u aahz
@@ -244,18 +241,14 @@ function checkForHotBar(uuid)
         if hotBar == nil then
             return checkForHotBar(uuid)
         end
-        if HotBarMouseEnterHandler ~= nil then
-            hotBar:Unsubscribe(HotBarMouseEnterHandler)
-            hotBar:Unsubscribe(HotBarMouseLeaveHandler)
+        if HotBarListeners ~= nil then
+            hotBar:Unsubscribe(HotBarListeners.onMouseEnter)
+            hotBar:Unsubscribe(HotBarListeners.onMouseLeave)
         end
-        HotBarMouseEnterHandler = hotBar:Subscribe("MouseEnter", function (node, _)
-            print("MouseEnter", node)
-            IsMouseOverHotBar = true
-        end)
-        HotBarMouseLeaveHandler = hotBar:Subscribe("MouseLeave", function (node, _)
-            print("MouseLeave", node)
-            IsMouseOverHotBar = false
-        end)
+        HotBarListeners = {
+            onMouseEnter = hotBar:Subscribe("MouseEnter", function (_, _) IsMouseOverHotBar = true end),
+            onMouseLeave = hotBar:Subscribe("MouseLeave", function (_, _) IsMouseOverHotBar = false end),
+        }
         mapHotBarButtons(hotBar, uuid, attachListenersToButtons)
     end)
 end

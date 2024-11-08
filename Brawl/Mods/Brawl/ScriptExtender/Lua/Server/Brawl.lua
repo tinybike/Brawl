@@ -202,7 +202,7 @@ function getDisplayName(entityUuid)
     return Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
 end
 
-local function getPlayerByUserId(userId)
+function getPlayerByUserId(userId)
     if Players then
         for uuid, player in pairs(Players) do
             if player.userId == userId and player.isControllingDirectly then
@@ -222,7 +222,7 @@ local function getBrawlerByUuid(uuid)
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
-local function peerToUserId(peerId)
+function peerToUserId(peerId)
     return (peerId & 0xffff0000) | 0x0001
 end
 
@@ -2519,9 +2519,14 @@ local function onNetMessage(data)
         print("server action queue updated")
         _D(data)
         ActionQueue = Ext.Json.Parse(data.Payload)
-        local entity = Ext.Entity.Get(GetHostCharacter())
-        entity.TurnBased.IsInCombat_M = false
-        entity:Replicate("TurnBased")
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player and player.uuid then
+            local entity = Ext.Entity.Get(player.uuid)
+            -- entity.TurnBased.CanAct_M = false
+            -- entity.TurnBased.HadTurnInCombat = false
+            entity.TurnBased.IsInCombat_M = false
+            entity:Replicate("TurnBased")
+        end
     elseif data.Channel == "ExitFTB" then
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             Osi.ForceTurnBasedMode(Osi.GetUUID(player[1]), 0)
