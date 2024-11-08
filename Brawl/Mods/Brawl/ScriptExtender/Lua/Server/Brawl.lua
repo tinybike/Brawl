@@ -432,7 +432,7 @@ function getSpellByName(name)
     return nil
 end
 
-function checkSpellResources(casterUuid, spellName)
+function checkSpellResources(casterUuid, spellName, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local spell = getSpellByName(spellName)
     if not spell then
@@ -440,10 +440,10 @@ function checkSpellResources(casterUuid, spellName)
         return false
     end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
-    if targetUuid then
-        debugPrint("on", targetUuid, getDisplayName(targetUuid))
-    end
     debugDump(spell.costs)
+    if upcastLevel ~= nil then
+        debugPrint("Upcasted spell level", upcastLevel)
+    end
     local isSpellPrepared = false
     for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
         if preparedSpell.OriginatorPrototype == spellName then
@@ -458,7 +458,7 @@ function checkSpellResources(casterUuid, spellName)
     for costType, costValue in pairs(spell.costs) do
         if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
             if costType == "SpellSlot" then
-                local spellLevel = costValue
+                local spellLevel = upcastLevel == nil and costValue or upcastLevel
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
                 debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                 if availableResourceValue < 1 then
@@ -478,10 +478,14 @@ function checkSpellResources(casterUuid, spellName)
     return true
 end
 
-function useSpellAndResourcesAtPosition(casterUuid, position, spellName)
-    if not checkSpellResources(casterUuid, spellName) then
+function useSpellAndResourcesAtPosition(casterUuid, position, spellName, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, upcastLevel) then
         return false
     end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting at position", spellName, position[1], position[2], position[3])
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
     ActionsInProgress[casterUuid] = spellName
@@ -489,10 +493,14 @@ function useSpellAndResourcesAtPosition(casterUuid, position, spellName)
     return true
 end
 
-function useSpellAndResources(casterUuid, targetUuid, spellName)
-    if not checkSpellResources(casterUuid, spellName) then
+function useSpellAndResources(casterUuid, targetUuid, spellName, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, upcastLevel) then
         return false
     end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
     ActionsInProgress[casterUuid] = spellName
@@ -1900,7 +1908,7 @@ local function onEnteredForceTurnBased(entityGuid)
         end
         if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] == nil then
             SpellCastIsCastingListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastIsCasting", function (entity, _, _)
-                print("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
+                debugPrint("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
                 if entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
                     Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "SpellCastIsCasting", entity.Uuid.EntityUuid)
                 end
@@ -1914,11 +1922,15 @@ function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
+        if FTBLockedIn[entityUuid] then
+            FTBLockedIn[entityUuid] = nil
+        end
         if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
-            if ActionQueue[entityUuid].target and ActionQueue[entityUuid].target.uuid then
-                useSpellAndResources(entityUuid, ActionQueue[entityUuid].target.uuid, ActionQueue[entityUuid].spellName)
+            local actionQueue = ActionQueue[entityUuid]
+            if actionQueue.target and actionQueue.target.uuid then
+                useSpellAndResources(entityUuid, actionQueue.target.uuid, actionQueue.spellName, actionQueue.upcastLevel)
             else
-                useSpellAndResourcesAtPosition(entityUuid, ActionQueue[entityUuid].target.position, ActionQueue[entityUuid].spellName)
+                useSpellAndResourcesAtPosition(entityUuid, actionQueue.target.position, actionQueue.spellName, actionQueue.upcastLevel)
             end
             ActionQueue[entityUuid] = nil
             Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)

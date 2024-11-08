@@ -193,12 +193,14 @@ local function attachListenersToUpcastButtons(node, uuid, visited)
                 print("Upcast GotMouseCapture", upcastNode, nodeType, name)
                 local dataContext = upcastNode:GetProperty("DataContext")
                 _D(dataContext)
-                _D(dataContext:GetAllProperties())
+                _D(dataContext:GetAllProperties())                
                 if not dataContext:GetProperty("IsFake") then
-                    ActionQueue[uuid].isUpcasted = dataContext:GetProperty("IsUpcasted")
-                    ActionQueue[uuid].slotLevel = dataContext:GetProperty("SlotLevel")
-                    -- ActionQueue[uuid].resourceName = dataContext:GetProperty("ResourceName")
-                    print("Updated ActionQueue with upcasted spell")
+                    if dataContext:GetProperty("IsUpcasted") then
+                        ActionQueue[uuid].upcastLevel = dataContext:GetProperty("SlotLevel")
+                    else
+                        ActionQueue[uuid].upcastLevel = nil
+                    end
+                    print("Updated ActionQueue")
                     _D(ActionQueue)
                 end
             end)
@@ -225,8 +227,8 @@ local function attachListenersToButtons(node, uuid, visited)
                             mapHotBarButtons(getHotBar(), uuid, attachListenersToUpcastButtons)
                         end)
                         local spell = buttonNode:Child(1):GetProperty("Spell")
-                        ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID"), isUpcasted = false}
-                        print("Updated ActionQueue")
+                        ActionQueue[uuid] = {spellName = spell:GetProperty("PrototypeID")}
+                        print("Added spell to ActionQueue")
                         _D(ActionQueue)
                     end
                 end)
