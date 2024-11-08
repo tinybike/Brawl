@@ -432,18 +432,8 @@ function getSpellByName(name)
     return nil
 end
 
-function checkSpellResources(casterUuid, spellName, upcastLevel)
+function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
-    local spell = getSpellByName(spellName)
-    if not spell then
-        debugPrint("Error: spell not found")
-        return false
-    end
-    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
-    debugDump(spell.costs)
-    if upcastLevel ~= nil then
-        debugPrint("Upcasted spell level", upcastLevel)
-    end
     local isSpellPrepared = false
     for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
         if preparedSpell.OriginatorPrototype == spellName then
@@ -454,6 +444,19 @@ function checkSpellResources(casterUuid, spellName, upcastLevel)
     if not isSpellPrepared then
         debugPrint("Caster does not have spell", spellName, "prepared")
         return false
+    end
+    if variant ~= nil then
+        spellName = variant
+    end
+    local spell = getSpellByName(spellName)
+    if not spell then
+        debugPrint("Error: spell not found")
+        return false
+    end
+    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
+    debugDump(spell.costs)
+    if upcastLevel ~= nil then
+        debugPrint("Upcasted spell level", upcastLevel)
     end
     for costType, costValue in pairs(spell.costs) do
         if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
@@ -478,9 +481,12 @@ function checkSpellResources(casterUuid, spellName, upcastLevel)
     return true
 end
 
-function useSpellAndResourcesAtPosition(casterUuid, position, spellName, upcastLevel)
-    if not checkSpellResources(casterUuid, spellName, upcastLevel) then
+function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, variant, upcastLevel) then
         return false
+    end
+    if variant ~= nil then
+        spellName = variant
     end
     if upcastLevel ~= nil then
         spellName = spellName .. "_" .. tostring(upcastLevel)
@@ -493,9 +499,12 @@ function useSpellAndResourcesAtPosition(casterUuid, position, spellName, upcastL
     return true
 end
 
-function useSpellAndResources(casterUuid, targetUuid, spellName, upcastLevel)
-    if not checkSpellResources(casterUuid, spellName, upcastLevel) then
+function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, variant, upcastLevel) then
         return false
+    end
+    if variant ~= nil then
+        spellName = variant
     end
     if upcastLevel ~= nil then
         spellName = spellName .. "_" .. tostring(upcastLevel)
@@ -1928,9 +1937,9 @@ function onLeftForceTurnBased(entityGuid)
         if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
             local actionQueue = ActionQueue[entityUuid]
             if actionQueue.target and actionQueue.target.uuid then
-                useSpellAndResources(entityUuid, actionQueue.target.uuid, actionQueue.spellName, actionQueue.upcastLevel)
+                useSpellAndResources(entityUuid, actionQueue.target.uuid, actionQueue.spellName, actionQueue.variant, actionQueue.upcastLevel)
             else
-                useSpellAndResourcesAtPosition(entityUuid, actionQueue.target.position, actionQueue.spellName, actionQueue.upcastLevel)
+                useSpellAndResourcesAtPosition(entityUuid, actionQueue.target.position, actionQueue.spellName, actionQueue.variant, actionQueue.upcastLevel)
             end
             ActionQueue[entityUuid] = nil
             Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)

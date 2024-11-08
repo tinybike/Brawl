@@ -192,15 +192,21 @@ local function attachListenersToUpcastButtons(node, uuid, visited)
             node:Subscribe("GotMouseCapture", function (upcastNode, _)
                 print("Upcast GotMouseCapture", upcastNode, nodeType, name)
                 local dataContext = upcastNode:GetProperty("DataContext")
-                _D(dataContext)
-                _D(dataContext:GetAllProperties())                
-                if not dataContext:GetProperty("IsFake") then
-                    if dataContext:GetProperty("IsUpcasted") then
-                        ActionQueue[uuid].upcastLevel = dataContext:GetProperty("SlotLevel")
-                    else
-                        ActionQueue[uuid].upcastLevel = nil
+                if dataContext ~= nil then
+                    if not dataContext:GetProperty("IsFake") then
+                        if dataContext:GetProperty("IsUpcasted") then
+                            ActionQueue[uuid].upcastLevel = dataContext:GetProperty("SlotLevel")
+                        else
+                            ActionQueue[uuid].upcastLevel = nil
+                        end
+                        print("Updated ActionQueue")
+                        _D(ActionQueue)
                     end
-                    print("Updated ActionQueue")
+                else
+                    local spell = upcastNode:Child(1):GetProperty("Spell")
+                    -- _D(spell:GetAllProperties())
+                    ActionQueue[uuid].variant = spell:GetProperty("PrototypeID")
+                    print("Added variant to ActionQueue")
                     _D(ActionQueue)
                 end
             end)
