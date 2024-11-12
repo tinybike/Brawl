@@ -72,6 +72,17 @@
                             }
                         },
                         {
+                            "Id": "true_pause",
+                            "Name": "True Pause",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.",
+                            "Handles": {
+                                "DescriptionHandle": "h65ee56d8gbbbeg4e6agb486ge33349a73d09",
+                                "NameHandle": "h7a39e407g21e0g4f3bg98fdg7cd473b01043"
+                            }
+                        },
+                        {
                             "Id": "auto_pause_on_downed",
                             "Name": "Automatic Pause On Downed",
                             "Type": "checkbox",

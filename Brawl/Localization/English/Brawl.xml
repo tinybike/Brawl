@@ -22,4 +22,6 @@
     <content contentuid="h41ad2ed5g77dfg45c7g83f9g43fcf62e2376" version="1">Hitpoints Multiplier</content>
     <content contentuid="h5fba396bg3ea9g42c8g99f7gd52fad9d7c46" version="1">Tav's archetype for the AI</content>
     <content contentuid="h08b6adc8ge129g45a0ga62bgdd4a013d0e2b" version="1">Tav Archetype</content>
+    <content contentuid="h65ee56d8gbbbeg4e6agb486ge33349a73d09" version="1">If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.</content>
+    <content contentuid="h7a39e407g21e0g4f3bg98fdg7cd473b01043" version="1">True Pause</content>
 </contentList>

@@ -6,6 +6,7 @@ local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
+local TruePause = true
 local TavArchetype = "melee"
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
@@ -432,6 +433,30 @@ function getSpellByName(name)
     return nil
 end
 
+function checkSpellCharge(casterUuid, spellName)
+    print("checking spell charge", casterUuid, spellName)
+    if spellName then
+        local entity = Ext.Entity.Get(casterUuid)
+        if entity and entity.SpellBook and entity.SpellBook.Spells then
+            for i, spell in ipairs(entity.SpellBook.Spells) do
+                -- NB: OriginatorPrototype or Prototype?
+                if spell.Id.Prototype == spellName then
+                    print("found spell in book")
+                    _D(spell)
+                    if spell.Charged == false then
+                        debugPrint("spell is not charged", spellName, casterUuid)
+                        return false
+                    end
+                end
+            end
+            return true
+        end
+    end
+    return false
+end
+
+-- NB: these need to account for cooldowns as well, are these attached to entity or...?
+-- NB: system also needs to handle movement somehow -- do we queue that up, or just set to 0 temporarily? how about jumps etc, that don't trigger OnSpellcastCasting?
 function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
@@ -454,12 +479,17 @@ function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
         return false
     end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
+    -- NB: spell.costs doesn't work for spells granted by item
     debugDump(spell.costs)
     if upcastLevel ~= nil then
         debugPrint("Upcasted spell level", upcastLevel)
     end
     for costType, costValue in pairs(spell.costs) do
-        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+        if costType == "ShortRest" or costType == "LongRest" then
+            if costValue and not checkSpellCharge(casterUuid, spellName) then
+                return false
+            end
+        elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
             if costType == "SpellSlot" then
                 local spellLevel = upcastLevel == nil and costValue or upcastLevel
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
@@ -2132,8 +2162,22 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
     local entity = Ext.Entity.Get(casterUuid)
     if entity and ActionsInProgress[casterUuid] == spellName then
         local spell = getSpellByName(spellName)
+        _D(spell.costs)
         for costType, costValue in pairs(spell.costs) do
-            if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            if costType == "ShortRest" or costType == "LongRest" then
+                if costValue then
+                    if entity.SpellBook and entity.SpellBook.Spells then
+                        for _, spell in ipairs(entity.SpellBook.Spells) do
+                            -- if spell.Id.OriginatorPrototype == spellName then
+                            if spell.Id.Prototype == spellName then
+                                spell.Charged = false
+                                entity:Replicate("SpellBook")
+                                break
+                            end
+                        end
+                    end
+                end
+            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
                     local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
                     for _, spellSlot in ipairs(spellSlots) do
@@ -2554,7 +2598,6 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "ActionQueue" then
         print("server action queue updated")
-        _D(data)
         ActionQueue = Ext.Json.Parse(data.Payload)
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player and player.uuid then

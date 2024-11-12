@@ -9,7 +9,7 @@ end
 local IsShiftPressed = false
 local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
--- local UseCombatControllerControls = false
+local UseCombatControllerControls = false
 local IsMouseOverHotBar = false
 local HotBarListeners = nil
 local ActionQueue = {}
@@ -63,7 +63,9 @@ local function getHotBar()
 end
 
 local function getFTBItem()
-    return findNodeByName(Ext.UI.GetRoot():Child(1):Child(1), "FTBItem")
+    local node = findNodeByName(Ext.UI.GetRoot(), "FTBItem")
+    _D(node)
+    return node
 end
 
 local function getEnterFTBButton()
@@ -83,7 +85,7 @@ local function getDirectlyControlledCharacter()
     for _, entity in pairs(Ext.Entity.GetAllEntitiesWithComponent("ClientControl")) do
         if entity.UserReservedFor.UserID == 1 then
             DirectlyControlledCharacter = entity.Uuid.EntityUuid
-            return entity.Uuid.EntityUuid
+            return DirectlyControlledCharacter
         end
     end
 end
@@ -95,7 +97,6 @@ end
 
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
-    -- _D(pickingHelper)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
         local clickedOn = {position = pickingHelper.Inner.Position}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
@@ -107,23 +108,6 @@ local function getPositionInfo()
         return clickedOn
     end
     return nil
-end
-
--- Ext.Events.NetMessage:Subscribe(function (data)
---     if data.Channel == "UseCombatControllerControls" then
---         print("got msg from client")
---         print("use combat controls", UseCombatControllerControls)
---         UseCombatControllerControls = data.Payload == "1"
---     end
--- end)
-
-local function onControllerButtonInput(e)
-    if e.Pressed == true then
-        Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
-        -- if UseCombatControllerControls then
-        --     e:PreventAction()
-        -- end
-    end
 end
 
 local function checkCancelMidAction()
@@ -157,32 +141,6 @@ local function onKeyInput(e)
     end
 end
 
-local function mapHotBarButtons(node, uuid, attachListeners, visited)
-    visited = visited or {}
-    if not visited[node] then
-        visited[node] = true
-        attachListeners(node, uuid, visited)
-        local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
-        local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
-        if childrenCount > 0 then
-            for i = 1, childrenCount do
-                local childNode = node:Child(i)
-                if childNode then
-                    mapHotBarButtons(childNode, uuid, attachListeners, visited)
-                end
-            end
-        end
-        if visualChildrenCount > 0 then
-            for i = 1, visualChildrenCount do
-                local visualChildNode = node:VisualChild(i)
-                if visualChildNode then
-                    mapHotBarButtons(visualChildNode, uuid, attachListeners, visited)
-                end
-            end
-        end
-    end
-end
-
 local function attachListenersToUpcastButtons(node, uuid, visited)
     local nodeType = tostring(node.Type)
     if nodeType == "ls.LSButton" then
@@ -204,7 +162,6 @@ local function attachListenersToUpcastButtons(node, uuid, visited)
                     end
                 else
                     local spell = upcastNode:Child(1):GetProperty("Spell")
-                    -- _D(spell:GetAllProperties())
                     ActionQueue[uuid].variant = spell:GetProperty("PrototypeID")
                     print("Added variant to ActionQueue")
                     _D(ActionQueue)
@@ -243,6 +200,119 @@ local function attachListenersToButtons(node, uuid, visited)
     end
 end
 
+local function investigateNode(node)
+    local nodeType = tostring(node.Type)
+    print(nodeType, node:GetProperty("Name"))
+    -- nodeType == "ls.LSButton" and name == "UseSlotBinding"
+    -- nodeType == "ls.LSButton" and name == "ShowContextMenu"
+    -- nodeType == "ls.LSButton" and name == "SelectButtonVisual"
+    -- if nodeType == "ls.LSButton" or nodeType == "Button" then
+    local name = node:GetProperty("Name")
+    if name ~= nil then
+        local nodeName = tostring(name)
+        _D(node:GetAllProperties())
+        node:Subscribe("GotFocus", function (e, t) print("GotFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("GotKeyboardFocus", function (e, t) print("GotKeyboardFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("GotMouseCapture", function (e, t) print("GotMouseCapture", e, t, nodeType, nodeName) end)
+        node:Subscribe("KeyDown", function (e, t) print("KeyDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("KeyUp", function (e, t) print("KeyUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("LostFocus", function (e, t) print("LostFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("LostKeyboardFocus", function (e, t) print("LostKeyboardFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("LostMouseCapture", function (e, t) print("LostMouseCapture", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseDown", function (e, t) print("MouseDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseEnter", function (e, t) print("MouseEnter", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseLeave", function (e, t) print("MouseLeave", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseLeftButtonDown", function (e, t) print("MouseLeftButtonDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseLeftButtonUp", function (e, t) print("MouseLeftButtonUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseMove", function (e, t) print("MouseMove", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseRightButtonDown", function (e, t) print("MouseRightButtonDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseRightButtonUp", function (e, t) print("MouseRightButtonUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseUp", function (e, t) print("MouseUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("MouseWheel", function (e, t) print("MouseWheel", e, t, nodeType, nodeName) end)
+        node:Subscribe("TouchDown", function (e, t) print("TouchDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("TouchMove", function (e, t) print("TouchMove", e, t, nodeType, nodeName) end)
+        node:Subscribe("TouchUp", function (e, t) print("TouchUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("TouchEnter", function (e, t) print("TouchEnter", e, t, nodeType, nodeName) end)
+        node:Subscribe("TouchLeave", function (e, t) print("TouchLeave", e, t, nodeType, nodeName) end)
+        node:Subscribe("GotTouchCapture", function (e, t) print("GotTouchCapture", e, t, nodeType, nodeName) end)
+        node:Subscribe("LostTouchCapture", function (e, t) print("LostTouchCapture", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewTouchDown", function (e, t) print("PreviewTouchDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewTouchMove", function (e, t) print("PreviewTouchMove", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewTouchUp", function (e, t) print("PreviewTouchUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("ManipulationStarting", function (e, t) print("ManipulationStarting", e, t, nodeType, nodeName) end)
+        node:Subscribe("ManipulationStarted", function (e, t) print("ManipulationStarted", e, t, nodeType, nodeName) end)
+        node:Subscribe("ManipulationDelta", function (e, t) print("ManipulationDelta", e, t, nodeType, nodeName) end)
+        node:Subscribe("ManipulationInertiaStarting", function (e, t) print("ManipulationInertiaStarting", e, t, nodeType, nodeName) end)
+        node:Subscribe("ManipulationCompleted", function (e, t) print("ManipulationCompleted", e, t, nodeType, nodeName) end)
+        node:Subscribe("Tapped", function (e, t) print("Tapped", e, t, nodeType, nodeName) end)
+        node:Subscribe("DoubleTapped", function (e, t) print("DoubleTapped", e, t, nodeType, nodeName) end)
+        node:Subscribe("Holding", function (e, t) print("Holding", e, t, nodeType, nodeName) end)
+        node:Subscribe("RightTapped", function (e, t) print("RightTapped", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewGotKeyboardFocus", function (e, t) print("PreviewGotKeyboardFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewKeyDown", function (e, t) print("PreviewKeyDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewKeyUp", function (e, t) print("PreviewKeyUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewLostKeyboardFocus", function (e, t) print("PreviewLostKeyboardFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseDown", function (e, t) print("PreviewMouseDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseLeftButtonDown", function (e, t) print("PreviewMouseLeftButtonDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseLeftButtonUp", function (e, t) print("PreviewMouseLeftButtonUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseMove", function (e, t) print("PreviewMouseMove", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseRightButtonDown", function (e, t) print("PreviewMouseRightButtonDown", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseRightButtonUp", function (e, t) print("PreviewMouseRightButtonUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseUp", function (e, t) print("PreviewMouseUp", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewMouseWheel", function (e, t) print("PreviewMouseWheel", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewTextInput", function (e, t) print("PreviewTextInput", e, t, nodeType, nodeName) end)
+        node:Subscribe("QueryCursor", function (e, t) print("QueryCursor", e, t, nodeType, nodeName) end)
+        node:Subscribe("TextInput", function (e, t) print("TextInput", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewQueryContinueDrag", function (e, t) print("PreviewQueryContinueDrag", e, t, nodeType, nodeName) end)
+        node:Subscribe("QueryContinueDrag", function (e, t) print("QueryContinueDrag", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewGiveFeedback", function (e, t) print("PreviewGiveFeedback", e, t, nodeType, nodeName) end)
+        node:Subscribe("GiveFeedback", function (e, t) print("GiveFeedback", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewDragEnter", function (e, t) print("PreviewDragEnter", e, t, nodeType, nodeName) end)
+        node:Subscribe("DragEnter", function (e, t) print("DragEnter", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewDragOver", function (e, t) print("PreviewDragOver", e, t, nodeType, nodeName) end)
+        node:Subscribe("DragOver", function (e, t) print("DragOver", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewDragLeave", function (e, t) print("PreviewDragLeave", e, t, nodeType, nodeName) end)
+        node:Subscribe("DragLeave", function (e, t) print("DragLeave", e, t, nodeType, nodeName) end)
+        node:Subscribe("PreviewDrop", function (e, t) print("PreviewDrop", e, t, nodeType, nodeName) end)
+        node:Subscribe("Drop", function (e, t) print("Drop", e, t, nodeType, nodeName) end)
+        node:Subscribe("GotMouseCapture", function (e, t) print("GotMouseCapture", e, t, nodeType, nodeName) end)
+    end
+end
+
+local function attachListenersToControllerButtons(node, uuid, visited)
+    local status, result = pcall(investigateNode, node)
+    if not status then
+        print("Error:", result)
+    end
+end
+
+-- thank u focus
+function mapHotBarButtons(node, uuid, attachListeners, visited)
+    visited = visited or {}
+    if not visited[node] then
+        visited[node] = true
+        attachListeners(node, uuid, visited)
+        local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
+        local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
+        if childrenCount > 0 then
+            for i = 1, childrenCount do
+                local childNode = node:Child(i)
+                if childNode then
+                    mapHotBarButtons(childNode, uuid, attachListeners, visited)
+                end
+            end
+        end
+        if visualChildrenCount > 0 then
+            for i = 1, visualChildrenCount do
+                local visualChildNode = node:VisualChild(i)
+                if visualChildNode then
+                    mapHotBarButtons(visualChildNode, uuid, attachListeners, visited)
+                end
+            end
+        end
+    end
+end
+
 -- thank u volitio
 function checkForHotBar(uuid)
     -- nb: use OnCreateDeferred instead?
@@ -263,17 +333,33 @@ function checkForHotBar(uuid)
     end)
 end
 
+local function onControllerButtonInput(e)
+    -- print("controller button pressed")
+    -- _D(e)
+    if e.Pressed == true and tostring(e.Button) == "LeftStick" then
+        -- local uuid = getDirectlyControlledCharacter()
+        -- mapHotBarButtons(Ext.UI.GetRoot(), uuid, attachListenersToControllerButtons)
+        Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
+        if tostring(e.Button) == "RightStick" and isInFTB(getDirectlyControlledCharacter()) then
+            Ext.ClientNet.PostMessageToServer("ExitFTB", "")
+        end
+        -- if UseCombatControllerControls then
+        --     e:PreventAction()
+        -- end
+    end
+end
+
 local function onNetMessage(data)
     if data.Channel == "Started" then
         checkForHotBar(getDirectlyControlledCharacter())
     elseif data.Channel == "GainedControl" then
-        print("gained control", data.Payload)
         DirectlyControlledCharacter = data.Payload
         checkForHotBar(DirectlyControlledCharacter)
+    elseif data.Channel == "UseCombatControllerControls" then
+        UseCombatControllerControls = data.Payload == "1"
     elseif data.Channel == "ClearActionQueue" then
         ActionQueue[data.Payload] = nil
     elseif data.Channel == "SpellCastIsCasting" then
-        print("Client got SpellCastIsCasting", data.Payload)
         ShouldPreventAction[data.Payload] = true
     end
 end
@@ -282,16 +368,10 @@ local function onMouseButtonInput(e)
     if e.Pressed then
         if e.Button == 1 then
             if not IsMouseOverHotBar then
-                print("mouse button input 1")
                 local uuid = getDirectlyControlledCharacter()
-                print(uuid)
-                print("should prevent action?")
-                _D(ShouldPreventAction)
                 if ShouldPreventAction[uuid] and isInFTB(uuid) then
                     if ActionQueue[uuid] ~= nil and ActionQueue[uuid].spellName ~= nil then
                         ActionQueue[uuid].target = getPositionInfo()
-                        print("updated ActionQueue with target")
-                        _D(ActionQueue)
                         Ext.ClientNet.PostMessageToServer("ActionQueue", Ext.Json.Stringify(ActionQueue))
                         ShouldPreventAction[uuid] = false
                         e:PreventAction()
@@ -312,6 +392,9 @@ local function onSessionLoaded()
     Ext.Events.ControllerButtonInput:Subscribe(onControllerButtonInput)
     Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)
     Ext.Events.NetMessage:Subscribe(onNetMessage)
+    -- Ext.Entity.OnCreateDeferred("HotbarContainer", function (entity, x, y)
+    --     print("OnCreateDeferred", entity, x, y)
+    -- end)
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)
