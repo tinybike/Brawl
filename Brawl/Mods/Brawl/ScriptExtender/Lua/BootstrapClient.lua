@@ -9,6 +9,7 @@ end
 local IsShiftPressed = false
 local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
+local IsUsingController = false
 local UseCombatControllerControls = false
 local IsMouseOverHotBar = false
 local HotBarListeners = nil
@@ -334,15 +335,19 @@ function checkForHotBar(uuid)
 end
 
 local function onControllerButtonInput(e)
-    -- print("controller button pressed")
-    -- _D(e)
-    if e.Pressed == true and tostring(e.Button) == "LeftStick" then
-        -- local uuid = getDirectlyControlledCharacter()
-        -- mapHotBarButtons(Ext.UI.GetRoot(), uuid, attachListenersToControllerButtons)
+    if e.Pressed == true then
+        if not IsUsingController then
+            IsUsingController = true
+            Ext.ClientNet.PostMessageToServer("IsUsingController", "1")
+        end    
         Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
         if tostring(e.Button) == "RightStick" and isInFTB(getDirectlyControlledCharacter()) then
             Ext.ClientNet.PostMessageToServer("ExitFTB", "")
         end
+        -- if tostring(e.Button) == "LeftStick" then
+        --     local uuid = getDirectlyControlledCharacter()
+        --     mapHotBarButtons(Ext.UI.GetRoot(), uuid, attachListenersToControllerButtons)
+        -- end
         -- if UseCombatControllerControls then
         --     e:PreventAction()
         -- end
@@ -351,10 +356,14 @@ end
 
 local function onNetMessage(data)
     if data.Channel == "Started" then
-        checkForHotBar(getDirectlyControlledCharacter())
+        if not IsUsingController then
+            checkForHotBar(getDirectlyControlledCharacter())
+        end
     elseif data.Channel == "GainedControl" then
         DirectlyControlledCharacter = data.Payload
-        checkForHotBar(DirectlyControlledCharacter)
+        if not IsUsingController then
+            checkForHotBar(DirectlyControlledCharacter)
+        end
     elseif data.Channel == "UseCombatControllerControls" then
         UseCombatControllerControls = data.Payload == "1"
     elseif data.Channel == "ClearActionQueue" then
@@ -366,6 +375,11 @@ end
 
 local function onMouseButtonInput(e)
     if e.Pressed then
+        if IsUsingController then
+            IsUsingController = false
+            Ext.ClientNet.PostMessageToServer("IsUsingController", "0")
+            checkForHotBar(getDirectlyControlledCharacter())
+        end
         if e.Button == 1 then
             if not IsMouseOverHotBar then
                 local uuid = getDirectlyControlledCharacter()
