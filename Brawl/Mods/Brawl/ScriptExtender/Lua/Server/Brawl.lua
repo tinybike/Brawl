@@ -218,6 +218,19 @@ function getPlayerByUserId(userId)
     return nil
 end
 
+local function isInFTB(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function addActionResourceBlockMovement(uuid)
+    Osi.AddBoosts(uuid, "ActionResourceBlock(Movement)", "Brawl", "1")
+end
+
+local function removeActionResourceBlockMovement(uuid)
+    Osi.RemoveBoosts(uuid, "ActionResourceBlock(Movement)", 0, "Brawl", "1")
+end
+
 local function getBrawlerByUuid(uuid)
     local level = Osi.GetRegion(uuid)
     if level and Brawlers[level] then
@@ -435,15 +448,13 @@ function getSpellByName(name)
 end
 
 function checkSpellCharge(casterUuid, spellName)
-    print("checking spell charge", casterUuid, spellName)
+    debugPrint("checking spell charge", casterUuid, spellName)
     if spellName then
         local entity = Ext.Entity.Get(casterUuid)
         if entity and entity.SpellBook and entity.SpellBook.Spells then
             for i, spell in ipairs(entity.SpellBook.Spells) do
                 -- NB: OriginatorPrototype or Prototype?
                 if spell.Id.Prototype == spellName then
-                    print("found spell in book")
-                    _D(spell)
                     if spell.Charged == false then
                         debugPrint("spell is not charged", spellName, casterUuid)
                         return false
@@ -456,8 +467,6 @@ function checkSpellCharge(casterUuid, spellName)
     return false
 end
 
--- NB: these need to account for cooldowns as well, are these attached to entity or...?
--- NB: system also needs to handle movement somehow -- do we queue that up, or just set to 0 temporarily? how about jumps etc, that don't trigger OnSpellcastCasting?
 function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
@@ -971,7 +980,6 @@ function findTarget(brawler)
                 local friendlyTargetUuid = nil
                 for targetUuid, target in pairs(Brawlers[level]) do
                     if isOnSameLevel(brawler.uuid, targetUuid) and Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
-                        -- print("Enemy isally check", brawler.uuid, brawler.displayName, targetUuid, getDisplayName(targetUuid), Osi.IsAlly(brawler.uuid, targetUuid))
                         local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
                         if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
                             minTargetHpPct = targetHpPct
@@ -1783,6 +1791,61 @@ function setupPartyMembersHitpoints()
     end
 end
 
+local function startTruePause(entityUuid)
+    -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
+    -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
+    -- eoc::TurnBasedComponent: Replicated (all characters)
+    if TruePause and Osi.IsPartyMember(entityUuid, 1) == 1 then
+        addActionResourceBlockMovement(entityUuid)
+        if SpellCastMovementListeners[entityUuid] == nil then
+            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (entity, _, _)
+                debugPrint("TurnBased", entity, entityUuid)
+                if entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and entity.TurnBased.RequestedEndTurn and not entity.TurnBased.IsInCombat_M then
+                    entity.TurnBased.IsInCombat_M = true
+                    entity:Replicate("TurnBased")
+                    FTBLockedIn[entityUuid] = false
+                end
+            end, Ext.Entity.Get(entityUuid))
+            -- NB: can specify only the specific cast entity?
+            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, _)
+                local caster = entity.SpellCastState.Caster
+                if caster.Uuid.EntityUuid == entityUuid then
+                    debugPrint("SpellCastMovement", caster, entityUuid)
+                    -- _D(caster.FTBParticipant.field_18:GetAllComponents())
+                    if caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
+                        if caster.SpellCastIsCasting and caster.SpellCastIsCasting.Cast and caster.SpellCastIsCasting.Cast.SpellCastState then
+                            local spellCastState = caster.SpellCastIsCasting.Cast.SpellCastState
+                            if spellCastState.Targets then
+                                local target = spellCastState.Targets[1]
+                                if target and (target.Position or target.Target) then
+                                    caster.TurnBased.IsInCombat_M = false
+                                    caster:Replicate("TurnBased")
+                                    FTBLockedIn[entityUuid] = true
+                                    if isFTBAllLockedIn() then
+                                        allExitFTB()
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function stopTruePause(entityUuid)
+    if Osi.IsPartyMember(entityUuid, 1) == 1 then
+        removeActionResourceBlockMovement(entityUuid)
+        if SpellCastMovementListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(TurnBasedListeners[entityUuid])
+            TurnBasedListeners[entityUuid] = nil
+            Ext.Entity.Unsubscribe(SpellCastMovementListeners[entityUuid])
+            SpellCastMovementListeners[entityUuid] = nil
+        end
+    end
+end
+
 function onStarted(level)
     debugPrint("onStarted")
     resetSpellData()
@@ -1793,6 +1856,13 @@ function onStarted(level)
     resetPlayersMovementSpeed()
     setupPartyMembersHitpoints()
     initBrawlers(level)
+    for uuid, _ in pairs(Players) do
+        if isInFTB(uuid) then
+            startTruePause(uuid)
+        else
+            stopTruePause(uuid)
+        end
+    end
     debugDump(Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -1948,44 +2018,7 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
-        -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
-        -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
-        -- eoc::TurnBasedComponent: Replicated (all characters)
-        --     set movement speed to zero while paused?
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastMovementListeners[entityUuid] == nil then
-            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (entity, _, _)
-                debugPrint("TurnBased", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
-                if entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and entity.TurnBased.RequestedEndTurn and not entity.TurnBased.IsInCombat_M then
-                    entity.TurnBased.IsInCombat_M = true
-                    entity:Replicate("TurnBased")
-                    FTBLockedIn[entity.Uuid.EntityUuid] = false
-                end
-            end, Ext.Entity.Get(entityUuid))
-            -- NB: can specify only the specific cast entity?
-            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, _)
-                local caster = entity.SpellCastState.Caster
-                if caster.Uuid.EntityUuid == entityUuid then
-                    debugPrint("SpellCastMovement", caster)
-                    -- _D(caster.FTBParticipant.field_18:GetAllComponents())
-                    if caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
-                        if caster.SpellCastIsCasting and caster.SpellCastIsCasting.Cast and caster.SpellCastIsCasting.Cast.SpellCastState then
-                            local spellCastState = caster.SpellCastIsCasting.Cast.SpellCastState
-                            if spellCastState.Targets then
-                                local target = spellCastState.Targets[1]
-                                if target and (target.Position or target.Target) then
-                                    caster.TurnBased.IsInCombat_M = false
-                                    caster:Replicate("TurnBased")
-                                    FTBLockedIn[caster.Uuid.EntityUuid] = true
-                                    if isFTBAllLockedIn() then
-                                        allExitFTB()
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)    
-        end
+        startTruePause(entityUuid)
     end
 end
 
@@ -2007,12 +2040,7 @@ function onLeftForceTurnBased(entityGuid)
             ActionQueue[entityUuid] = nil
             Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)
         end
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastMovementListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(TurnBasedListeners[entityUuid])
-            TurnBasedListeners[entityUuid] = nil
-            Ext.Entity.Unsubscribe(SpellCastMovementListeners[entityUuid])
-            SpellCastMovementListeners[entityUuid] = nil
-        end
+        stopTruePause(entityUuid)
         -- nb: is there a better way to do this than just adding a delay?
         Ext.Timer.WaitFor(2000, function ()
             if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
@@ -2570,6 +2598,8 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "companion_ai_max_spell_level" then
         CompanionAIMaxSpellLevel = payload.value
+    elseif payload.settingId == "true_pause" then
+        TruePause = payload.value
     elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
