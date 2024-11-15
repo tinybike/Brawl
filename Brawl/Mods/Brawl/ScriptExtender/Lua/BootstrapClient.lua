@@ -66,6 +66,7 @@ end
 local function getFTBItem()
     local node = findNodeByName(Ext.UI.GetRoot(), "FTBItem")
     _D(node)
+    _D(node:GetAllProperties())
     return node
 end
 
@@ -211,14 +212,22 @@ local function investigateNode(node)
     local name = node:GetProperty("Name")
     if name ~= nil then
         local nodeName = tostring(name)
-        _D(node:GetAllProperties())
+        -- node:Subscribe("UIAccept", function (e, t) print("UIAccept", e, t, nodeType, nodeName) end)
         node:Subscribe("GotFocus", function (e, t) print("GotFocus", e, t, nodeType, nodeName) end)
         node:Subscribe("GotKeyboardFocus", function (e, t) print("GotKeyboardFocus", e, t, nodeType, nodeName) end)
         node:Subscribe("GotMouseCapture", function (e, t) print("GotMouseCapture", e, t, nodeType, nodeName) end)
         node:Subscribe("KeyDown", function (e, t) print("KeyDown", e, t, nodeType, nodeName) end)
         node:Subscribe("KeyUp", function (e, t) print("KeyUp", e, t, nodeType, nodeName) end)
-        node:Subscribe("LostFocus", function (e, t) print("LostFocus", e, t, nodeType, nodeName) end)
-        node:Subscribe("LostKeyboardFocus", function (e, t) print("LostKeyboardFocus", e, t, nodeType, nodeName) end)
+        node:Subscribe("LostFocus", function (e, t)
+            print("LostFocus", e, t, nodeType, nodeName)
+            _D(e)
+            _D(e:GetAllProperties())
+        end)
+        node:Subscribe("LostKeyboardFocus", function (e, t)
+            print("LostKeyboardFocus", e, t, nodeType, nodeName)
+            _D(e)
+            _D(e:GetAllProperties())
+        end)
         node:Subscribe("LostMouseCapture", function (e, t) print("LostMouseCapture", e, t, nodeType, nodeName) end)
         node:Subscribe("MouseDown", function (e, t) print("MouseDown", e, t, nodeType, nodeName) end)
         node:Subscribe("MouseEnter", function (e, t) print("MouseEnter", e, t, nodeType, nodeName) end)
@@ -347,6 +356,8 @@ local function onControllerButtonInput(e)
         -- if tostring(e.Button) == "LeftStick" then
         --     local uuid = getDirectlyControlledCharacter()
         --     mapHotBarButtons(Ext.UI.GetRoot(), uuid, attachListenersToControllerButtons)
+        --     local FTBItem = getFTBItem()
+        --     investigateNode(FTBItem)
         -- end
         -- if UseCombatControllerControls then
         --     e:PreventAction()

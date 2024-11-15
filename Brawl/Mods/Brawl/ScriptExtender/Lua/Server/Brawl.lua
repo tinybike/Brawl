@@ -1,3 +1,5 @@
+Ext.Require("Server/ECSPrinter.lua")
+
 -- MCM Settings
 local ModEnabled = true
 local CompanionAIEnabled = true
@@ -1809,6 +1811,8 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
+    -- Printer:Start()
+    -- SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -1947,6 +1951,8 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
+        -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
+        -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
         if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] == nil then
             SpellCastIsCastingListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastIsCasting", function (entity, _, component)
                 debugPrint("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
@@ -1954,27 +1960,54 @@ local function onEnteredForceTurnBased(entityGuid)
                     -- Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "SpellCastIsCasting", entity.Uuid.EntityUuid)
                 end
             end, Ext.Entity.Get(entityUuid))
-            DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
-                debugPrint("DynamicAnimationTags", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
-                if IsUsingController[entity.UserReservedFor.UserID] and entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
-                    if entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState then
-                        local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
-                        if spellCastState.Targets then
-                            local target = spellCastState.Targets[1]
-                            if target and (target.Position or target.Target) then
-                                -- entity.TurnBased.CanAct_M = false
-                                -- entity.TurnBased.HadTurnInCombat = false
-                                entity.TurnBased.IsInCombat_M = false
-                                entity:Replicate("TurnBased")
-                                FTBLockedIn[entity.Uuid.EntityUuid] = true
-                                if isFTBAllLockedIn() then
-                                    allExitFTB()
+            -- DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastTargetsChangedEvent", function (entity, _, component)
+            DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, component)
+                local caster = entity.SpellCastState.Caster
+                if caster.Uuid.EntityUuid == entityUuid then
+                    debugPrint("SpellCastMovement", caster)
+                    -- _D(caster.FTBParticipant)
+                    -- _D(caster.FTBParticipant.field_18:GetAllComponents())
+                    if IsUsingController[caster.UserReservedFor.UserID] and caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
+                        if caster.SpellCastIsCasting and caster.SpellCastIsCasting.Cast and caster.SpellCastIsCasting.Cast.SpellCastState then
+                            local spellCastState = caster.SpellCastIsCasting.Cast.SpellCastState
+                            if spellCastState.Targets then
+                                local target = spellCastState.Targets[1]
+                                if target and (target.Position or target.Target) then
+                                    -- caster.TurnBased.CanAct_M = false
+                                    -- caster.TurnBased.HadTurnInCombat = false
+                                    caster.TurnBased.IsInCombat_M = false
+                                    caster:Replicate("TurnBased")
+                                    FTBLockedIn[caster.Uuid.EntityUuid] = true
+                                    if isFTBAllLockedIn() then
+                                        allExitFTB()
+                                    end
                                 end
                             end
                         end
                     end
                 end
-            end, Ext.Entity.Get(entityUuid))
+            end)    
+            -- DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
+            --     debugPrint("DynamicAnimationTags", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
+            --     if IsUsingController[entity.UserReservedFor.UserID] and entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
+            --         if entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState then
+            --             local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
+            --             if spellCastState.Targets then
+            --                 local target = spellCastState.Targets[1]
+            --                 if target and (target.Position or target.Target) then
+            --                     -- entity.TurnBased.CanAct_M = false
+            --                     -- entity.TurnBased.HadTurnInCombat = false
+            --                     entity.TurnBased.IsInCombat_M = false
+            --                     entity:Replicate("TurnBased")
+            --                     FTBLockedIn[entity.Uuid.EntityUuid] = true
+            --                     if isFTBAllLockedIn() then
+            --                         allExitFTB()
+            --                     end
+            --                 end
+            --             end
+            --         end
+            --     end
+            -- end, Ext.Entity.Get(entityUuid))
         end
     end
 end
@@ -2602,7 +2635,6 @@ function allExitFTB()
         if IsUsingController[Players[uuid].userId] then
             local entity = Ext.Entity.Get(uuid)
             if entity.TurnBased and entity.TurnBased.IsInCombat_M == false then
-                print("setting is in combat m to true for", Players[uuid].userId, uuid)
                 entity.TurnBased.IsInCombat_M = true
                 entity:Replicate("TurnBased")
             end
@@ -2715,6 +2747,8 @@ local function onNetMessage(data)
 end
 
 function onSessionLoaded()
+    -- Printer:Start()
+    -- SpellPrinter:Start()
     Ext.Events.NetMessage:Subscribe(onNetMessage)
     if ModEnabled then
         startListeners()
