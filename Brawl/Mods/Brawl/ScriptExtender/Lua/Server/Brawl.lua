@@ -1,4 +1,4 @@
-Ext.Require("Server/ECSPrinter.lua")
+-- Ext.Require("Server/ECSPrinter.lua")
 
 -- MCM Settings
 local ModEnabled = true
@@ -133,6 +133,7 @@ local CONTROLLER_TO_SLOT = {
     -- Start = nil,
     -- Touchpad = nil,
     -- LeftStick = nil,
+    -- RightStick = nil,
 }
 
 -- Session state
@@ -149,11 +150,9 @@ ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
 PartyMembersHitpointsListeners = {}
-SpellCastIsCastingListeners = {}
-DynamicAnimationTagsListeners = {}
-ActionQueue = {}
+TurnBasedListeners = {}
+SpellCastMovementListeners = {}
 FTBLockedIn = {}
-IsUsingController = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -295,8 +294,6 @@ function isNpcSpellUsable(spell, archetype)
         if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
     end
-    -- if spell == "Throw_Throw" then return false end
-    -- if spell == "Target_MainHandAttack" then return false end
     return true
 end
 
@@ -1953,28 +1950,29 @@ local function onEnteredForceTurnBased(entityGuid)
         end
         -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
         -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] == nil then
-            SpellCastIsCastingListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastIsCasting", function (entity, _, component)
-                debugPrint("SpellCastIsCasting", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
-                if entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
-                    -- Ext.ServerNet.PostMessageToUser(entity.UserReservedFor.UserID, "SpellCastIsCasting", entity.Uuid.EntityUuid)
+        -- eoc::TurnBasedComponent: Replicated (all characters)
+        --     set movement speed to zero while paused?
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastMovementListeners[entityUuid] == nil then
+            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (entity, _, _)
+                debugPrint("TurnBased", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
+                if entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and entity.TurnBased.RequestedEndTurn and not entity.TurnBased.IsInCombat_M then
+                    entity.TurnBased.IsInCombat_M = true
+                    entity:Replicate("TurnBased")
+                    FTBLockedIn[entity.Uuid.EntityUuid] = false
                 end
             end, Ext.Entity.Get(entityUuid))
-            -- DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastTargetsChangedEvent", function (entity, _, component)
-            DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, component)
+            -- NB: can specify only the specific cast entity?
+            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, _)
                 local caster = entity.SpellCastState.Caster
                 if caster.Uuid.EntityUuid == entityUuid then
                     debugPrint("SpellCastMovement", caster)
-                    -- _D(caster.FTBParticipant)
                     -- _D(caster.FTBParticipant.field_18:GetAllComponents())
-                    if IsUsingController[caster.UserReservedFor.UserID] and caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
+                    if caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
                         if caster.SpellCastIsCasting and caster.SpellCastIsCasting.Cast and caster.SpellCastIsCasting.Cast.SpellCastState then
                             local spellCastState = caster.SpellCastIsCasting.Cast.SpellCastState
                             if spellCastState.Targets then
                                 local target = spellCastState.Targets[1]
                                 if target and (target.Position or target.Target) then
-                                    -- caster.TurnBased.CanAct_M = false
-                                    -- caster.TurnBased.HadTurnInCombat = false
                                     caster.TurnBased.IsInCombat_M = false
                                     caster:Replicate("TurnBased")
                                     FTBLockedIn[caster.Uuid.EntityUuid] = true
@@ -1987,27 +1985,6 @@ local function onEnteredForceTurnBased(entityGuid)
                     end
                 end
             end)    
-            -- DynamicAnimationTagsListeners[entityUuid] = Ext.Entity.Subscribe("DynamicAnimationTags", function (entity, _, _)
-            --     debugPrint("DynamicAnimationTags", entity, entity.Uuid.EntityUuid, entity.UserReservedFor.UserID)
-            --     if IsUsingController[entity.UserReservedFor.UserID] and entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil then
-            --         if entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState then
-            --             local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
-            --             if spellCastState.Targets then
-            --                 local target = spellCastState.Targets[1]
-            --                 if target and (target.Position or target.Target) then
-            --                     -- entity.TurnBased.CanAct_M = false
-            --                     -- entity.TurnBased.HadTurnInCombat = false
-            --                     entity.TurnBased.IsInCombat_M = false
-            --                     entity:Replicate("TurnBased")
-            --                     FTBLockedIn[entity.Uuid.EntityUuid] = true
-            --                     if isFTBAllLockedIn() then
-            --                         allExitFTB()
-            --                     end
-            --                 end
-            --             end
-            --         end
-            --     end
-            -- end, Ext.Entity.Get(entityUuid))
         end
     end
 end
@@ -2030,11 +2007,11 @@ function onLeftForceTurnBased(entityGuid)
             ActionQueue[entityUuid] = nil
             Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)
         end
-        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastIsCastingListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(SpellCastIsCastingListeners[entityUuid])
-            SpellCastIsCastingListeners[entityUuid] = nil
-            Ext.Entity.Unsubscribe(DynamicAnimationTagsListeners[entityUuid])
-            DynamicAnimationTagsListeners[entityUuid] = nil
+        if Osi.IsPartyMember(entityUuid, 1) == 1 and SpellCastMovementListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(TurnBasedListeners[entityUuid])
+            TurnBasedListeners[entityUuid] = nil
+            Ext.Entity.Unsubscribe(SpellCastMovementListeners[entityUuid])
+            SpellCastMovementListeners[entityUuid] = nil
         end
         -- nb: is there a better way to do this than just adding a delay?
         Ext.Timer.WaitFor(2000, function ()
@@ -2632,12 +2609,10 @@ end
 function allExitFTB()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        if IsUsingController[Players[uuid].userId] then
-            local entity = Ext.Entity.Get(uuid)
-            if entity.TurnBased and entity.TurnBased.IsInCombat_M == false then
-                entity.TurnBased.IsInCombat_M = true
-                entity:Replicate("TurnBased")
-            end
+        local entity = Ext.Entity.Get(uuid)
+        if entity.TurnBased and entity.TurnBased.IsInCombat_M == false then
+            entity.TurnBased.IsInCombat_M = true
+            entity:Replicate("TurnBased")
         end
         Osi.ForceTurnBasedMode(uuid, 0)
     end
@@ -2662,25 +2637,8 @@ local function onNetMessage(data)
         else
             toggleFullAuto(data.Payload)
         end
-    elseif data.Channel == "ActionQueue" then
-        print("server action queue updated")
-        ActionQueue = Ext.Json.Parse(data.Payload)
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player and player.uuid then
-            local entity = Ext.Entity.Get(player.uuid)
-            -- entity.TurnBased.CanAct_M = false
-            -- entity.TurnBased.HadTurnInCombat = false
-            entity.TurnBased.IsInCombat_M = false
-            entity:Replicate("TurnBased")
-            FTBLockedIn[player.uuid] = true
-            if isFTBAllLockedIn() then
-                allExitFTB()
-            end
-        end
     elseif data.Channel == "ExitFTB" then
         allExitFTB()
-    elseif data.Channel == "IsUsingController" then
-        IsUsingController[peerToUserId(data.UserID)] = data.Payload == "1"
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
@@ -2747,8 +2705,6 @@ local function onNetMessage(data)
 end
 
 function onSessionLoaded()
-    -- Printer:Start()
-    -- SpellPrinter:Start()
     Ext.Events.NetMessage:Subscribe(onNetMessage)
     if ModEnabled then
         startListeners()
