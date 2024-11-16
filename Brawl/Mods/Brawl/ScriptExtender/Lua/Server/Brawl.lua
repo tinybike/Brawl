@@ -3,22 +3,23 @@
 -- MCM Settings
 local ModEnabled = true
 local CompanionAIEnabled = true
-local CompanionAIMaxSpellLevel = 0
+local TruePause = true
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
-local TruePause = true
 local TavArchetype = "melee"
+local CompanionAIMaxSpellLevel = 0
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
-    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
+    TruePause = MCM.Get("true_pause")
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     TavArchetype = string.lower(MCM.Get("tav_archetype"))
+    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
 end
 
 -- Constants
@@ -1791,6 +1792,27 @@ function setupPartyMembersHitpoints()
     end
 end
 
+local function isLocked(entity)
+    return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
+end
+
+local function unlock(entity)
+    if isLocked(entity) then
+        entity.TurnBased.IsInCombat_M = true
+        entity:Replicate("TurnBased")
+        FTBLockedIn[entity.Uuid.EntityUuid] = false
+    end
+end
+
+local function lock(entity)
+    entity.TurnBased.IsInCombat_M = false
+    entity:Replicate("TurnBased")
+    FTBLockedIn[entity.Uuid.EntityUuid] = true
+    if isFTBAllLockedIn() then
+        allExitFTB()
+    end
+end
+
 local function startTruePause(entityUuid)
     -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
     -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
@@ -1800,10 +1822,8 @@ local function startTruePause(entityUuid)
         if SpellCastMovementListeners[entityUuid] == nil then
             TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (entity, _, _)
                 debugPrint("TurnBased", entity, entityUuid)
-                if entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and entity.TurnBased.RequestedEndTurn and not entity.TurnBased.IsInCombat_M then
-                    entity.TurnBased.IsInCombat_M = true
-                    entity:Replicate("TurnBased")
-                    FTBLockedIn[entityUuid] = false
+                if isLocked(entity) and entity.TurnBased.RequestedEndTurn then
+                    unlock(entity)
                 end
             end, Ext.Entity.Get(entityUuid))
             -- NB: can specify only the specific cast entity?
@@ -1818,12 +1838,7 @@ local function startTruePause(entityUuid)
                             if spellCastState.Targets then
                                 local target = spellCastState.Targets[1]
                                 if target and (target.Position or target.Target) then
-                                    caster.TurnBased.IsInCombat_M = false
-                                    caster:Replicate("TurnBased")
-                                    FTBLockedIn[entityUuid] = true
-                                    if isFTBAllLockedIn() then
-                                        allExitFTB()
-                                    end
+                                    lock(caster)
                                 end
                             end
                         end
@@ -1846,6 +1861,23 @@ local function stopTruePause(entityUuid)
     end
 end
 
+local function checkTruePauseParty()
+    if TruePause then
+        for uuid, _ in pairs(Players) do
+            if isInFTB(uuid) then
+                startTruePause(uuid)
+            else
+                stopTruePause(uuid)
+            end
+        end
+    else
+        for uuid, _ in pairs(Players) do
+            stopTruePause(uuid)
+            unlock(Ext.Entity.Get(uuid))
+        end
+    end
+end
+
 function onStarted(level)
     debugPrint("onStarted")
     resetSpellData()
@@ -1856,13 +1888,7 @@ function onStarted(level)
     resetPlayersMovementSpeed()
     setupPartyMembersHitpoints()
     initBrawlers(level)
-    for uuid, _ in pairs(Players) do
-        if isInFTB(uuid) then
-            startTruePause(uuid)
-        else
-            stopTruePause(uuid)
-        end
-    end
+    checkTruePauseParty()
     debugDump(Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -1878,8 +1904,6 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    -- Printer:Start()
-    -- SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -2600,6 +2624,7 @@ local function onMCMSettingSaved(payload)
         CompanionAIMaxSpellLevel = payload.value
     elseif payload.settingId == "true_pause" then
         TruePause = payload.value
+        checkTruePauseParty()
     elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
@@ -2639,11 +2664,7 @@ end
 function allExitFTB()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        local entity = Ext.Entity.Get(uuid)
-        if entity.TurnBased and entity.TurnBased.IsInCombat_M == false then
-            entity.TurnBased.IsInCombat_M = true
-            entity:Replicate("TurnBased")
-        end
+        unlock(Ext.Entity.Get(uuid))
         Osi.ForceTurnBasedMode(uuid, 0)
     end
 end
