@@ -1,19 +1,25 @@
+-- Ext.Require("Server/ECSPrinter.lua")
+
 -- MCM Settings
 local ModEnabled = true
 local CompanionAIEnabled = true
-local CompanionAIMaxSpellLevel = 0
+local TruePause = true
 local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
+local TavArchetype = "melee"
+local CompanionAIMaxSpellLevel = 0
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
-    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
+    TruePause = MCM.Get("true_pause")
     AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
+    TavArchetype = string.lower(MCM.Get("tav_archetype"))
+    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
 end
 
 -- Constants
@@ -128,6 +134,7 @@ local CONTROLLER_TO_SLOT = {
     -- Start = nil,
     -- Touchpad = nil,
     -- LeftStick = nil,
+    -- RightStick = nil,
 }
 
 -- Session state
@@ -143,7 +150,13 @@ IsAttackingOrBeingAttackedByPlayer = {}
 ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
+MovementQueue = {}
 PartyMembersHitpointsListeners = {}
+ActionResourcesListeners = {}
+TurnBasedListeners = {}
+SpellCastMovementListeners = {}
+FTBLockedIn = {}
+LastClickPosition = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -198,7 +211,7 @@ function getDisplayName(entityUuid)
     return Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
 end
 
-local function getPlayerByUserId(userId)
+function getPlayerByUserId(userId)
     if Players then
         for uuid, player in pairs(Players) do
             if player.userId == userId and player.isControllingDirectly then
@@ -207,6 +220,19 @@ local function getPlayerByUserId(userId)
         end
     end
     return nil
+end
+
+local function isInFTB(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function addActionResourceBlockMovement(uuid)
+    Osi.AddBoosts(uuid, "ActionResourceBlock(Movement)", "Brawl", "1")
+end
+
+local function removeActionResourceBlockMovement(uuid)
+    Osi.RemoveBoosts(uuid, "ActionResourceBlock(Movement)", 0, "Brawl", "1")
 end
 
 local function getBrawlerByUuid(uuid)
@@ -218,7 +244,7 @@ local function getBrawlerByUuid(uuid)
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
-local function peerToUserId(peerId)
+function peerToUserId(peerId)
     return (peerId & 0xffff0000) | 0x0001
 end
 
@@ -285,8 +311,6 @@ function isNpcSpellUsable(spell, archetype)
         if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
     end
-    -- if spell == "Throw_Throw" then return false end
-    -- if spell == "Target_MainHandAttack" then return false end
     return true
 end
 
@@ -371,7 +395,7 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     --     end
     -- end
     debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
-    Osi.PurgeOsirisQueue(attackerUuid, 1)
+    -- Osi.PurgeOsirisQueue(attackerUuid, 1)
     Osi.FlushOsirisQueue(attackerUuid)
     Osi.UseSpell(attackerUuid, spellName, targetUuid)
 end
@@ -427,14 +451,28 @@ function getSpellByName(name)
     return nil
 end
 
-function useSpellAndResources(casterUuid, targetUuid, spellName)
-    local entity = Ext.Entity.Get(casterUuid)
-    local spell = getSpellByName(spellName)
-    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
-    if targetUuid then
-        debugPrint("on", targetUuid, getDisplayName(targetUuid))
+function checkSpellCharge(casterUuid, spellName)
+    debugPrint("checking spell charge", casterUuid, spellName)
+    if spellName then
+        local entity = Ext.Entity.Get(casterUuid)
+        if entity and entity.SpellBook and entity.SpellBook.Spells then
+            for i, spell in ipairs(entity.SpellBook.Spells) do
+                -- NB: OriginatorPrototype or Prototype?
+                if spell.Id.Prototype == spellName then
+                    if spell.Charged == false then
+                        debugPrint("spell is not charged", spellName, casterUuid)
+                        return false
+                    end
+                end
+            end
+            return true
+        end
     end
-    debugDump(spell.costs)
+    return false
+end
+
+function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
+    local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
     for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
         if preparedSpell.OriginatorPrototype == spellName then
@@ -446,10 +484,28 @@ function useSpellAndResources(casterUuid, targetUuid, spellName)
         debugPrint("Caster does not have spell", spellName, "prepared")
         return false
     end
+    if variant ~= nil then
+        spellName = variant
+    end
+    local spell = getSpellByName(spellName)
+    if not spell then
+        debugPrint("Error: spell not found")
+        return false
+    end
+    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
+    -- NB: spell.costs doesn't work for spells granted by item
+    debugDump(spell.costs)
+    if upcastLevel ~= nil then
+        debugPrint("Upcasted spell level", upcastLevel)
+    end
     for costType, costValue in pairs(spell.costs) do
-        if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+        if costType == "ShortRest" or costType == "LongRest" then
+            if costValue and not checkSpellCharge(casterUuid, spellName) then
+                return false
+            end
+        elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
             if costType == "SpellSlot" then
-                local spellLevel = costValue
+                local spellLevel = upcastLevel == nil and costValue or upcastLevel
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
                 debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                 if availableResourceValue < 1 then
@@ -466,6 +522,38 @@ function useSpellAndResources(casterUuid, targetUuid, spellName)
             end
         end
     end
+    return true
+end
+
+function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, variant, upcastLevel) then
+        return false
+    end
+    if variant ~= nil then
+        spellName = variant
+    end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting at position", spellName, position[1], position[2], position[3])
+    Osi.PurgeOsirisQueue(casterUuid, 1)
+    Osi.FlushOsirisQueue(casterUuid)
+    ActionsInProgress[casterUuid] = spellName
+    Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
+    return true
+end
+
+function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+    if not checkSpellResources(casterUuid, spellName, variant, upcastLevel) then
+        return false
+    end
+    if variant ~= nil then
+        spellName = variant
+    end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
     ActionsInProgress[casterUuid] = spellName
@@ -748,7 +836,7 @@ end
 function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
-        archetype = "melee"
+        archetype = archetype == "base" and TavArchetype or "melee"
     end
     local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
@@ -896,7 +984,6 @@ function findTarget(brawler)
                 local friendlyTargetUuid = nil
                 for targetUuid, target in pairs(Brawlers[level]) do
                     if isOnSameLevel(brawler.uuid, targetUuid) and Osi.IsAlly(brawler.uuid, targetUuid) == 1 then
-                        -- print("Enemy isally check", brawler.uuid, brawler.displayName, targetUuid, getDisplayName(targetUuid), Osi.IsAlly(brawler.uuid, targetUuid))
                         local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
                         if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
                             minTargetHpPct = targetHpPct
@@ -1012,7 +1099,7 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
         -- If we're close to melee range, then advance, even if we're too far from the player
         if distanceToTarget < MELEE_RANGE*2 then
             debugPrint("inside melee x 2", brawlerUuid, targetUuid)
-            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         -- Otherwise, if the target would take us too far from the player, move halfway (?) back towards the player
@@ -1025,7 +1112,7 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
         end
     elseif archetype == "melee" then
         if distanceToTarget > MELEE_RANGE then
-            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
             Osi.FlushOsirisQueue(brawlerUuid)
             Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
         else
@@ -1708,6 +1795,136 @@ function setupPartyMembersHitpoints()
     end
 end
 
+function isLocked(entity)
+    return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
+end
+
+function unlock(entity)
+    if isLocked(entity) then
+        entity.TurnBased.IsInCombat_M = true
+        entity:Replicate("TurnBased")
+        local uuid = entity.Uuid.EntityUuid
+        FTBLockedIn[uuid] = false
+        if MovementQueue[uuid] then
+            if ActionResourcesListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(ActionResourcesListeners[uuid])
+                ActionResourcesListeners[uuid] = nil
+            end    
+            local moveTo = MovementQueue[uuid]
+            Osi.CharacterMoveToPosition(uuid, moveTo[1], moveTo[2], moveTo[3], getMovementSpeed(uuid), "")
+            MovementQueue[uuid] = nil
+        end
+    end
+end
+
+function lock(entity)
+    entity.TurnBased.IsInCombat_M = false
+    -- entity:Replicate("TurnBased")
+    FTBLockedIn[entity.Uuid.EntityUuid] = true
+    if isFTBAllLockedIn() then
+        allExitFTB()
+    end
+end
+
+local function isInFTB(entity)
+    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function isActionFinalized(entity)
+    return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
+end
+
+local function midActionLock(entity)
+    local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
+    if spellCastState.Targets then
+        local target = spellCastState.Targets[1]
+        if target and (target.Position or target.Target) then
+            lock(entity)
+        end
+    end
+end
+
+local function startTruePause(entityUuid)
+    -- eoc::ActionResourcesComponent: Replicated
+    -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
+    -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
+    -- eoc::TurnBasedComponent: Replicated (all characters)
+    -- movement only triggers ActionResources
+    --      only pay attention to this if it doesn't occur after a spellcastmovement
+    -- move-then-act triggers SpellCastMovement, (TurnBased?), ActionResources
+    --      if SpellCastMovement triggered, then ignore the next action resources trigger
+    -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
+    if TruePause and Osi.IsPartyMember(entityUuid, 1) == 1 then
+        -- addActionResourceBlockMovement(entityUuid)
+        if SpellCastMovementListeners[entityUuid] == nil then
+            local entity = Ext.Entity.Get(entityUuid)
+            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
+                debugPrint("TurnBased", caster, entityUuid, getDisplayName(entityUuid))
+                if isLocked(caster) and caster.TurnBased.RequestedEndTurn then
+                    unlock(caster)
+                end
+            end, entity)
+            ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
+                debugPrint("ActionResources", caster, entityUuid, getDisplayName(entityUuid))
+                if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
+                    lock(caster)
+                    local position = LastClickPosition[entityUuid].position
+                    MovementQueue[entityUuid] = {position[1], position[2], position[3]}
+                end
+            end, entity)
+            -- NB: can specify only the specific cast entity?
+            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
+                local caster = cast.SpellCastState.Caster
+                if caster.Uuid.EntityUuid == entityUuid then
+                    debugPrint("SpellCastMovement", caster, entityUuid, getDisplayName(entityUuid))
+                    if ActionResourcesListeners[entityUuid] ~= nil then
+                        Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
+                        ActionResourcesListeners[entityUuid] = nil
+                    end
+                    if isInFTB(caster) and isActionFinalized(caster) then
+                        midActionLock(caster)
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function stopTruePause(entityUuid)
+    if Osi.IsPartyMember(entityUuid, 1) == 1 then
+        -- removeActionResourceBlockMovement(entityUuid)
+        if ActionResourcesListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
+            ActionResourcesListeners[entityUuid] = nil
+        end
+        if TurnBasedListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(TurnBasedListeners[entityUuid])
+            TurnBasedListeners[entityUuid] = nil
+        end
+        if SpellCastMovementListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(SpellCastMovementListeners[entityUuid])
+            SpellCastMovementListeners[entityUuid] = nil
+        end
+    end
+end
+
+local function checkTruePauseParty()
+    if TruePause then
+        for uuid, _ in pairs(Players) do
+            if isInFTB(uuid) then
+                startTruePause(uuid)
+            else
+                stopTruePause(uuid)
+            end
+        end
+    else
+        for uuid, _ in pairs(Players) do
+            stopTruePause(uuid)
+            unlock(Ext.Entity.Get(uuid))
+        end
+    end
+end
+
 function onStarted(level)
     debugPrint("onStarted")
     resetSpellData()
@@ -1718,7 +1935,9 @@ function onStarted(level)
     resetPlayersMovementSpeed()
     setupPartyMembersHitpoints()
     initBrawlers(level)
+    checkTruePauseParty()
     debugDump(Players)
+    Ext.ServerNet.BroadcastMessage("Started", level)
 end
 
 function startBrawlFizzler(level)
@@ -1732,6 +1951,8 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
+    -- Printer:Start()
+    -- SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -1870,6 +2091,7 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
+        startTruePause(entityUuid)
     end
 end
 
@@ -1878,35 +2100,42 @@ function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
-        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
-            Brawlers[level][entityUuid].isInBrawl = true
-            if isPlayerControllingDirectly(entityUuid) then
-                startPulseAddNearby(entityUuid)
-            end
+        if FTBLockedIn[entityUuid] then
+            FTBLockedIn[entityUuid] = nil
         end
-        startPulseReposition(level)
-        if areAnyPlayersBrawling() then
-            debugPrint("players are brawling")
-            startBrawlFizzler(level)
-            if isToT() then
-                startToTTimers()
+        stopTruePause(entityUuid)
+        -- nb: is there a better way to do this than just adding a delay?
+        Ext.Timer.WaitFor(2000, function ()
+            if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+                Brawlers[level][entityUuid].isInBrawl = true
+                if isPlayerControllingDirectly(entityUuid) then
+                    startPulseAddNearby(entityUuid)
+                end
             end
-            if Brawlers[level] then
-                for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                    if not isPlayerControllingDirectly(brawlerUuid) then
-                        Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                        Osi.FlushOsirisQueue(brawlerUuid)
-                        startPulseAction(brawler)
-                    end
-                    if Players[brawlerUuid] then
-                        Brawlers[level][brawlerUuid].isPaused = false
-                        if brawlerUuid ~= entityUuid then
-                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
+            startPulseReposition(level)
+            if areAnyPlayersBrawling() then
+                debugPrint("players are brawling")
+                startBrawlFizzler(level)
+                if isToT() then
+                    startToTTimers()
+                end
+                if Brawlers[level] then
+                    for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                        if not isPlayerControllingDirectly(brawlerUuid) then
+                            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                            Osi.FlushOsirisQueue(brawlerUuid)
+                            startPulseAction(brawler)
+                        end
+                        if Players[brawlerUuid] then
+                            Brawlers[level][brawlerUuid].isPaused = false
+                            if brawlerUuid ~= entityUuid then
+                                Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                            end
                         end
                     end
                 end
             end
-        end
+        end)
     end
 end
 
@@ -1962,6 +2191,7 @@ local function onGainedControl(targetGuid)
                 stopPulseAction(Brawlers[level][targetUuid], true)
             end
             debugDump(Players)
+            Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
 end
@@ -2058,8 +2288,22 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
     local entity = Ext.Entity.Get(casterUuid)
     if entity and ActionsInProgress[casterUuid] == spellName then
         local spell = getSpellByName(spellName)
+        _D(spell.costs)
         for costType, costValue in pairs(spell.costs) do
-            if costType ~= "ShortRest" and costType ~= "LongRest" and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            if costType == "ShortRest" or costType == "LongRest" then
+                if costValue then
+                    if entity.SpellBook and entity.SpellBook.Spells then
+                        for _, spell in ipairs(entity.SpellBook.Spells) do
+                            -- if spell.Id.OriginatorPrototype == spellName then
+                            if spell.Id.Prototype == spellName then
+                                spell.Charged = false
+                                entity:Replicate("SpellBook")
+                                break
+                            end
+                        end
+                    end
+                end
+            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
                     local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
                     for _, spellSlot in ipairs(spellSlots) do
@@ -2417,6 +2661,9 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "companion_ai_max_spell_level" then
         CompanionAIMaxSpellLevel = payload.value
+    elseif payload.settingId == "true_pause" then
+        TruePause = payload.value
+        checkTruePauseParty()
     elseif payload.settingId == "auto_pause_on_downed" then
         AutoPauseOnDowned = payload.value
     elseif payload.settingId == "action_interval" then
@@ -2439,6 +2686,25 @@ local function onMCMSettingSaved(payload)
         else
             disableFullAuto(hotkey)
         end
+    elseif payload.settingId == "tav_archetype" then
+        TavArchetype = string.lower(payload.value)
+    end
+end
+
+function isFTBAllLockedIn()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        if not FTBLockedIn[Osi.GetUUID(player[1])] then
+            return false
+        end
+    end
+    return true
+end
+
+function allExitFTB()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local uuid = Osi.GetUUID(player[1])
+        unlock(Ext.Entity.Get(uuid))
+        Osi.ForceTurnBasedMode(uuid, 0)
     end
 end
 
@@ -2461,12 +2727,19 @@ local function onNetMessage(data)
         else
             toggleFullAuto(data.Payload)
         end
+    elseif data.Channel == "ExitFTB" then
+        allExitFTB()
+    elseif data.Channel == "ClickPosition" then
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player.uuid then
+            LastClickPosition[player.uuid] = Ext.Json.Parse(data.Payload)
+        end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
             local brawler = getBrawlerByUuid(player.uuid)
             if brawler then
-                Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
+                -- Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
                 if not brawler.isPaused then
                     if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
                         debugPrint("use spell")

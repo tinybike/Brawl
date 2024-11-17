@@ -61,14 +61,14 @@
                             }
                         },
                         {
-                            "Id": "companion_ai_max_spell_level",
-                            "Name": "Companion AI Maximum Allowed Spell Level (NYI)",
-                            "Type": "int",
-                            "Default": 0,
-                            "Description": "The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)",
+                            "Id": "true_pause",
+                            "Name": "True Pause",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.",
                             "Handles": {
-                                "DescriptionHandle": "h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0",
-                                "NameHandle": "hfeb61696ga4bfg4f53g8fd6g4a123be02832"
+                                "DescriptionHandle": "h65ee56d8gbbbeg4e6agb486ge33349a73d09",
+                                "NameHandle": "h7a39e407g21e0g4f3bg98fdg7cd473b01043"
                             }
                         },
                         {
@@ -128,6 +128,36 @@
                             "Handles": {
                                 "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
                                 "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
+                            }
+                        },
+                        {
+                            "Id": "tav_archetype",
+                            "Name": "Tav Archetype",
+                            "Type": "enum",
+                            "Default": "Melee",
+                            "Options": {
+                                "Choices": [
+                                    "Melee",
+                                    "Caster",
+                                    "Ranged",
+                                    "Healer"
+                                ]
+                            },
+                            "Description": "Tav's archetype for the AI",
+                            "Handles": {
+                                "DescriptionHandle": "h5fba396bg3ea9g42c8g99f7gd52fad9d7c46",
+                                "NameHandle": "h08b6adc8ge129g45a0ga62bgdd4a013d0e2b"
+                            }
+                        },
+                        {
+                            "Id": "companion_ai_max_spell_level",
+                            "Name": "Companion AI Maximum Allowed Spell Level (NYI)",
+                            "Type": "int",
+                            "Default": 0,
+                            "Description": "The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)",
+                            "Handles": {
+                                "DescriptionHandle": "h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0",
+                                "NameHandle": "hfeb61696ga4bfg4f53g8fd6g4a123be02832"
                             }
                         }
                     ]
