@@ -544,6 +544,9 @@ function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant
 end
 
 function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+    if targetUuid == nil then
+        return false
+    end
     if not checkSpellResources(casterUuid, spellName, variant, upcastLevel) then
         return false
     end
@@ -557,14 +560,10 @@ function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcast
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
     ActionsInProgress[casterUuid] = spellName
-    if targetUuid ~= nil then
-        Osi.UseSpell(casterUuid, spellName, targetUuid)
-    else
-        -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
-        -- local x, y, z = getPointInFrontOf(casterUuid, 1.0)
-        -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
-        return false
-    end
+    Osi.UseSpell(casterUuid, spellName, targetUuid)
+    -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
+    -- local x, y, z = getPointInFrontOf(casterUuid, 1.0)
+    -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
     return true
 end
 
@@ -1860,8 +1859,11 @@ local function startTruePause(entityUuid)
             local entity = Ext.Entity.Get(entityUuid)
             TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
                 debugPrint("TurnBased", caster, entityUuid, getDisplayName(entityUuid))
-                if isLocked(caster) and caster.TurnBased.RequestedEndTurn then
-                    unlock(caster)
+                if caster and caster.TurnBased then
+                    FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
+                end
+                if isFTBAllLockedIn() then
+                    allExitFTB()
                 end
             end, entity)
             ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
@@ -2104,38 +2106,40 @@ function onLeftForceTurnBased(entityGuid)
             FTBLockedIn[entityUuid] = nil
         end
         stopTruePause(entityUuid)
-        -- nb: is there a better way to do this than just adding a delay?
-        Ext.Timer.WaitFor(2000, function ()
-            if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
-                Brawlers[level][entityUuid].isInBrawl = true
-                if isPlayerControllingDirectly(entityUuid) then
-                    startPulseAddNearby(entityUuid)
-                end
+        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+            Brawlers[level][entityUuid].isInBrawl = true
+            if isPlayerControllingDirectly(entityUuid) then
+                startPulseAddNearby(entityUuid)
             end
+        end
+        Ext.Timer.WaitFor(1000, function ()
             startPulseReposition(level)
-            if areAnyPlayersBrawling() then
-                debugPrint("players are brawling")
-                startBrawlFizzler(level)
-                if isToT() then
-                    startToTTimers()
-                end
-                if Brawlers[level] then
-                    for brawlerUuid, brawler in pairs(Brawlers[level]) do
+        end)
+        if areAnyPlayersBrawling() then
+            debugPrint("players are brawling")
+            startBrawlFizzler(level)
+            if isToT() then
+                startToTTimers()
+            end
+            if Brawlers[level] then
+                for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                    if Players[brawlerUuid] then
                         if not isPlayerControllingDirectly(brawlerUuid) then
-                            -- Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                            Osi.FlushOsirisQueue(brawlerUuid)
-                            startPulseAction(brawler)
+                            Ext.Timer.WaitFor(2000, function ()
+                                Osi.FlushOsirisQueue(brawlerUuid)
+                                startPulseAction(brawler)
+                            end)
                         end
-                        if Players[brawlerUuid] then
-                            Brawlers[level][brawlerUuid].isPaused = false
-                            if brawlerUuid ~= entityUuid then
-                                Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                            end
+                        Brawlers[level][brawlerUuid].isPaused = false
+                        if brawlerUuid ~= entityUuid then
+                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
+                    else
+                        startPulseAction(brawler)
                     end
                 end
             end
-        end)
+        end
     end
 end
 

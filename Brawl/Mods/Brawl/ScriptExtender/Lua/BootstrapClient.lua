@@ -70,12 +70,16 @@ local function onKeyInput(e)
     end
 end
 
+local function postClickPosition()
+    Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+end
+
 local function onControllerButtonInput(e)
     if e.Pressed == true then
         Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
         local button = tostring(e.Button)
         if button == "A" then
-            Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+            postClickPosition()
         elseif button == "RightStick" then
             postExitFTB()
         end
@@ -90,7 +94,7 @@ end
 
 local function onMouseButtonInput(e)
     if e.Pressed and e.Button == 1 then
-        Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+        postClickPosition()
     end
 end
 
