@@ -35,6 +35,21 @@ local function postExitFTB()
     end
 end
 
+local function getPositionInfo()
+    local pickingHelper = Ext.UI.GetPickingHelper(1)
+    if pickingHelper.Inner and pickingHelper.Inner.Position then
+        local clickedOn = {position = pickingHelper.Inner.Position}
+        if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
+            local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
+            if clickedOnEntity and clickedOnEntity.Uuid and clickedOnEntity.Uuid.EntityUuid then
+                clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
+            end
+        end
+        return clickedOn
+    end
+    return nil
+end
+
 local function onKeyInput(e)
     if e.Repeat == false then
         if e.Key == ModToggleHotkey and e.Event == "KeyDown" then
@@ -58,7 +73,10 @@ end
 local function onControllerButtonInput(e)
     if e.Pressed == true then
         Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
-        if tostring(e.Button) == "RightStick" then
+        local button = tostring(e.Button)
+        if button == "A" then
+            Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+        elseif button == "RightStick" then
             postExitFTB()
         end
     end
@@ -70,9 +88,16 @@ local function onNetMessage(data)
     end
 end
 
+local function onMouseButtonInput(e)
+    if e.Pressed and e.Button == 1 then
+        Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+    end
+end
+
 local function onSessionLoaded()
     Ext.Events.KeyInput:Subscribe(onKeyInput)
     Ext.Events.ControllerButtonInput:Subscribe(onControllerButtonInput)
+    Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)
     Ext.Events.NetMessage:Subscribe(onNetMessage)
 end
 

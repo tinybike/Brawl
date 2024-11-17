@@ -150,10 +150,13 @@ IsAttackingOrBeingAttackedByPlayer = {}
 ClosestEnemyBrawlers = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
+MovementQueue = {}
 PartyMembersHitpointsListeners = {}
+ActionResourcesListeners = {}
 TurnBasedListeners = {}
 SpellCastMovementListeners = {}
 FTBLockedIn = {}
+LastClickPosition = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -1792,56 +1795,94 @@ function setupPartyMembersHitpoints()
     end
 end
 
-local function isLocked(entity)
+function isLocked(entity)
     return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
 end
 
-local function unlock(entity)
+function unlock(entity)
     if isLocked(entity) then
         entity.TurnBased.IsInCombat_M = true
         entity:Replicate("TurnBased")
-        FTBLockedIn[entity.Uuid.EntityUuid] = false
+        local uuid = entity.Uuid.EntityUuid
+        FTBLockedIn[uuid] = false
+        if MovementQueue[uuid] then
+            if ActionResourcesListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(ActionResourcesListeners[uuid])
+                ActionResourcesListeners[uuid] = nil
+            end    
+            local moveTo = MovementQueue[uuid]
+            Osi.CharacterMoveToPosition(uuid, moveTo[1], moveTo[2], moveTo[3], getMovementSpeed(uuid), "")
+            MovementQueue[uuid] = nil
+        end
     end
 end
 
-local function lock(entity)
+function lock(entity)
     entity.TurnBased.IsInCombat_M = false
-    entity:Replicate("TurnBased")
+    -- entity:Replicate("TurnBased")
     FTBLockedIn[entity.Uuid.EntityUuid] = true
     if isFTBAllLockedIn() then
         allExitFTB()
     end
 end
 
+local function isInFTB(entity)
+    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function isActionFinalized(entity)
+    return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
+end
+
+local function midActionLock(entity)
+    local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
+    if spellCastState.Targets then
+        local target = spellCastState.Targets[1]
+        if target and (target.Position or target.Target) then
+            lock(entity)
+        end
+    end
+end
+
 local function startTruePause(entityUuid)
+    -- eoc::ActionResourcesComponent: Replicated
     -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
     -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
     -- eoc::TurnBasedComponent: Replicated (all characters)
+    -- movement only triggers ActionResources
+    --      only pay attention to this if it doesn't occur after a spellcastmovement
+    -- move-then-act triggers SpellCastMovement, (TurnBased?), ActionResources
+    --      if SpellCastMovement triggered, then ignore the next action resources trigger
+    -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
     if TruePause and Osi.IsPartyMember(entityUuid, 1) == 1 then
-        addActionResourceBlockMovement(entityUuid)
+        -- addActionResourceBlockMovement(entityUuid)
         if SpellCastMovementListeners[entityUuid] == nil then
-            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (entity, _, _)
-                debugPrint("TurnBased", entity, entityUuid)
-                if isLocked(entity) and entity.TurnBased.RequestedEndTurn then
-                    unlock(entity)
+            local entity = Ext.Entity.Get(entityUuid)
+            TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
+                debugPrint("TurnBased", caster, entityUuid, getDisplayName(entityUuid))
+                if isLocked(caster) and caster.TurnBased.RequestedEndTurn then
+                    unlock(caster)
                 end
-            end, Ext.Entity.Get(entityUuid))
+            end, entity)
+            ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
+                debugPrint("ActionResources", caster, entityUuid, getDisplayName(entityUuid))
+                if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
+                    lock(caster)
+                    local position = LastClickPosition[entityUuid].position
+                    MovementQueue[entityUuid] = {position[1], position[2], position[3]}
+                end
+            end, entity)
             -- NB: can specify only the specific cast entity?
-            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (entity, _, _)
-                local caster = entity.SpellCastState.Caster
+            SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
+                local caster = cast.SpellCastState.Caster
                 if caster.Uuid.EntityUuid == entityUuid then
-                    debugPrint("SpellCastMovement", caster, entityUuid)
-                    -- _D(caster.FTBParticipant.field_18:GetAllComponents())
-                    if caster.FTBParticipant and caster.FTBParticipant.field_18 ~= nil then
-                        if caster.SpellCastIsCasting and caster.SpellCastIsCasting.Cast and caster.SpellCastIsCasting.Cast.SpellCastState then
-                            local spellCastState = caster.SpellCastIsCasting.Cast.SpellCastState
-                            if spellCastState.Targets then
-                                local target = spellCastState.Targets[1]
-                                if target and (target.Position or target.Target) then
-                                    lock(caster)
-                                end
-                            end
-                        end
+                    debugPrint("SpellCastMovement", caster, entityUuid, getDisplayName(entityUuid))
+                    if ActionResourcesListeners[entityUuid] ~= nil then
+                        Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
+                        ActionResourcesListeners[entityUuid] = nil
+                    end
+                    if isInFTB(caster) and isActionFinalized(caster) then
+                        midActionLock(caster)
                     end
                 end
             end)
@@ -1851,10 +1892,16 @@ end
 
 local function stopTruePause(entityUuid)
     if Osi.IsPartyMember(entityUuid, 1) == 1 then
-        removeActionResourceBlockMovement(entityUuid)
-        if SpellCastMovementListeners[entityUuid] ~= nil then
+        -- removeActionResourceBlockMovement(entityUuid)
+        if ActionResourcesListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
+            ActionResourcesListeners[entityUuid] = nil
+        end
+        if TurnBasedListeners[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(TurnBasedListeners[entityUuid])
             TurnBasedListeners[entityUuid] = nil
+        end
+        if SpellCastMovementListeners[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(SpellCastMovementListeners[entityUuid])
             SpellCastMovementListeners[entityUuid] = nil
         end
@@ -1904,6 +1951,8 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
+    -- Printer:Start()
+    -- SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -2053,16 +2102,6 @@ function onLeftForceTurnBased(entityGuid)
     if level and entityUuid then
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
-        end
-        if ActionQueue and ActionQueue[entityUuid] and ActionQueue[entityUuid].spellName and ActionQueue[entityUuid].target then
-            local actionQueue = ActionQueue[entityUuid]
-            if actionQueue.target and actionQueue.target.uuid then
-                useSpellAndResources(entityUuid, actionQueue.target.uuid, actionQueue.spellName, actionQueue.variant, actionQueue.upcastLevel)
-            else
-                useSpellAndResourcesAtPosition(entityUuid, actionQueue.target.position, actionQueue.spellName, actionQueue.variant, actionQueue.upcastLevel)
-            end
-            ActionQueue[entityUuid] = nil
-            Ext.ServerNet.PostMessageToUser(Osi.GetReservedUserID(entityUuid), "ClearActionQueue", entityUuid)
         end
         stopTruePause(entityUuid)
         -- nb: is there a better way to do this than just adding a delay?
@@ -2690,6 +2729,11 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "ExitFTB" then
         allExitFTB()
+    elseif data.Channel == "ClickPosition" then
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player.uuid then
+            LastClickPosition[player.uuid] = Ext.Json.Parse(data.Payload)
+        end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
