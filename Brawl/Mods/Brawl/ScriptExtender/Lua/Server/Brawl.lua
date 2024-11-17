@@ -227,14 +227,6 @@ local function isInFTB(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
-local function addActionResourceBlockMovement(uuid)
-    Osi.AddBoosts(uuid, "ActionResourceBlock(Movement)", "Brawl", "1")
-end
-
-local function removeActionResourceBlockMovement(uuid)
-    Osi.RemoveBoosts(uuid, "ActionResourceBlock(Movement)", 0, "Brawl", "1")
-end
-
 local function getBrawlerByUuid(uuid)
     local level = Osi.GetRegion(uuid)
     if level and Brawlers[level] then
@@ -1854,11 +1846,10 @@ local function startTruePause(entityUuid)
     --      if SpellCastMovement triggered, then ignore the next action resources trigger
     -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
     if TruePause and Osi.IsPartyMember(entityUuid, 1) == 1 then
-        -- addActionResourceBlockMovement(entityUuid)
         if SpellCastMovementListeners[entityUuid] == nil then
             local entity = Ext.Entity.Get(entityUuid)
             TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
-                debugPrint("TurnBased", caster, entityUuid, getDisplayName(entityUuid))
+                -- debugPrint("TurnBased", caster, entityUuid, getDisplayName(entityUuid))
                 if caster and caster.TurnBased then
                     FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
                 end
@@ -1867,18 +1858,20 @@ local function startTruePause(entityUuid)
                 end
             end, entity)
             ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
-                debugPrint("ActionResources", caster, entityUuid, getDisplayName(entityUuid))
+                -- debugPrint("ActionResources", caster, entityUuid, getDisplayName(entityUuid))
                 if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
-                    lock(caster)
-                    local position = LastClickPosition[entityUuid].position
-                    MovementQueue[entityUuid] = {position[1], position[2], position[3]}
+                    if LastClickPosition[entityUuid] and LastClickPosition[entityUuid].position then
+                        lock(caster)
+                        local position = LastClickPosition[entityUuid].position
+                        MovementQueue[entityUuid] = {position[1], position[2], position[3]}
+                    end
                 end
             end, entity)
             -- NB: can specify only the specific cast entity?
             SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
                 local caster = cast.SpellCastState.Caster
                 if caster.Uuid.EntityUuid == entityUuid then
-                    debugPrint("SpellCastMovement", caster, entityUuid, getDisplayName(entityUuid))
+                    -- debugPrint("SpellCastMovement", caster, entityUuid, getDisplayName(entityUuid))
                     if ActionResourcesListeners[entityUuid] ~= nil then
                         Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
                         ActionResourcesListeners[entityUuid] = nil
@@ -1894,7 +1887,6 @@ end
 
 local function stopTruePause(entityUuid)
     if Osi.IsPartyMember(entityUuid, 1) == 1 then
-        -- removeActionResourceBlockMovement(entityUuid)
         if ActionResourcesListeners[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(ActionResourcesListeners[entityUuid])
             ActionResourcesListeners[entityUuid] = nil
