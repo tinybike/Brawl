@@ -1812,9 +1812,9 @@ function lock(entity)
     entity.TurnBased.IsInCombat_M = false
     -- entity:Replicate("TurnBased")
     FTBLockedIn[entity.Uuid.EntityUuid] = true
-    if isFTBAllLockedIn() then
-        allExitFTB()
-    end
+    -- if isFTBAllLockedIn() then
+    --     allExitFTB()
+    -- end
 end
 
 local function isInFTB(entity)

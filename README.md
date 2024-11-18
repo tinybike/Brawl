@@ -34,6 +34,10 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 
 [![Real time combat test 7](https://img.youtube.com/vi/zehZKax_CTE/0.jpg)](https://www.youtube.com/watch?v=zehZKax_CTE)
 
-### 8) True Pause
+### 8) True Pause (draft)
 
 [![Real time combat test 8](https://img.youtube.com/vi/eExf2d7W4o4/0.jpg)](https://www.youtube.com/watch?v=eExf2d7W4o4)
+
+### 9) True Pause
+
+[![Real time combat test 9](https://img.youtube.com/vi/0nTcq8mUPYY/0.jpg)](https://www.youtube.com/watch?v=0nTcq8mUPYY)
