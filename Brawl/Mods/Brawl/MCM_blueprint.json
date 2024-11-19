@@ -87,7 +87,7 @@
                             "Name": "AI Turn Length",
                             "Type": "int",
                             "Default": 6000,
-                            "Description": "The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Higher values make combat easier, lower values make combat harder.",
+                            "Description": "The AI's turn length, in milliseconds.  The default is 6000, meaning the AI will act once every 6 seconds.  Higher values make combat easier, lower values make combat harder.",
                             "Handles": {
                                 "DescriptionHandle": "h4c13f868gad03g469ag9ce3g69560b7b3467",
                                 "NameHandle": "h63988dd4gbad9g405fgbb73gdefece90bbba"
@@ -158,6 +158,17 @@
                             "Handles": {
                                 "DescriptionHandle": "h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0",
                                 "NameHandle": "hfeb61696ga4bfg4f53g8fd6g4a123be02832"
+                            }
+                        },
+                        {
+                            "Id": "hogwild_mode",
+                            "Name": "Hogwild Mode",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, the companion AI will go hogwild, freely using any of their spells/abilities with zero resource costs.",
+                            "Handles": {
+                                "DescriptionHandle": "h82826325ge87dg4b9fga2d4g1918131934e8",
+                                "NameHandle": "h3a37f938gf803g45f1gb3bage75ca7adae42"
                             }
                         }
                     ]

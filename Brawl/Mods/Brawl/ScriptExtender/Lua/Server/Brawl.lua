@@ -10,6 +10,7 @@ local FullAuto = false
 local HitpointsMultiplier = 1.0
 local TavArchetype = "melee"
 local CompanionAIMaxSpellLevel = 0
+local HogwildMode = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -20,6 +21,7 @@ if MCM then
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     TavArchetype = string.lower(MCM.Get("tav_archetype"))
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
+    HogwildMode = MCM.Get("hogwild_mode")
 end
 
 -- Constants
@@ -387,9 +389,13 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     --     end
     -- end
     debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
-    -- Osi.PurgeOsirisQueue(attackerUuid, 1)
-    Osi.FlushOsirisQueue(attackerUuid)
-    Osi.UseSpell(attackerUuid, spellName, targetUuid)
+    if HogwildMode then
+        Osi.PurgeOsirisQueue(attackerUuid, 1)
+        Osi.FlushOsirisQueue(attackerUuid)    
+        Osi.UseSpell(attackerUuid, spellName, targetUuid)
+    else
+        useSpellAndResources(attackerUuid, targetUuid, spellName)
+    end
 end
 
 function getForwardVector(entityUuid)
@@ -486,7 +492,9 @@ function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
     end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
     -- NB: spell.costs doesn't work for spells granted by item
-    debugDump(spell.costs)
+    if spell and spell.costs then
+        debugDump(spell.costs)
+    end
     if upcastLevel ~= nil then
         debugPrint("Upcasted spell level", upcastLevel)
     end
@@ -761,11 +769,38 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- weight = weight + getResistanceWeight(spell, targetEntity)
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
-    -- Adjust by spell level (higher level spells are disfavored)
-    weight = weight - spell.level*2
+    -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
+    if not HogwildMode then
+        weight = weight - spell.level*2
+    end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
     return weight
+end
+
+-- NB: need to allow healing, buffs, debuffs etc for companions too
+local function isCompanionSpellAvailable(uuid, spellName, spell)
+    -- This should never happen but...
+    if spellName == nil or spell == nil then
+        return false
+    end
+    -- Exclude AoE spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
+    if spell.areaRadius > 0 then
+        return false
+    end
+    -- Who cares about resources, we're going hogwild
+    if HogwildMode then
+        return true
+    end
+    -- Make sure we're not exceeding the user's specified AI max spell level
+    if spell.level > CompanionAIMaxSpellLevel then
+        return false
+    end
+    -- Make sure we have the resources to actually cast what we want to cast
+    if not checkSpellResources(uuid, spellName) then
+        return false
+    end
+    return true
 end
 
 -- What to do?  In all cases, give extra weight to spells that you're already within range for
@@ -777,7 +812,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-function getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -788,8 +823,7 @@ function getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype,
                 break
             end
         end
-        -- Exclude AoE stuff and all non-cantrip spells for companions
-        if spell and spell.areaRadius == 0 and spell.level == 0 then
+        if isCompanionSpellAvailable(uuid, spellName, spell) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
@@ -804,7 +838,7 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs/debuffs (NYI)
-function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -824,21 +858,21 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
     return weightedSpells
 end
 
-function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = archetype == "base" and TavArchetype or "melee"
     end
-    local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
 end
 
-function decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+function decideActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = "melee"
     end
-    local weightedSpells = getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -851,10 +885,10 @@ function actOnHostileTarget(brawler, target)
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, {"Damage"})
+            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"})
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+            actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
@@ -2655,8 +2689,6 @@ local function onMCMSettingSaved(payload)
         else
             disableCompanionAI(hotkey)
         end
-    elseif payload.settingId == "companion_ai_max_spell_level" then
-        CompanionAIMaxSpellLevel = payload.value
     elseif payload.settingId == "true_pause" then
         TruePause = payload.value
         checkTruePauseParty()
@@ -2684,6 +2716,10 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "tav_archetype" then
         TavArchetype = string.lower(payload.value)
+    elseif payload.settingId == "companion_ai_max_spell_level" then
+        CompanionAIMaxSpellLevel = payload.value
+    elseif payload.settingId == "hogwild_mode" then
+        HogwildMode = payload.value
     end
 end
 
