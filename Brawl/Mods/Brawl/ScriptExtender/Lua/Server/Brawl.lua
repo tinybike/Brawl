@@ -2780,7 +2780,17 @@ local function onNetMessage(data)
     elseif data.Channel == "ClickPosition" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player.uuid then
-            LastClickPosition[player.uuid] = Ext.Json.Parse(data.Payload)
+            local clickPosition = Ext.Json.Parse(data.Payload)
+            if clickPosition and clickPosition.position then
+                local pos = clickPosition.position
+                local validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
+                if validX ~= nil and validY ~= nil and validZ ~= nil then
+                    LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
+                    debugPrint("Valid position found", pos[1], pos[2], pos[3], "->", validX, validY, validZ)
+                else
+                    debugPrint("No valid position found", pos[1], pos[2], pos[3])
+                end
+            end
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
