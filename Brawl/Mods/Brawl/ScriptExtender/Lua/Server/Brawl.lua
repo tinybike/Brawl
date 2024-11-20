@@ -2095,6 +2095,9 @@ end
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
+    if isPlayerControllingDirectly(entityUuid) then
+        Ext.ServerNet.PostMessageToClient(entityUuid, "FTBToggled", "Entered")
+    end
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
         if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
@@ -2126,6 +2129,9 @@ end
 function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
+    if isPlayerControllingDirectly(entityUuid) then
+        Ext.ServerNet.PostMessageToClient(entityUuid, "FTBToggled", "Left")
+    end
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
         if FTBLockedIn[entityUuid] then
@@ -2732,6 +2738,13 @@ function isFTBAllLockedIn()
     return true
 end
 
+function allEnterFTB()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local uuid = Osi.GetUUID(player[1])
+        Osi.ForceTurnBasedMode(uuid, 1)
+    end
+end
+
 function allExitFTB()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
@@ -2761,6 +2774,9 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "ExitFTB" then
         allExitFTB()
+    -- should this be per-player, or just drag everyone in at the same time?
+    elseif data.Channel == "EnterFTB" then
+        allEnterFTB()
     elseif data.Channel == "ClickPosition" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player.uuid then
