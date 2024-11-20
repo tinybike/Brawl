@@ -2794,59 +2794,63 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player and player.uuid then
-            if not isInFTB(player.uuid) then
-                if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
-                    debugPrint("use spell")
-                    Osi.PurgeOsirisQueue(player.uuid, 1)
-                    Osi.FlushOsirisQueue(player.uuid)
-                    local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
-                    if spellName ~= nil then
-                        local spell = getSpellByName(spellName)
-                        if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
-                            return useSpellAndResources(player.uuid, player.uuid, spellName)
-                        end
-                        -- local splitSpellName = split(spellName, "_")
-                        -- local isZoneSpell = splitSpellName[1] == "Zone"
-                        -- local isProjectileSpell = splitSpellName[1] == "Projectile"
-                        -- if isZoneSpell or isProjectileSpell then
-                        --     return useSpellAndResources(player.uuid, nil, spellName)
-                        -- end
-                        if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
-                            buildClosestEnemyBrawlers(player.uuid)
-                        end
-                        return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
-                    end
-                end
-                -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
-                if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
-                    -- if ClosestEnemyBrawlers[player.uuid] == nil then
-                        buildClosestEnemyBrawlers(player.uuid)
-                    -- end
-                    if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
-                        debugPrint("Selecting next enemy brawler")
-                        selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
-                    end
-                end
-                if data.Payload == "RightStick" then
-                    debugPrint("pausing")
-                    Osi.PurgeOsirisQueue(player.uuid, 1)
-                    Osi.FlushOsirisQueue(player.uuid)
-                    return Osi.ForceTurnBasedMode(player.uuid, 1)
-                end
-            else
-                if data.Payload == "RightStick" then
-                    debugPrint("unpausing")
-                    local level = Osi.GetRegion(player.uuid)
-                    if level and Brawlers[level] then
-                        for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                            if Players[brawlerUuid] ~= nil then
-                                Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                                Osi.FlushOsirisQueue(brawlerUuid)
-                                Osi.ForceTurnBasedMode(brawlerUuid, 0)
+        if player then
+            local brawler = getBrawlerByUuid(player.uuid)
+            if brawler then
+                -- Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
+                if not brawler.isPaused then
+                    if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
+                        debugPrint("use spell")
+                        Osi.PurgeOsirisQueue(player.uuid, 1)
+                        Osi.FlushOsirisQueue(player.uuid)
+                        local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
+                        if spellName ~= nil then
+                            local spell = getSpellByName(spellName)
+                            if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
+                                return useSpellAndResources(player.uuid, player.uuid, spellName)
                             end
+                            -- local splitSpellName = split(spellName, "_")
+                            -- local isZoneSpell = splitSpellName[1] == "Zone"
+                            -- local isProjectileSpell = splitSpellName[1] == "Projectile"
+                            -- if isZoneSpell or isProjectileSpell then
+                            --     return useSpellAndResources(player.uuid, nil, spellName)
+                            -- end
+                            if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
+                                buildClosestEnemyBrawlers(player.uuid)
+                            end
+                            return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
                         end
                     end
+                    -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
+                    if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
+                        -- if ClosestEnemyBrawlers[player.uuid] == nil then
+                            buildClosestEnemyBrawlers(player.uuid)
+                        -- end
+                        if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
+                            debugPrint("Selecting next enemy brawler")
+                            selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
+                        end
+                    end
+                    -- if data.Payload == "RightStick" then
+                    --     debugPrint("pausing")
+                    --     Osi.PurgeOsirisQueue(player.uuid, 1)
+                    --     Osi.FlushOsirisQueue(player.uuid)
+                    --     return Osi.ForceTurnBasedMode(player.uuid, 1)
+                    -- end
+                -- else
+                --     if data.Payload == "RightStick" then
+                --         debugPrint("unpausing")
+                --         local level = Osi.GetRegion(player.uuid)
+                --         if level and Brawlers[level] then
+                --             for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                --                 if Players[brawlerUuid] ~= nil then
+                --                     Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                --                     Osi.FlushOsirisQueue(brawlerUuid)
+                --                     Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                --                 end
+                --             end
+                --         end
+                --     end
                 end
             end
         end
