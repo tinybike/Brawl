@@ -9,7 +9,6 @@ end
 local IsShiftPressed = false
 local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
-local IsUsingController = false
 
 -- thank u aahz
 function getDirectlyControlledCharacter()
@@ -85,10 +84,6 @@ end
 
 local function onControllerButtonInput(e)
     if e.Pressed == true then
-        if not IsUsingController then
-            IsUsingController = true
-            Ext.ClientNet.PostMessageToServer("IsUsingController", "1")
-        end
         Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
         local button = tostring(e.Button)
         if button == "A" then
@@ -100,15 +95,8 @@ local function onControllerButtonInput(e)
 end
 
 local function onMouseButtonInput(e)
-    if e.Pressed then
-        if IsUsingController then
-            IsUsingController = false
-            Ext.ClientNet.PostMessageToServer("IsUsingController", "0")
-            startFTBButtonListeners()
-        end
-        if e.Button == 1 then
-            postClickPosition()
-        end
+    if e.Pressed and e.Button == 1 then
+        postClickPosition()
     end
 end
 
