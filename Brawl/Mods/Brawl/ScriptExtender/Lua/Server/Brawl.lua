@@ -284,25 +284,16 @@ function isNpcSpellUsable(spell, archetype)
     if spell == "Projectile_Jump" then return false end
     if spell == "Shout_Dash_NPC" then return false end
     if spell == "Target_Shove" then return false end
-    if spell == "Target_CureWounds" then return false end
-    if spell == "Target_HealingWord" then return false end
-    if spell == "Target_CureWounds_Mass" then return false end
     if spell == "Target_Devour_Ghoul" then return false end
     if spell == "Target_Devour_ShadowMound" then return false end
     if spell == "Target_LOW_RamazithsTower_Nightsong_Globe_1" then return false end
     if archetype == "melee" then
         if spell == "Target_Dip_NPC" then return false end
-        if spell == "Target_MageArmor" then return false end
         if spell == "Projectile_SneakAttack" then return false end
     elseif archetype == "ranged" then
-        if spell == "Target_UnarmedAttack" then return false end
-        if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
-        if spell == "Target_MageArmor" then return false end
         if spell == "Projectile_SneakAttack" then return false end
     elseif archetype == "mage" then
-        if spell == "Target_UnarmedAttack" then return false end
-        if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
     end
     return true
@@ -368,34 +359,6 @@ function getBrawlersSortedByDistance(entityUuid)
         table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
     end
     return brawlersSortedByDistance
-end
-
--- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
--- (automove using UseSpell/Attack only uses the fastest possible movement speed)
-function moveThenAct(attackerUuid, targetUuid, spellName)
-    -- local targetRadius = Ext.Stats.Get(spellName).TargetRadius
-    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, targetRadius)
-    -- debugDump(Players[attackerUuid])
-    -- if targetRadius == "MeleeMainWeaponRange" then
-    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-    -- else
-    --     local targetRadiusNumber = tonumber(targetRadius)
-    --     if targetRadiusNumber ~= nil then
-    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-    --         if distanceToTarget > targetRadiusNumber then
-    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
-    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-    --         end
-    --     end
-    -- end
-    debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
-    if HogwildMode then
-        Osi.PurgeOsirisQueue(attackerUuid, 1)
-        Osi.FlushOsirisQueue(attackerUuid)    
-        Osi.UseSpell(attackerUuid, spellName, targetUuid)
-    else
-        useSpellAndResources(attackerUuid, targetUuid, spellName)
-    end
 end
 
 function getForwardVector(entityUuid)
@@ -580,7 +543,7 @@ function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwa
     local deltaX = targetPos[1] - sourcePos[1]
     local deltaY = targetPos[2] - sourcePos[2]
     local deltaZ = targetPos[3] - sourcePos[3]
-    local squaredDistance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+    local squaredDistance = deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ
     if squaredDistance < 1600 then -- 40^2 = 1600
         local distance = math.sqrt(squaredDistance)
         local vecToTargetX = deltaX/distance
@@ -689,6 +652,32 @@ function selectNextEnemyBrawler(playerUuid, isNext)
     end
 end
 
+function moveThenAct(attackerUuid, targetUuid, spellName)
+    -- local targetRadius = Ext.Stats.Get(spellName).TargetRadius
+    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, targetRadius)
+    -- debugDump(Players[attackerUuid])
+    -- if targetRadius == "MeleeMainWeaponRange" then
+    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    -- else
+    --     local targetRadiusNumber = tonumber(targetRadius)
+    --     if targetRadiusNumber ~= nil then
+    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+    --         if distanceToTarget > targetRadiusNumber then
+    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
+    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+    --         end
+    --     end
+    -- end
+    debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
+    if HogwildMode then
+        Osi.PurgeOsirisQueue(attackerUuid, 1)
+        Osi.FlushOsirisQueue(attackerUuid)
+        Osi.UseSpell(attackerUuid, spellName, targetUuid)
+    else
+        useSpellAndResources(attackerUuid, targetUuid, spellName)
+    end
+end
+
 function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
         return 7
@@ -784,8 +773,12 @@ local function isCompanionSpellAvailable(uuid, spellName, spell)
     if spellName == nil or spell == nil then
         return false
     end
-    -- Exclude AoE spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
-    if spell.areaRadius > 0 then
+    -- Exclude AoE damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
+    if spell.type == "Damage" and spell.areaRadius > 0 then
+        return false
+    end
+    -- If it's a healing spell, make sure it's a direct heal
+    if spell.type == "Healing" and not spell.isDirectHeal then
         return false
     end
     -- Who cares about resources, we're going hogwild
@@ -1002,7 +995,8 @@ function findTarget(brawler)
     local level = Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
-        -- Healing (non-player only)
+        -- NB: merge all this together so the decisions are made in one go!
+        -- Healing
         if Osi.IsPlayer(brawler.uuid) == 0 then
             if Brawlers[level] then
                 local minTargetHpPct = 200.0
@@ -1019,9 +1013,9 @@ function findTarget(brawler)
                 -- Arbitrary threshold for healing
                 if minTargetHpPct < AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD and friendlyTargetUuid and Brawlers[level][friendlyTargetUuid] then
                     debugPrint("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
-                    local result = actOnFriendlyTarget(brawler, Brawlers[level][friendlyTargetUuid])
-                    debugPrint("result", result)
-                    return result
+                    if actOnFriendlyTarget(brawler, Brawlers[level][friendlyTargetUuid]) then
+                        return true
+                    end
                 end
             end
         end
@@ -2831,26 +2825,6 @@ local function onNetMessage(data)
                             selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
                         end
                     end
-                    -- if data.Payload == "RightStick" then
-                    --     debugPrint("pausing")
-                    --     Osi.PurgeOsirisQueue(player.uuid, 1)
-                    --     Osi.FlushOsirisQueue(player.uuid)
-                    --     return Osi.ForceTurnBasedMode(player.uuid, 1)
-                    -- end
-                -- else
-                --     if data.Payload == "RightStick" then
-                --         debugPrint("unpausing")
-                --         local level = Osi.GetRegion(player.uuid)
-                --         if level and Brawlers[level] then
-                --             for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                --                 if Players[brawlerUuid] ~= nil then
-                --                     Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                --                     Osi.FlushOsirisQueue(brawlerUuid)
-                --                     Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                --                 end
-                --             end
-                --         end
-                --     end
                 end
             end
         end

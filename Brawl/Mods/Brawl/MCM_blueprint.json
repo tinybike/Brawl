@@ -151,10 +151,10 @@
                         },
                         {
                             "Id": "companion_ai_max_spell_level",
-                            "Name": "Companion AI Maximum Allowed Spell Level (NYI)",
+                            "Name": "Companion AI Maximum Allowed Spell Level",
                             "Type": "int",
                             "Default": 0,
-                            "Description": "The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)",
+                            "Description": "The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots.",
                             "Handles": {
                                 "DescriptionHandle": "h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0",
                                 "NameHandle": "hfeb61696ga4bfg4f53g8fd6g4a123be02832"
