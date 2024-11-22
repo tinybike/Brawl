@@ -9,6 +9,7 @@ local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
 local TavArchetype = "melee"
+local CompanionTactics = "Offense"
 local CompanionAIMaxSpellLevel = 0
 local HogwildMode = false
 if MCM then
@@ -20,6 +21,7 @@ if MCM then
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     TavArchetype = string.lower(MCM.Get("tav_archetype"))
+    CompanionTactics = MCM.Get("companion_tactics")
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     HogwildMode = MCM.Get("hogwild_mode")
 end
@@ -395,6 +397,14 @@ local function getPointInFrontOf(entityUuid, distance)
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance
 end
 
+local function isZoneSpell(spellName)
+    return split(spellName, "_")[1] == "Zone"
+end
+
+local function isProjectileSpell(spellName)
+    return split(spellName, "_")[1] == "Projectile"
+end
+
 local function getSpellNameBySlot(uuid, slot)
     local entity = Ext.Entity.Get(uuid)
     -- NB: is this always index 6?
@@ -468,7 +478,6 @@ function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
         return false
     end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
-    -- NB: spell.costs doesn't work for spells granted by item
     if spell and spell.costs then
         debugDump(spell.costs)
     end
@@ -778,7 +787,7 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     weight = weight + getSpellTypeWeight(spellType)
     -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
     -- if not HogwildMode then
-    --     weight = weight - spell.level*0.25
+    --     weight = weight - spell.level
     -- end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -791,8 +800,8 @@ local function isCompanionSpellAvailable(uuid, spellName, spell)
     if spellName == nil or spell == nil then
         return false
     end
-    -- Exclude AoE damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
-    if spell.type == "Damage" and spell.areaRadius > 0 then
+    -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
+    if spell.type == "Damage" and (spell.areaRadius > 0 or isZoneSpell(spellName)) then
         return false
     end
     -- If it's a healing spell, make sure it's a direct heal
@@ -804,7 +813,6 @@ local function isCompanionSpellAvailable(uuid, spellName, spell)
         return true
     end
     -- Make sure we're not exceeding the user's specified AI max spell level
-    print("spell level check", spell.level, CompanionAIMaxSpellLevel)
     if spell.level > CompanionAIMaxSpellLevel then
         return false
     end
@@ -876,9 +884,9 @@ function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, a
         archetype = archetype == "base" and TavArchetype or "melee"
     end
     local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
-    print("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
-    _D(ARCHETYPE_WEIGHTS[archetype])
-    _D(weightedSpells)
+    debugPrint("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
+    debugDump(ARCHETYPE_WEIGHTS[archetype])
+    debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -912,7 +920,7 @@ function actOnHostileTarget(brawler, target)
             for _, preparedSpell in pairs(preparedSpells) do
                 local spellName = preparedSpell.OriginatorPrototype
                 if isNpcSpellUsable(spellName, archetype) then
-                    if not SpellTable.Healing[spellName] and not SpellTable.Buff[spellName] and not SpellTable.Utility[spellName] then
+                    if SpellTable.Damage[spellName] or SpellTable.Control[spellName] then
                         table.insert(usableSpells, spellName)
                         numUsableSpells = numUsableSpells + 1
                     end
@@ -984,7 +992,14 @@ function getHostileWeightedTargets(brawler, potentialTargets)
             if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
                 local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
                 local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-                weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                -- if CompanionTactics == "Offense" then
+                    weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                -- elseif CompanionTactics == "Defense" then
+                --     -- distance to target, or distance to group?
+                --     if distanceToTarget < 25 then
+                --         weightedTargets[potentialTargetUuid] = 3*distanceToTarget + 0.25*targetHp
+                --     end
+                -- end
                 -- NB: this is too intense of a request and will crash the game :/
                 -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
                 -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
@@ -1017,7 +1032,6 @@ function findTarget(brawler)
     local level = Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
-        -- NB: merge all this together so the decisions are made in one go!
         -- Healing
         if Osi.IsPlayer(brawler.uuid) == 0 then
             if Brawlers[level] then
@@ -2328,7 +2342,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
     end
 end
 
-function useLocalResourceAccounting(uuid, spellName)
+function doLocalResourceAccounting(uuid, spellName)
     if ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -2340,7 +2354,10 @@ function useLocalResourceAccounting(uuid, spellName)
             end
         end
         if foundActionInProgress then
-            table.remove(ActionsInProgress[uuid], actionsInProgressIndex)
+            for i = actionsInProgressIndex, 1, -1 do
+                debugPrint("remove action in progress", i, getDisplayName(uuid), ActionsInProgress[uuid])
+                table.remove(ActionsInProgress[uuid], i)
+            end
             return true
         end
     end
@@ -2351,10 +2368,9 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
     debugPrint("CastedSpell", caster, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(caster)
     local entity = Ext.Entity.Get(casterUuid)
-    -- if entity and ActionsInProgress[casterUuid] == spellName then
-    _D(ActionsInProgress[casterUuid])
-    if entity and useLocalResourceAccounting(casterUuid, spellName) then
-        print("using local resource accounting")
+    debugDump(ActionsInProgress[casterUuid])
+    if entity and doLocalResourceAccounting(casterUuid, spellName) then
+        debugPrint("using local resource accounting")
         local spell = getSpellByName(spellName)
         for costType, costValue in pairs(spell.costs) do
             if costType == "ShortRest" or costType == "LongRest" then
@@ -2387,7 +2403,6 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
             end
         end
         entity:Replicate("ActionResources")
-        -- ActionsInProgress[casterUuid] = nil
     end
 end
 
@@ -2753,6 +2768,8 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "tav_archetype" then
         TavArchetype = string.lower(payload.value)
+    elseif payload.settingId == "companion_tactics" then
+        CompanionTactics = payload.value
     elseif payload.settingId == "companion_ai_max_spell_level" then
         CompanionAIMaxSpellLevel = payload.value
     elseif payload.settingId == "hogwild_mode" then
