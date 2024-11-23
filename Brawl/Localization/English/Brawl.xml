@@ -7,12 +7,9 @@
     <content contentuid="h47678051g6e17g4844g9740gf082019d8ab0" version="1">Hotkey for toggling the mod on/off</content>
     <content contentuid="h5de513b6g8819g43f5ga5fag90de0b66f6f2" version="1">Mod Toggle Hotkey</content>
     <content contentuid="h9f0b74e2g0973g4847g8c88g12e26d743cb7" version="1">Hotkey for toggling the companion AI on/off</content>
-    <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>
-    <content contentuid="h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0" version="1">The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots. (Not Yet Implemented)</content>
-    <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level (NYI)</content>
     <content contentuid="h358f0669gbeffg4e34g9d77g3f7d1960c100" version="1">If checked, the game will automatically pause when the character the player is controlling goes down</content>
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
-    <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in milliseconds.  The default is 6, meaning the AI will act once every 6 seconds.  Decreasing this will make the game substantially harder.</content>
+    <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in milliseconds.  The default is 6000, meaning the AI will act once every 6 seconds.  Higher values make combat easier, lower values make combat harder.</content>
     <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
     <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>
     <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
@@ -24,4 +21,11 @@
     <content contentuid="h08b6adc8ge129g45a0ga62bgdd4a013d0e2b" version="1">Tav Archetype</content>
     <content contentuid="h65ee56d8gbbbeg4e6agb486ge33349a73d09" version="1">If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.</content>
     <content contentuid="h7a39e407g21e0g4f3bg98fdg7cd473b01043" version="1">True Pause</content>
+    <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>
+    <content contentuid="h6794c735g3288g4b07gb7c3ge060e416e904" version="1">High-level behavior for the companion AI.  All-Out Attack: kill or be killed.  Stick Together: prioritize staying with the group, don't run off alone to attack.</content>
+    <content contentuid="hc01f084cg13c4g42a1g8197g960e8f993d9c" version="1">Companion Tactics</content>
+    <content contentuid="h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0" version="1">The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots.</content>
+    <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level</content>
+    <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the companion AI will freely use any of their spells/abilities with zero resource costs.</content>
+    <content contentuid="h3a37f938gf803g45f1gb3bage75ca7adae42" version="1">Hogwild Mode</content>
 </contentList>

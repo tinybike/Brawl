@@ -11,7 +11,7 @@ local IsSpacePressed = false
 local DirectlyControlledCharacter = nil
 
 -- thank u aahz
-local function getDirectlyControlledCharacter()
+function getDirectlyControlledCharacter()
     if DirectlyControlledCharacter ~= nil then
         return DirectlyControlledCharacter
     end
@@ -29,9 +29,11 @@ local function isInFTB(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
-local function postExitFTB()
+local function postToggleFTB()
     if isInFTB(getDirectlyControlledCharacter()) then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
+    else
+        Ext.ClientNet.PostMessageToServer("EnterFTB", "")
     end
 end
 
@@ -50,6 +52,10 @@ local function getPositionInfo()
     return nil
 end
 
+local function postClickPosition()
+    Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+end
+
 local function onKeyInput(e)
     if e.Repeat == false then
         if e.Key == ModToggleHotkey and e.Event == "KeyDown" then
@@ -65,13 +71,15 @@ local function onKeyInput(e)
             IsSpacePressed = e.Event == "KeyDown"
         end
         if IsShiftPressed and IsSpacePressed then
-            postExitFTB()
+            postToggleFTB()
         end
     end
 end
 
-local function postClickPosition()
-    Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+local function onNetMessage(data)
+    if data.Channel == "GainedControl" then
+        DirectlyControlledCharacter = data.Payload
+    end
 end
 
 local function onControllerButtonInput(e)
@@ -81,14 +89,8 @@ local function onControllerButtonInput(e)
         if button == "A" then
             postClickPosition()
         elseif button == "RightStick" then
-            postExitFTB()
+            postToggleFTB()
         end
-    end
-end
-
-local function onNetMessage(data)
-    if data.Channel == "GainedControl" then
-        DirectlyControlledCharacter = data.Payload
     end
 end
 

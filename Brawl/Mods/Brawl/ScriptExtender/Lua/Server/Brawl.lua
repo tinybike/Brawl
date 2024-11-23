@@ -9,7 +9,9 @@ local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
 local TavArchetype = "melee"
+local CompanionTactics = "Offense"
 local CompanionAIMaxSpellLevel = 0
+local HogwildMode = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -19,7 +21,9 @@ if MCM then
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     TavArchetype = string.lower(MCM.Get("tav_archetype"))
+    CompanionTactics = MCM.Get("companion_tactics")
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
+    HogwildMode = MCM.Get("hogwild_mode")
 end
 
 -- Constants
@@ -99,6 +103,20 @@ local ARCHETYPE_WEIGHTS = {
         spellInRange = 5,
     },
 }
+ARCHETYPE_WEIGHTS.beast = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.goblin_melee = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.goblin_ranged = ARCHETYPE_WEIGHTS.ranged
+ARCHETYPE_WEIGHTS.mage = ARCHETYPE_WEIGHTS.caster
+ARCHETYPE_WEIGHTS.koboldinventor_drunk = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.ranged_stupid = ARCHETYPE_WEIGHTS.ranged
+ARCHETYPE_WEIGHTS.melee_magic_smart = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.merregon = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.act3_LOW_ghost_nurse = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.melee_magic = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.ogre_melee = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.beholder = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.minotaur = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.steel_watcher_biped = ARCHETYPE_WEIGHTS.melee
 local DAMAGE_TYPES = {
     Slashing = 2,
     Piercing = 3,
@@ -282,25 +300,16 @@ function isNpcSpellUsable(spell, archetype)
     if spell == "Projectile_Jump" then return false end
     if spell == "Shout_Dash_NPC" then return false end
     if spell == "Target_Shove" then return false end
-    if spell == "Target_CureWounds" then return false end
-    if spell == "Target_HealingWord" then return false end
-    if spell == "Target_CureWounds_Mass" then return false end
     if spell == "Target_Devour_Ghoul" then return false end
     if spell == "Target_Devour_ShadowMound" then return false end
     if spell == "Target_LOW_RamazithsTower_Nightsong_Globe_1" then return false end
     if archetype == "melee" then
         if spell == "Target_Dip_NPC" then return false end
-        if spell == "Target_MageArmor" then return false end
         if spell == "Projectile_SneakAttack" then return false end
     elseif archetype == "ranged" then
-        if spell == "Target_UnarmedAttack" then return false end
-        if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
-        if spell == "Target_MageArmor" then return false end
         if spell == "Projectile_SneakAttack" then return false end
     elseif archetype == "mage" then
-        if spell == "Target_UnarmedAttack" then return false end
-        if spell == "Target_Topple" then return false end
         if spell == "Target_Dip_NPC" then return false end
     end
     return true
@@ -368,30 +377,6 @@ function getBrawlersSortedByDistance(entityUuid)
     return brawlersSortedByDistance
 end
 
--- Use CharacterMoveTo when possible to move units around so we can specify movement speeds
--- (automove using UseSpell/Attack only uses the fastest possible movement speed)
-function moveThenAct(attackerUuid, targetUuid, spellName)
-    -- local targetRadius = Ext.Stats.Get(spellName).TargetRadius
-    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, targetRadius)
-    -- debugDump(Players[attackerUuid])
-    -- if targetRadius == "MeleeMainWeaponRange" then
-    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-    -- else
-    --     local targetRadiusNumber = tonumber(targetRadius)
-    --     if targetRadiusNumber ~= nil then
-    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-    --         if distanceToTarget > targetRadiusNumber then
-    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
-    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-    --         end
-    --     end
-    -- end
-    debugPrint("moveThenAct", attackerUuid, targetUuid, spellName)
-    -- Osi.PurgeOsirisQueue(attackerUuid, 1)
-    Osi.FlushOsirisQueue(attackerUuid)
-    Osi.UseSpell(attackerUuid, spellName, targetUuid)
-end
-
 function getForwardVector(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
     local rotationQuat = entity.Transform.Transform.RotationQuat
@@ -410,6 +395,14 @@ local function getPointInFrontOf(entityUuid, distance)
     local forwardX, forwardY, forwardZ = getForwardVector(entityUuid)
     local translate = entity.Transform.Transform.Translate
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance
+end
+
+local function isZoneSpell(spellName)
+    return split(spellName, "_")[1] == "Zone"
+end
+
+local function isProjectileSpell(spellName)
+    return split(spellName, "_")[1] == "Projectile"
 end
 
 local function getSpellNameBySlot(uuid, slot)
@@ -485,8 +478,9 @@ function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
         return false
     end
     debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
-    -- NB: spell.costs doesn't work for spells granted by item
-    debugDump(spell.costs)
+    if spell and spell.costs then
+        debugDump(spell.costs)
+    end
     if upcastLevel ~= nil then
         debugPrint("Upcasted spell level", upcastLevel)
     end
@@ -530,7 +524,8 @@ function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant
     debugPrint("casting at position", spellName, position[1], position[2], position[3])
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
-    ActionsInProgress[casterUuid] = spellName
+    ActionsInProgress[casterUuid] = ActionsInProgress[casterUuid] or {}
+    table.insert(ActionsInProgress[casterUuid], spellName)
     Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
     return true
 end
@@ -551,7 +546,10 @@ function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcast
     debugPrint("casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
-    ActionsInProgress[casterUuid] = spellName
+    ActionsInProgress[casterUuid] = ActionsInProgress[casterUuid] or {}
+    print("inserting into actions in progress")
+    _D(ActionsInProgress)
+    table.insert(ActionsInProgress[casterUuid], spellName)
     Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = getPointInFrontOf(casterUuid, 1.0)
@@ -572,7 +570,7 @@ function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwa
     local deltaX = targetPos[1] - sourcePos[1]
     local deltaY = targetPos[2] - sourcePos[2]
     local deltaZ = targetPos[3] - sourcePos[3]
-    local squaredDistance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+    local squaredDistance = deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ
     if squaredDistance < 1600 then -- 40^2 = 1600
         local distance = math.sqrt(squaredDistance)
         local vecToTargetX = deltaX/distance
@@ -681,6 +679,32 @@ function selectNextEnemyBrawler(playerUuid, isNext)
     end
 end
 
+function moveThenAct(attackerUuid, targetUuid, spellName)
+    -- local targetRadius = Ext.Stats.Get(spellName).TargetRadius
+    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, targetRadius)
+    -- debugDump(Players[attackerUuid])
+    -- if targetRadius == "MeleeMainWeaponRange" then
+    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    -- else
+    --     local targetRadiusNumber = tonumber(targetRadius)
+    --     if targetRadiusNumber ~= nil then
+    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+    --         if distanceToTarget > targetRadiusNumber then
+    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
+    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+    --         end
+    --     end
+    -- end
+    debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, HogwildMode)
+    if HogwildMode then
+        Osi.PurgeOsirisQueue(attackerUuid, 1)
+        Osi.FlushOsirisQueue(attackerUuid)
+        Osi.UseSpell(attackerUuid, spellName, targetUuid)
+    else
+        useSpellAndResources(attackerUuid, targetUuid, spellName)
+    end
+end
+
 function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
         return 7
@@ -761,11 +785,45 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- weight = weight + getResistanceWeight(spell, targetEntity)
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
-    -- Adjust by spell level (higher level spells are disfavored)
-    weight = weight - spell.level*2
+    -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
+    -- if not HogwildMode then
+    --     weight = weight - spell.level
+    -- end
+    if HogwildMode then
+        weight = weight + spell.level
+    end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
     return weight
+end
+
+-- NB: need to allow healing, buffs, debuffs etc for companions too
+local function isCompanionSpellAvailable(uuid, spellName, spell)
+    -- This should never happen but...
+    if spellName == nil or spell == nil then
+        return false
+    end
+    -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
+    if spell.type == "Damage" and (spell.areaRadius > 0 or isZoneSpell(spellName)) then
+        return false
+    end
+    -- If it's a healing spell, make sure it's a direct heal
+    if spell.type == "Healing" and not spell.isDirectHeal then
+        return false
+    end
+    -- Who cares about resources, we're going hogwild
+    if HogwildMode then
+        return true
+    end
+    -- Make sure we're not exceeding the user's specified AI max spell level
+    if spell.level > CompanionAIMaxSpellLevel then
+        return false
+    end
+    -- Make sure we have the resources to actually cast what we want to cast
+    if not checkSpellResources(uuid, spellName) then
+        return false
+    end
+    return true
 end
 
 -- What to do?  In all cases, give extra weight to spells that you're already within range for
@@ -777,7 +835,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-function getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -788,8 +846,7 @@ function getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype,
                 break
             end
         end
-        -- Exclude AoE stuff and all non-cantrip spells for companions
-        if spell and spell.areaRadius == 0 and spell.level == 0 then
+        if isCompanionSpellAvailable(uuid, spellName, spell) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
@@ -804,7 +861,7 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs/debuffs (NYI)
-function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -824,21 +881,24 @@ function getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTyp
     return weightedSpells
 end
 
-function decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = archetype == "base" and TavArchetype or "melee"
     end
-    local weightedSpells = getCompanionWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
+    debugPrint("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
+    debugDump(ARCHETYPE_WEIGHTS[archetype])
+    debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
-function decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+function decideActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = "melee"
     end
-    local weightedSpells = getWeightedSpells(preparedSpells, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -851,10 +911,10 @@ function actOnHostileTarget(brawler, target)
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(preparedSpells, distanceToTarget, archetype, {"Damage"})
+            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"})
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(preparedSpells, distanceToTarget, archetype, spellTypes)
+            actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
@@ -863,7 +923,7 @@ function actOnHostileTarget(brawler, target)
             for _, preparedSpell in pairs(preparedSpells) do
                 local spellName = preparedSpell.OriginatorPrototype
                 if isNpcSpellUsable(spellName, archetype) then
-                    if not SpellTable.Healing[spellName] and not SpellTable.Buff[spellName] and not SpellTable.Utility[spellName] then
+                    if SpellTable.Damage[spellName] or SpellTable.Control[spellName] then
                         table.insert(usableSpells, spellName)
                         numUsableSpells = numUsableSpells + 1
                     end
@@ -935,7 +995,14 @@ function getHostileWeightedTargets(brawler, potentialTargets)
             if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
                 local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
                 local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-                weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                -- if CompanionTactics == "Offense" then
+                    weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                -- elseif CompanionTactics == "Defense" then
+                --     -- distance to target, or distance to group?
+                --     if distanceToTarget < 25 then
+                --         weightedTargets[potentialTargetUuid] = 3*distanceToTarget + 0.25*targetHp
+                --     end
+                -- end
                 -- NB: this is too intense of a request and will crash the game :/
                 -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
                 -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
@@ -968,7 +1035,7 @@ function findTarget(brawler)
     local level = Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
-        -- Healing (non-player only)
+        -- Healing
         if Osi.IsPlayer(brawler.uuid) == 0 then
             if Brawlers[level] then
                 local minTargetHpPct = 200.0
@@ -985,9 +1052,9 @@ function findTarget(brawler)
                 -- Arbitrary threshold for healing
                 if minTargetHpPct < AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD and friendlyTargetUuid and Brawlers[level][friendlyTargetUuid] then
                     debugPrint("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
-                    local result = actOnFriendlyTarget(brawler, Brawlers[level][friendlyTargetUuid])
-                    debugPrint("result", result)
-                    return result
+                    if actOnFriendlyTarget(brawler, Brawlers[level][friendlyTargetUuid]) then
+                        return true
+                    end
                 end
             end
         end
@@ -1568,7 +1635,7 @@ function revertAllModifiedHitpoints()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars.ModifiedHitpoints and next(modVars.ModifiedHitpoints) ~= nil then
         for uuid, _ in pairs(modVars.ModifiedHitpoints) do
-            debugPrint("Revert modified hp for", uuid, getDisplayName(uuid))
+            -- debugPrint("Revert modified hp for", uuid, getDisplayName(uuid))
             revertHitpoints(uuid)
         end
     end
@@ -1611,8 +1678,8 @@ local function getSpellInfo(spellType, spellName)
     if spell and spell.VerbalIntent == spellType then
         local useCosts = split(spell.UseCosts, ";")
         local costs = {
-            ShortRest = spell.Cooldown == "OncePerShortRest",
-            LongRest = spell.Cooldown == "OncePerRest",
+            ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
+            LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
         }
         -- local hitCost = nil -- divine smite only..?
         for _, useCost in ipairs(useCosts) do
@@ -1636,6 +1703,8 @@ local function getSpellInfo(spellType, spellName)
             targetRadius = spell.TargetRadius,
             costs = costs,
             type = spellType,
+            -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
+            -- damage = spell.TooltipDamageList,
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -1707,8 +1776,8 @@ function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
     if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
-        debugPrint("Reverting hitpoints", entityUuid)
-        debugDump(modifiedHitpoints[entityUuid])
+        -- debugPrint("Reverting hitpoints", entityUuid)
+        -- debugDump(modifiedHitpoints[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
         local currentMaxHp = entity.Health.MaxHp
         local currentHp = entity.Health.Hp
@@ -1723,7 +1792,7 @@ function revertHitpoints(entityUuid)
         entity:Replicate("Health")
         modifiedHitpoints[entityUuid] = nil
         modVars.ModifiedHitpoints = modifiedHitpoints
-        debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
@@ -1734,7 +1803,7 @@ function modifyHitpoints(entityUuid)
     end
     local modifiedHitpoints = modVars.ModifiedHitpoints
     if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
-        debugPrint("modify hitpoints", entityUuid, HitpointsMultiplier)
+        -- debugPrint("modify hitpoints", entityUuid, HitpointsMultiplier)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxHp = entity.Health.MaxHp
         local originalHp = entity.Health.Hp
@@ -1750,7 +1819,7 @@ function modifyHitpoints(entityUuid)
         modifiedHitpoints[entityUuid].maxHp = entity.Health.MaxHp
         modifiedHitpoints[entityUuid].multiplier = HitpointsMultiplier
         modVars.ModifiedHitpoints = modifiedHitpoints
-        debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
@@ -1764,14 +1833,14 @@ function setupPartyMembersHitpoints()
         end
         PartyMembersHitpointsListeners[partyMemberUuid] = Ext.Entity.Subscribe("Health", function (entity, _, _)
             local uuid = entity.Uuid.EntityUuid
-            debugPrint("Health changed", uuid)
+            -- debugPrint("Health changed", uuid)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local modifiedHitpoints = modVars.ModifiedHitpoints
             if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil and modifiedHitpoints[uuid].maxHp ~= entity.Health.MaxHp then
                 debugDump(modifiedHitpoints[uuid])
                 if modifiedHitpoints[uuid].updating == false then
                     -- External change detected; re-apply modifications
-                    debugPrint("External MaxHp change detected for", uuid, ". Re-applying hitpoint modifications.")
+                    -- debugPrint("External MaxHp change detected for", uuid, ". Re-applying hitpoint modifications.")
                     modifiedHitpoints[uuid] = nil
                     modVars.ModifiedHitpoints = modifiedHitpoints
                     modifyHitpoints(uuid)
@@ -1817,7 +1886,7 @@ function lock(entity)
     -- end
 end
 
-local function isInFTB(entity)
+function isInFTB(entity)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
@@ -2062,8 +2131,8 @@ local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid then
-        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+    if level and entityUuid and Players[entityUuid] then
+        if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = false
         end
         stopPulseAddNearby(entityUuid)
@@ -2072,6 +2141,7 @@ local function onEnteredForceTurnBased(entityGuid)
         if isToT() then
             stopToTTimers()
         end
+        startTruePause(entityUuid)
         if Brawlers[level] then
             for brawlerUuid, brawler in pairs(Brawlers[level]) do
                 if brawlerUuid ~= entityUuid and not Brawlers[level][brawlerUuid].isPaused then
@@ -2085,7 +2155,6 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
-        startTruePause(entityUuid)
     end
 end
 
@@ -2093,12 +2162,12 @@ function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid then
+    if level and entityUuid and Players[entityUuid] then
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
         end
         stopTruePause(entityUuid)
-        if Players[entityUuid] and Brawlers[level] and Brawlers[level][entityUuid] then
+        if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
             if isPlayerControllingDirectly(entityUuid) then
                 startPulseAddNearby(entityUuid)
@@ -2278,13 +2347,36 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
     end
 end
 
+function doLocalResourceAccounting(uuid, spellName)
+    if ActionsInProgress[uuid] then
+        local foundActionInProgress = false
+        local actionsInProgressIndex = nil
+        for i, actionInProgress in ipairs(ActionsInProgress[uuid]) do
+            if actionInProgress == spellName then
+                foundActionInProgress = true
+                actionsInProgressIndex = i
+                break
+            end
+        end
+        if foundActionInProgress then
+            for i = actionsInProgressIndex, 1, -1 do
+                debugPrint("remove action in progress", i, getDisplayName(uuid), ActionsInProgress[uuid])
+                table.remove(ActionsInProgress[uuid], i)
+            end
+            return true
+        end
+    end
+    return false
+end
+
 local function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID)
     debugPrint("CastedSpell", caster, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(caster)
     local entity = Ext.Entity.Get(casterUuid)
-    if entity and ActionsInProgress[casterUuid] == spellName then
+    debugDump(ActionsInProgress[casterUuid])
+    if entity and doLocalResourceAccounting(casterUuid, spellName) then
+        debugPrint("using local resource accounting")
         local spell = getSpellByName(spellName)
-        _D(spell.costs)
         for costType, costValue in pairs(spell.costs) do
             if costType == "ShortRest" or costType == "LongRest" then
                 if costValue then
@@ -2316,7 +2408,6 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
             end
         end
         entity:Replicate("ActionResources")
-        ActionsInProgress[casterUuid] = nil
     end
 end
 
@@ -2655,8 +2746,6 @@ local function onMCMSettingSaved(payload)
         else
             disableCompanionAI(hotkey)
         end
-    elseif payload.settingId == "companion_ai_max_spell_level" then
-        CompanionAIMaxSpellLevel = payload.value
     elseif payload.settingId == "true_pause" then
         TruePause = payload.value
         checkTruePauseParty()
@@ -2684,6 +2773,12 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "tav_archetype" then
         TavArchetype = string.lower(payload.value)
+    elseif payload.settingId == "companion_tactics" then
+        CompanionTactics = payload.value
+    elseif payload.settingId == "companion_ai_max_spell_level" then
+        CompanionAIMaxSpellLevel = payload.value
+    elseif payload.settingId == "hogwild_mode" then
+        HogwildMode = payload.value
     end
 end
 
@@ -2694,6 +2789,13 @@ function isFTBAllLockedIn()
         end
     end
     return true
+end
+
+function allEnterFTB()
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local uuid = Osi.GetUUID(player[1])
+        Osi.ForceTurnBasedMode(uuid, 1)
+    end
 end
 
 function allExitFTB()
@@ -2724,11 +2826,23 @@ local function onNetMessage(data)
             toggleFullAuto(data.Payload)
         end
     elseif data.Channel == "ExitFTB" then
+        debugPrint("Got ExitFTB signal from client")
         allExitFTB()
+    -- should this be per-player, or just drag everyone in at the same time?
+    elseif data.Channel == "EnterFTB" then
+        debugPrint("Got EnterFTB signal from client")
+        allEnterFTB()
     elseif data.Channel == "ClickPosition" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player.uuid then
-            LastClickPosition[player.uuid] = Ext.Json.Parse(data.Payload)
+            local clickPosition = Ext.Json.Parse(data.Payload)
+            if clickPosition and clickPosition.position then
+                local pos = clickPosition.position
+                local validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
+                if validX ~= nil and validY ~= nil and validZ ~= nil then
+                    LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
+                end
+            end
         end
     elseif data.Channel == "ControllerButtonPressed" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
@@ -2747,10 +2861,7 @@ local function onNetMessage(data)
                             if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
                                 return useSpellAndResources(player.uuid, player.uuid, spellName)
                             end
-                            -- local splitSpellName = split(spellName, "_")
-                            -- local isZoneSpell = splitSpellName[1] == "Zone"
-                            -- local isProjectileSpell = splitSpellName[1] == "Projectile"
-                            -- if isZoneSpell or isProjectileSpell then
+                            -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
                             --     return useSpellAndResources(player.uuid, nil, spellName)
                             -- end
                             if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
@@ -2767,26 +2878,6 @@ local function onNetMessage(data)
                         if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
                             debugPrint("Selecting next enemy brawler")
                             selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
-                        end
-                    end
-                    if data.Payload == "RightStick" then
-                        debugPrint("pausing")
-                        Osi.PurgeOsirisQueue(player.uuid, 1)
-                        Osi.FlushOsirisQueue(player.uuid)
-                        return Osi.ForceTurnBasedMode(player.uuid, 1)
-                    end
-                else
-                    if data.Payload == "RightStick" then
-                        debugPrint("unpausing")
-                        local level = Osi.GetRegion(player.uuid)
-                        if level and Brawlers[level] then
-                            for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                                if Players[brawlerUuid] ~= nil then
-                                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                                    Osi.FlushOsirisQueue(brawlerUuid)
-                                    Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                                end
-                            end
                         end
                     end
                 end
