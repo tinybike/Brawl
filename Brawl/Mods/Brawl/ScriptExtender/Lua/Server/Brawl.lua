@@ -789,6 +789,9 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- if not HogwildMode then
     --     weight = weight - spell.level
     -- end
+    if HogwildMode then
+        weight = weight + spell.level
+    end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
     return weight
@@ -1700,6 +1703,8 @@ local function getSpellInfo(spellType, spellName)
             targetRadius = spell.TargetRadius,
             costs = costs,
             type = spellType,
+            -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
+            -- damage = spell.TooltipDamageList,
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -2836,9 +2841,6 @@ local function onNetMessage(data)
                 local validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
                 if validX ~= nil and validY ~= nil and validZ ~= nil then
                     LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
-                --     debugPrint("Valid position found", pos[1], pos[2], pos[3], "->", validX, validY, validZ)
-                -- else
-                --     debugPrint("No valid position found", pos[1], pos[2], pos[3])
                 end
             end
         end
@@ -2859,10 +2861,7 @@ local function onNetMessage(data)
                             if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
                                 return useSpellAndResources(player.uuid, player.uuid, spellName)
                             end
-                            -- local splitSpellName = split(spellName, "_")
-                            -- local isZoneSpell = splitSpellName[1] == "Zone"
-                            -- local isProjectileSpell = splitSpellName[1] == "Projectile"
-                            -- if isZoneSpell or isProjectileSpell then
+                            -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
                             --     return useSpellAndResources(player.uuid, nil, spellName)
                             -- end
                             if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
