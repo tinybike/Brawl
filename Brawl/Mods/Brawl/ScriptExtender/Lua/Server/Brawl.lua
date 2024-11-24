@@ -344,14 +344,16 @@ function calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     local dy = yMover - yTarget
     local dz = zMover - zTarget
     local fracDistance = goalDistance / math.sqrt(dx*dx + dy*dy + dz*dz)
-    return xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance
+    return Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 0, moverUuid, 1)
 end
 
 function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
-    Osi.PurgeOsirisQueue(moverUuid, 1)
-    Osi.FlushOsirisQueue(moverUuid)
-    Osi.CharacterMoveToPosition(moverUuid, x, y, z, getMovementSpeed(moverUuid), "")
+    if x ~= nil and y ~= nil and z ~= nil then
+        Osi.PurgeOsirisQueue(moverUuid, 1)
+        Osi.FlushOsirisQueue(moverUuid)
+        Osi.CharacterMoveToPosition(moverUuid, x, y, z, getMovementSpeed(moverUuid), "")
+    end
 end
 
 -- Example monk looping animations (can these be interruptable?)
@@ -691,28 +693,33 @@ function selectNextEnemyBrawler(playerUuid, isNext)
 end
 
 function moveThenAct(attackerUuid, targetUuid, spellName)
-    -- local targetRadius = Ext.Stats.Get(spellName).TargetRadius
-    -- debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, targetRadius)
-    -- debugDump(Players[attackerUuid])
-    -- if targetRadius == "MeleeMainWeaponRange" then
-    --     Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-    -- else
-    --     local targetRadiusNumber = tonumber(targetRadius)
-    --     if targetRadiusNumber ~= nil then
-    --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-    --         if distanceToTarget > targetRadiusNumber then
-    --             debugPrint("moveThenAct distance > targetRadius, moving to...")
-    --             moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
-    --         end
-    --     end
-    -- end
     debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, HogwildMode)
-    if HogwildMode then
-        Osi.PurgeOsirisQueue(attackerUuid, 1)
-        Osi.FlushOsirisQueue(attackerUuid)
-        Osi.UseSpell(attackerUuid, spellName, targetUuid)
+    -- debugDump(Players[attackerUuid])
+    local targetRadius = Ext.Stats.Get(spellName).TargetRadius
+    local targetRadiusNumber
+    if targetRadius == "MeleeMainWeaponRange" then
+        Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+    elseif targetRadius == "RangedMainWeaponRange" then
+        targetRadiusNumber = 18
     else
-        useSpellAndResources(attackerUuid, targetUuid, spellName)
+        targetRadiusNumber = tonumber(targetRadius)
+        local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+        if distanceToTarget > targetRadiusNumber then
+            debugPrint("moveThenAct distance > targetRadius, moving to...")
+            moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+        end
+    end
+    if Osi.CanSee(attackerUuid, targetUuid) == 0 and not string.match(spellName, "^Projectile_MagicMissile") then
+        debugPrint("moveThenAct can't see target, moving closer")
+        moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+    else
+        if HogwildMode then
+            Osi.PurgeOsirisQueue(attackerUuid, 1)
+            Osi.FlushOsirisQueue(attackerUuid)
+            Osi.UseSpell(attackerUuid, spellName, targetUuid)
+        else
+            useSpellAndResources(attackerUuid, targetUuid, spellName)
+        end
     end
 end
 
@@ -1007,7 +1014,10 @@ function getHostileWeightedTargets(brawler, potentialTargets)
                 local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
                 local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                 -- if CompanionTactics == "Offense" then
-                    weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                if Osi.CanSee(potentialTargetUuid, brawler.uuid) == 0 then
+                    weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * 0.5
+                end
                 -- elseif CompanionTactics == "Defense" then
                 --     -- distance to target, or distance to group?
                 --     if distanceToTarget < 25 then
@@ -1350,6 +1360,18 @@ function startPulseAddNearby(uuid)
     end
 end
 
+function checkForDownedOrDeadPlayers()
+    if Players then
+        for uuid, player in pairs(Players) do
+            if Osi.IsDead(uuid) == 1 or isDowned(uuid) then
+                Osi.PurgeOsirisQueue(uuid, 1)
+                Osi.FlushOsirisQueue(uuid)
+                Osi.LieOnGround(uuid)
+            end
+        end
+    end
+end
+
 function stopPulseReposition(level)
     debugPrint("stopPulseReposition", level)
     if PulseRepositionTimers[level] ~= nil then
@@ -1362,6 +1384,7 @@ end
 function pulseReposition(level)
     -- addNearbyEnemiesToBrawlers(Osi.GetHostCharacter(), 30)
     -- addNearbyToBrawlers(Osi.GetHostCharacter(), 30)
+    checkForDownedOrDeadPlayers()
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             if isAliveAndCanFight(brawlerUuid) then
@@ -1405,9 +1428,9 @@ function pulseReposition(level)
                     end
                 end
             elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
-                Osi.PurgeOsirisQueue(entityUuid, 1)
-                Osi.FlushOsirisQueue(entityUuid)
-                Osi.LieOnGround(entityUuid)    
+                Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                Osi.FlushOsirisQueue(brawlerUuid)
+                Osi.LieOnGround(brawlerUuid)
             end
         end
     end
@@ -2837,7 +2860,7 @@ local function onNetMessage(data)
         allEnterFTB()
     elseif data.Channel == "ClickPosition" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player.uuid then
+        if player and player.uuid then
             local clickPosition = Ext.Json.Parse(data.Payload)
             if clickPosition and clickPosition.position then
                 local pos = clickPosition.position
