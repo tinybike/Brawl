@@ -315,6 +315,19 @@ function isNpcSpellUsable(spell, archetype)
     return true
 end
 
+local function split(inputstr, sep)
+    if sep == nil then
+        sep = "%s" -- whitespace
+    else
+        sep = string.gsub(sep, "([^%w])", "%%%1")
+    end
+    local t = {}
+    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+        table.insert(t, str)
+    end
+    return t
+end
+
 function getMovementSpeed(entityUuid)
     -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
     local entity = Ext.Entity.Get(entityUuid)
@@ -547,8 +560,6 @@ function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcast
     Osi.PurgeOsirisQueue(casterUuid, 1)
     Osi.FlushOsirisQueue(casterUuid)
     ActionsInProgress[casterUuid] = ActionsInProgress[casterUuid] or {}
-    print("inserting into actions in progress")
-    _D(ActionsInProgress)
     table.insert(ActionsInProgress[casterUuid], spellName)
     Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
@@ -790,7 +801,7 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     --     weight = weight - spell.level
     -- end
     if HogwildMode then
-        weight = weight + spell.level
+        weight = weight + spell.level*2
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -1393,6 +1404,10 @@ function pulseReposition(level)
                         end
                     end
                 end
+            elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
+                Osi.PurgeOsirisQueue(entityUuid, 1)
+                Osi.FlushOsirisQueue(entityUuid)
+                Osi.LieOnGround(entityUuid)    
             end
         end
     end
@@ -1451,7 +1466,7 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 Osi.SetCanJoinCombat(entityUuid, 0)
             end
             Brawlers[level][entityUuid] = brawler
-            if isInBrawl and PulseActionTimers[entityUuid] == nil then
+            if isInBrawl and PulseActionTimers[entityUuid] == nil and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
                 startPulseAction(brawler)
             end
         end
@@ -1658,19 +1673,6 @@ function cleanupAll()
     end
     revertAllModifiedHitpoints()
     resetSpellData()
-end
-
-function split(inputstr, sep)
-    if sep == nil then
-        sep = "%s" -- whitespace
-    else
-        sep = string.gsub(sep, "([^%w])", "%%%1")
-    end
-    local t = {}
-    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
-        table.insert(t, str)
-    end
-    return t
 end
 
 local function getSpellInfo(spellType, spellName)
@@ -2784,7 +2786,8 @@ end
 
 function isFTBAllLockedIn()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-        if not FTBLockedIn[Osi.GetUUID(player[1])] then
+        local uuid = Osi.GetUUID(player[1])
+        if not FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not isDowned(uuid) then
             return false
         end
     end
