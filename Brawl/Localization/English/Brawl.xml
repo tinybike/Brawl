@@ -28,6 +28,11 @@
     <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level</content>
     <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the companion AI will freely use any of their spells/abilities with zero resource costs.</content>
     <content contentuid="h3a37f938gf803g45f1gb3bage75ca7adae42" version="1">Hogwild Mode</content>
-    <content contentuid="h093bb5f6g0706g401fgb0dfg36dd685cf28d" version="1">Pause Hotkey</content>
+    <content contentuid="h093bb5f6g0706g401fgb0dfg36dd685cf28d" version="1">Pause Toggle Hotkey</content>
     <content contentuid="heae14576gd38dg4abdgb2eagd99a9aef0374" version="1">Hotkey for pause/unpause</content>
+    <content contentuid="hb6c54fdfg8152g4c1eg96ddg6befe054537a" version="1">Pause Toggle Hotkey 2 (Optional)</content>
+    <content contentuid="h5b682c2agbaeeg4eb2gaff4g41033a6c3a3d" version="1">Fully Automated Brawls Toggle Hotkey 2 (Optional)</content>
+    <content contentuid="h707f2e87ge8d2g43f6g9c57gc9442b1a2e32" version="1">Companion AI Toggle Hotkey 2 (Optional)</content>
+    <content contentuid="hd4810f84g0a89g4cf1ga874ga8cd18897e96" version="1">Mod Toggle Hotkey 2 (Optional)</content>
+    <content contentuid="h31c4820dg3873g4c88gb703g821e8061692e" version="1">If hotkey 2 is set, both buttons must be pressed together.  Leave hotkey 2 blank to just use a single controller button.</content>
 </contentList>

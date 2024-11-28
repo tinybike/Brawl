@@ -2,23 +2,38 @@ local ModToggleHotkey = {ScanCode = "F9", Modifier = "NONE"}
 local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
 local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
 local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
-local ControllerModToggleHotkey = ""
-local ControllerCompanionAIToggleHotkey = ""
-local ControllerFullAutoToggleHotkey = ""
-local ControllerPauseToggleHotkey = "RightStick"
+local ControllerModToggleHotkey = {"", ""}
+local ControllerCompanionAIToggleHotkey = {"", ""}
+local ControllerFullAutoToggleHotkey = {"", ""}
+local ControllerPauseToggleHotkey = {"RightStick", ""}
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
     FullAutoToggleHotkey = MCM.Get("full_auto_toggle_hotkey")
     PauseToggleHotkey = MCM.Get("pause_toggle_hotkey")
-    ControllerModToggleHotkey = MCM.Get("controller_mod_toggle_hotkey")
-    ControllerCompanionAIToggleHotkey = MCM.Get("controller_companion_ai_toggle_hotkey")
-    ControllerFullAutoToggleHotkey = MCM.Get("controller_full_auto_toggle_hotkey")
-    ControllerPauseToggleHotkey = MCM.Get("controller_pause_toggle_hotkey")
+    ControllerModToggleHotkey = {MCM.Get("controller_mod_toggle_hotkey"), MCM.Get("controller_mod_toggle_hotkey_2")}
+    ControllerCompanionAIToggleHotkey = {MCM.Get("controller_companion_ai_toggle_hotkey"), MCM.Get("controller_companion_ai_toggle_hotkey_2")}
+    ControllerFullAutoToggleHotkey = {MCM.Get("controller_full_auto_toggle_hotkey"), MCM.Get("controller_full_auto_toggle_hotkey_2")}
+    ControllerPauseToggleHotkey = {MCM.Get("controller_pause_toggle_hotkey"), MCM.Get("controller_pause_toggle_hotkey_2")}
 end
-local IsRightTriggerPressed = false
-local IsLeftTriggerPressed = false
 local DirectlyControlledCharacter = nil
+local IsControllerButtonPressed = {
+    A = false,
+    B = false,
+    X = false,
+    Y = false,
+    DPadLeft = false,
+    DPadRight = false,
+    DPadUp = false,
+    DPadDown = false,
+    Back = false,
+    Start = false,
+    Touchpad = false,
+    LeftStick = false,
+    RightStick = false,
+    TriggerLeft = false,
+    TriggerRight = false,
+}
 
 -- Keybinding stuff from https://github.com/AtilioA/BG3-MCM & modified/re-used with permission
 
@@ -83,11 +98,18 @@ function KeybindingManager:IsModifierPressed(e, modifiers)
     return self:AreAllModifiersPresent(e.Modifiers, activeModifiers) and self:AreAllActiveModifiersPressed(eActiveModifiers, activeModifiers)
 end
 
-function isKeybindingPressed(e, keybinding)
+local function isKeybindingPressed(e, keybinding)
     if e.Key ~= keybinding.ScanCode then
         return false
     end
     return KeybindingManager:IsModifierPressed(e, keybinding.Modifier)
+end
+
+local function isControllerKeybindingPressed(keybinding)
+    if keybinding[2] == "" then
+        return IsControllerButtonPressed[keybinding[1]]
+    end
+    return IsControllerButtonPressed[keybinding[1]] and IsControllerButtonPressed[keybinding[2]]
 end
 
 -- thank u aahz
@@ -109,12 +131,24 @@ local function isInFTB(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
-local function postToggleFTB()
+local function postPauseToggle()
     if isInFTB(getDirectlyControlledCharacter()) then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     else
         Ext.ClientNet.PostMessageToServer("EnterFTB", "")
     end
+end
+
+local function postModToggle()
+    Ext.ClientNet.PostMessageToServer("ModToggle", "")
+end
+
+local function postCompanionAIToggle()
+    Ext.ClientNet.PostMessageToServer("CompanionAIToggle", "")
+end
+
+local function postFullAutoToggle()
+    Ext.ClientNet.PostMessageToServer("FullAutoToggle", "")
 end
 
 local function getPositionInfo()
@@ -140,53 +174,64 @@ local function onKeyInput(e)
     if e.Repeat == false and e.Event == "KeyDown" then
         local key = tostring(e.Key)
         if isKeybindingPressed(e, ModToggleHotkey) then
-            Ext.ClientNet.PostMessageToServer("ModToggle", key)
+            postModToggle()
         elseif isKeybindingPressed(e, CompanionAIToggleHotkey) then
-            Ext.ClientNet.PostMessageToServer("CompanionAIToggle", key)
+            postCompanionAIToggle()
         elseif isKeybindingPressed(e, FullAutoToggleHotkey) then
-            Ext.ClientNet.PostMessageToServer("FullAutoToggle", key)
+            postFullAutoToggle()
         elseif isKeybindingPressed(e, PauseToggleHotkey) then
-            postToggleFTB()
+            postPauseToggle()
         end
     end
 end
 
-local function onNetMessage(data)
-    if data.Channel == "GainedControl" then
-        DirectlyControlledCharacter = data.Payload
+local function onControllerButtonPressed(button)
+    Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", button)
+    if button == "A" then
+        postClickPosition()
+    end
+    if isControllerKeybindingPressed(ControllerModToggleHotkey) then
+        postModToggle()
+    elseif isControllerKeybindingPressed(ControllerCompanionAIToggleHotkey) then
+        postCompanionAIToggle()
+    elseif isControllerKeybindingPressed(ControllerFullAutoToggleHotkey) then
+        postFullAutoToggle()
+    elseif isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
+        postPauseToggle()
     end
 end
 
 local function onControllerAxisInput(e)
-    if e.Axis == "TriggerLeft" then
-        if IsLeftTriggerPressed then
+    local axis = tostring(e.Axis)
+    if axis == "TriggerLeft" or axis == "TriggerRight" then
+        if IsControllerButtonPressed[axis] then
             if e.Value == 0.0 then
-                IsLeftTriggerPressed = false
+                IsControllerButtonPressed[axis] = false
             end
-            return
-        end
-        if not IsLeftTriggerPressed then
-            IsLeftTriggerPressed = true
-            return
+        else
+            IsControllerButtonPressed[axis] = true
+            onControllerButtonPressed(axis)
         end
     end
 end
 
 local function onControllerButtonInput(e)
-    if e.Pressed == true then
-        Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", tostring(e.Button))
-        local button = tostring(e.Button)
-        if button == "A" then
-            postClickPosition()
-        elseif button == "RightStick" and IsLeftTriggerPressed then
-            postToggleFTB()
-        end
+    local button = tostring(e.Button)
+    IsControllerButtonPressed[button] = e.Pressed
+    if e.Pressed then
+        onControllerButtonPressed(button)
     end
 end
 
 local function onMouseButtonInput(e)
     if e.Pressed and e.Button == 1 then
         postClickPosition()
+    end
+end
+
+local function onNetMessage(data)
+    if data.Channel == "GainedControl" then
+        DirectlyControlledCharacter = data.Payload
     end
 end
 
@@ -202,6 +247,22 @@ local function onMCMSettingSaved(payload)
         FullAutoToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "pause_toggle_hotkey" then
         PauseToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "controller_mod_toggle_hotkey" then
+        ControllerModToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_mod_toggle_hotkey_2" then
+        ControllerModToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_companion_ai_toggle_hotkey" then
+        ControllerCompanionAIToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_companion_ai_toggle_hotkey_2" then
+        ControllerCompanionAIToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_full_auto_toggle_hotkey" then
+        ControllerFullAutoToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_full_auto_toggle_hotkey_2" then
+        ControllerFullAutoToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_pause_toggle_hotkey" then
+        ControllerPauseToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_pause_toggle_hotkey_2" then
+        ControllerPauseToggleHotkey[2] = payload.value
     end
 end
 

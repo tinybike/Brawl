@@ -2837,19 +2837,19 @@ local function onNetMessage(data)
         if MCM then
             MCM.Set("mod_enabled", not ModEnabled)
         else
-            toggleMod(data.Payload)
+            toggleMod()
         end
     elseif data.Channel == "CompanionAIToggle" then
         if MCM then
             MCM.Set("companion_ai_enabled", not CompanionAIEnabled)
         else
-            toggleCompanionAI(data.Payload)
+            toggleCompanionAI()
         end
     elseif data.Channel == "FullAutoToggle" then
         if MCM then
             MCM.Set("full_auto", not FullAuto)
         else
-            toggleFullAuto(data.Payload)
+            toggleFullAuto()
         end
     elseif data.Channel == "ExitFTB" then
         debugPrint("Got ExitFTB signal from client")
