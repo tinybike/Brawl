@@ -711,7 +711,7 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     end
     if Osi.CanSee(attackerUuid, targetUuid) == 0 and not string.match(spellName, "^Projectile_MagicMissile") then
         debugPrint("moveThenAct can't see target, moving closer")
-        moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+        moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber or 2)
     else
         if HogwildMode then
             Osi.PurgeOsirisQueue(attackerUuid, 1)
@@ -1106,7 +1106,7 @@ function stopPulseAction(brawler, remainInBrawl)
         brawler.isInBrawl = false
     end
     if PulseActionTimers[brawler.uuid] ~= nil then
-        debugPrint("stop pulse action", brawler.displayName)
+        debugPrint("stop pulse action", brawler.displayName, remainInBrawl)
         Ext.Timer.Cancel(PulseActionTimers[brawler.uuid])
         PulseActionTimers[brawler.uuid] = nil
     end
@@ -1438,8 +1438,8 @@ end
 
 -- Reposition if needed every REPOSITION_INTERVAL ms
 function startPulseReposition(level)
-    debugPrint("startPulseReposition", level)
     if PulseRepositionTimers[level] == nil then
+        debugPrint("startPulseReposition", level)
         PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
             pulseReposition(level)
         end, REPOSITION_INTERVAL)
@@ -1448,10 +1448,12 @@ end
 
 function setPlayerRunToSprint(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
-    if Players[entityUuid].movementSpeedRun == nil then
-        Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
+    if entity and entity.ServerCharacter then
+        if Players[entityUuid].movementSpeedRun == nil then
+            Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
+        end
+        entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
     end
-    entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
 end
 
 -- NB: should we also index Brawlers by combatGuid?
@@ -1569,7 +1571,7 @@ end
 function resetPlayersMovementSpeed()
     for playerUuid, player in pairs(Players) do
         local entity = Ext.Entity.Get(playerUuid)
-        if player.movementSpeedRun ~= nil then
+        if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
             entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
             player.movementSpeedRun = nil
         end
@@ -1660,10 +1662,12 @@ function resetSpellData()
         local spellReqs = modVars.SpellRequirements
         for spellName, req in pairs(spellReqs) do
             local spell = Ext.Stats.Get(spellName)
-            local requirements = spell.Requirements
-            table.insert(requirements, {Requirement = req.Requirement, Param = req.Param, Not = req.Not})
-            spell.Requirements = requirements
-            spell:Sync()
+            if spell then
+                local requirements = spell.Requirements
+                table.insert(requirements, {Requirement = req.Requirement, Param = req.Param, Not = req.Not})
+                spell.Requirements = requirements
+                spell:Sync()
+            end
         end
         modVars.SpellRequirements = nil
     end
@@ -2153,10 +2157,10 @@ local function onEnteredCombat(entityGuid, combatGuid)
 end
 
 local function onEnteredForceTurnBased(entityGuid)
-    debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players[entityUuid] then
+        debugPrint("EnteredForceTurnBased", entityGuid)
         if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = false
         end
@@ -2184,10 +2188,10 @@ local function onEnteredForceTurnBased(entityGuid)
 end
 
 function onLeftForceTurnBased(entityGuid)
-    debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players[entityUuid] then
+        debugPrint("LeftForceTurnBased", entityGuid)
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
         end
@@ -2202,7 +2206,6 @@ function onLeftForceTurnBased(entityGuid)
             startPulseReposition(level)
         end)
         if areAnyPlayersBrawling() then
-            debugPrint("players are brawling")
             startBrawlFizzler(level)
             if isToT() then
                 startToTTimers()
@@ -2632,7 +2635,7 @@ local function onGameStateChanged(e)
     end
 end
 
-local function disableCompanionAI(hotkey)
+local function disableCompanionAI()
     debugPrint("companion ai disabled")
     CompanionAIEnabled = false
     for playerUuid, player in pairs(Players) do
@@ -2644,13 +2647,13 @@ local function disableCompanionAI(hotkey)
         end
     end
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Disabled (Press " .. hotkey .. " to Enable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Disabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function enableCompanionAI(hotkey)
+local function enableCompanionAI()
     debugPrint("companion ai enabled")
     CompanionAIEnabled = true
     if Players and areAnyPlayersBrawling() then
@@ -2661,13 +2664,13 @@ local function enableCompanionAI(hotkey)
         end
     end
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Enabled (Press " .. hotkey .. " to Disable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Companion AI Enabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function disableFullAuto(hotkey)
+local function disableFullAuto()
     debugPrint("full auto disabled")
     FullAuto = false
     for playerUuid, player in pairs(Players) do
@@ -2681,13 +2684,13 @@ local function disableFullAuto(hotkey)
         end
     end
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Disabled (Press " .. hotkey .. " to Enable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Disabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function enableFullAuto(hotkey)
+local function enableFullAuto()
     debugPrint("full auto enabled")
     FullAuto = true
     if Players and areAnyPlayersBrawling() then
@@ -2696,39 +2699,39 @@ local function enableFullAuto(hotkey)
         end
     end
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Enabled (Press " .. hotkey .. " to Disable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Full Auto Enabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function toggleCompanionAI(hotkey)
+local function toggleCompanionAI()
     if CompanionAIEnabled then
-        disableCompanionAI(hotkey)
+        disableCompanionAI()
     else
-        enableCompanionAI(hotkey)
+        enableCompanionAI()
     end
 end
 
-local function toggleFullAuto(hotkey)
+local function toggleFullAuto()
     if FullAuto then
-        disableFullAuto(hotkey)
+        disableFullAuto()
     else
-        enableFullAuto(hotkey)
+        enableFullAuto()
     end
 end
 
-local function disableMod(hotkey)
+local function disableMod()
     ModEnabled = false
     stopListeners()
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Brawl Disabled (Press " .. hotkey .. " to Enable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Brawl Disabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function enableMod(hotkey)
+local function enableMod()
     ModEnabled = true
     startListeners()
     local level = Osi.GetRegion(Osi.GetHostCharacter())
@@ -2736,17 +2739,17 @@ local function enableMod(hotkey)
         onStarted(level)
     end
     Osi.QuestMessageHide("ModStatusMessage")
-    Osi.QuestMessageShow("ModStatusMessage", "Brawl Enabled (Press " .. hotkey .. " to Disable)")
+    Osi.QuestMessageShow("ModStatusMessage", "Brawl Enabled")
     Ext.Timer.WaitFor(3000, function ()
         Osi.QuestMessageHide("ModStatusMessage")
     end)
 end
 
-local function toggleMod(hotkey)
+local function toggleMod()
     if ModEnabled then
-        disableMod(hotkey)
+        disableMod()
     else
-        enableMod(hotkey)
+        enableMod()
     end
 end
 
@@ -2757,19 +2760,17 @@ local function onMCMSettingSaved(payload)
     end
     if payload.settingId == "mod_enabled" then
         ModEnabled = payload.value
-        local hotkey = MCM.Get("mod_toggle_hotkey")
         if ModEnabled then
-            enableMod(hotkey)
+            enableMod()
         else
-            disableMod(hotkey)
+            disableMod()
         end
     elseif payload.settingId == "companion_ai_enabled" then
         CompanionAIEnabled = payload.value
-        local hotkey = MCM.Get("companion_ai_toggle_hotkey")
         if CompanionAIEnabled then
-            enableCompanionAI(hotkey)
+            enableCompanionAI()
         else
-            disableCompanionAI(hotkey)
+            disableCompanionAI()
         end
     elseif payload.settingId == "true_pause" then
         TruePause = payload.value
@@ -2790,11 +2791,10 @@ local function onMCMSettingSaved(payload)
         end
     elseif payload.settingId == "full_auto" then
         FullAuto = payload.value
-        local hotkey = MCM.Get("full_auto_toggle_hotkey")
         if FullAuto then
-            enableFullAuto(hotkey)
+            enableFullAuto()
         else
-            disableFullAuto(hotkey)
+            disableFullAuto()
         end
     elseif payload.settingId == "tav_archetype" then
         TavArchetype = string.lower(payload.value)

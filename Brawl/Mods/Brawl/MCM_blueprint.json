@@ -3,12 +3,12 @@
     "Optional": true,
     "Tabs": [
         {
-            "TabName": "General",
-            "TabId": "general",
+            "TabName": "Settings",
+            "TabId": "settings",
             "Sections": [
                 {
-                    "SectionId": "general_settings",
-                    "SectionName": "General Settings",
+                    "SectionId": "enable_mod_section",
+                    "SectionName": "Mod",
                     "Settings": [
                         {
                             "Id": "mod_enabled",
@@ -19,17 +19,6 @@
                             "Handles": {
                                 "DescriptionHandle": "h012f6360970348a09ec00cfbae32d13a078e",
                                 "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"
-                            }
-                        },
-                        {
-                            "Id": "mod_toggle_hotkey",
-                            "Name": "Mod Toggle Hotkey",
-                            "Type": "text",
-                            "Default": "F9",
-                            "Description": "Hotkey for toggling the mod on/off",
-                            "Handles": {
-                                "DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0",
-                                "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"
                             }
                         }
                     ]
@@ -47,17 +36,6 @@
                             "Handles": {
                                 "DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c",
                                 "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"
-                            }
-                        },
-                        {
-                            "Id": "companion_ai_toggle_hotkey",
-                            "Name": "Companion AI Toggle Hotkey",
-                            "Type": "text",
-                            "Default": "F11",
-                            "Description": "Hotkey for toggling the companion AI on/off",
-                            "Handles": {
-                                "DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7",
-                                "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"
                             }
                         },
                         {
@@ -102,17 +80,6 @@
                             "Handles": {
                                 "DescriptionHandle": "h0c4f4c12g54a4g4d43g9dd9g0f61857119d9",
                                 "NameHandle": "hd6431cb2g76b4g497bgaccbg202b25c375c7"
-                            }
-                        },
-                        {
-                            "Id": "full_auto_toggle_hotkey",
-                            "Name": "Fully Automated Brawls Toggle Hotkey",
-                            "Type": "text",
-                            "Default": "F6",
-                            "Description": "Hotkey for toggling Full Auto on and off",
-                            "Handles": {
-                                "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
-                                "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
                             }
                         },
                         {
@@ -186,6 +153,166 @@
                             "Handles": {
                                 "DescriptionHandle": "h82826325ge87dg4b9fga2d4g1918131934e8",
                                 "NameHandle": "h3a37f938gf803g45f1gb3bage75ca7adae42"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "TabName": "Hotkeys",
+            "TabId": "hotkeys",
+            "Sections": [
+                {
+                    "SectionId": "mod_hotkey_section",
+                    "SectionName": "Enable Mod",
+                    "Settings": [
+                        {
+                            "Id": "mod_toggle_hotkey",
+                            "Name": "Mod Toggle Hotkey",
+                            "Type": "keybinding",
+                            "Default": {
+                                "ScanCode": "F9",
+                                "Modifier": ""
+                            },
+                            "Description": "Hotkey for toggling the mod on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0",
+                                "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "companion_ai_hotkey_section",
+                    "SectionName": "Companion AI",
+                    "Settings": [
+                        {
+                            "Id": "companion_ai_toggle_hotkey",
+                            "Name": "Companion AI Toggle Hotkey",
+                            "Type": "keybinding",
+                            "Default": {
+                                "ScanCode": "F11",
+                                "Modifier": ""
+                            },
+                            "Description": "Hotkey for toggling the companion AI on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7",
+                                "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "full_auto_hotkey_section",
+                    "SectionName": "Fully Automated Brawls",
+                    "Settings": [
+                        {
+                            "Id": "full_auto_toggle_hotkey",
+                            "Name": "Fully Automated Brawls Toggle Hotkey",
+                            "Type": "keybinding",
+                            "Default": {
+                                "ScanCode": "F6",
+                                "Modifier": ""
+                            },
+                            "Description": "Hotkey for toggling Full Auto on and off",
+                            "Handles": {
+                                "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
+                                "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "pause_hotkey_section",
+                    "SectionName": "Pause",
+                    "Settings": [
+                        {
+                            "Id": "pause_toggle_hotkey",
+                            "Name": "Pause Toggle Hotkey",
+                            "Type": "keybinding",
+                            "Default": {
+                                "ScanCode": "SPACE",
+                                "Modifier": "LShift"
+                            },
+                            "Description": "Hotkey for pause/unpause",
+                            "Handles": {
+                                "DescriptionHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d",
+                                "NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "TabName": "Controller",
+            "TabId": "controller",
+            "Sections": [
+                {
+                    "SectionId": "controller_mod_hotkey_section",
+                    "SectionName": "Enable Mod",
+                    "Settings": [
+                        {
+                            "Id": "controller_mod_toggle_hotkey",
+                            "Name": "Mod Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "",
+                            "Description": "Hotkey for toggling the mod on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0",
+                                "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "controller_companion_ai_hotkey_section",
+                    "SectionName": "Companion AI",
+                    "Settings": [
+                        {
+                            "Id": "controller_companion_ai_toggle_hotkey",
+                            "Name": "Companion AI Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "",
+                            "Description": "Hotkey for toggling the companion AI on/off",
+                            "Handles": {
+                                "DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7",
+                                "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "controller_full_auto_hotkey_section",
+                    "SectionName": "Fully Automated Brawls",
+                    "Settings": [
+                        {
+                            "Id": "controller_full_auto_toggle_hotkey",
+                            "Name": "Fully Automated Brawls Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "",
+                            "Description": "Hotkey for toggling Full Auto on and off",
+                            "Handles": {
+                                "DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd",
+                                "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "SectionId": "controller_pause_hotkey_section",
+                    "SectionName": "Pause",
+                    "Settings": [
+                        {
+                            "Id": "controller_pause_toggle_hotkey",
+                            "Name": "Pause Toggle Hotkey",
+                            "Type": "text",
+                            "Default": "RightStick",
+                            "Description": "Hotkey for pause/unpause",
+                            "Handles": {
+                                "DescriptionHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d",
+                                "NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"
                             }
                         }
                     ]

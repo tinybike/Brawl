@@ -28,4 +28,6 @@
     <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level</content>
     <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the companion AI will freely use any of their spells/abilities with zero resource costs.</content>
     <content contentuid="h3a37f938gf803g45f1gb3bage75ca7adae42" version="1">Hogwild Mode</content>
+    <content contentuid="h093bb5f6g0706g401fgb0dfg36dd685cf28d" version="1">Pause Hotkey</content>
+    <content contentuid="heae14576gd38dg4abdgb2eagd99a9aef0374" version="1">Hotkey for pause/unpause</content>
 </contentList>
