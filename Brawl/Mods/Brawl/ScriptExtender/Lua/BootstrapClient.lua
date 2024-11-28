@@ -131,6 +131,21 @@ local function isInFTB(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
+local function getPositionInfo()
+    local pickingHelper = Ext.UI.GetPickingHelper(1)
+    if pickingHelper.Inner and pickingHelper.Inner.Position then
+        local clickedOn = {position = pickingHelper.Inner.Position}
+        if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
+            local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
+            if clickedOnEntity and clickedOnEntity.Uuid and clickedOnEntity.Uuid.EntityUuid then
+                clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
+            end
+        end
+        return clickedOn
+    end
+    return nil
+end
+
 local function postPauseToggle()
     if isInFTB(getDirectlyControlledCharacter()) then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
@@ -149,21 +164,6 @@ end
 
 local function postFullAutoToggle()
     Ext.ClientNet.PostMessageToServer("FullAutoToggle", "")
-end
-
-local function getPositionInfo()
-    local pickingHelper = Ext.UI.GetPickingHelper(1)
-    if pickingHelper.Inner and pickingHelper.Inner.Position then
-        local clickedOn = {position = pickingHelper.Inner.Position}
-        if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
-            local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
-            if clickedOnEntity and clickedOnEntity.Uuid and clickedOnEntity.Uuid.EntityUuid then
-                clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
-            end
-        end
-        return clickedOn
-    end
-    return nil
 end
 
 local function postClickPosition()
