@@ -6,6 +6,9 @@ local ControllerModToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
 local ControllerFullAutoToggleHotkey = {"", ""}
 local ControllerPauseToggleHotkey = {"RightStick", ""}
+local ControllerTargetCloserEnemyHotkey = {"DPadLeft", ""}
+local ControllerTargetFartherEnemyHotkey = {"DPadRight", ""}
+local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
@@ -15,6 +18,19 @@ if MCM then
     ControllerCompanionAIToggleHotkey = {MCM.Get("controller_companion_ai_toggle_hotkey"), MCM.Get("controller_companion_ai_toggle_hotkey_2")}
     ControllerFullAutoToggleHotkey = {MCM.Get("controller_full_auto_toggle_hotkey"), MCM.Get("controller_full_auto_toggle_hotkey_2")}
     ControllerPauseToggleHotkey = {MCM.Get("controller_pause_toggle_hotkey"), MCM.Get("controller_pause_toggle_hotkey_2")}
+    ControllerActionButtonHotkeys = {
+        {MCM.Get("controller_action_1_hotkey"), MCM.Get("controller_action_1_hotkey_2")},
+        {MCM.Get("controller_action_2_hotkey"), MCM.Get("controller_action_2_hotkey_2")},
+        {MCM.Get("controller_action_3_hotkey"), MCM.Get("controller_action_3_hotkey_2")},
+        {MCM.Get("controller_action_4_hotkey"), MCM.Get("controller_action_4_hotkey_2")},
+        {MCM.Get("controller_action_5_hotkey"), MCM.Get("controller_action_5_hotkey_2")},
+        {MCM.Get("controller_action_6_hotkey"), MCM.Get("controller_action_6_hotkey_2")},
+        {MCM.Get("controller_action_7_hotkey"), MCM.Get("controller_action_7_hotkey_2")},
+        {MCM.Get("controller_action_8_hotkey"), MCM.Get("controller_action_8_hotkey_2")},
+        {MCM.Get("controller_action_9_hotkey"), MCM.Get("controller_action_9_hotkey_2")},
+    }
+    ControllerTargetCloserEnemyHotkey = {MCM.Get("controller_target_closer_enemy_hotkey"),MCM.Get("controller_target_closer_enemy_hotkey_2")}
+    ControllerTargetFartherEnemyHotkey = {MCM.Get("controller_target_farther_enemy_hotkey"),MCM.Get("controller_target_farther_enemy_hotkey_2")}
 end
 local DirectlyControlledCharacter = nil
 local IsControllerButtonPressed = {
@@ -166,6 +182,10 @@ local function postFullAutoToggle()
     Ext.ClientNet.PostMessageToServer("FullAutoToggle", "")
 end
 
+local function postActionButton(actionButtonLabel)
+    Ext.ClientNet.PostMessageToServer("ActionButton", tostring(actionButtonLabel))
+end
+
 local function postClickPosition()
     Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
 end
@@ -192,12 +212,20 @@ local function onControllerButtonPressed(button)
     end
     if isControllerKeybindingPressed(ControllerModToggleHotkey) then
         postModToggle()
-    elseif isControllerKeybindingPressed(ControllerCompanionAIToggleHotkey) then
+    end
+    if isControllerKeybindingPressed(ControllerCompanionAIToggleHotkey) then
         postCompanionAIToggle()
-    elseif isControllerKeybindingPressed(ControllerFullAutoToggleHotkey) then
+    end
+    if isControllerKeybindingPressed(ControllerFullAutoToggleHotkey) then
         postFullAutoToggle()
-    elseif isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
+    end
+    if isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
         postPauseToggle()
+    end
+    for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
+        if isControllerKeybindingPressed(controllerActionButtonHotkey) then
+            postActionButton(actionButtonLabel)
+        end
     end
 end
 
@@ -263,6 +291,22 @@ local function onMCMSettingSaved(payload)
         ControllerPauseToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_pause_toggle_hotkey_2" then
         ControllerPauseToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_target_closer_enemy_hotkey" then
+        ControllerTargetCloserEnemyHotkey[1] = payload.value
+    elseif payload.settingId == "controller_target_closer_enemy_hotkey_2" then
+        ControllerTargetCloserEnemyHotkey[2] = payload.value
+    elseif payload.settingId == "controller_target_farther_enemy_hotkey" then
+        ControllerTargetFartherEnemyHotkey[1] = payload.value
+    elseif payload.settingId == "controller_target_farther_enemy_hotkey_2" then
+        ControllerTargetFartherEnemyHotkey[2] = payload.value
+    else
+        for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
+            if payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey" then
+                controllerActionButtonHotkey[1] = payload.value
+            elseif payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey_2" then
+                controllerActionButtonHotkey[2] = payload.value
+            end
+        end
     end
 end
 

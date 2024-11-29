@@ -140,20 +140,21 @@ local MOVEMENT_SPEED_THRESHOLDS = {
     MEDIUM = {Sprint = 8, Run = 5, Walk = 3},
     EASY = {Sprint = 12, Run = 9, Walk = 6},
 }
-local CONTROLLER_TO_SLOT = {
-    A = 0,
-    B = 2,
-    X = 4,
-    Y = 6,
-    -- DPadLeft = 8,
-    -- DPadRight = 10,
-    -- DPadUp = nil,
-    -- Back = nil,
-    -- Start = nil,
-    -- Touchpad = nil,
-    -- LeftStick = nil,
-    -- RightStick = nil,
-}
+-- local CONTROLLER_TO_SLOT = {
+--     A = 0,
+--     B = 2,
+--     X = 4,
+--     Y = 6,
+--     -- DPadLeft = 8,
+--     -- DPadRight = 10,
+--     -- DPadUp = nil,
+--     -- Back = nil,
+--     -- Start = nil,
+--     -- Touchpad = nil,
+--     -- LeftStick = nil,
+--     -- RightStick = nil,
+-- }
+local ACTION_BUTTON_TO_SLOT = {0, 2, 4, 6, 8, 10, 12, 14, 16}
 
 -- Session state
 SpellTable = {}
@@ -2870,18 +2871,22 @@ local function onNetMessage(data)
                 end
             end
         end
-    elseif data.Channel == "ControllerButtonPressed" then
+    -- elseif data.Channel == "ControllerButtonPressed" then
+    elseif data.Channel == "ActionButton" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player then
             local brawler = getBrawlerByUuid(player.uuid)
             if brawler then
                 -- Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
                 if not brawler.isPaused then
-                    if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
+                    local actionButtonLabel = tonumber(data.Payload)
+                    -- if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
+                    if ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
                         debugPrint("use spell")
                         Osi.PurgeOsirisQueue(player.uuid, 1)
                         Osi.FlushOsirisQueue(player.uuid)
-                        local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
+                        -- local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
+                        local spellName = getSpellNameBySlot(player.uuid, ACTION_BUTTON_TO_SLOT[actionButtonLabel])
                         if spellName ~= nil then
                             local spell = getSpellByName(spellName)
                             if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
@@ -2896,6 +2901,25 @@ local function onNetMessage(data)
                             return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
                         end
                     end
+                    -- -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
+                    -- if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
+                    --     -- if ClosestEnemyBrawlers[player.uuid] == nil then
+                    --         buildClosestEnemyBrawlers(player.uuid)
+                    --     -- end
+                    --     if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
+                    --         debugPrint("Selecting next enemy brawler")
+                    --         selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
+                    --     end
+                    -- end
+                end
+            end
+        end
+    elseif data.Channel == "ChangeTarget" then
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player then
+            local brawler = getBrawlerByUuid(player.uuid)
+            if brawler then
+                if not brawler.isPaused then
                     -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
                     if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
                         -- if ClosestEnemyBrawlers[player.uuid] == nil then
