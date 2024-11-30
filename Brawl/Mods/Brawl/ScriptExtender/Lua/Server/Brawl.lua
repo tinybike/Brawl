@@ -696,18 +696,19 @@ end
 function moveThenAct(attackerUuid, targetUuid, spellName)
     debugPrint("moveThenAct", attackerUuid, targetUuid, spellName, HogwildMode)
     -- debugDump(Players[attackerUuid])
-    local targetRadius = Ext.Stats.Get(spellName).TargetRadius
-    local targetRadiusNumber
-    if targetRadius == "MeleeMainWeaponRange" then
+    local spell = Ext.Stats.Get(spellName)
+    local range = isZoneSpell(spellName) and spell.Range or spell.TargetRadius
+    local rangeNumber
+    if range == "MeleeMainWeaponRange" then
         Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
-    elseif targetRadius == "RangedMainWeaponRange" then
-        targetRadiusNumber = 18
+    elseif range == "RangedMainWeaponRange" then
+        rangeNumber = 18
     else
-        targetRadiusNumber = tonumber(targetRadius)
+        rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if distanceToTarget > targetRadiusNumber then
-            debugPrint("moveThenAct distance > targetRadius, moving to...")
-            moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber)
+        if distanceToTarget > rangeNumber then
+            debugPrint("moveThenAct distance > range, moving to...")
+            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end
     end
     if Osi.CanSee(attackerUuid, targetUuid) == 0 and not string.match(spellName, "^Projectile_MagicMissile") then
