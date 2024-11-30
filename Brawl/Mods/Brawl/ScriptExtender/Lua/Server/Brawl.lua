@@ -810,7 +810,7 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     --     weight = weight - spell.level
     -- end
     if HogwildMode then
-        weight = weight + spell.level*2
+        weight = weight + spell.level*3
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -1015,23 +1015,25 @@ function getHostileWeightedTargets(brawler, potentialTargets)
             end
             if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
                 local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
-                local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-                -- if CompanionTactics == "Offense" then
-                weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
-                if Osi.CanSee(potentialTargetUuid, brawler.uuid) == 0 then
-                    weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * 0.5
+                if distanceToTarget < 30 or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+                    local targetHp = Osi.GetHitpoints(potentialTargetUuid)
+                    -- if CompanionTactics == "Offense" then
+                    weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
+                    if Osi.CanSee(potentialTargetUuid, brawler.uuid) == 0 then
+                        weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * 0.4
+                    end
+                    -- elseif CompanionTactics == "Defense" then
+                    --     -- distance to target, or distance to group?
+                    --     if distanceToTarget < 25 then
+                    --         weightedTargets[potentialTargetUuid] = 3*distanceToTarget + 0.25*targetHp
+                    --     end
+                    -- end
+                    -- NB: this is too intense of a request and will crash the game :/
+                    -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
+                    -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                    --     weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
+                    -- end
                 end
-                -- elseif CompanionTactics == "Defense" then
-                --     -- distance to target, or distance to group?
-                --     if distanceToTarget < 25 then
-                --         weightedTargets[potentialTargetUuid] = 3*distanceToTarget + 0.25*targetHp
-                --     end
-                -- end
-                -- NB: this is too intense of a request and will crash the game :/
-                -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
-                -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
-                --     weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
-                -- end
             end
         end
     end
