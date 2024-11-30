@@ -817,13 +817,13 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
 end
 
 -- NB: need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, spellName, spell)
+local function isCompanionSpellAvailable(uuid, spellName, spell, allowAoE)
     -- This should never happen but...
     if spellName == nil or spell == nil then
         return false
     end
     -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
-    if spell.type == "Damage" and (spell.areaRadius > 0 or isZoneSpell(spellName)) then
+    if not allowAoE and spell.type == "Damage" and (spell.areaRadius > 0 or isZoneSpell(spellName)) then
         return false
     end
     -- If it's a healing spell, make sure it's a direct heal
@@ -854,7 +854,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
+function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -865,7 +865,7 @@ function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, arch
                 break
             end
         end
-        if isCompanionSpellAvailable(uuid, spellName, spell) then
+        if isCompanionSpellAvailable(uuid, spellName, spell, allowAoE) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
@@ -900,12 +900,12 @@ function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, sp
     return weightedSpells
 end
 
-function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
+function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = archetype == "base" and TavArchetype or "melee"
     end
-    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
+    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
     debugPrint("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
     debugDump(ARCHETYPE_WEIGHTS[archetype])
     debugDump(weightedSpells)
@@ -930,7 +930,8 @@ function actOnHostileTarget(brawler, target)
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"})
+            local allowAoE = Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
+            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"}, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
             actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
