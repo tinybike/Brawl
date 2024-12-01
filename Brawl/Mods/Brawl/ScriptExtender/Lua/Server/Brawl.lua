@@ -50,7 +50,7 @@ local ACTION_RESOURCES = {
     ReactionActionPoint = "45ff0f48-b210-4024-972f-b64a44dc6985",
     SpellSlot = "d136c5d9-0ff0-43da-acce-a74a07f8d6bf",
     ChannelDivinity = "028304ef-e4b7-4dfb-a7ec-cd87865cdb16",
-    ChannelOath = "c0503ecf-c3cd-4719-fd9c-46051d0a5ab9",
+    ChannelOath = "c0503ecf-c3cd-4719-9cfd-05460a1db95a",
     KiPoint = "46d3d228-04e0-4a43-9a2e-78137e858c14",
     DeflectMissiles_Charge = "2b8021f4-99ac-42d4-87ce-96a7c5505aee",
     SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
@@ -2434,6 +2434,10 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
                         end
                     end
                 else
+                    print(costType)
+                    _D(ACTION_RESOURCES)
+                    _D(ACTION_RESOURCES[costType])
+                    _D(entity.ActionResources.Resources[ACTION_RESOURCES[costType]])
                     local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
                     debugDump(resource)
                     resource.Amount = resource.Amount - costValue
@@ -2837,6 +2841,51 @@ function allExitFTB()
     end
 end
 
+local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
+    local player = getPlayerByUserId(peerToUserId(data.UserID))
+    if player then
+        local brawler = getBrawlerByUuid(player.uuid)
+        if brawler and not brawler.isPaused then
+            buildClosestEnemyBrawlers(player.uuid)
+            if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
+                debugPrint("Selecting next enemy brawler")
+                selectNextEnemyBrawler(player.uuid, targetFartherEnemy)
+            end
+        end
+    end
+end
+
+local function processActionButton(data, isController)
+    local player = getPlayerByUserId(peerToUserId(data.UserID))
+    if player then
+        -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
+        if isController then
+            local brawler = getBrawlerByUuid(player.uuid)
+            if not brawler or brawler.isPaused then
+                return
+            end
+        end
+        local actionButtonLabel = tonumber(data.Payload)
+        if ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
+            local spellName = getSpellNameBySlot(player.uuid, ACTION_BUTTON_TO_SLOT[actionButtonLabel])
+            if spellName ~= nil then
+                local spell = getSpellByName(spellName)
+                -- NB: maintain separate friendly target list for healing/buffs?
+                if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
+                    return useSpellAndResources(player.uuid, player.uuid, spellName)
+                end
+                -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
+                --     return useSpellAndResources(player.uuid, nil, spellName)
+                -- end
+                if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
+                    buildClosestEnemyBrawlers(player.uuid)
+                end
+                return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
+            end
+        end
+    end
+end
+
 local function onNetMessage(data)
     if data.Channel == "ModToggle" then
         if MCM then
@@ -2875,68 +2924,14 @@ local function onNetMessage(data)
                 end
             end
         end
-    -- elseif data.Channel == "ControllerButtonPressed" then
     elseif data.Channel == "ActionButton" then
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player then
-            local brawler = getBrawlerByUuid(player.uuid)
-            if brawler then
-                -- Ext.ServerNet.PostMessageToClient(player.uuid, "UseCombatControllerControls", "1")
-                if not brawler.isPaused then
-                    local actionButtonLabel = tonumber(data.Payload)
-                    -- if CONTROLLER_TO_SLOT[data.Payload] ~= nil and isAliveAndCanFight(player.uuid) then
-                    if ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
-                        debugPrint("use spell")
-                        Osi.PurgeOsirisQueue(player.uuid, 1)
-                        Osi.FlushOsirisQueue(player.uuid)
-                        -- local spellName = getSpellNameBySlot(player.uuid, CONTROLLER_TO_SLOT[data.Payload])
-                        local spellName = getSpellNameBySlot(player.uuid, ACTION_BUTTON_TO_SLOT[actionButtonLabel])
-                        if spellName ~= nil then
-                            local spell = getSpellByName(spellName)
-                            if spell ~= nil and spell.type == "Buff" or spell.type == "Healing" then
-                                return useSpellAndResources(player.uuid, player.uuid, spellName)
-                            end
-                            -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
-                            --     return useSpellAndResources(player.uuid, nil, spellName)
-                            -- end
-                            if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
-                                buildClosestEnemyBrawlers(player.uuid)
-                            end
-                            return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
-                        end
-                    end
-                    -- -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
-                    -- if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
-                    --     -- if ClosestEnemyBrawlers[player.uuid] == nil then
-                    --         buildClosestEnemyBrawlers(player.uuid)
-                    --     -- end
-                    --     if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
-                    --         debugPrint("Selecting next enemy brawler")
-                    --         selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
-                    --     end
-                    -- end
-                end
-            end
-        end
-    elseif data.Channel == "ChangeTarget" then
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player then
-            local brawler = getBrawlerByUuid(player.uuid)
-            if brawler then
-                if not brawler.isPaused then
-                    -- Use dpadright/left to switch targets: get list of enemies, toggle between them, ping the current selection
-                    if data.Payload == "DPadLeft" or data.Payload == "DPadRight" then
-                        -- if ClosestEnemyBrawlers[player.uuid] == nil then
-                            buildClosestEnemyBrawlers(player.uuid)
-                        -- end
-                        if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
-                            debugPrint("Selecting next enemy brawler")
-                            selectNextEnemyBrawler(player.uuid, data.Payload == "DPadRight")
-                        end
-                    end
-                end
-            end
-        end
+        processActionButton(data, false)
+    elseif data.Channel == "ControllerActionButton" then
+        processActionButton(data, true)
+    elseif data.Channel == "TargetCloserEnemy" then
+        targetCloserOrFartherEnemy(data, false)
+    elseif data.Channel == "TargetFartherEnemy" then
+        targetCloserOrFartherEnemy(data, true)
     end
 end
 
