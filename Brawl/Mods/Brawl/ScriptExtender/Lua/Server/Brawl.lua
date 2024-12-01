@@ -2434,10 +2434,6 @@ local function onCastedSpell(caster, spellName, spellType, spellElement, storyAc
                         end
                     end
                 else
-                    print(costType)
-                    _D(ACTION_RESOURCES)
-                    _D(ACTION_RESOURCES[costType])
-                    _D(entity.ActionResources.Resources[ACTION_RESOURCES[costType]])
                     local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
                     debugDump(resource)
                     resource.Amount = resource.Amount - costValue
