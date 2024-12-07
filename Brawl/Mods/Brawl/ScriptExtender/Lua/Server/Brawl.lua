@@ -699,6 +699,9 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     local spell = Ext.Stats.Get(spellName)
     local range = isZoneSpell(spellName) and spell.Range or spell.TargetRadius
     local rangeNumber
+    Osi.PurgeOsirisQueue(attackerUuid, 1)
+    Osi.FlushOsirisQueue(attackerUuid)
+    local attackerCanMove = Osi.CanMove(attackerUuid) == 1
     if range == "MeleeMainWeaponRange" then
         Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
     elseif range == "RangedMainWeaponRange" then
@@ -706,22 +709,20 @@ function moveThenAct(attackerUuid, targetUuid, spellName)
     else
         rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if distanceToTarget > rangeNumber then
+        if distanceToTarget > rangeNumber and attackerCanMove then
             debugPrint("moveThenAct distance > range, moving to...")
             moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end
     end
-    if Osi.CanSee(attackerUuid, targetUuid) == 0 and not string.match(spellName, "^Projectile_MagicMissile") then
+    local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
+    if not canSeeTarget and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
         debugPrint("moveThenAct can't see target, moving closer")
         moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber or 2)
+    end
+    if HogwildMode then
+        Osi.UseSpell(attackerUuid, spellName, targetUuid)
     else
-        if HogwildMode then
-            Osi.PurgeOsirisQueue(attackerUuid, 1)
-            Osi.FlushOsirisQueue(attackerUuid)
-            Osi.UseSpell(attackerUuid, spellName, targetUuid)
-        else
-            useSpellAndResources(attackerUuid, targetUuid, spellName)
-        end
+        useSpellAndResources(attackerUuid, targetUuid, spellName)
     end
 end
 
@@ -1015,11 +1016,12 @@ function getHostileWeightedTargets(brawler, potentialTargets)
             end
             if isHostile and Osi.IsInvisible(potentialTargetUuid) == 0 and isAliveAndCanFight(potentialTargetUuid) then
                 local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
-                if distanceToTarget < 30 or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+                local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
+                if (distanceToTarget < 30 and canSeeTarget) or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     -- if CompanionTactics == "Offense" then
                     weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
-                    if Osi.CanSee(potentialTargetUuid, brawler.uuid) == 0 then
+                    if not canSeeTarget then
                         weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * 0.4
                     end
                     -- elseif CompanionTactics == "Defense" then
