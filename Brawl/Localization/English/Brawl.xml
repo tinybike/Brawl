@@ -57,4 +57,10 @@
     <content contentuid="he12904dfgcaecg403ag8a3fgabed8630de40" version="1">Target Closer Enemy Hotkey 2 (Optional)</content>
     <content contentuid="hfe794853g9946g4220g94d3gf185c3884c8b" version="1">Target Farther Enemy Hotkey</content>
     <content contentuid="ha2026636g7d73g4321g87efg78265cb0d85a" version="1">Target Farther Enemy Hotkey 2 (Optional)</content>
+    <content contentuid="hf7d30515g5e2ag4951gae39g47318360265f" version="1">Hotkey to instruct your companions to come to you</content>
+    <content contentuid="h433ac630gc4ceg4724gb8aeg12e07759c7bb" version="1">On Me Hotkey</content>
+    <content contentuid="hba555ba8ga141g4277gb041g39ce915801f3" version="1">On Me Hotkey 2 (Optional)</content>
+    <content contentuid="h30cd0d71g52c2g4d40gb050gab864feb71ca" version="1">Hotkey to instruct your companions to attack your most recent target</content>
+    <content contentuid="hbef77ddaga0a5g4588g8697g61d822610c6e" version="1">Attack My Target Hotkey</content>
+    <content contentuid="h38f332f6gf4a0g425cg93degba52939be6db" version="1">Attack My Target Hotkey 2 (Optional)</content>
 </contentList>

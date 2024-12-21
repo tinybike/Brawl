@@ -128,6 +128,20 @@
                             "Default": {"ScanCode": "F11", "Modifier": ""},
                             "Description": "Hotkey for toggling the companion AI on/off",
                             "Handles": {"DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7", "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"}
+                        }, {
+                            "Id": "on_me_hotkey",
+                            "Name": "On Me Hotkey",
+                            "Type": "keybinding",
+                            "Default": {"ScanCode": "NUM_1", "Modifier": "LShift"},
+                            "Description": "Hotkey to instruct your companions to come to you",
+                            "Handles": {"DescriptionHandle": "hf7d30515g5e2ag4951gae39g47318360265f", "NameHandle": "h433ac630gc4ceg4724gb8aeg12e07759c7bb"}
+                        }, {
+                            "Id": "attack_my_target_hotkey",
+                            "Name": "Attack My Target Hotkey",
+                            "Type": "keybinding",
+                            "Default": {"ScanCode": "NUM_2", "Modifier": "LShift"},
+                            "Description": "Hotkey to instruct your companions to attack your most recent target",
+                            "Handles": {"DescriptionHandle": "h30cd0d71g52c2g4d40gb050gab864feb71ca", "NameHandle": "hbef77ddaga0a5g4588g8697g61d822610c6e"}
                         }
                     ]
                 }, {
@@ -280,6 +294,36 @@
                             "Default": "",
                             "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
                             "Handles": {"NameHandle": "h707f2e87ge8d2g43f6g9c57gc9442b1a2e32", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                        }, {
+                            "Id": "on_me_hotkey",
+                            "Name": "On Me Hotkey",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "h433ac630gc4ceg4724gb8aeg12e07759c7bb", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                        }, {
+                            "Id": "on_me_hotkey_2",
+                            "Name": "On Me Hotkey 2 (Optional)",
+                            "Description": "If hotkey 2 is set, both buttons must be pressed together.  Leave hotkey 2 blank to just use a single controller button.",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "hba555ba8ga141g4277gb041g39ce915801f3", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                        }, {
+                            "Id": "attack_my_target_hotkey",
+                            "Name": "Attack My Target Hotkey",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "hbef77ddaga0a5g4588g8697g61d822610c6e", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                        }, {
+                            "Id": "attack_my_target_hotkey_2",
+                            "Name": "Attack My Target Hotkey 2 (Optional)",
+                            "Description": "If hotkey 2 is set, both buttons must be pressed together.  Leave hotkey 2 blank to just use a single controller button.",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "h38f332f6gf4a0g425cg93degba52939be6db", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
                         }
                     ]
                 }, {

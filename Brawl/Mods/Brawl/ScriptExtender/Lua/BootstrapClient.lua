@@ -4,6 +4,8 @@ local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
 local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
 local TargetCloserEnemyHotkey = {ScanCode = "NUM_1", Modifier = "LCtrl"}
 local TargetFartherEnemyHotkey = {ScanCode = "NUM_2", Modifier = "LCtrl"}
+local OnMeHotKey = {ScanCode = "NUM_1", Modifier = "LShift"}
+local AttackMyTargetHotKey = {ScanCode = "NUM_2", Modifier = "LShift"}
 local ActionButtonHotkeys = {
     {ScanCode = "NONE", Modifier = "NONE"},
     {ScanCode = "NONE", Modifier = "NONE"},
@@ -21,6 +23,7 @@ local ControllerFullAutoToggleHotkey = {"", ""}
 local ControllerPauseToggleHotkey = {"RightStick", ""}
 local ControllerTargetCloserEnemyHotkey = {"DPadLeft", ""}
 local ControllerTargetFartherEnemyHotkey = {"DPadRight", ""}
+-- local ControllerOnMeHotkey = {"", ""}
 local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
@@ -29,6 +32,8 @@ if MCM then
     PauseToggleHotkey = MCM.Get("pause_toggle_hotkey")
     TargetCloserEnemyHotkey = MCM.Get("target_closer_enemy_hotkey")
     TargetFartherEnemyHotkey = MCM.Get("target_farther_enemy_hotkey")
+    OnMeHotKey = MCM.Get("on_me_hotkey")
+    AttackMyTargetHotKey = MCM.Get("attack_my_target_hotkey")
     ActionButtonHotkeys = {
         MCM.Get("action_1_hotkey"),
         MCM.Get("action_2_hotkey"),
@@ -46,6 +51,8 @@ if MCM then
     ControllerPauseToggleHotkey = {MCM.Get("controller_pause_toggle_hotkey"), MCM.Get("controller_pause_toggle_hotkey_2")}
     ControllerTargetCloserEnemyHotkey = {MCM.Get("controller_target_closer_enemy_hotkey"), MCM.Get("controller_target_closer_enemy_hotkey_2")}
     ControllerTargetFartherEnemyHotkey = {MCM.Get("controller_target_farther_enemy_hotkey"), MCM.Get("controller_target_farther_enemy_hotkey_2")}
+    ControllerOnMeHotKey = {MCM.Get("controller_on_me_hotkey"), MCM.Get("controller_on_me_hotkey_2")}
+    ControllerAttackMyTargetHotKey = {MCM.Get("controller_attack_my_target_hotkey"), MCM.Get("controller_attack_my_target_hotkey_2")}
     ControllerActionButtonHotkeys = {
         {MCM.Get("controller_action_1_hotkey"), MCM.Get("controller_action_1_hotkey_2")},
         {MCM.Get("controller_action_2_hotkey"), MCM.Get("controller_action_2_hotkey_2")},
@@ -216,6 +223,14 @@ local function postTargetFartherEnemy()
     Ext.ClientNet.PostMessageToServer("TargetFartherEnemy", "")
 end
 
+local function postOnMe()
+    Ext.ClientNet.PostMessageToServer("OnMe", "")
+end
+
+local function postAttackMyTarget()
+    Ext.ClientNet.PostMessageToServer("AttackMyTarget", "")
+end
+
 local function postControllerActionButton(actionButtonLabel)
     Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
 end
@@ -233,21 +248,35 @@ local function onKeyInput(e)
         local key = tostring(e.Key)
         if isKeybindingPressed(e, ModToggleHotkey) then
             postModToggle()
+            e:PreventAction()
         end
         if isKeybindingPressed(e, CompanionAIToggleHotkey) then
             postCompanionAIToggle()
+            e:PreventAction()
         end
         if isKeybindingPressed(e, FullAutoToggleHotkey) then
             postFullAutoToggle()
+            e:PreventAction()
         end
         if isKeybindingPressed(e, PauseToggleHotkey) then
             postPauseToggle()
+            e:PreventAction()
         end
         if isKeybindingPressed(e, TargetCloserEnemyHotkey) then
             postTargetCloserEnemy()
+            e:PreventAction()
         end
         if isKeybindingPressed(e, TargetFartherEnemyHotkey) then
             postTargetFartherEnemy()
+            e:PreventAction()
+        end
+        if isKeybindingPressed(e, OnMeHotKey) then
+            postOnMe()
+            e:PreventAction()
+        end
+        if isKeybindingPressed(e, AttackMyTargetHotKey) then
+            postAttackMyTarget()
+            e:PreventAction()
         end
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if isKeybindingPressed(e, actionButtonHotkey) then
@@ -279,6 +308,12 @@ local function onControllerButtonPressed(button)
     end
     if isControllerKeybindingPressed(ControllerTargetFartherEnemyHotkey) then
         postTargetFartherEnemy()
+    end
+    if isControllerKeybindingPressed(ControllerOnMeHotKey) then
+        postOnMe()
+    end
+    if isControllerKeybindingPressed(ControllerAttackMyTargetHotKey) then
+        postAttackMyTarget()
     end
     for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
         if isControllerKeybindingPressed(controllerActionButtonHotkey) then

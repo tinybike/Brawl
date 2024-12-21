@@ -2859,6 +2859,33 @@ local function onNetMessage(data)
         targetCloserOrFartherEnemy(data, false)
     elseif data.Channel == "TargetFartherEnemy" then
         targetCloserOrFartherEnemy(data, true)
+    elseif data.Channel == "OnMe" then
+        if Players then
+            local player = getPlayerByUserId(peerToUserId(data.UserID))
+            for uuid, _ in pairs(Players) do
+                if not isPlayerControllingDirectly(uuid) then
+                    -- moveToDistanceFromTarget(uuid, player.uuid, 3)
+                    Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
+                end
+            end
+        end
+    elseif data.Channel == "AttackMyTarget" then
+        debugDump(data)
+        if Players and Brawlers then
+            local player = getPlayerByUserId(peerToUserId(data.UserID))
+            local level = Osi.GetRegion(player.uuid)
+            if level and Brawlers[level] then
+                local currentTarget = IsAttackingOrBeingAttackedByPlayer[player.uuid]
+                if currentTarget then
+                    for uuid, _ in pairs(Players) do
+                        if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
+                            Brawlers[level][uuid].targetUuid = currentTarget
+                            debugPrint("Set target to", uuid, getDisplayName(uuid), currentTarget, getDisplayName(currentTarget))
+                        end
+                    end
+                end
+            end
+        end
     end
 end
 
