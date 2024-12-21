@@ -2871,12 +2871,13 @@ local function onNetMessage(data)
             for uuid, _ in pairs(Players) do
                 if not isPlayerControllingDirectly(uuid) then
                     -- moveToDistanceFromTarget(uuid, player.uuid, 3)
+                    Osi.PurgeOsirisQueue(uuid, 1)
+                    Osi.FlushOsirisQueue(uuid)
                     Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
                 end
             end
         end
     elseif data.Channel == "AttackMyTarget" then
-        debugDump(data)
         if Players and Brawlers then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             local level = Osi.GetRegion(player.uuid)
