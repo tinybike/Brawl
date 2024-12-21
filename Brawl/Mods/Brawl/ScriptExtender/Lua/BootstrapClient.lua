@@ -246,42 +246,47 @@ end
 local function onKeyInput(e)
     if e.Repeat == false and e.Event == "KeyDown" then
         local key = tostring(e.Key)
+        local keybindingPressed = false
         if isKeybindingPressed(e, ModToggleHotkey) then
             postModToggle()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, CompanionAIToggleHotkey) then
             postCompanionAIToggle()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, FullAutoToggleHotkey) then
             postFullAutoToggle()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, PauseToggleHotkey) then
             postPauseToggle()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, TargetCloserEnemyHotkey) then
             postTargetCloserEnemy()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, TargetFartherEnemyHotkey) then
             postTargetFartherEnemy()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, OnMeHotKey) then
             postOnMe()
-            e:PreventAction()
+            keybindingPressed = true
         end
         if isKeybindingPressed(e, AttackMyTargetHotKey) then
             postAttackMyTarget()
-            e:PreventAction()
+            keybindingPressed = true
         end
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if isKeybindingPressed(e, actionButtonHotkey) then
                 postActionButton(actionButtonLabel)
+                keybindingPressed = true
             end
+        end
+        if keybindingPressed then
+            e:PreventAction()
         end
     end
 end

@@ -153,6 +153,7 @@ PulseActionTimers = {}
 BrawlFizzler = {}
 IsAttackingOrBeingAttackedByPlayer = {}
 ClosestEnemyBrawlers = {}
+PlayerMarkedTarget = {}
 PlayerCurrentTarget = {}
 ActionsInProgress = {}
 MovementQueue = {}
@@ -597,8 +598,8 @@ local function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourc
 end
 
 local function buildClosestEnemyBrawlers(playerUuid)
-    if PlayerCurrentTarget[playerUuid] and not isAliveAndCanFight(PlayerCurrentTarget[playerUuid]) then
-        PlayerCurrentTarget[playerUuid] = nil
+    if PlayerMarkedTarget[playerUuid] and not isAliveAndCanFight(PlayerMarkedTarget[playerUuid]) then
+        PlayerMarkedTarget[playerUuid] = nil
     end
     local playerEntity = Ext.Entity.Get(playerUuid)
     local playerPos = playerEntity.Transform.Transform.Translate
@@ -636,12 +637,12 @@ local function buildClosestEnemyBrawlers(playerUuid)
     for i, target in ipairs(topTargets) do
         ClosestEnemyBrawlers[playerUuid][i] = target.uuid
     end
-    if #ClosestEnemyBrawlers[playerUuid] > 0 and PlayerCurrentTarget[playerUuid] == nil then
-        PlayerCurrentTarget[playerUuid] = ClosestEnemyBrawlers[playerUuid][1]
+    if #ClosestEnemyBrawlers[playerUuid] > 0 and PlayerMarkedTarget[playerUuid] == nil then
+        PlayerMarkedTarget[playerUuid] = ClosestEnemyBrawlers[playerUuid][1]
     end
     debugPrint("Closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
     debugDump(ClosestEnemyBrawlers)
-    debugPrint("Current target:", PlayerCurrentTarget[playerUuid])
+    debugPrint("Current target:", PlayerMarkedTarget[playerUuid])
     Ext.Timer.WaitFor(3000, function ()
         ClosestEnemyBrawlers[playerUuid] = nil
     end)
@@ -651,8 +652,8 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
     local nextTargetIndex = nil
     local nextTargetUuid = nil
     for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(ClosestEnemyBrawlers[playerUuid]) do
-        if PlayerCurrentTarget[playerUuid] == enemyBrawlerUuid then
-            debugPrint("found current target", PlayerCurrentTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
+        if PlayerMarkedTarget[playerUuid] == enemyBrawlerUuid then
+            debugPrint("found current target", PlayerMarkedTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
             if isNext then
                 debugPrint("getting NEXT target")
                 if enemyBrawlerIndex < #ClosestEnemyBrawlers[playerUuid] then
@@ -676,14 +677,14 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
         end
     end
     if nextTargetUuid then
-        if PlayerCurrentTarget[playerUuid] ~= nil then
-            Osi.RemoveStatus(PlayerCurrentTarget[playerUuid], "LOW_HAG_MUSHROOM_VFX")
+        if PlayerMarkedTarget[playerUuid] ~= nil then
+            Osi.RemoveStatus(PlayerMarkedTarget[playerUuid], "LOW_HAG_MUSHROOM_VFX")
         end
         debugPrint("pinging next target", nextTargetUuid)
         local x, y, z = Osi.GetPosition(nextTargetUuid)
         Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
         Osi.ApplyStatus(nextTargetUuid, "LOW_HAG_MUSHROOM_VFX", -1)
-        PlayerCurrentTarget[playerUuid] = nextTargetUuid
+        PlayerMarkedTarget[playerUuid] = nextTargetUuid
     end
 end
 
@@ -1363,6 +1364,10 @@ local function removeBrawler(level, entityUuid)
         Osi.SetCanJoinCombat(entityUuid, 1)
         if Osi.IsPartyMember(entityUuid, 1) == 0 then
             revertHitpoints(entityUuid)
+        else
+            PlayerCurrentTarget[entityUuid] = nil
+            PlayerMarkedTarget[entityUuid] = nil
+            IsAttackingOrBeingAttackedByPlayer[entityUuid] = nil
         end
     end
 end
@@ -2337,6 +2342,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
             addBrawler(defenderUuid, true)
         end
         if Osi.IsPlayer(attackerUuid) == 1 then
+            PlayerCurrentTarget[attackerUuid] = defenderUuid
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
                 IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
             end
@@ -2804,10 +2810,10 @@ local function processActionButton(data, isController)
                 -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
                 --     return useSpellAndResources(player.uuid, nil, spellName)
                 -- end
-                if PlayerCurrentTarget[player.uuid] == nil or Osi.IsDead(PlayerCurrentTarget[player.uuid]) == 1 then
+                if PlayerMarkedTarget[player.uuid] == nil or Osi.IsDead(PlayerMarkedTarget[player.uuid]) == 1 then
                     buildClosestEnemyBrawlers(player.uuid)
                 end
-                return useSpellAndResources(player.uuid, PlayerCurrentTarget[player.uuid], spellName)
+                return useSpellAndResources(player.uuid, PlayerMarkedTarget[player.uuid], spellName)
             end
         end
     end
@@ -2875,8 +2881,16 @@ local function onNetMessage(data)
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             local level = Osi.GetRegion(player.uuid)
             if level and Brawlers[level] then
-                local currentTarget = IsAttackingOrBeingAttackedByPlayer[player.uuid]
-                if currentTarget then
+                local currentTarget
+                if PlayerMarkedTarget[player.uuid] then
+                    currentTarget = PlayerMarkedTarget[player.uuid]
+                elseif IsAttackingOrBeingAttackedByPlayer[player.uuid] then
+                    currentTarget = IsAttackingOrBeingAttackedByPlayer[player.uuid]
+                elseif PlayerCurrentTarget[player.uuid] then
+                    currentTarget = PlayerCurrentTarget[player.uuid]
+                end
+                debugPrint("Got current player's target", currentTarget)
+                if currentTarget and Brawlers[level][currentTarget] and isAliveAndCanFight(currentTarget) then
                     for uuid, _ in pairs(Players) do
                         if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
                             Brawlers[level][uuid].targetUuid = currentTarget
