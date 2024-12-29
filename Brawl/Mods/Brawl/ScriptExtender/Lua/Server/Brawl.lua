@@ -38,10 +38,10 @@ local RANGED_RANGE_MAX = 25
 local RANGED_RANGE_SWEETSPOT = 10
 local RANGED_RANGE_MIN = 10
 local HELP_DOWNED_MAX_RANGE = 20
-local MAX_COMPANION_DISTANCE_FROM_PLAYER = 10
 local MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 local AI_HEALTH_PERCENTAGE_HEALING_THRESHOLD = 20.0
 local AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
+local DEFENSE_TACTICS_MAX_DISTANCE = 15
 local MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 local LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 local ACTION_RESOURCES = {
@@ -822,8 +822,18 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     return weight
 end
 
+local function convertSpellRangeToNumber(range)
+    if range == "RangedMainWeaponRange" then
+        return 18
+    elseif range == "MeleeMainWeaponRange" then
+        return 2
+    else
+        return tonumber(range)
+    end
+end
+
 -- NB: need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, spellName, spell, allowAoE)
+local function isCompanionSpellAvailable(uuid, spellName, spell, distanceToTarget, targetDistanceToParty, allowAoE)
     -- This should never happen but...
     if spellName == nil or spell == nil then
         return false
@@ -836,17 +846,24 @@ local function isCompanionSpellAvailable(uuid, spellName, spell, allowAoE)
     if spell.type == "Healing" and not spell.isDirectHeal then
         return false
     end
-    -- Who cares about resources, we're going hogwild
-    if HogwildMode then
-        return true
+    if not HogwildMode then
+        -- Make sure we're not exceeding the user's specified AI max spell level
+        if spell.level > CompanionAIMaxSpellLevel then
+            return false
+        end
+        -- Make sure we have the resources to actually cast what we want to cast
+        if not checkSpellResources(uuid, spellName) then
+            return false
+        end
     end
-    -- Make sure we're not exceeding the user's specified AI max spell level
-    if spell.level > CompanionAIMaxSpellLevel then
-        return false
-    end
-    -- Make sure we have the resources to actually cast what we want to cast
-    if not checkSpellResources(uuid, spellName) then
-        return false
+    -- For defense tactics:
+    --  1. Is the target already within range? Then ok to use
+    --  2. If the target is out-of-range, can we hit him without moving outside of the perimeter? Then ok to use
+    if CompanionTactics == "Defense" then
+        local range = convertSpellRangeToNumber(getSpellRange(spellName))
+        if distanceToTarget > range and targetDistanceToParty > (range + DEFENSE_TACTICS_MAX_DISTANCE) then
+            return false
+        end
     end
     return true
 end
@@ -860,7 +877,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
+local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = {}
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -871,7 +888,7 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
                 break
             end
         end
-        if isCompanionSpellAvailable(uuid, spellName, spell, allowAoE) then
+        if isCompanionSpellAvailable(uuid, spellName, spell, distanceToTarget, targetDistanceToParty, allowAoE) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
@@ -906,12 +923,12 @@ local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archety
     return weightedSpells
 end
 
-local function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
+local function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, targetDistanceToParty, allowAoE)
     if not ARCHETYPE_WEIGHTS[archetype] then
         debugPrint("Archetype missing from the list, using melee for now", archetype)
         archetype = archetype == "base" and TavArchetype or "melee"
     end
-    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, allowAoE)
+    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, targetDistanceToParty, allowAoE)
     debugPrint("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
     debugDump(ARCHETYPE_WEIGHTS[archetype])
     debugDump(weightedSpells)
@@ -937,7 +954,10 @@ local function actOnHostileTarget(brawler, target)
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
             local allowAoE = Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
-            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"}, allowAoE)
+            local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
+            local targetDistanceToParty = Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
+            debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
+            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, {"Damage"}, targetDistanceToParty, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
             actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
@@ -996,6 +1016,30 @@ local function isVisible(entityUuid)
     return Osi.IsInvisible(entityUuid) == 0 and Osi.HasActiveStatus(entityUuid, "SNEAKING") == 0
 end
 
+local function getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget)
+    local weightedTarget = 2*distanceToTarget + 0.25*targetHp
+    if not canSeeTarget then
+        weightedTarget = weightedTarget*1.4
+    end
+    return weightedTarget
+end
+
+local function getDefenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, attackerUuid, targetUuid)
+    local weightedTarget
+    local closestAlivePlayer = Osi.GetClosestAlivePlayer(attackerUuid)
+    if closestAlivePlayer then
+        local targetDistanceToParty = Osi.GetDistanceTo(targetUuid, closestAlivePlayer)
+        -- Only include potential targets that are within X meters of the party
+        if targetDistanceToParty ~= nil and targetDistanceToParty < DEFENSE_TACTICS_MAX_DISTANCE then
+            weightedTarget = 3*distanceToTarget + 0.25*targetHp
+            if not canSeeTarget then
+                weightedTarget = weightedTarget*1.8
+            end
+        end
+    end
+    return weightedTarget
+end
+
 -- Attacking targets: prioritize close targets with less remaining HP
 -- (Lowest weight = most desireable target)
 local function getHostileWeightedTargets(brawler, potentialTargets)
@@ -1021,18 +1065,16 @@ local function getHostileWeightedTargets(brawler, potentialTargets)
                 local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
                 if (distanceToTarget < 30 and canSeeTarget) or ActiveCombatGroups[brawler.combatGroupId] or IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-                    -- if CompanionTactics == "Offense" then
-                    weightedTargets[potentialTargetUuid] = 2*distanceToTarget + 0.25*targetHp
-                    if not canSeeTarget then
-                        weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]*0.4
+                    if not isPlayerOrAlly(brawler.uuid) then
+                        weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget)
+                        ActiveCombatGroups[brawler.combatGroupId] = true
+                    else
+                        if CompanionTactics == "Offense" then
+                            weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget)
+                        elseif CompanionTactics == "Defense" then
+                            weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, brawler.uuid, potentialTargetUuid)
+                        end
                     end
-                    ActiveCombatGroups[brawler.combatGroupId] = true
-                    -- elseif CompanionTactics == "Defense" then
-                    --     -- distance to target, or distance to group?
-                    --     if distanceToTarget < 25 then
-                    --         weightedTargets[potentialTargetUuid] = 3*distanceToTarget + 0.25*targetHp
-                    --     end
-                    -- end
                     -- NB: this is too intense of a request and will crash the game :/
                     -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
                     -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
@@ -2870,7 +2912,6 @@ local function onNetMessage(data)
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             for uuid, _ in pairs(Players) do
                 if not isPlayerControllingDirectly(uuid) then
-                    -- moveToDistanceFromTarget(uuid, player.uuid, 3)
                     Osi.PurgeOsirisQueue(uuid, 1)
                     Osi.FlushOsirisQueue(uuid)
                     Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
