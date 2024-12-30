@@ -45,3 +45,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 ### 10) Hogwild Mode
 
 [![Real time combat test 10](https://img.youtube.com/vi/ceyBFM_o2Bo/0.jpg)](https://www.youtube.com/watch?v=ceyBFM_o2Bo)
+
+### 11) Commands & Tactics
+
+[![Real time combat test 11](https://img.youtube.com/vi/3CjowJxfX7E.jpg)](https://www.youtube.com/watch?v=3CjowJxfX7E)
