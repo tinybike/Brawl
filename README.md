@@ -48,4 +48,4 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 
 ### 11) Commands & Tactics
 
-[![Real time combat test 11](https://img.youtube.com/vi/3CjowJxfX7E.jpg)](https://www.youtube.com/watch?v=3CjowJxfX7E)
+[![Real time combat test 11](https://img.youtube.com/vi/3CjowJxfX7E/0.jpg)](https://www.youtube.com/watch?v=3CjowJxfX7E)
