@@ -2910,7 +2910,7 @@ local function onNetMessage(data)
                         Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
                         Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
                         for uuid, _ in pairs(Players) do
-                            if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
+                            if (not isPlayerControllingDirectly(uuid) or FullAuto) and Brawlers[level][uuid] then
                                 Brawlers[level][uuid].targetUuid = targetUuid
                                 debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
                             end
@@ -2925,7 +2925,7 @@ local function onNetMessage(data)
                             Osi.ApplyStatus(dummyUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
                             Osi.ApplyStatus(dummyUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
                             for uuid, _ in pairs(Players) do
-                                if not isPlayerControllingDirectly(uuid) then
+                                if not isPlayerControllingDirectly(uuid) or FullAuto then
                                     Osi.FlushOsirisQueue(uuid)
                                     Osi.CharacterMoveToPosition(uuid, validX, validY, validZ, getMovementSpeed(uuid), "")
                                 end
@@ -2980,7 +2980,7 @@ local function onNetMessage(data)
                     Osi.ApplyStatus(currentTarget, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
                     Osi.ApplyStatus(currentTarget, "MAG_ARCANE_VAMPIRISM_VFX", 1)
                     for uuid, _ in pairs(Players) do
-                        if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
+                        if (not isPlayerControllingDirectly(uuid) or FullAuto) and Brawlers[level][uuid] then
                             Brawlers[level][uuid].targetUuid = currentTarget
                             debugPrint("Set target to", uuid, getDisplayName(uuid), currentTarget, getDisplayName(currentTarget))
                         end
