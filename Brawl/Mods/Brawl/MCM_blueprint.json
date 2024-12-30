@@ -76,11 +76,11 @@
                             "Handles": {"DescriptionHandle": "h5fba396bg3ea9g42c8g99f7gd52fad9d7c46", "NameHandle": "h08b6adc8ge129g45a0ga62bgdd4a013d0e2b"}
                         }, {
                             "Id": "companion_tactics",
-                            "Name": "Companion Tactics (NYI)",
+                            "Name": "Companion Tactics",
                             "Type": "enum",
                             "Default": "Offense",
                             "Options": {"Choices": ["Offense", "Defense"]},
-                            "Description": "High-level behavior for the companion AI.  Offense: all-out attack, prioritize killing enemies.  Defense: prioritize staying with the group, don't run off alone to attack. (Not Yet Implemented)",
+                            "Description": "High-level behavior for the companion AI.  Offense: all-out attack, prioritize killing enemies.  Defense: prioritize staying with the group, don't run off alone to attack.",
                             "Handles": {"DescriptionHandle": "h6794c735g3288g4b07gb7c3ge060e416e904", "NameHandle": "hc01f084cg13c4g42a1g8197g960e8f993d9c"}
                         }, {
                             "Id": "companion_ai_max_spell_level",

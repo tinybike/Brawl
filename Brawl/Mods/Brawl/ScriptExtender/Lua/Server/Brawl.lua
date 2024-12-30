@@ -1283,9 +1283,11 @@ local function pulseAction(brawler)
             end
             -- We have a target and the target is alive
             local level = Osi.GetRegion(brawler.uuid)
-            if level and isOnSameLevel(brawler.uuid, brawler.targetUuid) and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 and Brawlers[level][brawler.targetUuid] then
-                debugPrint("Attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                return actOnHostileTarget(brawler, Brawlers[level][brawler.targetUuid])
+            if level and isOnSameLevel(brawler.uuid, brawler.targetUuid) and Brawlers[level][brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
+                if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 or brawler.lockedOnTarget then
+                    debugPrint("Attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+                    return actOnHostileTarget(brawler, Brawlers[level][brawler.targetUuid])
+                end
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one
             debugPrint("Find target 2", brawler.uuid, brawler.displayName)
@@ -1396,6 +1398,7 @@ local function removeBrawler(level, entityUuid)
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             if brawler.targetUuid == entityUuid then
                 brawler.targetUuid = nil
+                brawler.lockedOnTarget = nil
                 Osi.PurgeOsirisQueue(brawlerUuid, 1)
                 Osi.FlushOsirisQueue(brawlerUuid)
             end
@@ -2909,10 +2912,19 @@ local function onNetMessage(data)
                         local targetUuid = clickPosition.uuid
                         Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
                         Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+                        if not Brawlers[level][targetUuid] then
+                            addBrawler(targetUuid, true)
+                        end
                         for uuid, _ in pairs(Players) do
-                            if (not isPlayerControllingDirectly(uuid) or FullAuto) and Brawlers[level][uuid] then
-                                Brawlers[level][uuid].targetUuid = targetUuid
-                                debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+                            if not isPlayerControllingDirectly(uuid) or FullAuto then
+                                if not Brawlers[level][uuid] then
+                                    addBrawler(uuid, true)
+                                end
+                                if uuid ~= targetUuid then
+                                    Brawlers[level][uuid].targetUuid = targetUuid
+                                    Brawlers[level][uuid].lockedOnTarget = true
+                                    debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+                                end
                             end
                         end
                     elseif clickPosition.position then
@@ -2926,6 +2938,7 @@ local function onNetMessage(data)
                             Osi.ApplyStatus(dummyUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
                             for uuid, _ in pairs(Players) do
                                 if not isPlayerControllingDirectly(uuid) or FullAuto then
+                                    Osi.PurgeOsirisQueue(uuid, 1)
                                     Osi.FlushOsirisQueue(uuid)
                                     Osi.CharacterMoveToPosition(uuid, validX, validY, validZ, getMovementSpeed(uuid), "")
                                 end
@@ -2950,8 +2963,9 @@ local function onNetMessage(data)
         if Players then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-                Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+                Osi.ApplyStatus(player.uuid, "GUIDED_STRIKE", 1)
                 Osi.ApplyStatus(player.uuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+                -- Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
                 -- Osi.ApplyStatus(player.uuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
                 for uuid, _ in pairs(Players) do
                     if not isPlayerControllingDirectly(uuid) then
@@ -2982,6 +2996,7 @@ local function onNetMessage(data)
                     for uuid, _ in pairs(Players) do
                         if (not isPlayerControllingDirectly(uuid) or FullAuto) and Brawlers[level][uuid] then
                             Brawlers[level][uuid].targetUuid = currentTarget
+                            Brawlers[level][uuid].lockedOnTarget = true
                             debugPrint("Set target to", uuid, getDisplayName(uuid), currentTarget, getDisplayName(currentTarget))
                         end
                     end
