@@ -164,6 +164,7 @@ SpellCastMovementListeners = {}
 FTBLockedIn = {}
 LastClickPosition = {}
 ActiveCombatGroups = {}
+AwaitingTarget = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
@@ -2891,11 +2892,49 @@ local function onNetMessage(data)
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player and player.uuid then
             local clickPosition = Ext.Json.Parse(data.Payload)
-            if clickPosition and clickPosition.position then
-                local pos = clickPosition.position
-                local validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
-                if validX ~= nil and validY ~= nil and validZ ~= nil then
-                    LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
+            local validX, validY, validZ
+            if clickPosition then
+                if clickPosition.position then
+                    local pos = clickPosition.position
+                    validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
+                    if validX ~= nil and validY ~= nil and validZ ~= nil then
+                        LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
+                    end
+                end
+                if AwaitingTarget[player.uuid] then
+                    AwaitingTarget[player.uuid] = false
+                    Ext.ServerNet.PostMessageToClient(player.uuid, "AwaitingTarget", "0")
+                    local level = Osi.GetRegion(player.uuid)
+                    if clickPosition.uuid and level and Brawlers and Brawlers[level] then
+                        local targetUuid = clickPosition.uuid
+                        Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+                        Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+                        for uuid, _ in pairs(Players) do
+                            if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
+                                Brawlers[level][uuid].targetUuid = targetUuid
+                                debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+                            end
+                        end
+                    elseif clickPosition.position then
+                        if validX ~= nil and validY ~= nil and validZ ~= nil then
+                            local dummyUuid = Osi.CreateAt("c13a872b-7d9b-4c1d-8c65-f672333b0c11", validX, validY, validZ, 0, 0, "")
+                            local dummyEntity = Ext.Entity.Get(dummyUuid)
+                            dummyEntity.GameObjectVisual.Scale = 0.0
+                            dummyEntity:Replicate("GameObjectVisual")
+                            -- Osi.ApplyStatus(dummyUuid, "HEROES_FEAST_CHEST", 1)
+                            Osi.ApplyStatus(dummyUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+                            Osi.ApplyStatus(dummyUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+                            for uuid, _ in pairs(Players) do
+                                if not isPlayerControllingDirectly(uuid) then
+                                    Osi.FlushOsirisQueue(uuid)
+                                    Osi.CharacterMoveToPosition(uuid, validX, validY, validZ, getMovementSpeed(uuid), "")
+                                end
+                            end
+                            Ext.Timer.WaitFor(1000, function ()
+                                Osi.RequestDelete(dummyUuid)
+                            end)
+                        end
+                    end
                 end
             end
         end
@@ -2910,6 +2949,9 @@ local function onNetMessage(data)
     elseif data.Channel == "OnMe" then
         if Players then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
+            Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+            Osi.ApplyStatus(player.uuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+            -- Osi.ApplyStatus(player.uuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
             for uuid, _ in pairs(Players) do
                 if not isPlayerControllingDirectly(uuid) then
                     Osi.PurgeOsirisQueue(uuid, 1)
@@ -2933,6 +2975,8 @@ local function onNetMessage(data)
                 end
                 debugPrint("Got current player's target", currentTarget)
                 if currentTarget and Brawlers[level][currentTarget] and isAliveAndCanFight(currentTarget) then
+                    Osi.ApplyStatus(currentTarget, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+                    Osi.ApplyStatus(currentTarget, "MAG_ARCANE_VAMPIRISM_VFX", 1)
                     for uuid, _ in pairs(Players) do
                         if not isPlayerControllingDirectly(uuid) and Brawlers[level][uuid] then
                             Brawlers[level][uuid].targetUuid = currentTarget
@@ -2940,6 +2984,14 @@ local function onNetMessage(data)
                         end
                     end
                 end
+            end
+        end
+    elseif data.Channel == "AttackMove" then
+        if Players then
+            local player = getPlayerByUserId(peerToUserId(data.UserID))
+            if player and player.uuid then
+                AwaitingTarget[player.uuid] = true
+                Ext.ServerNet.PostMessageToClient(player.uuid, "AwaitingTarget", "1")
             end
         end
     end

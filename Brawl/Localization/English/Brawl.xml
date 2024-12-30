@@ -63,4 +63,7 @@
     <content contentuid="h30cd0d71g52c2g4d40gb050gab864feb71ca" version="1">Hotkey to instruct your companions to attack your most recent target</content>
     <content contentuid="hbef77ddaga0a5g4588g8697g61d822610c6e" version="1">Attack My Target Hotkey</content>
     <content contentuid="h38f332f6gf4a0g425cg93degba52939be6db" version="1">Attack My Target Hotkey 2 (Optional)</content>
+    <content contentuid="hd7111993g8df4g4013gad20g0439cc4fe010" version="1">Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)</content>
+    <content contentuid="hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5" version="1">Attack-Move Hotkey</content>
+    <content contentuid="h5c50e90bg939bg4f67g9b0cg8203649e4002" version="1">Attack-Move Hotkey 2 (Optional)</content>
 </contentList>

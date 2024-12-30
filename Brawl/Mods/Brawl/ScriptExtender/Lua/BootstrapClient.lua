@@ -6,6 +6,7 @@ local TargetCloserEnemyHotkey = {ScanCode = "NUM_1", Modifier = "LCtrl"}
 local TargetFartherEnemyHotkey = {ScanCode = "NUM_2", Modifier = "LCtrl"}
 local OnMeHotKey = {ScanCode = "NUM_1", Modifier = "LShift"}
 local AttackMyTargetHotKey = {ScanCode = "NUM_2", Modifier = "LShift"}
+local AttackMoveHotKey = {ScanCode = "A", Modifier = "LShift"}
 local ActionButtonHotkeys = {
     {ScanCode = "NONE", Modifier = "NONE"},
     {ScanCode = "NONE", Modifier = "NONE"},
@@ -23,7 +24,9 @@ local ControllerFullAutoToggleHotkey = {"", ""}
 local ControllerPauseToggleHotkey = {"RightStick", ""}
 local ControllerTargetCloserEnemyHotkey = {"DPadLeft", ""}
 local ControllerTargetFartherEnemyHotkey = {"DPadRight", ""}
--- local ControllerOnMeHotkey = {"", ""}
+local ControllerOnMeHotkey = {"", ""}
+local ControllerAttackMyTargetHotkey = {"", ""}
+local ControllerAttackMoveHotkey = {"", ""}
 local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
@@ -34,6 +37,7 @@ if MCM then
     TargetFartherEnemyHotkey = MCM.Get("target_farther_enemy_hotkey")
     OnMeHotKey = MCM.Get("on_me_hotkey")
     AttackMyTargetHotKey = MCM.Get("attack_my_target_hotkey")
+    AttackMoveHotKey = MCM.Get("attack_move_hotkey")
     ActionButtonHotkeys = {
         MCM.Get("action_1_hotkey"),
         MCM.Get("action_2_hotkey"),
@@ -53,6 +57,7 @@ if MCM then
     ControllerTargetFartherEnemyHotkey = {MCM.Get("controller_target_farther_enemy_hotkey"), MCM.Get("controller_target_farther_enemy_hotkey_2")}
     ControllerOnMeHotKey = {MCM.Get("controller_on_me_hotkey"), MCM.Get("controller_on_me_hotkey_2")}
     ControllerAttackMyTargetHotKey = {MCM.Get("controller_attack_my_target_hotkey"), MCM.Get("controller_attack_my_target_hotkey_2")}
+    ControllerAttackMoveHotKey = {MCM.Get("controller_attack_move_hotkey"), MCM.Get("controller_attack_move_hotkey_2")}
     ControllerActionButtonHotkeys = {
         {MCM.Get("controller_action_1_hotkey"), MCM.Get("controller_action_1_hotkey_2")},
         {MCM.Get("controller_action_2_hotkey"), MCM.Get("controller_action_2_hotkey_2")},
@@ -66,6 +71,7 @@ if MCM then
     }
 end
 local DirectlyControlledCharacter = nil
+local AwaitingTarget = false
 local IsControllerButtonPressed = {
     A = false,
     B = false,
@@ -231,6 +237,10 @@ local function postAttackMyTarget()
     Ext.ClientNet.PostMessageToServer("AttackMyTarget", "")
 end
 
+local function postAttackMove()
+    Ext.ClientNet.PostMessageToServer("AttackMove", "")
+end
+
 local function postControllerActionButton(actionButtonLabel)
     Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
 end
@@ -279,6 +289,10 @@ local function onKeyInput(e)
             postAttackMyTarget()
             keybindingPressed = true
         end
+        if isKeybindingPressed(e, AttackMoveHotKey) then
+            postAttackMove()
+            keybindingPressed = true
+        end
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if isKeybindingPressed(e, actionButtonHotkey) then
                 postActionButton(actionButtonLabel)
@@ -320,6 +334,9 @@ local function onControllerButtonPressed(button)
     if isControllerKeybindingPressed(ControllerAttackMyTargetHotKey) then
         postAttackMyTarget()
     end
+    if isControllerKeybindingPressed(ControllerAttackMoveHotKey) then
+        postAttackMove()
+    end
     for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
         if isControllerKeybindingPressed(controllerActionButtonHotkey) then
             postControllerActionButton(actionButtonLabel)
@@ -352,12 +369,17 @@ end
 local function onMouseButtonInput(e)
     if e.Pressed and e.Button == 1 then
         postClickPosition()
+        if AwaitingTarget then
+            e:PreventAction()
+        end
     end
 end
 
 local function onNetMessage(data)
     if data.Channel == "GainedControl" then
         DirectlyControlledCharacter = data.Payload
+    elseif data.Channel == "AwaitingTarget" then
+        AwaitingTarget = data.Payload == "1"
     end
 end
 
