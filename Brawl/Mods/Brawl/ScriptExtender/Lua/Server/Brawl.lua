@@ -1947,7 +1947,7 @@ local function unlock(entity)
             if ActionResourcesListeners[uuid] ~= nil then
                 Ext.Entity.Unsubscribe(ActionResourcesListeners[uuid])
                 ActionResourcesListeners[uuid] = nil
-            end    
+            end
             local moveTo = MovementQueue[uuid]
             Osi.CharacterMoveToPosition(uuid, moveTo[1], moveTo[2], moveTo[3], getMovementSpeed(uuid), "")
             MovementQueue[uuid] = nil
@@ -2949,14 +2949,16 @@ local function onNetMessage(data)
     elseif data.Channel == "OnMe" then
         if Players then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
-            Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
-            Osi.ApplyStatus(player.uuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
-            -- Osi.ApplyStatus(player.uuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
-            for uuid, _ in pairs(Players) do
-                if not isPlayerControllingDirectly(uuid) then
-                    Osi.PurgeOsirisQueue(uuid, 1)
-                    Osi.FlushOsirisQueue(uuid)
-                    Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
+            if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
+                Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+                Osi.ApplyStatus(player.uuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+                -- Osi.ApplyStatus(player.uuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
+                for uuid, _ in pairs(Players) do
+                    if not isPlayerControllingDirectly(uuid) then
+                        Osi.PurgeOsirisQueue(uuid, 1)
+                        Osi.FlushOsirisQueue(uuid)
+                        Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
+                    end
                 end
             end
         end
@@ -2964,7 +2966,7 @@ local function onNetMessage(data)
         if Players and Brawlers then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             local level = Osi.GetRegion(player.uuid)
-            if level and Brawlers[level] then
+            if level and Brawlers[level] and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
                 local currentTarget
                 if PlayerMarkedTarget[player.uuid] then
                     currentTarget = PlayerMarkedTarget[player.uuid]
@@ -2989,7 +2991,7 @@ local function onNetMessage(data)
     elseif data.Channel == "AttackMove" then
         if Players then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
-            if player and player.uuid then
+            if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
                 AwaitingTarget[player.uuid] = true
                 Ext.ServerNet.PostMessageToClient(player.uuid, "AwaitingTarget", "1")
             end
