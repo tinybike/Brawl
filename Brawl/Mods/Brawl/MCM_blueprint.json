@@ -132,21 +132,21 @@
                             "Id": "on_me_hotkey",
                             "Name": "On Me Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_1", "Modifier": "LShift"},
+                            "Default": {"ScanCode": "NUM_1", "Modifier": "LAlt"},
                             "Description": "Hotkey to instruct your companions to come to you",
                             "Handles": {"DescriptionHandle": "hf7d30515g5e2ag4951gae39g47318360265f", "NameHandle": "h433ac630gc4ceg4724gb8aeg12e07759c7bb"}
                         }, {
                             "Id": "attack_my_target_hotkey",
                             "Name": "Attack My Target Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_2", "Modifier": "LShift"},
+                            "Default": {"ScanCode": "NUM_2", "Modifier": "LAlt"},
                             "Description": "Hotkey to instruct your companions to attack your most recent target",
                             "Handles": {"DescriptionHandle": "h30cd0d71g52c2g4d40gb050gab864feb71ca", "NameHandle": "hbef77ddaga0a5g4588g8697g61d822610c6e"}
                         }, {
                             "Id": "attack_move_hotkey",
                             "Name": "Attack-Move Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "A", "Modifier": "LShift"},
+                            "Default": {"ScanCode": "A", "Modifier": "LAlt"},
                             "Description": "Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)",
                             "Handles": {"DescriptionHandle": "hd7111993g8df4g4013gad20g0439cc4fe010", "NameHandle": "hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5"}
                         }

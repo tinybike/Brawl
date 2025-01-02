@@ -399,6 +399,12 @@ local function onMCMSettingSaved(payload)
         TargetCloserEnemyHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "target_farther_enemy_hotkey" then
         TargetFartherEnemyHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "on_me_hotkey" then
+        OnMeHotKey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "attack_my_target_hotkey" then
+        AttackMyTargetHotKey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "attack_move_hotkey" then
+        AttackMoveHotKey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "controller_mod_toggle_hotkey" then
         ControllerModToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_mod_toggle_hotkey_2" then
@@ -423,6 +429,18 @@ local function onMCMSettingSaved(payload)
         ControllerTargetFartherEnemyHotkey[1] = payload.value
     elseif payload.settingId == "controller_target_farther_enemy_hotkey_2" then
         ControllerTargetFartherEnemyHotkey[2] = payload.value
+    elseif payload.settingId == "controller_on_me_hotkey" then
+        ControllerOnMeHotkey[1] = payload.value
+    elseif payload.settingId == "controller_on_me_hotkey_2" then
+        ControllerOnMeHotkey[2] = payload.value
+    elseif payload.settingId == "controller_attack_my_target_hotkey" then
+        ControllerAttackMyTargetHotkey[1] = payload.value
+    elseif payload.settingId == "controller_attack_my_target_hotkey_2" then
+        ControllerAttackMyTargetHotkey[2] = payload.value
+    elseif payload.settingId == "controller_attack_move_hotkey" then
+        ControllerAttackMoveHotkey[1] = payload.value
+    elseif payload.settingId == "controller_attack_move_hotkey_2" then
+        ControllerAttackMoveHotkey[2] = payload.value
     else
         for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
             if payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey" then
