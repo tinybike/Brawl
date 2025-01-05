@@ -1325,7 +1325,7 @@ local function revertHitpoints(entityUuid)
         local entity = Ext.Entity.Get(entityUuid)
         local currentMaxHp = entity.Health.MaxHp
         local currentHp = entity.Health.Hp
-        local multiplier = modifiedHitpoints[entityUuid].multiplier
+        local multiplier = modifiedHitpoints[entityUuid].multiplier or HitpointsMultiplier
         if modifiedHitpoints[entityUuid] == nil then
             modifiedHitpoints[entityUuid] = {}
         end
@@ -2160,7 +2160,7 @@ local function allExitFTB()
 end
 
 local function lock(entity)
-    entity.TurnBased.IsInCombat_M = falses
+    entity.TurnBased.IsInCombat_M = false
     FTBLockedIn[entity.Uuid.EntityUuid] = true
 end
 
