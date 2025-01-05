@@ -222,8 +222,29 @@ local function isDowned(entityUuid)
     return Osi.IsDead(entityUuid) == 0 and Osi.GetHitpoints(entityUuid) == 0
 end
 
-local function isAliveAndCanFight(entityUuid)
-    return Osi.IsDead(entityUuid) == 0 and Osi.GetHitpoints(entityUuid) > 0 and Osi.CanFight(entityUuid) == 1
+function isAliveAndCanFight(entityUuid)
+    local isDead = Osi.IsDead(entityUuid)
+    if isDead == nil then
+        return false
+    end
+    if isDead == 1 then
+        return false
+    end
+    local hitpoints = Osi.GetHitpoints(entityUuid)
+    if hitpoints == nil then
+        return false
+    end
+    if hitpoints == 0 then
+        return false
+    end
+    local canFight = Osi.CanFight(entityUuid)
+    if canFight == nil then
+        return false
+    end
+    if canFight == 0 then
+        return false
+    end
+    return true
 end
 
 local function isPlayerOrAlly(entityUuid)
@@ -858,9 +879,13 @@ local function convertSpellRangeToNumber(range)
 end
 
 -- NB: need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, spellName, spell, distanceToTarget, targetDistanceToParty, allowAoE)
+local function isCompanionSpellAvailable(uuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE)
     -- This should never happen but...
     if spellName == nil or spell == nil then
+        return false
+    end
+    -- If we're silenced, we can't use spells that have a verbal component
+    if isSilenced and spell.hasVerbalComponent then
         return false
     end
     -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
@@ -896,8 +921,11 @@ local function isCompanionSpellAvailable(uuid, spellName, spell, distanceToTarge
     return true
 end
 
-local function isEnemySpellAvailable(uuid, spellName, spell)
+local function isEnemySpellAvailable(uuid, spellName, spell, isSilenced)
     if spellName == nil or spell == nil then
+        return false
+    end
+    if isSilenced and spell.hasVerbalComponent then
         return false
     end
     if spellType == "Healing" and not spell.isDirectHeal then
@@ -914,6 +942,16 @@ local function isEnemySpellAvailable(uuid, spellName, spell)
     return true
 end
 
+local function isSilenced(uuid)
+    -- nb: what other labels can silences have? :/
+    if Osi.HasActiveStatus(uuid, "SILENCED") == 1 then
+        return true
+    elseif Osi.HasActiveStatus(uuid, "SHA_SILENTLIBRARY_LIBRARIANSILENCE_STATUS") == 1 then
+        return true
+    end
+    return false
+end
+
 -- What to do?  In all cases, give extra weight to spells that you're already within range for
 -- 1. Check if any players are downed and nearby, if so, help them up.
 -- 2? Check if any players are badly wounded and in-range, if so, heal them? (...but this will consume resources...)
@@ -925,6 +963,7 @@ end
 -- 4. Status effects/buffs (NYI)
 local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = {}
+    local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         local spell = nil
@@ -934,7 +973,7 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
                 break
             end
         end
-        if isCompanionSpellAvailable(uuid, spellName, spell, distanceToTarget, targetDistanceToParty, allowAoE) then
+        if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
             weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
         end
     end
@@ -951,6 +990,7 @@ end
 -- 3. Status effects/buffs/debuffs (NYI)
 local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes)
     local weightedSpells = {}
+    local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         if isNpcSpellUsable(spellName) then
@@ -961,7 +1001,7 @@ local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archety
                     break
                 end
             end
-            if isEnemySpellAvailable(uuid, spellName, spell) then
+            if isEnemySpellAvailable(uuid, spellName, spell, silenced) then
                 weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
             end
         end
@@ -1041,6 +1081,9 @@ local function actOnHostileTarget(brawler, target)
 end
 
 local function hasDirectHeal(uuid, preparedSpells)
+    if isSilenced(uuid) then
+        return false
+    end
     for _, preparedSpell in ipairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         if SpellTable.Healing[spellName] ~= nil and checkSpellResources(uuid, spellName) then
@@ -1451,6 +1494,7 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         if replaceExistingBrawler then
             okToAdd = level and Brawlers[level] ~= nil and isAliveAndCanFight(entityUuid)
         else
+            print(level, Brawlers[level][entityUuid], isAliveAndCanFight(entityUuid))
             okToAdd = level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
         end
         if okToAdd then
@@ -1981,6 +2025,12 @@ local function getSpellInfo(spellType, spellName)
                 outOfCombatOnly = true
             end
         end
+        local hasVerbalComponent = false
+        for _, flag in ipairs(spell.SpellFlags) do
+            if flag == "HasVerbalComponent" then
+                hasVerbalComponent = true
+            end
+        end
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -1992,6 +2042,7 @@ local function getSpellInfo(spellType, spellName)
             targetRadius = spell.TargetRadius,
             costs = costs,
             type = spellType,
+            hasVerbalComponent = hasVerbalComponent,
             -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
             -- damage = spell.TooltipDamageList,
         }
@@ -2109,7 +2160,7 @@ local function allExitFTB()
 end
 
 local function lock(entity)
-    entity.TurnBased.IsInCombat_M = false
+    entity.TurnBased.IsInCombat_M = falses
     FTBLockedIn[entity.Uuid.EntityUuid] = true
 end
 
