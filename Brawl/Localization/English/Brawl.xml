@@ -66,4 +66,10 @@
     <content contentuid="hd7111993g8df4g4013gad20g0439cc4fe010" version="1">Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)</content>
     <content contentuid="hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5" version="1">Attack-Move Hotkey</content>
     <content contentuid="h5c50e90bg939bg4f67g9b0cg8203649e4002" version="1">Attack-Move Hotkey 2 (Optional)</content>
+    <content contentuid="h3ebbf8aeg5b9bg4db7ga9a3ga26bd7d53ad8" version="1">Hotkey to instruct your companions to heal</content>
+    <content contentuid="h0722b7b4g2ecdg461fga390ge6fb1c0c69ac" version="1">Heal Hotkey</content>
+    <content contentuid="h0187e394gaba7g40d4g8241g24194438dd78" version="1">Heal Hotkey 2 (Optional)</content>
+    <content contentuid="hb32cfa26ge2ddg4d63gb4dbg8f8627f7366f" version="1">Hotkey to change your companions AI tactics setting</content>
+    <content contentuid="hb78e5343g38f9g47c2gafdag8d078d0de87d" version="1">Change Tactics Hotkey</content>
+    <content contentuid="hc0cf8e7bg45a5g40b9g8aadg8f9edfa87db8" version="1">Change Tactics Hotkey 2 (Optional)</content>
 </contentList>
