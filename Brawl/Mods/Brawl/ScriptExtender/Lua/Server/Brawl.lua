@@ -8,7 +8,6 @@ local AutoPauseOnDowned = true
 local ActionInterval = 6000
 local FullAuto = false
 local HitpointsMultiplier = 1.0
-local TavArchetype = "melee"
 local CompanionTactics = "Offense"
 local CompanionAIMaxSpellLevel = 0
 local HogwildMode = false
@@ -20,14 +19,13 @@ if MCM then
     ActionInterval = MCM.Get("action_interval")
     FullAuto = MCM.Get("full_auto")
     HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
-    TavArchetype = string.lower(MCM.Get("tav_archetype"))
     CompanionTactics = MCM.Get("companion_tactics")
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     HogwildMode = MCM.Get("hogwild_mode")
 end
 
 -- Constants
-local DEBUG_LOGGING = true
+local DEBUG_LOGGING = false
 local REPOSITION_INTERVAL = 2500
 local BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 local LIE_ON_GROUND_TIMEOUT = 3500
@@ -56,21 +54,11 @@ local ACTION_RESOURCES = {
     SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
     Movement = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185",
 }
-local COMPANION_TACTICS = {
-    "Offense",
-    "Defense",
-}
-local ALL_SPELL_TYPES = {
-    "Buff",
-    "Debuff",
-    "Control",
-    "Damage",
-    "Healing",
-    "Summon",
-    "Utility",
-}
+local PLAYER_ARCHETYPES = {"", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic"}
+local COMPANION_TACTICS = {"Offense", "Defense"}
+local ALL_SPELL_TYPES = {"Buff", "Debuff", "Control", "Damage", "Healing", "Summon", "Utility"}
 local ARCHETYPE_WEIGHTS = {
-    caster = {
+    mage = {
         rangedWeapon = -5,
         rangedWeaponInRange = 5,
         rangedWeaponOutOfRange = -5,
@@ -97,6 +85,15 @@ local ARCHETYPE_WEIGHTS = {
         isSpell = 4,
         spellInRange = 8,
     },
+    healer = {
+        rangedWeapon = 3,
+        rangedWeaponInRange = 3,
+        rangedWeaponOutOfRange = 3,
+        meleeWeapon = -2,
+        meleeWeaponInRange = 4,
+        isSpell = 8,
+        spellInRange = 8,
+    },
     melee = {
         rangedWeapon = -5,
         rangedWeaponInRange = 5,
@@ -106,19 +103,27 @@ local ARCHETYPE_WEIGHTS = {
         isSpell = -10,
         spellInRange = 5,
     },
+    melee_magic = {
+        rangedWeapon = -5,
+        rangedWeaponInRange = 5,
+        rangedWeaponOutOfRange = -5,
+        meleeWeapon = 5,
+        meleeWeaponInRange = 10,
+        isSpell = 5,
+        spellInRange = 5,
+    },
 }
 ARCHETYPE_WEIGHTS.beast = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.goblin_melee = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.goblin_ranged = ARCHETYPE_WEIGHTS.ranged
-ARCHETYPE_WEIGHTS.mage = ARCHETYPE_WEIGHTS.caster
+ARCHETYPE_WEIGHTS.mage = ARCHETYPE_WEIGHTS.mage
 ARCHETYPE_WEIGHTS.koboldinventor_drunk = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.ranged_stupid = ARCHETYPE_WEIGHTS.ranged
-ARCHETYPE_WEIGHTS.melee_magic_smart = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.melee_magic_smart = ARCHETYPE_WEIGHTS.melee_magic
 ARCHETYPE_WEIGHTS.merregon = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.act3_LOW_ghost_nurse = ARCHETYPE_WEIGHTS.melee
-ARCHETYPE_WEIGHTS.melee_magic = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.ogre_melee = ARCHETYPE_WEIGHTS.melee
-ARCHETYPE_WEIGHTS.beholder = ARCHETYPE_WEIGHTS.melee
+ARCHETYPE_WEIGHTS.beholder = ARCHETYPE_WEIGHTS.melee_magic
 ARCHETYPE_WEIGHTS.minotaur = ARCHETYPE_WEIGHTS.melee
 ARCHETYPE_WEIGHTS.steel_watcher_biped = ARCHETYPE_WEIGHTS.melee
 local DAMAGE_TYPES = {
@@ -180,6 +185,7 @@ MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY
 -- Persistent state
 Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
 
 local function debugPrint(...)
     if DEBUG_LOGGING then
@@ -516,7 +522,6 @@ local function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
         debugPrint("Error: spell not found")
         return false
     end
-    debugPrint(casterUuid, getDisplayName(casterUuid), "wants to cast", spellName)
     if spell and spell.costs then
         debugDump(spell.costs)
     end
@@ -532,16 +537,14 @@ local function checkSpellResources(casterUuid, spellName, variant, upcastLevel)
             if costType == "SpellSlot" then
                 local spellLevel = upcastLevel == nil and costValue or upcastLevel
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
-                debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                 if availableResourceValue < 1 then
-                    debugPrint("Insufficient resources", costType)
+                    debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                     return false
                 end
             else
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
-                debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
                 if availableResourceValue < costValue then
-                    debugPrint("Insufficient resources", costType)
+                    debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
                     return false
                 end
             end
@@ -1010,25 +1013,51 @@ local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archety
 end
 
 local function getArchetype(uuid)
-    local archetype = Osi.GetActiveArchetype(uuid)
+    local archetype
+    if Players and Players[uuid] then
+        local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+        local partyArchetypes = modVars.PartyArchetypes
+        if partyArchetypes == nil then
+            partyArchetypes = {}
+            modVars.PartyArchetypes = partyArchetypes
+        else
+            archetype = partyArchetypes[uuid]
+        end
+    end
+    if archetype == nil or archetype == "" then
+        archetype = Osi.GetActiveArchetype(uuid)
+    end
     if not ARCHETYPE_WEIGHTS[archetype] then
-        -- debugPrint("Archetype missing from the list, using melee for now", archetype)
-        archetype = archetype == "base" and TavArchetype or "melee"
+        if archetype == "base" then
+            archetype = TavArchetype or "melee"
+        elseif archetype:find("ranged") ~= nil then
+            archetype = "ranged"
+        elseif archetype:find("healer") ~= nil then
+            archetype = "healer"
+        elseif archetype:find("mage") ~= nil then
+            archetype = "mage"
+        elseif archetype:find("melee_magic") ~= nil then
+            archetype = "melee_magic"
+        elseif archetype:find("healer_melee") ~= nil then
+            archetype = "healer_melee"
+        else
+            debugPrint("Archetype missing from the list, using melee for now", archetype)
+            archetype = "melee"
+        end
     end
     return archetype
 end
 
-local function decideCompanionActionOnTarget(uuid, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
-    local archetype = getArchetype(uuid)
-    local weightedSpells = getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, targetDistanceToParty, allowAoE)
-    debugPrint("companion weighted spells", getDisplayName(uuid), archetype, distanceToTarget)
+local function decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
+    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, targetDistanceToParty, allowAoE)
+    debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
     debugDump(ARCHETYPE_WEIGHTS[archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
-local function decideActionOnTarget(uuid, preparedSpells, distanceToTarget, spellTypes)
-    local weightedSpells = getWeightedSpells(uuid, preparedSpells, distanceToTarget, getArchetype(uuid), spellTypes)
+local function decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
+    local weightedSpells = getWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -1044,11 +1073,11 @@ local function actOnHostileTarget(brawler, target)
             local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
             local targetDistanceToParty = Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
             debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
-            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
+            actionToTake = decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, spellTypes)
-            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
+            actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
+            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
             local numUsableSpells = 0
@@ -1107,9 +1136,9 @@ local function actOnFriendlyTarget(brawler, target)
         end
         local actionToTake = nil
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, spellTypes, 0, true)
+            actionToTake = decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, 0, true)
         else
-            actionToTake = decideActionOnTarget(brawler.uuid, preparedSpells, distanceToTarget, spellTypes)
+            actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
         end
         debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
         if actionToTake ~= nil then
@@ -1192,7 +1221,7 @@ end
 -- (Lowest weight = most desireable target)
 local function getWeightedTargets(brawler, potentialTargets)
     local weightedTargets = {}
-    local isHealer = isHealerArchetype(getArchetype(brawler.uuid))
+    local isHealer = isHealerArchetype(brawler.archetype)
     local closestAlivePlayer
     if CompanionTactics == "Defense" and isPlayerOrAlly(brawler.uuid) then
         closestAlivePlayer = Osi.GetClosestAlivePlayer(brawler.uuid)
@@ -1494,7 +1523,6 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         if replaceExistingBrawler then
             okToAdd = level and Brawlers[level] ~= nil and isAliveAndCanFight(entityUuid)
         else
-            print(level, Brawlers[level][entityUuid], isAliveAndCanFight(entityUuid))
             okToAdd = level and Brawlers[level] ~= nil and Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
         end
         if okToAdd then
@@ -1507,6 +1535,7 @@ function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 combatGroupId = Osi.GetCombatGroupID(entityUuid),
                 isInBrawl = isInBrawl,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
+                archetype = getArchetype(entityUuid),
             }
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
@@ -2501,6 +2530,26 @@ local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
+        if targetUuid == Osi.GetHostCharacter() then
+            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            local partyArchetypes = modVars.PartyArchetypes
+            if partyArchetypes == nil then
+                partyArchetypes = {}
+                modVars.PartyArchetypes = partyArchetypes
+            end
+            local archetype = ""
+            if partyArchetypes[targetUuid] ~= nil then
+                archetype = partyArchetypes[targetUuid]
+            end
+            local isValidArchetype = false
+            for _, validArchetype in ipairs(PLAYER_ARCHETYPES) do
+                if archetype == validArchetype then
+                    isValidArchetype = true
+                    break
+                end
+            end
+            MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
+        end
         Osi.PurgeOsirisQueue(targetUuid, 1)
         Osi.FlushOsirisQueue(targetUuid)
         local targetUserId = Osi.GetReservedUserID(targetUuid)
@@ -2978,8 +3027,23 @@ local function onMCMSettingSaved(payload)
         else
             disableFullAuto()
         end
-    elseif payload.settingId == "tav_archetype" then
-        TavArchetype = string.lower(payload.value)
+    elseif payload.settingId == "active_character_archetype" then
+        local uuid = Osi.GetHostCharacter()
+        if uuid ~= nil and payload.value ~= nil and payload.value ~= "" then
+            local archetype = payload.value
+            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            if modVars.PartyArchetypes == nil then
+                modVars.PartyArchetypes = {}
+            end
+            local partyArchetypes = modVars.PartyArchetypes
+            -- partyArchetypes[uuid] = string.lower(payload.value):gsub("/", "_")
+            partyArchetypes[uuid] = archetype
+            modVars.PartyArchetypes = partyArchetypes
+            local brawler = getBrawlerByUuid(uuid)
+            if brawler ~= nil then
+                brawler.archetype = archetype
+            end
+        end
     elseif payload.settingId == "companion_tactics" then
         CompanionTactics = payload.value
     elseif payload.settingId == "companion_ai_max_spell_level" then

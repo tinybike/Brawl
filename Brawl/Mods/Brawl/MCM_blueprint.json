@@ -21,7 +21,7 @@
                     ]
                 }, {
                     "SectionId": "features",
-                    "SectionName": "Features",
+                    "SectionName": "Features (Host)",
                     "Settings": [
                         {
                             "Id": "companion_ai_enabled",
@@ -67,12 +67,12 @@
                             "Description": "Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.",
                             "Handles": {"DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd", "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"}
                         }, {
-                            "Id": "tav_archetype",
-                            "Name": "Tav Archetype",
+                            "Id": "active_character_archetype",
+                            "Name": "Active Character Archetype",
                             "Type": "enum",
-                            "Default": "Melee",
-                            "Options": {"Choices": ["Melee", "Caster", "Ranged", "Healer"]},
-                            "Description": "Tav's archetype for the AI",
+                            "Default": "",
+                            "Options": {"Choices": ["", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic"]},
+                            "Description": "Combat archetype for your currently selected character",
                             "Handles": {"DescriptionHandle": "h5fba396bg3ea9g42c8g99f7gd52fad9d7c46", "NameHandle": "h08b6adc8ge129g45a0ga62bgdd4a013d0e2b"}
                         }, {
                             "Id": "companion_tactics",

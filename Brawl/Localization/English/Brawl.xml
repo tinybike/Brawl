@@ -17,8 +17,8 @@
     <content contentuid="hd2d7dc1ag806eg4339gb306g679658313ab2" version="1">Fully Automated Brawls Toggle Hotkey</content>
     <content contentuid="h5d6a4c77g02edg4c96gacc3g8b5adda5dde7" version="1">Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.</content>
     <content contentuid="h41ad2ed5g77dfg45c7g83f9g43fcf62e2376" version="1">Hitpoints Multiplier</content>
-    <content contentuid="h5fba396bg3ea9g42c8g99f7gd52fad9d7c46" version="1">Tav's archetype for the AI</content>
-    <content contentuid="h08b6adc8ge129g45a0ga62bgdd4a013d0e2b" version="1">Tav Archetype</content>
+    <content contentuid="h5fba396bg3ea9g42c8g99f7gd52fad9d7c46" version="1">Combat archetype for your currently selected character</content>
+    <content contentuid="h08b6adc8ge129g45a0ga62bgdd4a013d0e2b" version="1">Active Character Archetype</content>
     <content contentuid="h65ee56d8gbbbeg4e6agb486ge33349a73d09" version="1">If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.</content>
     <content contentuid="h7a39e407g21e0g4f3bg98fdg7cd473b01043" version="1">True Pause</content>
     <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>

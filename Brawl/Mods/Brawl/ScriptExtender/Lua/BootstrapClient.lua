@@ -202,6 +202,7 @@ local function getPositionInfo()
                 clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
             end
         end
+        -- _D(clickedOn)
         return clickedOn
     end
     return nil
