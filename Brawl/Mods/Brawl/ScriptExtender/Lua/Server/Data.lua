@@ -131,6 +131,8 @@ SAFE_AOE_SPELLS = {
     "Shout_DestructiveWave_Radiant",
     "Shout_DestructiveWave_Necrotic",
     "Shout_DivineIntervention_Attack",
+    "Shout_SpiritGuardians",
+    "Target_GuardianOfFaith",
 }
 
 -- Session state
