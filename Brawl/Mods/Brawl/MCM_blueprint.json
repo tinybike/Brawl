@@ -96,6 +96,14 @@
                             "Default": false,
                             "Description": "If checked, the companion AI will go hogwild, freely using any of their spells/abilities with zero resource costs.",
                             "Handles": {"DescriptionHandle": "h82826325ge87dg4b9fga2d4g1918131934e8", "NameHandle": "h3a37f938gf803g45f1gb3bage75ca7adae42"}
+                        }, {
+                            "Id": "max_party_size",
+                            "Name": "Max Party Size",
+                            "Type": "slider_int",
+                            "Default": 4,
+                            "Options": {"Min": 4, "Max": 50},
+                            "Description": "The maximum number of characters allowed in your party.",
+                            "Handles": {"DescriptionHandle": "hee8ad4cdgb401g4ff2gb947gf4269aaed29b", "NameHandle": "hca026ae7g2883g4754gad94gc5aa89feb0d2"}
                         }
                     ]
                 }
