@@ -10,6 +10,7 @@ CompanionTactics = "Offense"
 CompanionAIMaxSpellLevel = 0
 HogwildMode = false
 MaxPartySize = 4
+MurderhoboMode = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -22,6 +23,7 @@ if MCM then
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     HogwildMode = MCM.Get("hogwild_mode")
     MaxPartySize = MCM.Get("max_party_size")
+    MurderhoboMode = MCM.Get("murderhobo_mode")
 end
 
 function setMovementSpeedThresholds()
@@ -1783,6 +1785,8 @@ function onDialogStarted(dialog, dialogInstanceId)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             stopPulseAction(brawler, true)
+            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            Osi.FlushOsirisQueue(brawlerUuid)
         end
     end
 end
@@ -2115,6 +2119,8 @@ function onMCMSettingSaved(payload)
     elseif payload.settingId == "max_party_size" then
         MaxPartySize = payload.value
         setMaxPartySize()
+    elseif payload.settingId == "murderhobo_mode" then
+        MurderhoboMode = payload.value
     end
 end
 
