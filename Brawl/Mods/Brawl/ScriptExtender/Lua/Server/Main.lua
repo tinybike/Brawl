@@ -1783,6 +1783,8 @@ function onDialogStarted(dialog, dialogInstanceId)
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
             stopPulseAction(brawler, true)
+            Osi.PurgeOsirisQueue(brawlerUuid, 1)
+            Osi.FlushOsirisQueue(brawlerUuid)
         end
     end
 end
