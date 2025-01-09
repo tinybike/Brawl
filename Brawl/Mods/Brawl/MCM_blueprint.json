@@ -78,7 +78,7 @@
                             "Id": "companion_tactics",
                             "Name": "Companion Tactics",
                             "Type": "enum",
-                            "Default": "Offense",
+                            "Default": "Defense",
                             "Options": {"Choices": ["Offense", "Defense"]},
                             "Description": "High-level behavior for the companion AI.  Offense: all-out attack, prioritize killing enemies.  Defense: prioritize staying with the group, don't run off alone to attack.",
                             "Handles": {"DescriptionHandle": "h6794c735g3288g4b07gb7c3ge060e416e904", "NameHandle": "hc01f084cg13c4g42a1g8197g960e8f993d9c"}
@@ -117,6 +117,13 @@
                             "Default": false,
                             "Description": "If checked, every non-allied NPC in the game will be hostile and attack you on sight.  Recommended for aspiring murderhobos.",
                             "Handles": {"DescriptionHandle": "h79a0957bgbf5fg469fgad34gb6db3de93612", "NameHandle": "h085c4f90g9e92g4d10gba3bga59231ec03d2"}
+                        }, {
+                            "Id": "turn_based_swarm_mode",
+                            "Name": "Turn-Based Swarm Mode",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, the game will automa your party will take their turn simultaneously, and then enemies will have 6 seconds of real-time 'turn' simultaneously.",
+                            "Handles": {"DescriptionHandle": "h69f81fcfgaa46g44c0g9ccag8d8749fedb2c", "NameHandle": "h934a9d9cg4d60g4d75gb628g7187b622cb14"}
                         }
                     ]
                 }
@@ -238,55 +245,55 @@
                             "Id": "action_1_hotkey",
                             "Name": "Action 1 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_1", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_1", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "he1fd0118g426ag44f1gb63agc5631fa2ebc4"}
                         }, {
                             "Id": "action_2_hotkey",
                             "Name": "Action 2 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_2", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_2", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "hb3c5c1bag0dbfg4857g9ab7g465ed5cc052d"}
                         }, {
                             "Id": "action_3_hotkey",
                             "Name": "Action 3 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_3", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_3", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "h6483f109g1988g47c2gac6agdd4f6bb1b63f"}
                         }, {
                             "Id": "action_4_hotkey",
                             "Name": "Action 4 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_4", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_4", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "h5bfd6c30g5379g48b8g9165gdea2e962760f"}
                         }, {
                             "Id": "action_5_hotkey",
                             "Name": "Action 5 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_5", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_5", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "hebe77c4fgaf59g45c6g9691g4c157ff4098c"}
                         }, {
                             "Id": "action_6_hotkey",
                             "Name": "Action 6 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_6", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_6", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "ha9888301g13d6g40d8g8353g5abf4835375f"}
                         }, {
                             "Id": "action_7_hotkey",
                             "Name": "Action 7 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_7", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_7", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "h035cee56g0cf6g4b2ag866bg53f0c335bc90"}
                         }, {
                             "Id": "action_8_hotkey",
                             "Name": "Action 8 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_8", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_8", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "h8662dedega937g4bb2g9246gf34c560e2f1c"}
                         }, {
                             "Id": "action_9_hotkey",
                             "Name": "Action 9 Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_9", "Modifier": "LAlt"},
+                            "Default": {"ScanCode": "NUM_9", "Modifier": "LShift"},
                             "Handles": {"NameHandle": "h21cb8829g772eg4334gbc1bg1bb5fcd00bfe"}
                         }
                     ]
