@@ -53,3 +53,7 @@ Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o
 ### 12) AI Healing
 
 [![Real time combat test 12](https://img.youtube.com/vi/H_-c0xqzCxg/0.jpg)](https://www.youtube.com/watch?v=H_-c0xqzCxg)
+
+### 13) Bigger Party
+
+[![Real time combat test 13](https://img.youtube.com/vi/Nu51F3QY6CY/0.jpg)](https://www.youtube.com/watch?v=Nu51F3QY6CY)

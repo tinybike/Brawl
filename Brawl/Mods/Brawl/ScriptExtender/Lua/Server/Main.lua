@@ -6,10 +6,12 @@ AutoPauseOnDowned = true
 ActionInterval = 6000
 FullAuto = false
 HitpointsMultiplier = 1.0
-CompanionTactics = "Offense"
+CompanionTactics = "Defense"
 CompanionAIMaxSpellLevel = 0
 HogwildMode = false
 MaxPartySize = 4
+MurderhoboMode = false
+TurnBasedSwarmMode = false
 if MCM then
     ModEnabled = MCM.Get("mod_enabled")
     CompanionAIEnabled = MCM.Get("companion_ai_enabled")
@@ -22,6 +24,8 @@ if MCM then
     CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     HogwildMode = MCM.Get("hogwild_mode")
     MaxPartySize = MCM.Get("max_party_size")
+    MurderhoboMode = MCM.Get("murderhobo_mode")
+    TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
 end
 
 function setMovementSpeedThresholds()
@@ -2049,7 +2053,7 @@ function toggleMod()
 end
 
 function onMCMSettingSaved(payload)
-    debugDump(payload)
+    -- debugDump(payload)
     if not payload or payload.modUUID ~= ModuleUUID or not payload.settingId then
         return
     end
@@ -2117,6 +2121,10 @@ function onMCMSettingSaved(payload)
     elseif payload.settingId == "max_party_size" then
         MaxPartySize = payload.value
         setMaxPartySize()
+    elseif payload.settingId == "murderhobo_mode" then
+        MurderhoboMode = payload.value
+    elseif payload.settingId == "turn_based_swarm_mode" then
+        TurnBasedSwarmMode = payload.value
     end
 end
 

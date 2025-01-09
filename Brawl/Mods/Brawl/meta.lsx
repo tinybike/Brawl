@@ -16,7 +16,7 @@
           <attribute id="MainMenuBackgroundVideo" type="FixedString" value="" />
           <attribute id="MenuLevelName" type="FixedString" value="" />
           <attribute id="Name" type="FixedString" value="Brawl" />
-          <attribute id="NumPlayers" type="uint8" value="4" />
+          <attribute id="NumPlayers" type="uint8" value="16" />
           <attribute id="PhotoBooth" type="FixedString" value="" />
           <attribute id="StartupLevelName" type="FixedString" value="" />
           <attribute id="Tags" type="LSWString" value="" />

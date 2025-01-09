@@ -2,23 +2,23 @@ local ModToggleHotkey = {ScanCode = "F9", Modifier = "NONE"}
 local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
 local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
 local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
-local TargetCloserEnemyHotkey = {ScanCode = "NUM_1", Modifier = "LCtrl"}
-local TargetFartherEnemyHotkey = {ScanCode = "NUM_2", Modifier = "LCtrl"}
+local TargetCloserEnemyHotkey = {ScanCode = "COMMA", Modifier = "NONE"}
+local TargetFartherEnemyHotkey = {ScanCode = "PERIOD", Modifier = "NONE"}
 local OnMeHotkey = {ScanCode = "NUM_1", Modifier = "LAlt"}
 local AttackMyTargetHotkey = {ScanCode = "NUM_2", Modifier = "LAlt"}
 local AttackMoveHotkey = {ScanCode = "A", Modifier = "LAlt"}
 local HealHotkey = {ScanCode = "E", Modifier = "LAlt"}
 local ChangeTacticsHotkey = {ScanCode = "C", Modifier = "LAlt"}
 local ActionButtonHotkeys = {
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
-    {ScanCode = "NONE", Modifier = "NONE"},
+    {ScanCode = "NUM_1", Modifier = "LShift"},
+    {ScanCode = "NUM_2", Modifier = "LShift"},
+    {ScanCode = "NUM_3", Modifier = "LShift"},
+    {ScanCode = "NUM_4", Modifier = "LShift"},
+    {ScanCode = "NUM_5", Modifier = "LShift"},
+    {ScanCode = "NUM_6", Modifier = "LShift"},
+    {ScanCode = "NUM_7", Modifier = "LShift"},
+    {ScanCode = "NUM_8", Modifier = "LShift"},
+    {ScanCode = "NUM_9", Modifier = "LShift"},
 }
 local ControllerModToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
@@ -482,12 +482,18 @@ local function onMCMSettingSaved(payload)
         ControllerChangeTacticsHotkey[1] = payload.value
     elseif payload.settingId == "controller_change_tactics_hotkey_2" then
         ControllerChangeTacticsHotkey[2] = payload.value
-    else
+    elseif payload.settingId:find("controller_action_") ~= nil then
         for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
             if payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey" then
                 controllerActionButtonHotkey[1] = payload.value
             elseif payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey_2" then
                 controllerActionButtonHotkey[2] = payload.value
+            end
+        end
+    else
+        for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
+            if payload.settingId == "action_" .. actionButtonLabel .. "_hotkey" then
+                actionButtonHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
             end
         end
     end
