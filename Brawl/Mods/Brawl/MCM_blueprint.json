@@ -112,17 +112,17 @@
                             "Handles": {"DescriptionHandle": "hee8ad4cdgb401g4ff2gb947gf4269aaed29b", "NameHandle": "hca026ae7g2883g4754gad94gc5aa89feb0d2"}
                         }, {
                             "Id": "murderhobo_mode",
-                            "Name": "Murderhobo Mode",
+                            "Name": "Murderhobo Mode (NYI)",
                             "Type": "checkbox",
                             "Default": false,
-                            "Description": "If checked, every non-allied NPC in the game will be hostile and attack you on sight.  Recommended for aspiring murderhobos.",
+                            "Description": "If checked, every non-allied NPC in the game will be hostile and attack you on sight.  Recommended for aspiring murderhobos. (Not Yet Implemented)",
                             "Handles": {"DescriptionHandle": "h79a0957bgbf5fg469fgad34gb6db3de93612", "NameHandle": "h085c4f90g9e92g4d10gba3bga59231ec03d2"}
                         }, {
                             "Id": "turn_based_swarm_mode",
-                            "Name": "Turn-Based Swarm Mode",
+                            "Name": "Turn-Based Swarm Mode (NYI)",
                             "Type": "checkbox",
                             "Default": false,
-                            "Description": "If checked, the game will automa your party will take their turn simultaneously, and then enemies will have 6 seconds of real-time 'turn' simultaneously.",
+                            "Description": "If checked, the game will automa your party will take their turn simultaneously, and then enemies will have 6 seconds of real-time 'turn' simultaneously.  (Not Yet Implemented)",
                             "Handles": {"DescriptionHandle": "h69f81fcfgaa46g44c0g9ccag8d8749fedb2c", "NameHandle": "h934a9d9cg4d60g4d75gb628g7187b622cb14"}
                         }
                     ]

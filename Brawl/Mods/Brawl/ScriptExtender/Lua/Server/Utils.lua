@@ -72,9 +72,9 @@ function isPugnacious(potentialEnemyUuid, uuid)
     if uuid == nil then
         uuid = Osi.GetHostCharacter()
     end
-    if MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
-        Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
-    end
+    -- if MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
+    --     Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
+    -- end
     return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 
