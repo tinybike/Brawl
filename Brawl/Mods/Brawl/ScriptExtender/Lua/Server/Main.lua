@@ -1496,6 +1496,7 @@ end
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
+        print("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turn)
         Ext.Timer.Cancel(CountdownTimer.timer)
     end
     local level = Osi.GetRegion(entityGuid)
@@ -1537,7 +1538,8 @@ function onLeftForceTurnBased(entityGuid)
         end
         stopTruePause(entityUuid)
         if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
-            CountdownTimer.resume()
+            print("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turn)
+            CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turn)
             CountdownTimer = {}
         end
         if Brawlers[level] and Brawlers[level][entityUuid] then
@@ -1903,7 +1905,7 @@ function lakesideRitualTurn(uuid, turn)
         --         end
         --     end
         -- end
-        lakesideRitual(hostUuid, nextTurn)
+        lakesideRitual(uuid, turn)
     end
 end
 
@@ -1912,9 +1914,8 @@ function lakesideRitual(uuid, currentTurn)
         addBrawler(HALSIN_PORTAL_UUID, true)
     end
     CountdownTimer.uuid = uuid
-    CountdownTimer.resume = function ()
-        lakesideRitualTurn(uuid, currentTurn + 1)
-    end
+    CountdownTimer.turn = currentTurn + 1
+    CountdownTimer.resume = lakesideRitualTurn
     CountdownTimer.timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
         lakesideRitualTurn(uuid, currentTurn + 1)
     end)
