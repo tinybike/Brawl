@@ -1890,21 +1890,26 @@ function lakesideRitualTurn(uuid, turn)
     if Osi.IsInForceTurnBasedMode(uuid) == 0 and turn <= 5 and Osi.QRY_HAV_IsRitualActive() then
         Osi.PROC_HAV_LiftingTheCurse_SpawnWave(turn)
         Osi.PROC_HAV_LiftingTheCurse_DeclareRound(turn)
-        addNearbyToBrawlers(uuid, 30, nil, true)
-        -- local level = Osi.GetRegion(uuid)
-        -- if level and Brawlers and Brawlers[level] then
-        --     for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        --         if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
-        --             Osi.SetRelationTemporaryHostile(brawlerUuid, HALSIN_PORTAL_UUID)
-        --             print("enemy of portal", Osi.IsEnemy(brawlerUuid, HALSIN_PORTAL_UUID))
-        --             if math.random() > 0.2 then
-        --                 print("target the portal!", brawlerUuid)
-        --                 brawler.targetUuid = HALSIN_PORTAL_UUID
-        --                 _D(brawler)
-        --             end
-        --         end
-        --     end
-        -- end
+        Ext.Timer.WaitFor(200, function ()
+            if Osi.IsInForceTurnBasedMode(uuid) == 0 then
+                addNearbyToBrawlers(uuid, 30, nil, true)
+                local level = Osi.GetRegion(uuid)
+                if level and Brawlers and Brawlers[level] then
+                    for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                        if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
+                            -- Osi.SetRelationTemporaryHostile(brawlerUuid, HALSIN_PORTAL_UUID)
+                            print("enemy of portal", Osi.IsEnemy(brawlerUuid, HALSIN_PORTAL_UUID))
+                            if math.random() > 0.01 then
+                                print("target the portal!", brawlerUuid)
+                                brawler.targetUuid = HALSIN_PORTAL_UUID
+                                Osi.Attack(brawlerUuid, HALSIN_PORTAL_UUID, 1)
+                                _D(brawler)
+                            end
+                        end
+                    end
+                end
+            end
+        end)
         lakesideRitual(uuid, turn)
     end
 end
@@ -1913,12 +1918,14 @@ function lakesideRitual(uuid, currentTurn)
     if currentTurn == 0 then
         addBrawler(HALSIN_PORTAL_UUID, true)
     end
-    CountdownTimer.uuid = uuid
-    CountdownTimer.turn = currentTurn + 1
-    CountdownTimer.resume = lakesideRitualTurn
-    CountdownTimer.timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-        lakesideRitualTurn(uuid, currentTurn + 1)
-    end)
+    CountdownTimer = {
+        uuid = uuid,
+        turn = currentTurn + 1,
+        resume = lakesideRitualTurn,
+        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
+            lakesideRitualTurn(uuid, currentTurn + 1)
+        end)
+    }
 end
 
 function onFlagSet(flag, speaker, dialogInstance)
