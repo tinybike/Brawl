@@ -370,7 +370,8 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
                 weight = weight + ARCHETYPE_WEIGHTS[archetype].spellInRange
             end
         else
-            debugPrint("Target radius didn't convert to number, what is this?", spell.targetRadius)
+            debugPrint("Target radius didn't convert to number, what is this?")
+            debugPrint(spell.targetRadius)
         end
     end
     -- Favor using spells or non-spells?
@@ -1494,6 +1495,9 @@ end
 
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
+    if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
+        Ext.Timer.Cancel(CountdownTimer.timer)
+    end
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players[entityUuid] then
         debugPrint("EnteredForceTurnBased", entityGuid)
@@ -1532,6 +1536,10 @@ function onLeftForceTurnBased(entityGuid)
             FTBLockedIn[entityUuid] = nil
         end
         stopTruePause(entityUuid)
+        if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
+            CountdownTimer.resume()
+            CountdownTimer = {}
+        end
         if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
             if isPlayerControllingDirectly(entityUuid) then
@@ -1717,6 +1725,7 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
 end
 
 function doLocalResourceAccounting(uuid, spellName)
+    debugPrint("doLocalResourceAccounting", uuid, spellName)
     if ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -1744,7 +1753,6 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
     local entity = Ext.Entity.Get(casterUuid)
     debugDump(ActionsInProgress[casterUuid])
     if entity and doLocalResourceAccounting(casterUuid, spellName) then
-        debugPrint("using local resource accounting")
         local spell = getSpellByName(spellName)
         for costType, costValue in pairs(spell.costs) do
             if costType == "ShortRest" or costType == "LongRest" then
@@ -1844,6 +1852,82 @@ function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
     Brawlers[level] = nil
     stopPulseReposition(level)
+end
+
+function onObjectTimerFinished(objectGuid, timer)
+    print("ObjectTimerFinished", objectGuid, timer)
+    if timer == "TUT_Helm_Timer" then
+        Osi.PROC_TUT_Helm_GameOver()
+    end
+end
+
+function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
+    debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
+end
+
+function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
+    debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
+end
+
+function onQuestAccepted(character, questID)
+    debugPrint("QuestAccepted", character, questID)
+end
+
+function onFlagCleared(flag, speaker, dialogInstance)
+    debugPrint("FlagCleared", flag, speaker, dialogInstance)
+end
+
+function onFlagLoadedInPresetEvent(object, flag)
+    debugPrint("FlagLoadedInPresetEvent", object, flag)
+end
+
+function lakesideRitualTurn(uuid, turn)
+    print("lakeside ritual", turn)
+    -- 1. enemies need to attack portal sometimes
+    -- 2. during pause the timer needs to stop counting down
+    if Osi.IsInForceTurnBasedMode(uuid) == 0 and turn <= 5 and Osi.QRY_HAV_IsRitualActive() then
+        Osi.PROC_HAV_LiftingTheCurse_SpawnWave(turn)
+        Osi.PROC_HAV_LiftingTheCurse_DeclareRound(turn)
+        addNearbyToBrawlers(uuid, 30, nil, true)
+        -- local level = Osi.GetRegion(uuid)
+        -- if level and Brawlers and Brawlers[level] then
+        --     for brawlerUuid, brawler in pairs(Brawlers[level]) do
+        --         if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
+        --             Osi.SetRelationTemporaryHostile(brawlerUuid, HALSIN_PORTAL_UUID)
+        --             print("enemy of portal", Osi.IsEnemy(brawlerUuid, HALSIN_PORTAL_UUID))
+        --             if math.random() > 0.2 then
+        --                 print("target the portal!", brawlerUuid)
+        --                 brawler.targetUuid = HALSIN_PORTAL_UUID
+        --                 _D(brawler)
+        --             end
+        --         end
+        --     end
+        -- end
+        lakesideRitual(hostUuid, nextTurn)
+    end
+end
+
+function lakesideRitual(uuid, currentTurn)
+    if currentTurn == 0 then
+        addBrawler(HALSIN_PORTAL_UUID, true)
+    end
+    CountdownTimer.uuid = uuid
+    CountdownTimer.resume = function ()
+        lakesideRitualTurn(uuid, currentTurn + 1)
+    end
+    CountdownTimer.timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
+        lakesideRitualTurn(uuid, currentTurn + 1)
+    end)
+end
+
+function onFlagSet(flag, speaker, dialogInstance)
+    print("FlagSet", flag, speaker, dialogInstance)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectQuestTimerLaunch(uuid, "HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", COUNTDOWN_TURN_INTERVAL*5, 1)
+        end
+        lakesideRitual(Osi.GetHostCharacter(), 0)
+    end
 end
 
 function stopListeners()
@@ -1948,6 +2032,34 @@ function startListeners()
     }
     Listeners.LevelUnloading = {
         handle = Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", onLevelUnloading),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    Listeners.ObjectTimerFinished = {
+        handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    -- Listeners.SubQuestUpdateUnlocked = {
+    --     handle = Ext.Osiris.RegisterListener("SubQuestUpdateUnlocked", 3, "after", onSubQuestUpdateUnlocked),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.QuestUpdateUnlocked = {
+    --     handle = Ext.Osiris.RegisterListener("QuestUpdateUnlocked", 3, "after", onQuestUpdateUnlocked),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.QuestAccepted = {
+    --     handle = Ext.Osiris.RegisterListener("QuestAccepted", 2, "after", onQuestAccepted),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.FlagCleared = {
+    --     handle = Ext.Osiris.RegisterListener("FlagCleared", 3, "after", onFlagCleared),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.FlagLoadedInPresetEvent = {
+    --     handle = Ext.Osiris.RegisterListener("FlagLoadedInPresetEvent", 2, "after", onFlagLoadedInPresetEvent),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    Listeners.FlagSet = {
+        handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
 end

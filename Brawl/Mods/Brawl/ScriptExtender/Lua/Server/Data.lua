@@ -1,8 +1,9 @@
 -- Constants
-DEBUG_LOGGING = true
+DEBUG_LOGGING = false
 REPOSITION_INTERVAL = 2500
 BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 LIE_ON_GROUND_TIMEOUT = 3500
+COUNTDOWN_TURN_INTERVAL = 6000
 MOD_STATUS_MESSAGE_DURATION = 2000
 ENTER_COMBAT_RANGE = 20
 NEARBY_RADIUS = 35
@@ -14,6 +15,7 @@ HELP_DOWNED_MAX_RANGE = 20
 MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 -- AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
 DEFENSE_TACTICS_MAX_DISTANCE = 15
+HALSIN_PORTAL_UUID = "f2b5ad7f-013c-4c9e-a755-5fe9ff3287f6"
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 ACTION_RESOURCES = {
@@ -160,6 +162,7 @@ ActiveCombatGroups = {}
 AwaitingTarget = {}
 HealRequested = {}
 HealRequestedTimer = {}
+CountdownTimer = {}
 ToTTimer = nil
 ToTRoundTimer = nil
 FinalToTChargeTimer = nil
