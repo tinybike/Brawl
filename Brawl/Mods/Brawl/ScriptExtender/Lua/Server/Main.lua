@@ -785,7 +785,7 @@ end
 function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     for playerUuid, player in pairs(Players) do
         local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
-        if distanceTo < ENTER_COMBAT_RANGE then
+        if distanceTo ~= nil and distanceTo < ENTER_COMBAT_RANGE then
             addBrawler(playerUuid)
         end
     end
@@ -846,6 +846,9 @@ end
 
 function startPulseAction(brawler)
     if Osi.IsPlayer(brawler.uuid) == 1 and not CompanionAIEnabled then
+        return false
+    end
+    if IS_TRAINING_DUMMY[brawler.uuid] then
         return false
     end
     if PulseActionTimers[brawler.uuid] == nil then
@@ -1078,46 +1081,48 @@ function pulseReposition(level)
     checkForDownedOrDeadPlayers()
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if isAliveAndCanFight(brawlerUuid) then
-                -- Enemy units are actively looking for a fight and will attack if you get too close to them
-                if isPugnacious(brawlerUuid) then
-                    if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
-                        debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
-                        -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                        local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
-                        if closestDistance > 2*ENTER_COMBAT_RANGE then
-                            debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
-                            removeBrawler(level, brawlerUuid)
-                        end
-                    else
-                        debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
-                        checkForBrawlToJoin(brawler)
-                    end
-                -- Player, ally, and neutral units are not actively looking for a fight
-                -- - Companions and allies use the same logic
-                -- - Neutrals just chilling
-                elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                    -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
-                    if Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not FullAuto) then
-                        debugPrint("Player is controlling directly: do not take action!")
-                        debugDump(brawler)
-                        stopPulseAction(brawler, true)
-                    else
-                        if not brawler.isInBrawl then
-                            if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
-                                -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
-                                startPulseAction(brawler)
-                            end
-                        elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
-                            holdPosition(brawlerUuid)
+            if not IS_TRAINING_DUMMY[brawlerUuid] then
+                if isAliveAndCanFight(brawlerUuid) then
+                    -- Enemy units are actively looking for a fight and will attack if you get too close to them
+                    if isPugnacious(brawlerUuid) then
+                        if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
+                            debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
                             -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                            local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
+                            if closestDistance > 2*ENTER_COMBAT_RANGE then
+                                debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
+                                removeBrawler(level, brawlerUuid)
+                            end
+                        else
+                            debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
+                            checkForBrawlToJoin(brawler)
+                        end
+                    -- Player, ally, and neutral units are not actively looking for a fight
+                    -- - Companions and allies use the same logic
+                    -- - Neutrals just chilling
+                    elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                        -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
+                        if Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not FullAuto) then
+                            debugPrint("Player is controlling directly: do not take action!")
+                            debugDump(brawler)
+                            stopPulseAction(brawler, true)
+                        else
+                            if not brawler.isInBrawl then
+                                if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
+                                    -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                                    startPulseAction(brawler)
+                                end
+                            elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
+                                holdPosition(brawlerUuid)
+                                -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                            end
                         end
                     end
+                elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
+                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                    Osi.FlushOsirisQueue(brawlerUuid)
+                    Osi.LieOnGround(brawlerUuid)
                 end
-            elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
-                Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                Osi.FlushOsirisQueue(brawlerUuid)
-                Osi.LieOnGround(brawlerUuid)
             end
         end
     end
@@ -1496,7 +1501,7 @@ end
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
-        print("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turn)
+        debugPrint("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turn)
         Ext.Timer.Cancel(CountdownTimer.timer)
     end
     local level = Osi.GetRegion(entityGuid)
@@ -1538,7 +1543,7 @@ function onLeftForceTurnBased(entityGuid)
         end
         stopTruePause(entityUuid)
         if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
-            print("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turn)
+            debugPrint("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turn)
             CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turn)
             CountdownTimer = {}
         end
@@ -1884,7 +1889,7 @@ function onFlagLoadedInPresetEvent(object, flag)
 end
 
 function lakesideRitualTurn(uuid, turn)
-    print("lakeside ritual", turn)
+    debugPrint("lakeside ritual", turn)
     -- 1. enemies need to attack portal sometimes
     -- 2. during pause the timer needs to stop counting down
     if Osi.IsInForceTurnBasedMode(uuid) == 0 and turn <= 5 and Osi.QRY_HAV_IsRitualActive() then
@@ -1897,13 +1902,9 @@ function lakesideRitualTurn(uuid, turn)
                 if level and Brawlers and Brawlers[level] then
                     for brawlerUuid, brawler in pairs(Brawlers[level]) do
                         if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
-                            -- Osi.SetRelationTemporaryHostile(brawlerUuid, HALSIN_PORTAL_UUID)
-                            print("enemy of portal", Osi.IsEnemy(brawlerUuid, HALSIN_PORTAL_UUID))
-                            if math.random() > 0.01 then
-                                print("target the portal!", brawlerUuid)
+                            if math.random() > 0.65 then
                                 brawler.targetUuid = HALSIN_PORTAL_UUID
-                                Osi.Attack(brawlerUuid, HALSIN_PORTAL_UUID, 1)
-                                _D(brawler)
+                                brawler.lockedOnTarget = true
                             end
                         end
                     end
@@ -1911,6 +1912,10 @@ function lakesideRitualTurn(uuid, turn)
             end
         end)
         lakesideRitual(uuid, turn)
+    else
+        local level = Osi.GetRegion(uuid)
+        removeBrawler(HALSIN_PORTAL_UUID, level)
+        checkForEndOfBrawl(level)
     end
 end
 
@@ -1929,12 +1934,24 @@ function lakesideRitual(uuid, currentTurn)
 end
 
 function onFlagSet(flag, speaker, dialogInstance)
-    print("FlagSet", flag, speaker, dialogInstance)
+    debugPrint("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectQuestTimerLaunch(uuid, "HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", COUNTDOWN_TURN_INTERVAL*5, 1)
+        if Players then
+            for uuid, _ in pairs(Players) do
+                Osi.ObjectQuestTimerLaunch(uuid, "HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", COUNTDOWN_TURN_INTERVAL*5, 1)
+            end
         end
         lakesideRitual(Osi.GetHostCharacter(), 0)
+    elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
+        if Players then
+            for uuid, _ in pairs(Players) do
+                Osi.ObjectTimerCancel(GetHostCharacter(), "HAV_LikesideCombat_CombatRoundTimer")
+            end
+        end
+        if CountdownTimer.uuid ~= nil then
+            Ext.Timer.Cancel(CountdownTimer.timer)
+            CountdownTimer = {}
+        end
     end
 end
 
@@ -1982,10 +1999,10 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
-    Listeners.TurnEnded = {
-        handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- Listeners.TurnEnded = {
+    --     handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     Listeners.Died = {
         handle = Ext.Osiris.RegisterListener("Died", 1, "after", onDied),
         stop = Ext.Osiris.UnregisterListener,
@@ -2344,7 +2361,7 @@ function onNetMessage(data)
                             addBrawler(targetUuid, true)
                         end
                         for uuid, _ in pairs(Players) do
-                            if not isPlayerControllingDirectly(uuid) or FullAuto then
+                            if isAliveAndCanFight(uuid) and not isPlayerControllingDirectly(uuid) or FullAuto then
                                 if not Brawlers[level][uuid] then
                                     addBrawler(uuid, true)
                                 end

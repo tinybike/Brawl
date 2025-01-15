@@ -40,6 +40,9 @@ function isDowned(entityUuid)
 end
 
 function isAliveAndCanFight(entityUuid)
+    if IS_TRAINING_DUMMY[entityUuid] == true then
+        return true
+    end
     local isDead = Osi.IsDead(entityUuid)
     if isDead == nil then
         return false

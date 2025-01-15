@@ -1,5 +1,5 @@
 -- Constants
-DEBUG_LOGGING = false
+DEBUG_LOGGING = true
 REPOSITION_INTERVAL = 2500
 BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 LIE_ON_GROUND_TIMEOUT = 3500
@@ -15,7 +15,6 @@ HELP_DOWNED_MAX_RANGE = 20
 MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 -- AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
 DEFENSE_TACTICS_MAX_DISTANCE = 15
-HALSIN_PORTAL_UUID = "f2b5ad7f-013c-4c9e-a755-5fe9ff3287f6"
 MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
 LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 ACTION_RESOURCES = {
@@ -30,6 +29,12 @@ ACTION_RESOURCES = {
     SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
     Movement = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185",
 }
+AUNTIE_ETHEL_UUID = "c457d064-83fb-4ec6-b74d-1f30dfafd12d"
+MAKESHIFT_TRAINING_DUMMY_UUID = "9819c93a-fd5e-474a-b1b8-7ee0cc3a19a7"
+HALSIN_PORTAL_UUID = "f2b5ad7f-013c-4c9e-a755-5fe9ff3287f6"
+IS_TRAINING_DUMMY = {}
+IS_TRAINING_DUMMY[MAKESHIFT_TRAINING_DUMMY_UUID] = true
+IS_TRAINING_DUMMY[HALSIN_PORTAL_UUID] = true
 PLAYER_ARCHETYPES = {"", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic"}
 COMPANION_TACTICS = {"Offense", "Defense"}
 ALL_SPELL_TYPES = {"Buff", "Debuff", "Control", "Damage", "Healing", "Summon", "Utility"}
