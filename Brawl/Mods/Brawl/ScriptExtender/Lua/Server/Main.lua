@@ -1888,8 +1888,8 @@ function onFlagLoadedInPresetEvent(object, flag)
     debugPrint("FlagLoadedInPresetEvent", object, flag)
 end
 
-function lakesideRitualTurn(uuid, turn)
-    debugPrint("lakeside ritual", turn)
+function onLakesideRitualTurn(uuid, turn)
+    debugPrint("onLakesideRitualTurn", turn)
     -- 1. enemies need to attack portal sometimes
     -- 2. during pause the timer needs to stop counting down
     if Osi.IsInForceTurnBasedMode(uuid) == 0 and turn <= 5 and Osi.QRY_HAV_IsRitualActive() then
@@ -1902,7 +1902,7 @@ function lakesideRitualTurn(uuid, turn)
                 if level and Brawlers and Brawlers[level] then
                     for brawlerUuid, brawler in pairs(Brawlers[level]) do
                         if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
-                            if math.random() > 0.65 then
+                            if math.random() > 0.85 then
                                 brawler.targetUuid = HALSIN_PORTAL_UUID
                                 brawler.lockedOnTarget = true
                             end
@@ -1911,7 +1911,7 @@ function lakesideRitualTurn(uuid, turn)
                 end
             end
         end)
-        lakesideRitual(uuid, turn)
+        lakesideRitualCountdown(uuid, turn)
     else
         local level = Osi.GetRegion(uuid)
         removeBrawler(HALSIN_PORTAL_UUID, level)
@@ -1919,39 +1919,85 @@ function lakesideRitualTurn(uuid, turn)
     end
 end
 
-function lakesideRitual(uuid, currentTurn)
-    if currentTurn == 0 then
-        addBrawler(HALSIN_PORTAL_UUID, true)
+function onNautiloidTransponderTurn(uuid, turn)
+    print("onNautiloidTransponderTurn", turn)
+    if turn <= 15 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
+        local level = Osi.GetRegion(uuid)
+        if level == "TUT_Avernus_C" then
+            addNearbyToBrawlers(uuid, 30, nil, true)
+            if Brawlers and Brawlers[level] and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
+                if not Brawlers[level][TUT_ZHALK_UUID] then
+                    addBrawler(TUT_ZHALK_UUID, true)
+                end
+                if not Brawlers[level][TUT_MIND_FLAYER_UUID] then
+                    addBrawler(TUT_MIND_FLAYER_UUID, true)
+                end
+                Brawlers[level][TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
+                Brawlers[level][TUT_ZHALK_UUID].lockedOnTarget = true
+                Brawlers[level][TUT_MIND_FLAYER_UUID].targetUuid = TUT_ZHALK_UUID
+                Brawlers[level][TUT_MIND_FLAYER_UUID].lockedOnTarget = true
+            end
+            nautiloidTransponderCountdown(uuid, turn)
+        else
+            questTimerCancel("TUT_Helm_Timer")
+        end
     end
+end
+
+function setCountdownTimer(uuid, currentTurn, onNextTurn)
     CountdownTimer = {
         uuid = uuid,
         turn = currentTurn + 1,
-        resume = lakesideRitualTurn,
+        resume = onNextTurn,
         timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-            lakesideRitualTurn(uuid, currentTurn + 1)
+            onNextTurn(uuid, currentTurn + 1)
         end)
     }
 end
 
+function lakesideRitualCountdown(uuid, currentTurn)
+    if currentTurn == 0 then
+        addBrawler(HALSIN_PORTAL_UUID, true)
+    end
+    setCountdownTimer(uuid, currentTurn, onLakesideRitualTurn)
+end
+
+function nautiloidTransponderCountdown(uuid, currentTurn)
+    setCountdownTimer(uuid, currentTurn, onNautiloidTransponderTurn)
+end
+
+function questTimerLaunch(timer, label, numRounds)
+    if Players then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectQuestTimerLaunch(uuid, timer, label, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
+        end
+    end
+end
+
+function questTimerCancel(timer)
+    if Players then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectTimerCancel(uuid, timer)
+        end
+    end
+    if CountdownTimer.uuid ~= nil then
+        Ext.Timer.Cancel(CountdownTimer.timer)
+        CountdownTimer = {}
+    end
+end
+
 function onFlagSet(flag, speaker, dialogInstance)
-    debugPrint("FlagSet", flag, speaker, dialogInstance)
+    print("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-        if Players then
-            for uuid, _ in pairs(Players) do
-                Osi.ObjectQuestTimerLaunch(uuid, "HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", COUNTDOWN_TURN_INTERVAL*5, 1)
-            end
-        end
-        lakesideRitual(Osi.GetHostCharacter(), 0)
+        questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", 5)
+        lakesideRitualCountdown(Osi.GetHostCharacter(), 0)
     elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
-        if Players then
-            for uuid, _ in pairs(Players) do
-                Osi.ObjectTimerCancel(GetHostCharacter(), "HAV_LikesideCombat_CombatRoundTimer")
-            end
-        end
-        if CountdownTimer.uuid ~= nil then
-            Ext.Timer.Cancel(CountdownTimer.timer)
-            CountdownTimer = {}
-        end
+        questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+        questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", 15)
+        nautiloidTransponderCountdown(Osi.GetHostCharacter(), 0)
+    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+        questTimerCancel("TUT_Helm_Timer")
     end
 end
 
