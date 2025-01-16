@@ -575,3 +575,34 @@ end
 function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
+
+function setCountdownTimer(uuid, currentTurn, onNextTurn)
+    CountdownTimer = {
+        uuid = uuid,
+        turn = currentTurn + 1,
+        resume = onNextTurn,
+        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
+            onNextTurn(uuid, currentTurn + 1)
+        end)
+    }
+end
+
+function questTimerLaunch(timer, label, numRounds)
+    if Players then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectQuestTimerLaunch(uuid, timer, label, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
+        end
+    end
+end
+
+function questTimerCancel(timer)
+    if Players then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectTimerCancel(uuid, timer)
+        end
+    end
+    if CountdownTimer.uuid ~= nil then
+        Ext.Timer.Cancel(CountdownTimer.timer)
+        CountdownTimer = {}
+    end
+end

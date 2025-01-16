@@ -1500,9 +1500,10 @@ end
 
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
-    if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid then
+    if CountdownTimer.uuid ~= nil and entityUuid == CountdownTimer.uuid and CountdownTimer.timer ~= nil then
         debugPrint("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turn)
         Ext.Timer.Cancel(CountdownTimer.timer)
+        CountdownTimer.timer = nil
     end
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players[entityUuid] then
@@ -1776,17 +1777,25 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
                 end
             elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
-                    local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
-                    for _, spellSlot in ipairs(spellSlots) do
-                        if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
-                            spellSlot.Amount = spellSlot.Amount - 1
-                            break
+                    if entity.ActionResources and entity.ActionResources.Resources then
+                        local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        if spellSlots then
+                            for _, spellSlot in ipairs(spellSlots) do
+                                if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+                                    spellSlot.Amount = spellSlot.Amount - 1
+                                    break
+                                end
+                            end
                         end
                     end
                 else
-                    local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
-                    -- debugDump(resource)
-                    resource.Amount = resource.Amount - costValue
+                    if entity.ActionResources and entity.ActionResources.Resources then
+                        local resources = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        if resources then
+                            local resource = resources[1] -- NB: always index 1?
+                            resource.Amount = resource.Amount - costValue
+                        end
+                    end
                 end
             end
         end
@@ -1795,7 +1804,7 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
 end
 
 function onDialogStarted(dialog, dialogInstanceId)
-    debugPrint("DialogStarted", dialog, dialogInstanceId)
+    print("DialogStarted", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     stopPulseReposition(level)
     stopBrawlFizzler(level)
@@ -1806,10 +1815,17 @@ function onDialogStarted(dialog, dialogInstanceId)
             Osi.FlushOsirisQueue(brawlerUuid)
         end
     end
+    if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
+        if CountdownTimer.uuid ~= nil and CountdownTimer.timer ~= nil then
+            print("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turn)
+            Ext.Timer.Cancel(CountdownTimer.timer)
+            CountdownTimer.timer = nil
+        end
+    end
 end
 
 function onDialogEnded(dialog, dialogInstanceId)
-    debugPrint("DialogEnded", dialog, dialogInstanceId)
+    print("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     startPulseReposition(level)
     if Brawlers[level] then
@@ -1817,6 +1833,13 @@ function onDialogEnded(dialog, dialogInstanceId)
             if brawler.isInBrawl and not isPlayerControllingDirectly(brawlerUuid) then
                 startPulseAction(brawler)
             end
+        end
+    end
+    if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
+        if CountdownTimer.uuid ~= nil then
+            print("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turn)
+            CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turn)
+            CountdownTimer = {}
         end
     end
 end
@@ -1862,7 +1885,7 @@ function onLevelUnloading(level)
 end
 
 function onObjectTimerFinished(objectGuid, timer)
-    print("ObjectTimerFinished", objectGuid, timer)
+    debugPrint("ObjectTimerFinished", objectGuid, timer)
     if timer == "TUT_Helm_Timer" then
         Osi.PROC_TUT_Helm_GameOver()
     end
@@ -1888,6 +1911,7 @@ function onFlagLoadedInPresetEvent(object, flag)
     debugPrint("FlagLoadedInPresetEvent", object, flag)
 end
 
+-- NB: start the counter at the limit and count down to 0 so the logic matches the display exactly
 function onLakesideRitualTurn(uuid, turn)
     debugPrint("onLakesideRitualTurn", turn)
     -- 1. enemies need to attack portal sometimes
@@ -1920,7 +1944,7 @@ function onLakesideRitualTurn(uuid, turn)
 end
 
 function onNautiloidTransponderTurn(uuid, turn)
-    print("onNautiloidTransponderTurn", turn)
+    debugPrint("onNautiloidTransponderTurn", turn)
     if turn <= 15 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
         local level = Osi.GetRegion(uuid)
         if level == "TUT_Avernus_C" then
@@ -1944,17 +1968,6 @@ function onNautiloidTransponderTurn(uuid, turn)
     end
 end
 
-function setCountdownTimer(uuid, currentTurn, onNextTurn)
-    CountdownTimer = {
-        uuid = uuid,
-        turn = currentTurn + 1,
-        resume = onNextTurn,
-        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-            onNextTurn(uuid, currentTurn + 1)
-        end)
-    }
-end
-
 function lakesideRitualCountdown(uuid, currentTurn)
     if currentTurn == 0 then
         addBrawler(HALSIN_PORTAL_UUID, true)
@@ -1964,26 +1977,6 @@ end
 
 function nautiloidTransponderCountdown(uuid, currentTurn)
     setCountdownTimer(uuid, currentTurn, onNautiloidTransponderTurn)
-end
-
-function questTimerLaunch(timer, label, numRounds)
-    if Players then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectQuestTimerLaunch(uuid, timer, label, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
-        end
-    end
-end
-
-function questTimerCancel(timer)
-    if Players then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectTimerCancel(uuid, timer)
-        end
-    end
-    if CountdownTimer.uuid ~= nil then
-        Ext.Timer.Cancel(CountdownTimer.timer)
-        CountdownTimer = {}
-    end
 end
 
 function onFlagSet(flag, speaker, dialogInstance)
@@ -2411,7 +2404,7 @@ function onNetMessage(data)
                                 if not Brawlers[level][uuid] then
                                     addBrawler(uuid, true)
                                 end
-                                if uuid ~= targetUuid then
+                                if Brawlers[level][uuid] and uuid ~= targetUuid then
                                     Brawlers[level][uuid].targetUuid = targetUuid
                                     Brawlers[level][uuid].lockedOnTarget = true
                                     debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
