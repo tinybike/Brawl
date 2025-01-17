@@ -74,6 +74,9 @@ end
 function isPugnacious(potentialEnemyUuid, uuid)
     if uuid == nil then
         uuid = Osi.GetHostCharacter()
+        if uuid == nil then
+            return nil
+        end
     end
     -- if MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
     --     Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
@@ -576,33 +579,44 @@ function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
 
-function setCountdownTimer(uuid, currentTurn, onNextTurn)
-    CountdownTimer = {
-        uuid = uuid,
-        turn = currentTurn + 1,
-        resume = onNextTurn,
-        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-            onNextTurn(uuid, currentTurn + 1)
-        end)
-    }
-end
-
-function questTimerLaunch(timer, label, numRounds)
-    if Players then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectQuestTimerLaunch(uuid, timer, label, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
-        end
-    end
-end
-
 function questTimerCancel(timer)
     if Players then
         for uuid, _ in pairs(Players) do
             Osi.ObjectTimerCancel(uuid, timer)
         end
     end
-    if CountdownTimer.uuid ~= nil then
+end
+
+function questTimerLaunch(timer, textKey, numRounds)
+    if Players then
+        for uuid, _ in pairs(Players) do
+            Osi.ObjectQuestTimerLaunch(uuid, timer, textKey, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
+        end
+    end
+end
+
+function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
+    CountdownTimer = {
+        uuid = uuid,
+        turnsRemaining = turnsRemaining,
+        resume = onNextTurn,
+        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
+            onNextTurn(uuid, turnsRemaining - 1)
+        end)
+    }
+end
+
+function stopCountdownTimer(uuid)
+    if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid and CountdownTimer.timer ~= nil then
+        print("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
         Ext.Timer.Cancel(CountdownTimer.timer)
-        CountdownTimer = {}
+        CountdownTimer.timer = nil
+    end
+end
+
+function resumeCountdownTimer(uuid)
+    if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid then
+        print("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
+        CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turnsRemaining)
     end
 end
