@@ -575,6 +575,17 @@ function isInFTB(entity)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
+function isPartyInRealTime()
+    if Players then
+        for uuid, _ in pairs(Players) do
+            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
+                return false
+            end
+        end
+    end
+    return true
+end
+
 function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
