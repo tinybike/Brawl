@@ -200,6 +200,7 @@ local function getPositionInfo()
             local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
             if clickedOnEntity and clickedOnEntity.Uuid and clickedOnEntity.Uuid.EntityUuid then
                 clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
+                print("clicked on", clickedOn.uuid)
             end
         end
         -- _D(clickedOn)

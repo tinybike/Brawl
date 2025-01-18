@@ -370,7 +370,8 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
                 weight = weight + ARCHETYPE_WEIGHTS[archetype].spellInRange
             end
         else
-            debugPrint("Target radius didn't convert to number, what is this?", spell.targetRadius)
+            debugPrint("Target radius didn't convert to number, what is this?")
+            debugPrint(spell.targetRadius)
         end
     end
     -- Favor using spells or non-spells?
@@ -784,7 +785,7 @@ end
 function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     for playerUuid, player in pairs(Players) do
         local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
-        if distanceTo < ENTER_COMBAT_RANGE then
+        if distanceTo ~= nil and distanceTo < ENTER_COMBAT_RANGE then
             addBrawler(playerUuid)
         end
     end
@@ -845,6 +846,9 @@ end
 
 function startPulseAction(brawler)
     if Osi.IsPlayer(brawler.uuid) == 1 and not CompanionAIEnabled then
+        return false
+    end
+    if IS_TRAINING_DUMMY[brawler.uuid] then
         return false
     end
     if PulseActionTimers[brawler.uuid] == nil then
@@ -1002,8 +1006,8 @@ end
 -- Enemies are pugnacious jerks and looking for a fight >:(
 function checkForBrawlToJoin(brawler)
     local closestPlayerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
-    debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestPlayerUuid, closestDistance)
-    if isOnSameLevel(brawler.uuid, closestPlayerUuid) and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
+    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
+        debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestPlayerUuid, closestDistance)
         addBrawler(closestPlayerUuid)
         for playerUuid, player in pairs(Players) do
             if playerUuid ~= closestPlayerUuid then
@@ -1077,46 +1081,48 @@ function pulseReposition(level)
     checkForDownedOrDeadPlayers()
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if isAliveAndCanFight(brawlerUuid) then
-                -- Enemy units are actively looking for a fight and will attack if you get too close to them
-                if isPugnacious(brawlerUuid) then
-                    if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
-                        debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", getDisplayName(brawler.targetUuid))
-                        -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                        local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
-                        if closestDistance > 2*ENTER_COMBAT_RANGE then
-                            debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
-                            removeBrawler(level, brawlerUuid)
-                        end
-                    else
-                        debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
-                        checkForBrawlToJoin(brawler)
-                    end
-                -- Player, ally, and neutral units are not actively looking for a fight
-                -- - Companions and allies use the same logic
-                -- - Neutrals just chilling
-                elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                    -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
-                    if Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not FullAuto) then
-                        debugPrint("Player is controlling directly: do not take action!")
-                        debugDump(brawler)
-                        stopPulseAction(brawler, true)
-                    else
-                        if not brawler.isInBrawl then
-                            if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
-                                -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
-                                startPulseAction(brawler)
-                            end
-                        elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
-                            holdPosition(brawlerUuid)
+            if not IS_TRAINING_DUMMY[brawlerUuid] then
+                if isAliveAndCanFight(brawlerUuid) then
+                    -- Enemy units are actively looking for a fight and will attack if you get too close to them
+                    if isPugnacious(brawlerUuid) then
+                        if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
+                            debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
                             -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                            local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
+                            if closestDistance > 2*ENTER_COMBAT_RANGE then
+                                debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
+                                removeBrawler(level, brawlerUuid)
+                            end
+                        else
+                            debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
+                            checkForBrawlToJoin(brawler)
+                        end
+                    -- Player, ally, and neutral units are not actively looking for a fight
+                    -- - Companions and allies use the same logic
+                    -- - Neutrals just chilling
+                    elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                        -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
+                        if Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not FullAuto) then
+                            debugPrint("Player is controlling directly: do not take action!")
+                            debugDump(brawler)
+                            stopPulseAction(brawler, true)
+                        else
+                            if not brawler.isInBrawl then
+                                if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
+                                    -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                                    startPulseAction(brawler)
+                                end
+                            elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
+                                holdPosition(brawlerUuid)
+                                -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                            end
                         end
                     end
+                elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
+                    Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                    Osi.FlushOsirisQueue(brawlerUuid)
+                    Osi.LieOnGround(brawlerUuid)
                 end
-            elseif Osi.IsDead(brawlerUuid) == 1 or isDowned(brawlerUuid) then
-                Osi.PurgeOsirisQueue(brawlerUuid, 1)
-                Osi.FlushOsirisQueue(brawlerUuid)
-                Osi.LieOnGround(brawlerUuid)
             end
         end
     end
@@ -1495,8 +1501,13 @@ end
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and Players[entityUuid] then
+    if level and entityUuid and Players and Players[entityUuid] then
         debugPrint("EnteredForceTurnBased", entityGuid)
+        if Players[entityUuid].isFreshSummon then
+            Players[entityUuid].isFreshSummon = false
+            return Osi.ForceTurnBasedMode(entityUuid, 0)
+        end
+        stopCountdownTimer(entityUuid)
         if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = false
         end
@@ -1526,8 +1537,12 @@ end
 function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and Players[entityUuid] then
+    if level and entityUuid and Players and Players[entityUuid] then
         debugPrint("LeftForceTurnBased", entityGuid)
+        if Players[entityUuid].isFreshSummon then
+            Players[entityUuid].isFreshSummon = false
+        end
+        resumeCountdownTimer(entityUuid)
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
         end
@@ -1652,6 +1667,9 @@ function onCharacterJoinedParty(character)
         if areAnyPlayersBrawling() then
             addBrawler(uuid, true)
         end
+        if Osi.IsSummon(uuid) == 1 then
+            Players[uuid].isFreshSummon = true
+        end
     end
 end
 
@@ -1700,16 +1718,20 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
                 IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
             end
+            -- NB: is this needed?
             if isToT() then
-                addNearbyToBrawlers(attackerUuid, 30, nil, true)
+                -- addNearbyToBrawlers(attackerUuid, 30, nil, true)
+                addNearbyToBrawlers(attackerUuid, 30)
             end
         end
         if Osi.IsPlayer(defenderUuid) == 1 then
             if Osi.IsPlayer(attackerUuid) == 0 and damageAmount > 0 then
                 IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
+            -- NB: is this needed?
             if isToT() then
-                addNearbyToBrawlers(defenderUuid, 30, nil, true)
+                -- addNearbyToBrawlers(defenderUuid, 30, nil, true)
+                addNearbyToBrawlers(defenderUuid, 30)
             end
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
@@ -1717,6 +1739,7 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
 end
 
 function doLocalResourceAccounting(uuid, spellName)
+    debugPrint("doLocalResourceAccounting", uuid, spellName)
     if ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -1744,7 +1767,6 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
     local entity = Ext.Entity.Get(casterUuid)
     debugDump(ActionsInProgress[casterUuid])
     if entity and doLocalResourceAccounting(casterUuid, spellName) then
-        debugPrint("using local resource accounting")
         local spell = getSpellByName(spellName)
         for costType, costValue in pairs(spell.costs) do
             if costType == "ShortRest" or costType == "LongRest" then
@@ -1761,17 +1783,25 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
                 end
             elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
-                    local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
-                    for _, spellSlot in ipairs(spellSlots) do
-                        if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
-                            spellSlot.Amount = spellSlot.Amount - 1
-                            break
+                    if entity.ActionResources and entity.ActionResources.Resources then
+                        local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        if spellSlots then
+                            for _, spellSlot in ipairs(spellSlots) do
+                                if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+                                    spellSlot.Amount = spellSlot.Amount - 1
+                                    break
+                                end
+                            end
                         end
                     end
                 else
-                    local resource = entity.ActionResources.Resources[ACTION_RESOURCES[costType]][1] -- NB: always index 1?
-                    -- debugDump(resource)
-                    resource.Amount = resource.Amount - costValue
+                    if entity.ActionResources and entity.ActionResources.Resources then
+                        local resources = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        if resources then
+                            local resource = resources[1] -- NB: always index 1?
+                            resource.Amount = resource.Amount - costValue
+                        end
+                    end
                 end
             end
         end
@@ -1782,27 +1812,44 @@ end
 function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    stopPulseReposition(level)
-    stopBrawlFizzler(level)
-    if Brawlers[level] then
-        for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            stopPulseAction(brawler, true)
-            Osi.PurgeOsirisQueue(brawlerUuid, 1)
-            Osi.FlushOsirisQueue(brawlerUuid)
+    if level then
+        stopPulseReposition(level)
+        stopBrawlFizzler(level)
+        if Brawlers[level] then
+            for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                stopPulseAction(brawler, true)
+                Osi.PurgeOsirisQueue(brawlerUuid, 1)
+                Osi.FlushOsirisQueue(brawlerUuid)
+            end
         end
+        -- NB: no way to just pause timers, and spinning up a new timer will appear to have a new maximum value...
+        -- if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
+        --     if CountdownTimer.uuid ~= nil and CountdownTimer.timer ~= nil then
+        --         stopCountdownTimer(CountdownTimer.uuid)
+        --         questTimerCancel("TUT_Helm_Timer")
+        --     end
+        -- end
     end
 end
 
 function onDialogEnded(dialog, dialogInstanceId)
     debugPrint("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    startPulseReposition(level)
-    if Brawlers[level] then
-        for brawlerUuid, brawler in pairs(Brawlers[level]) do
-            if brawler.isInBrawl and not isPlayerControllingDirectly(brawlerUuid) then
-                startPulseAction(brawler)
+    if level then
+        startPulseReposition(level)
+        if Brawlers[level] then
+            for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                if brawler.isInBrawl and not isPlayerControllingDirectly(brawlerUuid) then
+                    startPulseAction(brawler)
+                end
             end
         end
+        -- if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
+        --     if CountdownTimer.uuid ~= nil and CountdownTimer.timer == nil then
+        --         resumeCountdownTimer(CountdownTimer.uuid)
+        --         questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", CountdownTimer.turnsRemaining)
+        --     end
+        -- end
     end
 end
 
@@ -1844,6 +1891,131 @@ function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
     Brawlers[level] = nil
     stopPulseReposition(level)
+end
+
+function onObjectTimerFinished(objectGuid, timer)
+    debugPrint("ObjectTimerFinished", objectGuid, timer)
+    if timer == "TUT_Helm_Timer" then
+        local uuid = Osi.GetUUID(objectGuid)
+        if uuid ~= nil and uuid == Osi.GetHostCharacter() then
+            Osi.PROC_TUT_Helm_GameOver()
+        end
+    elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
+        local uuid = Osi.GetUUID(objectGuid)
+        if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
+            Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
+        end
+    end
+end
+
+function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
+    debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
+end
+
+function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
+    debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
+end
+
+function onQuestAccepted(character, questID)
+    debugPrint("QuestAccepted", character, questID)
+end
+
+function onFlagCleared(flag, speaker, dialogInstance)
+    debugPrint("FlagCleared", flag, speaker, dialogInstance)
+end
+
+function onFlagLoadedInPresetEvent(object, flag)
+    debugPrint("FlagLoadedInPresetEvent", object, flag)
+end
+
+function onLakesideRitualTurn(uuid, turnsRemaining)
+    debugPrint("onLakesideRitualTurn", turnsRemaining)
+    -- 1. enemies need to attack portal sometimes
+    -- 2. during pause the timer needs to stop counting down
+    if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then
+        if Osi.IsInForceTurnBasedMode(uuid) == 0 then
+            local currentTurn = LAKESIDE_RITUAL_COUNTDOWN_TURNS - turnsRemaining
+            Osi.PROC_HAV_LiftingTheCurse_SpawnWave(currentTurn)
+            Osi.PROC_HAV_LiftingTheCurse_DeclareRound(currentTurn)
+            Ext.Timer.WaitFor(200, function ()
+                if Osi.IsInForceTurnBasedMode(uuid) == 0 then
+                    addNearbyToBrawlers(uuid, 30)
+                    local level = Osi.GetRegion(uuid)
+                    if level and Brawlers and Brawlers[level] then
+                        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+                            if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
+                                if math.random() > 0.85 then
+                                    brawler.targetUuid = HALSIN_PORTAL_UUID
+                                    brawler.lockedOnTarget = true
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            lakesideRitualCountdown(uuid, turnsRemaining)
+        end
+    else
+        local level = Osi.GetRegion(uuid)
+        removeBrawler(HALSIN_PORTAL_UUID, level)
+        checkForEndOfBrawl(level)
+    end
+end
+
+function onNautiloidTransponderTurn(uuid, turnsRemaining)
+    debugPrint("onNautiloidTransponderTurn", turnsRemaining)
+    if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
+        local level = Osi.GetRegion(uuid)
+        if level == "TUT_Avernus_C" then
+            addNearbyToBrawlers(uuid, 30)
+            if Brawlers and Brawlers[level] and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
+                if not Brawlers[level][TUT_ZHALK_UUID] then
+                    addBrawler(TUT_ZHALK_UUID, true)
+                end
+                if not Brawlers[level][TUT_MIND_FLAYER_UUID] then
+                    addBrawler(TUT_MIND_FLAYER_UUID, true)
+                end
+                Brawlers[level][TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
+                Brawlers[level][TUT_ZHALK_UUID].lockedOnTarget = true
+                Brawlers[level][TUT_MIND_FLAYER_UUID].targetUuid = TUT_ZHALK_UUID
+                Brawlers[level][TUT_MIND_FLAYER_UUID].lockedOnTarget = true
+            end
+            nautiloidTransponderCountdown(uuid, turnsRemaining)
+        else
+            questTimerCancel("TUT_Helm_Timer")
+        end
+    end
+end
+
+function lakesideRitualCountdown(uuid, turnsRemaining)
+    if turnsRemaining == LAKESIDE_RITUAL_COUNTDOWN_TURNS then
+        addBrawler(HALSIN_PORTAL_UUID, true)
+    end
+    setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
+end
+
+function nautiloidTransponderCountdown(uuid, turnsRemaining)
+    setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
+end
+
+function onFlagSet(flag, speaker, dialogInstance)
+    debugPrint("FlagSet", flag, speaker, dialogInstance)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+        questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+        lakesideRitualCountdown(Osi.GetHostCharacter(), LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+    elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
+        questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+        stopCountdownTimer(Osi.GetHostCharacter())
+    elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
+        questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+        stopCountdownTimer(Osi.GetHostCharacter())
+    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+        questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+        nautiloidTransponderCountdown(Osi.GetHostCharacter(), NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+        questTimerCancel("TUT_Helm_Timer")
+        stopCountdownTimer(Osi.GetHostCharacter())
+    end
 end
 
 function stopListeners()
@@ -1890,10 +2062,10 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
-    Listeners.TurnEnded = {
-        handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- Listeners.TurnEnded = {
+    --     handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     Listeners.Died = {
         handle = Ext.Osiris.RegisterListener("Died", 1, "after", onDied),
         stop = Ext.Osiris.UnregisterListener,
@@ -1948,6 +2120,34 @@ function startListeners()
     }
     Listeners.LevelUnloading = {
         handle = Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", onLevelUnloading),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    Listeners.ObjectTimerFinished = {
+        handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    -- Listeners.SubQuestUpdateUnlocked = {
+    --     handle = Ext.Osiris.RegisterListener("SubQuestUpdateUnlocked", 3, "after", onSubQuestUpdateUnlocked),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.QuestUpdateUnlocked = {
+    --     handle = Ext.Osiris.RegisterListener("QuestUpdateUnlocked", 3, "after", onQuestUpdateUnlocked),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.QuestAccepted = {
+    --     handle = Ext.Osiris.RegisterListener("QuestAccepted", 2, "after", onQuestAccepted),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.FlagCleared = {
+    --     handle = Ext.Osiris.RegisterListener("FlagCleared", 3, "after", onFlagCleared),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- Listeners.FlagLoadedInPresetEvent = {
+    --     handle = Ext.Osiris.RegisterListener("FlagLoadedInPresetEvent", 2, "after", onFlagLoadedInPresetEvent),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    Listeners.FlagSet = {
+        handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
 end
@@ -2224,11 +2424,11 @@ function onNetMessage(data)
                             addBrawler(targetUuid, true)
                         end
                         for uuid, _ in pairs(Players) do
-                            if not isPlayerControllingDirectly(uuid) or FullAuto then
+                            if isAliveAndCanFight(uuid) and not isPlayerControllingDirectly(uuid) or FullAuto then
                                 if not Brawlers[level][uuid] then
                                     addBrawler(uuid, true)
                                 end
-                                if uuid ~= targetUuid then
+                                if Brawlers[level][uuid] and uuid ~= targetUuid then
                                     Brawlers[level][uuid].targetUuid = targetUuid
                                     Brawlers[level][uuid].lockedOnTarget = true
                                     debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
