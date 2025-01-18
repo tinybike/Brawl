@@ -1243,8 +1243,6 @@ end
 
 function unlock(entity)
     if isLocked(entity) then
-        print("locked, unlocking ent")
-        _D(FTBLockedIn)
         entity.TurnBased.IsInCombat_M = true
         entity:Replicate("TurnBased")
         local uuid = entity.Uuid.EntityUuid
@@ -1262,10 +1260,8 @@ function unlock(entity)
 end
 
 function allExitFTB()
-    print("allExitFTB")
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        print("unlocking", uuid, getDisplayName(uuid))
         unlock(Ext.Entity.Get(uuid))
         Osi.ForceTurnBasedMode(uuid, 0)
     end
@@ -1506,7 +1502,7 @@ function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players and Players[entityUuid] then
-        print("EnteredForceTurnBased", entityGuid)
+        debugPrint("EnteredForceTurnBased", entityGuid)
         if Players[entityUuid].isFreshSummon then
             Players[entityUuid].isFreshSummon = false
             return Osi.ForceTurnBasedMode(entityUuid, 0)
@@ -1542,7 +1538,7 @@ function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and Players and Players[entityUuid] then
-        print("LeftForceTurnBased", entityGuid)
+        debugPrint("LeftForceTurnBased", entityGuid)
         if Players[entityUuid].isFreshSummon then
             Players[entityUuid].isFreshSummon = false
         end
@@ -1661,7 +1657,7 @@ function onGainedControl(targetGuid)
 end
 
 function onCharacterJoinedParty(character)
-    print("CharacterJoinedParty", character)
+    debugPrint("CharacterJoinedParty", character)
     local uuid = Osi.GetUUID(character)
     if uuid then
         if Players and not Players[uuid] then
@@ -1814,7 +1810,7 @@ function onCastedSpell(caster, spellName, spellType, spellElement, storyActionID
 end
 
 function onDialogStarted(dialog, dialogInstanceId)
-    print("DialogStarted", dialog, dialogInstanceId)
+    debugPrint("DialogStarted", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         stopPulseReposition(level)
@@ -1837,7 +1833,7 @@ function onDialogStarted(dialog, dialogInstanceId)
 end
 
 function onDialogEnded(dialog, dialogInstanceId)
-    print("DialogEnded", dialog, dialogInstanceId)
+    debugPrint("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         startPulseReposition(level)
@@ -1898,7 +1894,7 @@ function onLevelUnloading(level)
 end
 
 function onObjectTimerFinished(objectGuid, timer)
-    print("ObjectTimerFinished", objectGuid, timer)
+    debugPrint("ObjectTimerFinished", objectGuid, timer)
     if timer == "TUT_Helm_Timer" then
         local uuid = Osi.GetUUID(objectGuid)
         if uuid ~= nil and uuid == Osi.GetHostCharacter() then
@@ -1907,7 +1903,6 @@ function onObjectTimerFinished(objectGuid, timer)
     elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
         local uuid = Osi.GetUUID(objectGuid)
         if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
-            print("halsin portal quest didn't autocomplete for some reason, manually ending it now")
             Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
         end
     end
@@ -1934,7 +1929,7 @@ function onFlagLoadedInPresetEvent(object, flag)
 end
 
 function onLakesideRitualTurn(uuid, turnsRemaining)
-    print("onLakesideRitualTurn", turnsRemaining)
+    debugPrint("onLakesideRitualTurn", turnsRemaining)
     -- 1. enemies need to attack portal sometimes
     -- 2. during pause the timer needs to stop counting down
     if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then
@@ -1968,7 +1963,7 @@ function onLakesideRitualTurn(uuid, turnsRemaining)
 end
 
 function onNautiloidTransponderTurn(uuid, turnsRemaining)
-    print("onNautiloidTransponderTurn", turnsRemaining)
+    debugPrint("onNautiloidTransponderTurn", turnsRemaining)
     if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
         local level = Osi.GetRegion(uuid)
         if level == "TUT_Avernus_C" then
@@ -2004,7 +1999,7 @@ function nautiloidTransponderCountdown(uuid, turnsRemaining)
 end
 
 function onFlagSet(flag, speaker, dialogInstance)
-    print("FlagSet", flag, speaker, dialogInstance)
+    debugPrint("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
         questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", LAKESIDE_RITUAL_COUNTDOWN_TURNS)
         lakesideRitualCountdown(Osi.GetHostCharacter(), LAKESIDE_RITUAL_COUNTDOWN_TURNS)

@@ -619,7 +619,7 @@ end
 
 function stopCountdownTimer(uuid)
     if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid and CountdownTimer.timer ~= nil then
-        print("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
+        debugPrint("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
         Ext.Timer.Cancel(CountdownTimer.timer)
         CountdownTimer.timer = nil
     end
@@ -627,7 +627,7 @@ end
 
 function resumeCountdownTimer(uuid)
     if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid then
-        print("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
+        debugPrint("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
         CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turnsRemaining)
     end
 end
