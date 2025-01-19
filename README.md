@@ -1,6 +1,6 @@
 # Brawl
 
-Just an experiment to see if I can get real time combat working in Baldur's Gate 3.  Warning, this is very barebones right now!  [Download and use at your own risk.](https://www.nexusmods.com/baldursgate3/mods/12614/)
+Brawl is a real time combat with pause mod for Baldur's Gate 3.  [Download from Nexus.](https://www.nexusmods.com/baldursgate3/mods/12614/)
 
 Thanks to Focus for the idea and advice and [Hippo0o](https://github.com/Hippo0o) for the excellent library.
 
