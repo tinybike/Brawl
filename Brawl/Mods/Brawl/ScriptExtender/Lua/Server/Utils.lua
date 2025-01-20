@@ -590,48 +590,6 @@ function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
 
-function questTimerCancel(timer)
-    if Players then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectTimerCancel(uuid, timer)
-        end
-    end
-end
-
-function questTimerLaunch(timer, textKey, numRounds)
-    if Players then
-        for uuid, _ in pairs(Players) do
-            Osi.ObjectQuestTimerLaunch(uuid, timer, textKey, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
-        end
-    end
-end
-
-function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
-    CountdownTimer = {
-        uuid = uuid,
-        turnsRemaining = turnsRemaining,
-        resume = onNextTurn,
-        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-            onNextTurn(uuid, turnsRemaining - 1)
-        end)
-    }
-end
-
-function stopCountdownTimer(uuid)
-    if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid and CountdownTimer.timer ~= nil then
-        debugPrint("Stopping countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
-        Ext.Timer.Cancel(CountdownTimer.timer)
-        CountdownTimer.timer = nil
-    end
-end
-
-function resumeCountdownTimer(uuid)
-    if CountdownTimer.uuid ~= nil and uuid == CountdownTimer.uuid then
-        debugPrint("Resuming countdown", CountdownTimer.uuid, CountdownTimer.turnsRemaining)
-        CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turnsRemaining)
-    end
-end
-
 function createDummyObject(position)
     local dummyUuid = Osi.CreateAt(INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
     local dummyEntity = Ext.Entity.Get(dummyUuid)
@@ -647,4 +605,31 @@ function applyAttackMoveTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "HEROES_FEAST_CHEST", 1)
     Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
     Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+end
+
+function setAwaitingTarget(uuid, isAwaitingTarget)
+    if uuid ~= nil then
+        AwaitingTarget[uuid] = isAwaitingTarget
+        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
+    end
+end
+
+function showNotification(uuid, text, duration)
+    Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+end
+
+function findPathToPosition(playerUuid, position, callback)
+    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+    if validX ~= nil and validY ~= nil and validZ ~= nil then
+        local validPosition = {validX, validY, validZ}
+        LastClickPosition[playerUuid] = {position = validPosition}
+        if MovementQueue[playerUuid] ~= nil or AwaitingTarget[playerUuid] then
+            Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
+                if not path or not path.GoalFound then
+                    return showNotification(playerUuid, "Can't get there", 2)
+                end
+                callback(validPosition)
+            end)
+        end
+    end
 end

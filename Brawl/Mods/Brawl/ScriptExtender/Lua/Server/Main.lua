@@ -1249,7 +1249,6 @@ function cancelQueuedMovement(uuid)
 end
 
 function unlock(entity)
-    print("unlock")
     if isLocked(entity) then
         entity.TurnBased.IsInCombat_M = true
         entity:Replicate("TurnBased")
@@ -1268,7 +1267,6 @@ function unlock(entity)
 end
 
 function allExitFTB()
-    print("allExitFTB")
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
         unlock(Ext.Entity.Get(uuid))
@@ -1322,19 +1320,12 @@ function startTruePause(entityUuid)
                     FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
                 end
                 if isFTBAllLockedIn() then
-                    print("*********ALL LOCKED IN, EXITING*********")
+                    debugPrint("All locked in, auto-exiting FTB...")
                     allExitFTB()
                 end
             end, entity)
             ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
                 enqueueMovement(caster)
-                -- if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
-                --     if LastClickPosition[entityUuid] and LastClickPosition[entityUuid].position then
-                --         lock(caster)
-                --         local position = LastClickPosition[entityUuid].position
-                --         MovementQueue[entityUuid] = {position[1], position[2], position[3]}
-                --     end
-                -- end
             end, entity)
             -- NB: can specify only the specific cast entity?
             SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
@@ -1522,18 +1513,6 @@ function onEnteredCombat(entityGuid, combatGuid)
     addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
-function setAwaitingTarget(uuid, isAwaitingTarget)
-    if uuid ~= nil then
-        AwaitingTarget[uuid] = isAwaitingTarget
-        print("set awaiting target", isAwaitingTarget, (isAwaitingTarget == true) and "1" or "0")
-        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
-    end
-end
-
-function showNotification(uuid, text, duration)
-    Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
-end
-
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
@@ -1585,7 +1564,6 @@ function onLeftForceTurnBased(entityGuid)
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
         end
-        -- stopTruePause(entityUuid)
         if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
             if isPlayerControllingDirectly(entityUuid) then
@@ -1935,107 +1913,31 @@ end
 function onObjectTimerFinished(objectGuid, timer)
     debugPrint("ObjectTimerFinished", objectGuid, timer)
     if timer == "TUT_Helm_Timer" then
-        local uuid = Osi.GetUUID(objectGuid)
-        if uuid ~= nil and uuid == Osi.GetHostCharacter() then
-            Osi.PROC_TUT_Helm_GameOver()
-        end
+        nautiloidTransponderCountdownFinished(Osi.GetUUID(objectGuid))
     elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
-        local uuid = Osi.GetUUID(objectGuid)
-        if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
-            Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
-        end
+        lakesideRitualCountdownFinished(Osi.GetUUID(objectGuid))
     end
 end
 
-function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
-    debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
-end
+-- function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
+--     debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
+-- end
 
-function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
-    debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
-end
+-- function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
+--     debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
+-- end
 
-function onQuestAccepted(character, questID)
-    debugPrint("QuestAccepted", character, questID)
-end
+-- function onQuestAccepted(character, questID)
+--     debugPrint("QuestAccepted", character, questID)
+-- end
 
-function onFlagCleared(flag, speaker, dialogInstance)
-    debugPrint("FlagCleared", flag, speaker, dialogInstance)
-end
+-- function onFlagCleared(flag, speaker, dialogInstance)
+--     debugPrint("FlagCleared", flag, speaker, dialogInstance)
+-- end
 
-function onFlagLoadedInPresetEvent(object, flag)
-    debugPrint("FlagLoadedInPresetEvent", object, flag)
-end
-
-function onLakesideRitualTurn(uuid, turnsRemaining)
-    debugPrint("onLakesideRitualTurn", turnsRemaining)
-    -- 1. enemies need to attack portal sometimes
-    -- 2. during pause the timer needs to stop counting down
-    if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then
-        if Osi.IsInForceTurnBasedMode(uuid) == 0 then
-            local currentTurn = LAKESIDE_RITUAL_COUNTDOWN_TURNS - turnsRemaining
-            Osi.PROC_HAV_LiftingTheCurse_SpawnWave(currentTurn)
-            Osi.PROC_HAV_LiftingTheCurse_DeclareRound(currentTurn)
-            Ext.Timer.WaitFor(200, function ()
-                if Osi.IsInForceTurnBasedMode(uuid) == 0 then
-                    addNearbyToBrawlers(uuid, 30)
-                    local level = Osi.GetRegion(uuid)
-                    if level and Brawlers and Brawlers[level] then
-                        for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                            if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
-                                if math.random() > 0.85 then
-                                    brawler.targetUuid = HALSIN_PORTAL_UUID
-                                    brawler.lockedOnTarget = true
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            lakesideRitualCountdown(uuid, turnsRemaining)
-        end
-    else
-        local level = Osi.GetRegion(uuid)
-        removeBrawler(HALSIN_PORTAL_UUID, level)
-        checkForEndOfBrawl(level)
-    end
-end
-
-function onNautiloidTransponderTurn(uuid, turnsRemaining)
-    debugPrint("onNautiloidTransponderTurn", turnsRemaining)
-    if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
-        local level = Osi.GetRegion(uuid)
-        if level == "TUT_Avernus_C" then
-            addNearbyToBrawlers(uuid, 30)
-            if Brawlers and Brawlers[level] and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
-                if not Brawlers[level][TUT_ZHALK_UUID] then
-                    addBrawler(TUT_ZHALK_UUID, true)
-                end
-                if not Brawlers[level][TUT_MIND_FLAYER_UUID] then
-                    addBrawler(TUT_MIND_FLAYER_UUID, true)
-                end
-                Brawlers[level][TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
-                Brawlers[level][TUT_ZHALK_UUID].lockedOnTarget = true
-                Brawlers[level][TUT_MIND_FLAYER_UUID].targetUuid = TUT_ZHALK_UUID
-                Brawlers[level][TUT_MIND_FLAYER_UUID].lockedOnTarget = true
-            end
-            nautiloidTransponderCountdown(uuid, turnsRemaining)
-        else
-            questTimerCancel("TUT_Helm_Timer")
-        end
-    end
-end
-
-function lakesideRitualCountdown(uuid, turnsRemaining)
-    if turnsRemaining == LAKESIDE_RITUAL_COUNTDOWN_TURNS then
-        addBrawler(HALSIN_PORTAL_UUID, true)
-    end
-    setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
-end
-
-function nautiloidTransponderCountdown(uuid, turnsRemaining)
-    setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
-end
+-- function onFlagLoadedInPresetEvent(object, flag)
+--     debugPrint("FlagLoadedInPresetEvent", object, flag)
+-- end
 
 function onFlagSet(flag, speaker, dialogInstance)
     debugPrint("FlagSet", flag, speaker, dialogInstance)
@@ -2413,6 +2315,7 @@ function processActionButton(data, isController)
 end
 
 function setAttackMoveTarget(playerUuid, targetUuid)
+    debugPrint("Set attack-move target", playerUuid, targetUuid)
     setAwaitingTarget(playerUuid, false)
     local level = Osi.GetRegion(playerUuid)
     if level and targetUuid and not isPlayerOrAlly(targetUuid) and Brawlers and Brawlers[level] then
@@ -2448,28 +2351,17 @@ end
 function onClickPosition(playerUuid, clickPosition)
     if playerUuid and clickPosition then
         if AwaitingTarget[playerUuid] and clickPosition.uuid then
-            setAttackMoveTarget(playerUuid, targetUuid)
+            setAttackMoveTarget(playerUuid, clickPosition.uuid)
         elseif clickPosition.position then
-            local position = clickPosition.position
-            local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
-            if validX ~= nil and validY ~= nil and validZ ~= nil then
-                local validPosition = {validX, validY, validZ}
-                LastClickPosition[playerUuid] = {position = validPosition}
-                if MovementQueue[playerUuid] ~= nil or AwaitingTarget[playerUuid] then
-                    Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
-                        if not path or not path.GoalFound then
-                            return showNotification(playerUuid, "Can't get there", 2)
-                        end
-                        if MovementQueue[playerUuid] ~= nil then
-                            enqueueMovement(Ext.Entity.Get(playerUuid))
-                        elseif AwaitingTarget[playerUuid] then
-                            setAwaitingTarget(playerUuid, false)
-                            applyAttackMoveTargetVfx(createDummyObject(validPosition))
-                            moveCompanionsToPosition(validPosition)
-                        end
-                    end)
+            findPathToPosition(playerUuid, clickPosition.position, function (validPosition)
+                if MovementQueue[playerUuid] ~= nil then
+                    enqueueMovement(Ext.Entity.Get(playerUuid))
+                elseif AwaitingTarget[playerUuid] then
+                    setAwaitingTarget(playerUuid, false)
+                    applyAttackMoveTargetVfx(createDummyObject(validPosition))
+                    moveCompanionsToPosition(validPosition)
                 end
-            end
+            end)
         end
     end
 end
