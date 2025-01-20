@@ -631,3 +631,20 @@ function resumeCountdownTimer(uuid)
         CountdownTimer.resume(CountdownTimer.uuid, CountdownTimer.turnsRemaining)
     end
 end
+
+function createDummyObject(position)
+    local dummyUuid = Osi.CreateAt(INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
+    local dummyEntity = Ext.Entity.Get(dummyUuid)
+    dummyEntity.GameObjectVisual.Scale = 0.0
+    dummyEntity:Replicate("GameObjectVisual")
+    Ext.Timer.WaitFor(1000, function ()
+        Osi.RequestDelete(dummyUuid)
+    end)
+    return dummyUuid
+end
+
+function applyAttackMoveTargetVfx(targetUuid)
+    -- Osi.ApplyStatus(targetUuid, "HEROES_FEAST_CHEST", 1)
+    Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+    Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+end

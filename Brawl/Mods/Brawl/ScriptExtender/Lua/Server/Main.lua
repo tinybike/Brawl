@@ -1110,6 +1110,7 @@ function pulseReposition(level)
                             if not brawler.isInBrawl then
                                 if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
                                     -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                                    -- shouldDelay?
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
@@ -1241,7 +1242,14 @@ function allEnterFTB()
     end
 end
 
+function cancelQueuedMovement(uuid)
+    if MovementQueue[uuid] ~= nil and Osi.IsInForceTurnBasedMode(uuid) == 1 then
+        MovementQueue[uuid] = nil
+    end
+end
+
 function unlock(entity)
+    print("unlock")
     if isLocked(entity) then
         entity.TurnBased.IsInCombat_M = true
         entity:Replicate("TurnBased")
@@ -1260,10 +1268,12 @@ function unlock(entity)
 end
 
 function allExitFTB()
+    print("allExitFTB")
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
         unlock(Ext.Entity.Get(uuid))
         Osi.ForceTurnBasedMode(uuid, 0)
+        stopTruePause(uuid)
     end
 end
 
@@ -1278,6 +1288,18 @@ function midActionLock(entity)
         local target = spellCastState.Targets[1]
         if target and (target.Position or target.Target) then
             lock(entity)
+            MovementQueue[entity.Uuid.EntityUuid] = nil
+        end
+    end
+end
+
+function enqueueMovement(entity)
+    local uuid = entity.Uuid.EntityUuid
+    if uuid and isInFTB(entity) and (not isLocked(entity) or MovementQueue[uuid]) then
+        if LastClickPosition[uuid] and LastClickPosition[uuid].position then
+            lock(entity)
+            local position = LastClickPosition[uuid].position
+            MovementQueue[uuid] = {position[1], position[2], position[3]}
         end
     end
 end
@@ -1300,17 +1322,19 @@ function startTruePause(entityUuid)
                     FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
                 end
                 if isFTBAllLockedIn() then
+                    print("*********ALL LOCKED IN, EXITING*********")
                     allExitFTB()
                 end
             end, entity)
             ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
-                if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
-                    if LastClickPosition[entityUuid] and LastClickPosition[entityUuid].position then
-                        lock(caster)
-                        local position = LastClickPosition[entityUuid].position
-                        MovementQueue[entityUuid] = {position[1], position[2], position[3]}
-                    end
-                end
+                enqueueMovement(caster)
+                -- if isInFTB(caster) and (not isLocked(caster) or MovementQueue[entityUuid]) then
+                --     if LastClickPosition[entityUuid] and LastClickPosition[entityUuid].position then
+                --         lock(caster)
+                --         local position = LastClickPosition[entityUuid].position
+                --         MovementQueue[entityUuid] = {position[1], position[2], position[3]}
+                --     end
+                -- end
             end, entity)
             -- NB: can specify only the specific cast entity?
             SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
@@ -1498,6 +1522,18 @@ function onEnteredCombat(entityGuid, combatGuid)
     addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
+function setAwaitingTarget(uuid, isAwaitingTarget)
+    if uuid ~= nil then
+        AwaitingTarget[uuid] = isAwaitingTarget
+        print("set awaiting target", isAwaitingTarget, (isAwaitingTarget == true) and "1" or "0")
+        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
+    end
+end
+
+function showNotification(uuid, text, duration)
+    Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+end
+
 function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
@@ -1506,6 +1542,9 @@ function onEnteredForceTurnBased(entityGuid)
         if Players[entityUuid].isFreshSummon then
             Players[entityUuid].isFreshSummon = false
             return Osi.ForceTurnBasedMode(entityUuid, 0)
+        end
+        if AwaitingTarget[entityUuid] then
+            setAwaitingTarget(entityUuid, false)
         end
         stopCountdownTimer(entityUuid)
         if Brawlers[level] and Brawlers[level][entityUuid] then
@@ -1546,7 +1585,7 @@ function onLeftForceTurnBased(entityGuid)
         if FTBLockedIn[entityUuid] then
             FTBLockedIn[entityUuid] = nil
         end
-        stopTruePause(entityUuid)
+        -- stopTruePause(entityUuid)
         if Brawlers[level] and Brawlers[level][entityUuid] then
             Brawlers[level][entityUuid].isInBrawl = true
             if isPlayerControllingDirectly(entityUuid) then
@@ -2373,6 +2412,68 @@ function processActionButton(data, isController)
     end
 end
 
+function setAttackMoveTarget(playerUuid, targetUuid)
+    setAwaitingTarget(playerUuid, false)
+    local level = Osi.GetRegion(playerUuid)
+    if level and targetUuid and not isPlayerOrAlly(targetUuid) and Brawlers and Brawlers[level] then
+        applyAttackMoveTargetVfx(targetUuid)
+        if not Brawlers[level][targetUuid] then
+            addBrawler(targetUuid, true)
+        end
+        for uuid, _ in pairs(Players) do
+            if isAliveAndCanFight(uuid) and (not isPlayerControllingDirectly(uuid) or FullAuto) then
+                if not Brawlers[level][uuid] then
+                    addBrawler(uuid, true)
+                end
+                if Brawlers[level][uuid] and uuid ~= targetUuid then
+                    Brawlers[level][uuid].targetUuid = targetUuid
+                    Brawlers[level][uuid].lockedOnTarget = true
+                    debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+                end
+            end
+        end
+    end
+end
+
+function moveCompanionsToPosition(position)
+    for uuid, _ in pairs(Players) do
+        if not isPlayerControllingDirectly(uuid) or FullAuto then
+            Osi.PurgeOsirisQueue(uuid, 1)
+            Osi.FlushOsirisQueue(uuid)
+            Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
+        end
+    end
+end
+
+function onClickPosition(playerUuid, clickPosition)
+    if playerUuid and clickPosition then
+        if AwaitingTarget[playerUuid] and clickPosition.uuid then
+            setAttackMoveTarget(playerUuid, targetUuid)
+        elseif clickPosition.position then
+            local position = clickPosition.position
+            local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+            if validX ~= nil and validY ~= nil and validZ ~= nil then
+                local validPosition = {validX, validY, validZ}
+                LastClickPosition[playerUuid] = {position = validPosition}
+                if MovementQueue[playerUuid] ~= nil or AwaitingTarget[playerUuid] then
+                    Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
+                        if not path or not path.GoalFound then
+                            return showNotification(playerUuid, "Can't get there", 2)
+                        end
+                        if MovementQueue[playerUuid] ~= nil then
+                            enqueueMovement(Ext.Entity.Get(playerUuid))
+                        elseif AwaitingTarget[playerUuid] then
+                            setAwaitingTarget(playerUuid, false)
+                            applyAttackMoveTargetVfx(createDummyObject(validPosition))
+                            moveCompanionsToPosition(validPosition)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end
+
 function onNetMessage(data)
     if data.Channel == "ModToggle" then
         if MCM then
@@ -2402,62 +2503,12 @@ function onNetMessage(data)
     elseif data.Channel == "ClickPosition" then
         local player = getPlayerByUserId(peerToUserId(data.UserID))
         if player and player.uuid then
-            local clickPosition = Ext.Json.Parse(data.Payload)
-            local validX, validY, validZ
-            if clickPosition then
-                if clickPosition.position then
-                    local pos = clickPosition.position
-                    validX, validY, validZ = Osi.FindValidPosition(pos[1], pos[2], pos[3], 0, player.uuid, 1)
-                    if validX ~= nil and validY ~= nil and validZ ~= nil then
-                        LastClickPosition[player.uuid] = {position = {validX, validY, validZ}}
-                    end
-                end
-                if AwaitingTarget[player.uuid] then
-                    AwaitingTarget[player.uuid] = false
-                    Ext.ServerNet.PostMessageToClient(player.uuid, "AwaitingTarget", "0")
-                    local level = Osi.GetRegion(player.uuid)
-                    if clickPosition.uuid and not isPlayerOrAlly(clickPosition.uuid) and level and Brawlers and Brawlers[level] then
-                        local targetUuid = clickPosition.uuid
-                        Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
-                        Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
-                        if not Brawlers[level][targetUuid] then
-                            addBrawler(targetUuid, true)
-                        end
-                        for uuid, _ in pairs(Players) do
-                            if isAliveAndCanFight(uuid) and not isPlayerControllingDirectly(uuid) or FullAuto then
-                                if not Brawlers[level][uuid] then
-                                    addBrawler(uuid, true)
-                                end
-                                if Brawlers[level][uuid] and uuid ~= targetUuid then
-                                    Brawlers[level][uuid].targetUuid = targetUuid
-                                    Brawlers[level][uuid].lockedOnTarget = true
-                                    debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
-                                end
-                            end
-                        end
-                    elseif clickPosition.position then
-                        if validX ~= nil and validY ~= nil and validZ ~= nil then
-                            local dummyUuid = Osi.CreateAt("c13a872b-7d9b-4c1d-8c65-f672333b0c11", validX, validY, validZ, 0, 0, "")
-                            local dummyEntity = Ext.Entity.Get(dummyUuid)
-                            dummyEntity.GameObjectVisual.Scale = 0.0
-                            dummyEntity:Replicate("GameObjectVisual")
-                            -- Osi.ApplyStatus(dummyUuid, "HEROES_FEAST_CHEST", 1)
-                            Osi.ApplyStatus(dummyUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
-                            Osi.ApplyStatus(dummyUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
-                            for uuid, _ in pairs(Players) do
-                                if not isPlayerControllingDirectly(uuid) or FullAuto then
-                                    Osi.PurgeOsirisQueue(uuid, 1)
-                                    Osi.FlushOsirisQueue(uuid)
-                                    Osi.CharacterMoveToPosition(uuid, validX, validY, validZ, getMovementSpeed(uuid), "")
-                                end
-                            end
-                            Ext.Timer.WaitFor(1000, function ()
-                                Osi.RequestDelete(dummyUuid)
-                            end)
-                        end
-                    end
-                end
-            end
+            onClickPosition(player.uuid, Ext.Json.Parse(data.Payload))
+        end
+    elseif data.Channel == "Cancel" then
+        local player = getPlayerByUserId(peerToUserId(data.UserID))
+        if player and player.uuid then
+            cancelQueuedMovement(player.uuid)
         end
     elseif data.Channel == "ActionButton" then
         processActionButton(data, false)
@@ -2516,8 +2567,7 @@ function onNetMessage(data)
         if Players then
             local player = getPlayerByUserId(peerToUserId(data.UserID))
             if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-                AwaitingTarget[player.uuid] = true
-                Ext.ServerNet.PostMessageToClient(player.uuid, "AwaitingTarget", "1")
+                setAwaitingTarget(player.uuid, true)
             end
         end
     elseif data.Channel == "Heal" then

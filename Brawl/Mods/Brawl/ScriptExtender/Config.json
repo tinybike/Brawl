@@ -1,5 +1,5 @@
 {
-    "RequiredVersion": 20,
+    "RequiredVersion": 21,
     "ModTable": "Brawl",
     "FeatureFlags": ["Lua"]
 }

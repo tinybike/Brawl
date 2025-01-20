@@ -195,14 +195,14 @@ end
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
     if pickingHelper.Inner and pickingHelper.Inner.Position then
-        local clickedOn = {position = pickingHelper.Inner.Position}
+        local clickedOn = {}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
             local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
             if clickedOnEntity and clickedOnEntity.Uuid and clickedOnEntity.Uuid.EntityUuid then
                 clickedOn.uuid = clickedOnEntity.Uuid.EntityUuid
-                print("clicked on", clickedOn.uuid)
             end
         end
+        clickedOn.position = pickingHelper.Inner.Position
         -- _D(clickedOn)
         return clickedOn
     end
@@ -267,6 +267,10 @@ end
 
 local function postClickPosition()
     Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
+end
+
+local function postCancel()
+    Ext.ClientNet.PostMessageToServer("Cancel", "")
 end
 
 local function onKeyInput(e)
@@ -397,11 +401,49 @@ local function onControllerButtonInput(e)
 end
 
 local function onMouseButtonInput(e)
-    if e.Pressed and e.Button == 1 then
-        postClickPosition()
-        if AwaitingTarget then
-            e:PreventAction()
+    if e.Pressed then
+        if e.Button == 1 then
+            postClickPosition()
+            if AwaitingTarget then
+                e:PreventAction()
+            end
+        elseif e.Button == 3 then
+            postCancel()
         end
+    end
+end
+
+---@param struct userdata|table|any
+---@param property string
+---@param default any|nil
+---@return any
+-- thank u hippo
+function getProperty(struct, property, default)
+    local ok, value = pcall(function ()
+        return struct[property]
+    end)
+    if ok then
+        return value
+    end
+    return default
+end
+
+-- thank u hippo
+local function getSubtitleWidgetIndex()
+    for subtitleWidgetIndex = 1, 12 do
+        if getProperty(Ext.UI.GetRoot():Child(1):Child(1):Child(subtitleWidgetIndex), "XAMLPath", ""):match("OverheadInfo") then
+            return subtitleWidgetIndex
+        end
+    end
+end
+
+-- thank u hippo
+local function showNotification(notification)
+    local subtitleWidgetIndex = getSubtitleWidgetIndex()
+    if subtitleWidgetIndex then
+        local dataContext = Ext.UI.GetRoot():Child(1):Child(1):Child(subtitleWidgetIndex).DataContext
+        dataContext.CurrentSubtitleDuration = (notification.duration ~= "") and tonumber(notification.duration) or 2
+        dataContext.CurrentSubtitle = notification.text
     end
 end
 
@@ -410,6 +452,8 @@ local function onNetMessage(data)
         DirectlyControlledCharacter = data.Payload
     elseif data.Channel == "AwaitingTarget" then
         AwaitingTarget = data.Payload == "1"
+    elseif data.Channel == "Notification" then
+        showNotification(Ext.Json.Parse(data.Payload))
     end
 end
 
