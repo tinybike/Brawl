@@ -1,35 +1,77 @@
--- Settings
-ModEnabled = true
-CompanionAIEnabled = true
-TruePause = true
-AutoPauseOnDowned = true
-ActionInterval = 6000
-FullAuto = false
-HitpointsMultiplier = 1.0
-CompanionTactics = "Defense"
-CompanionAIMaxSpellLevel = 0
-HogwildMode = false
-MaxPartySize = 4
-MurderhoboMode = false
-TurnBasedSwarmMode = false
-if MCM then
-    ModEnabled = MCM.Get("mod_enabled")
-    CompanionAIEnabled = MCM.Get("companion_ai_enabled")
-    TruePause = MCM.Get("true_pause")
-    AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
-    ActionInterval = MCM.Get("action_interval")
-    FullAuto = MCM.Get("full_auto")
-    HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
-    CompanionTactics = MCM.Get("companion_tactics")
-    CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
-    HogwildMode = MCM.Get("hogwild_mode")
-    MaxPartySize = MCM.Get("max_party_size")
-    MurderhoboMode = MCM.Get("murderhobo_mode")
-    TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
-end
-
 function setMovementSpeedThresholds()
     MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[getDifficulty()]
+end
+
+function applyAttackMoveTargetVfx(targetUuid)
+    -- Osi.ApplyStatus(targetUuid, "HEROES_FEAST_CHEST", 1)
+    Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+    Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+end
+
+function applyOnMeTargetVfx(targetUuid)
+    Osi.ApplyStatus(targetUuid, "GUIDED_STRIKE", 1)
+    Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+    -- Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+    -- Osi.ApplyStatus(targetUuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
+    -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
+end
+
+function setAwaitingTarget(uuid, isAwaitingTarget)
+    if uuid ~= nil then
+        AwaitingTarget[uuid] = isAwaitingTarget
+        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
+    end
+end
+
+function findPathToPosition(playerUuid, position, callback)
+    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+    if validX ~= nil and validY ~= nil and validZ ~= nil then
+        local validPosition = {validX, validY, validZ}
+        LastClickPosition[playerUuid] = {position = validPosition}
+        if MovementQueue[playerUuid] ~= nil or AwaitingTarget[playerUuid] then
+            Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
+                if not path or not path.GoalFound then
+                    return showNotification(playerUuid, "Can't get there", 2)
+                end
+                callback(validPosition)
+            end)
+        end
+    end
+end
+
+function moveCompanionsToPlayer(playerUuid)
+    for uuid, _ in pairs(Players) do
+        if not isPlayerControllingDirectly(uuid) then
+            Osi.PurgeOsirisQueue(uuid, 1)
+            Osi.FlushOsirisQueue(uuid)
+            Osi.CharacterMoveTo(uuid, playerUuid, getMovementSpeed(uuid), "")
+        end
+    end
+end
+
+function moveCompanionsToPosition(position)
+    for uuid, _ in pairs(Players) do
+        if not isPlayerControllingDirectly(uuid) or FullAuto then
+            Osi.PurgeOsirisQueue(uuid, 1)
+            Osi.FlushOsirisQueue(uuid)
+            Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
+        end
+    end
+end
+
+function lockCompanionsOnTarget(level, targetUuid)
+    for uuid, _ in pairs(Players) do
+        if isAliveAndCanFight(uuid) and (not isPlayerControllingDirectly(uuid) or FullAuto) then
+            if not Brawlers[level][uuid] then
+                addBrawler(uuid, true)
+            end
+            if Brawlers[level][uuid] and uuid ~= targetUuid then
+                Brawlers[level][uuid].targetUuid = targetUuid
+                Brawlers[level][uuid].lockedOnTarget = true
+                debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+            end
+        end
+    end
 end
 
 function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
@@ -2099,395 +2141,15 @@ function onGameStateChanged(e)
     end
 end
 
-function disableCompanionAI()
-    debugPrint("companion ai disabled")
-    CompanionAIEnabled = false
-    for playerUuid, player in pairs(Players) do
-        local level = Osi.GetRegion(playerUuid)
-        if level and Brawlers and Brawlers[level] and Brawlers[level][playerUuid] then
-            Osi.PurgeOsirisQueue(playerUuid, 1)
-            Osi.FlushOsirisQueue(playerUuid)
-            stopPulseAction(Brawlers[level][playerUuid])
-        end
-    end
-    modStatusMessage("Companion AI Disabled")
-end
-
-function enableCompanionAI()
-    debugPrint("companion ai enabled")
-    CompanionAIEnabled = true
-    if Players and areAnyPlayersBrawling() then
-        for playerUuid, player in pairs(Players) do
-            if not isPlayerControllingDirectly(playerUuid) then
-                addBrawler(playerUuid, true, true)
-            end
-        end
-    end
-    modStatusMessage("Companion AI Enabled")
-end
-
-function disableFullAuto()
-    debugPrint("full auto disabled")
-    FullAuto = false
-    for playerUuid, player in pairs(Players) do
-        if isPlayerControllingDirectly(playerUuid) then
-            local level = Osi.GetRegion(playerUuid)
-            if level and Brawlers and Brawlers[level] and Brawlers[level][playerUuid] then
-                Osi.PurgeOsirisQueue(playerUuid, 1)
-                Osi.FlushOsirisQueue(playerUuid)
-                stopPulseAction(Brawlers[level][playerUuid])
-            end
-        end
-    end
-    modStatusMessage("Full Auto Disabled")
-end
-
-function enableFullAuto()
-    debugPrint("full auto enabled")
-    FullAuto = true
-    if Players and areAnyPlayersBrawling() then
-        for playerUuid, player in pairs(Players) do
-            addBrawler(playerUuid, true, true)
-        end
-    end
-    modStatusMessage("Full Auto Enabled")
-end
-
-function toggleCompanionAI()
-    if CompanionAIEnabled then
-        disableCompanionAI()
-    else
-        enableCompanionAI()
-    end
-end
-
-function toggleFullAuto()
-    if FullAuto then
-        disableFullAuto()
-    else
-        enableFullAuto()
-    end
-end
-
-function disableMod()
-    ModEnabled = false
-    stopListeners()
-    modStatusMessage("Brawl Disabled")
-end
-
-function enableMod()
-    ModEnabled = true
-    startListeners()
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
-        onStarted(level)
-    end
-    modStatusMessage("Brawl Enabled")
-end
-
-function toggleMod()
-    if ModEnabled then
-        disableMod()
-    else
-        enableMod()
-    end
-end
-
 function onMCMSettingSaved(payload)
-    -- debugDump(payload)
-    if not payload or payload.modUUID ~= ModuleUUID or not payload.settingId then
-        return
-    end
-    if payload.settingId == "mod_enabled" then
-        ModEnabled = payload.value
-        if ModEnabled then
-            enableMod()
-        else
-            disableMod()
-        end
-    elseif payload.settingId == "companion_ai_enabled" then
-        CompanionAIEnabled = payload.value
-        if CompanionAIEnabled then
-            enableCompanionAI()
-        else
-            disableCompanionAI()
-        end
-    elseif payload.settingId == "true_pause" then
-        TruePause = payload.value
-        checkTruePauseParty()
-    elseif payload.settingId == "auto_pause_on_downed" then
-        AutoPauseOnDowned = payload.value
-    elseif payload.settingId == "action_interval" then
-        ActionInterval = payload.value
-    elseif payload.settingId == "hitpoints_multiplier" then
-        HitpointsMultiplier = payload.value
-        setupPartyMembersHitpoints()
-        local level = Osi.GetRegion(Osi.GetHostCharacter())
-        if Brawlers and Brawlers[level] then
-            for brawlerUuid, brawler in pairs(Brawlers[level]) do
-                revertHitpoints(brawlerUuid)
-                modifyHitpoints(brawlerUuid)
-            end
-        end
-    elseif payload.settingId == "full_auto" then
-        FullAuto = payload.value
-        if FullAuto then
-            enableFullAuto()
-        else
-            disableFullAuto()
-        end
-    elseif payload.settingId == "active_character_archetype" then
-        local uuid = Osi.GetHostCharacter()
-        if uuid ~= nil and payload.value ~= nil and payload.value ~= "" then
-            local archetype = payload.value
-            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-            if modVars.PartyArchetypes == nil then
-                modVars.PartyArchetypes = {}
-            end
-            local partyArchetypes = modVars.PartyArchetypes
-            -- partyArchetypes[uuid] = string.lower(payload.value):gsub("/", "_")
-            partyArchetypes[uuid] = archetype
-            modVars.PartyArchetypes = partyArchetypes
-            local brawler = getBrawlerByUuid(uuid)
-            if brawler ~= nil then
-                brawler.archetype = archetype
-            end
-        end
-    elseif payload.settingId == "companion_tactics" then
-        CompanionTactics = payload.value
-    elseif payload.settingId == "companion_ai_max_spell_level" then
-        CompanionAIMaxSpellLevel = payload.value
-    elseif payload.settingId == "hogwild_mode" then
-        HogwildMode = payload.value
-    elseif payload.settingId == "max_party_size" then
-        MaxPartySize = payload.value
-        setMaxPartySize()
-    elseif payload.settingId == "murderhobo_mode" then
-        MurderhoboMode = payload.value
-    elseif payload.settingId == "turn_based_swarm_mode" then
-        TurnBasedSwarmMode = payload.value
-    end
-end
-
-function targetCloserOrFartherEnemy(data, targetFartherEnemy)
-    local player = getPlayerByUserId(peerToUserId(data.UserID))
-    if player then
-        local brawler = getBrawlerByUuid(player.uuid)
-        if brawler and not brawler.isPaused then
-            buildClosestEnemyBrawlers(player.uuid)
-            if ClosestEnemyBrawlers[player.uuid] ~= nil and next(ClosestEnemyBrawlers[player.uuid]) ~= nil then
-                debugPrint("Selecting next enemy brawler")
-                selectNextEnemyBrawler(player.uuid, targetFartherEnemy)
-            end
-        end
-    end
-end
-
-function processActionButton(data, isController)
-    local player = getPlayerByUserId(peerToUserId(data.UserID))
-    if player then
-        -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
-        if isController then
-            local brawler = getBrawlerByUuid(player.uuid)
-            if not brawler or brawler.isPaused then
-                return
-            end
-        end
-        local actionButtonLabel = tonumber(data.Payload)
-        if ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
-            local spellName = getSpellNameBySlot(player.uuid, ACTION_BUTTON_TO_SLOT[actionButtonLabel])
-            if spellName ~= nil then
-                local spell = getSpellByName(spellName)
-                -- NB: maintain separate friendly target list for healing/buffs?
-                if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
-                    return useSpellAndResources(player.uuid, player.uuid, spellName)
-                end
-                -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
-                --     return useSpellAndResources(player.uuid, nil, spellName)
-                -- end
-                if PlayerMarkedTarget[player.uuid] == nil or Osi.IsDead(PlayerMarkedTarget[player.uuid]) == 1 then
-                    buildClosestEnemyBrawlers(player.uuid)
-                end
-                return useSpellAndResources(player.uuid, PlayerMarkedTarget[player.uuid], spellName)
-            end
-        end
-    end
-end
-
-function setAttackMoveTarget(playerUuid, targetUuid)
-    debugPrint("Set attack-move target", playerUuid, targetUuid)
-    setAwaitingTarget(playerUuid, false)
-    local level = Osi.GetRegion(playerUuid)
-    if level and targetUuid and not isPlayerOrAlly(targetUuid) and Brawlers and Brawlers[level] then
-        applyAttackMoveTargetVfx(targetUuid)
-        if not Brawlers[level][targetUuid] then
-            addBrawler(targetUuid, true)
-        end
-        for uuid, _ in pairs(Players) do
-            if isAliveAndCanFight(uuid) and (not isPlayerControllingDirectly(uuid) or FullAuto) then
-                if not Brawlers[level][uuid] then
-                    addBrawler(uuid, true)
-                end
-                if Brawlers[level][uuid] and uuid ~= targetUuid then
-                    Brawlers[level][uuid].targetUuid = targetUuid
-                    Brawlers[level][uuid].lockedOnTarget = true
-                    debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
-                end
-            end
-        end
-    end
-end
-
-function moveCompanionsToPosition(position)
-    for uuid, _ in pairs(Players) do
-        if not isPlayerControllingDirectly(uuid) or FullAuto then
-            Osi.PurgeOsirisQueue(uuid, 1)
-            Osi.FlushOsirisQueue(uuid)
-            Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
-        end
-    end
-end
-
-function onClickPosition(playerUuid, clickPosition)
-    if playerUuid and clickPosition then
-        if AwaitingTarget[playerUuid] and clickPosition.uuid then
-            setAttackMoveTarget(playerUuid, clickPosition.uuid)
-        elseif clickPosition.position then
-            findPathToPosition(playerUuid, clickPosition.position, function (validPosition)
-                if MovementQueue[playerUuid] ~= nil then
-                    enqueueMovement(Ext.Entity.Get(playerUuid))
-                elseif AwaitingTarget[playerUuid] then
-                    setAwaitingTarget(playerUuid, false)
-                    applyAttackMoveTargetVfx(createDummyObject(validPosition))
-                    moveCompanionsToPosition(validPosition)
-                end
-            end)
-        end
+    if payload and payload.modUUID == ModuleUUID and payload.settingId and MCMSettingSaved[payload.settingId] then
+        MCMSettingSaved[payload.settingId](payload.value)
     end
 end
 
 function onNetMessage(data)
-    if data.Channel == "ModToggle" then
-        if MCM then
-            MCM.Set("mod_enabled", not ModEnabled)
-        else
-            toggleMod()
-        end
-    elseif data.Channel == "CompanionAIToggle" then
-        if MCM then
-            MCM.Set("companion_ai_enabled", not CompanionAIEnabled)
-        else
-            toggleCompanionAI()
-        end
-    elseif data.Channel == "FullAutoToggle" then
-        if MCM then
-            MCM.Set("full_auto", not FullAuto)
-        else
-            toggleFullAuto()
-        end
-    elseif data.Channel == "ExitFTB" then
-        debugPrint("Got ExitFTB signal from client")
-        allExitFTB()
-    -- should this be per-player, or just drag everyone in at the same time?
-    elseif data.Channel == "EnterFTB" then
-        debugPrint("Got EnterFTB signal from client")
-        allEnterFTB()
-    elseif data.Channel == "ClickPosition" then
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player and player.uuid then
-            onClickPosition(player.uuid, Ext.Json.Parse(data.Payload))
-        end
-    elseif data.Channel == "Cancel" then
-        local player = getPlayerByUserId(peerToUserId(data.UserID))
-        if player and player.uuid then
-            cancelQueuedMovement(player.uuid)
-        end
-    elseif data.Channel == "ActionButton" then
-        processActionButton(data, false)
-    elseif data.Channel == "ControllerActionButton" then
-        processActionButton(data, true)
-    elseif data.Channel == "TargetCloserEnemy" then
-        targetCloserOrFartherEnemy(data, false)
-    elseif data.Channel == "TargetFartherEnemy" then
-        targetCloserOrFartherEnemy(data, true)
-    elseif data.Channel == "OnMe" then
-        if Players then
-            local player = getPlayerByUserId(peerToUserId(data.UserID))
-            if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-                Osi.ApplyStatus(player.uuid, "GUIDED_STRIKE", 1)
-                Osi.ApplyStatus(player.uuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
-                -- Osi.ApplyStatus(player.uuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
-                -- Osi.ApplyStatus(player.uuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
-                -- Osi.ApplyStatus(player.uuid, "EPI_SPECTRALVOICEVFX", 1)
-                for uuid, _ in pairs(Players) do
-                    if not isPlayerControllingDirectly(uuid) then
-                        Osi.PurgeOsirisQueue(uuid, 1)
-                        Osi.FlushOsirisQueue(uuid)
-                        Osi.CharacterMoveTo(uuid, player.uuid, getMovementSpeed(uuid), "")
-                    end
-                end
-            end
-        end
-    elseif data.Channel == "AttackMyTarget" then
-        if Players and Brawlers then
-            local player = getPlayerByUserId(peerToUserId(data.UserID))
-            local level = Osi.GetRegion(player.uuid)
-            if level and Brawlers[level] and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-                local currentTarget
-                if PlayerMarkedTarget[player.uuid] then
-                    currentTarget = PlayerMarkedTarget[player.uuid]
-                elseif IsAttackingOrBeingAttackedByPlayer[player.uuid] then
-                    currentTarget = IsAttackingOrBeingAttackedByPlayer[player.uuid]
-                elseif PlayerCurrentTarget[player.uuid] then
-                    currentTarget = PlayerCurrentTarget[player.uuid]
-                end
-                debugPrint("Got current player's target", currentTarget)
-                if currentTarget and Brawlers[level][currentTarget] and isAliveAndCanFight(currentTarget) then
-                    Osi.ApplyStatus(currentTarget, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
-                    Osi.ApplyStatus(currentTarget, "MAG_ARCANE_VAMPIRISM_VFX", 1)
-                    for uuid, _ in pairs(Players) do
-                        if (not isPlayerControllingDirectly(uuid) or FullAuto) and Brawlers[level][uuid] then
-                            Brawlers[level][uuid].targetUuid = currentTarget
-                            Brawlers[level][uuid].lockedOnTarget = true
-                            debugPrint("Set target to", uuid, getDisplayName(uuid), currentTarget, getDisplayName(currentTarget))
-                        end
-                    end
-                end
-            end
-        end
-    elseif data.Channel == "AttackMove" then
-        if Players then
-            local player = getPlayerByUserId(peerToUserId(data.UserID))
-            if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-                setAwaitingTarget(player.uuid, true)
-            end
-        end
-    elseif data.Channel == "Heal" then
-        debugPrint("Requesting Heal")
-        local userId = peerToUserId(data.UserID)
-        if userId then
-            if HealRequestedTimer[userId] then
-                Ext.Timer.Cancel(HealRequestedTimer[userId])
-                HealRequestedTimer[userId] = nil
-            end
-            local player = getPlayerByUserId(userId)
-            if player and player.uuid then
-                HealRequested[userId] = true
-                addPlayersInEnterCombatRangeToBrawlers(player.uuid)
-                HealRequestedTimer[userId] = Ext.Timer.WaitFor(9000, function ()
-                    HealRequested[userId] = false
-                end)
-            end
-        end
-    elseif data.Channel == "ChangeTactics" then
-        for i, tactics in ipairs(COMPANION_TACTICS) do
-            if CompanionTactics == tactics then
-                CompanionTactics = i < #COMPANION_TACTICS and COMPANION_TACTICS[i + 1] or COMPANION_TACTICS[1]
-                MCM.Set("companion_tactics", CompanionTactics)
-                break
-            end
-        end
-        modStatusMessage(CompanionTactics .. " Tactics")
+    if NetMessage[data.Channel] then
+        NetMessage[data.Channel](data)
     end
 end
 

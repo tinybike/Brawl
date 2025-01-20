@@ -7,7 +7,7 @@ local TargetFartherEnemyHotkey = {ScanCode = "PERIOD", Modifier = "NONE"}
 local OnMeHotkey = {ScanCode = "NUM_1", Modifier = "LAlt"}
 local AttackMyTargetHotkey = {ScanCode = "NUM_2", Modifier = "LAlt"}
 local AttackMoveHotkey = {ScanCode = "A", Modifier = "LAlt"}
-local HealHotkey = {ScanCode = "E", Modifier = "LAlt"}
+local RequestHealHotkey = {ScanCode = "E", Modifier = "LAlt"}
 local ChangeTacticsHotkey = {ScanCode = "C", Modifier = "LAlt"}
 local ActionButtonHotkeys = {
     {ScanCode = "NUM_1", Modifier = "LShift"},
@@ -29,7 +29,7 @@ local ControllerTargetFartherEnemyHotkey = {"DPadRight", ""}
 local ControllerOnMeHotkey = {"", ""}
 local ControllerAttackMyTargetHotkey = {"", ""}
 local ControllerAttackMoveHotkey = {"", ""}
-local ControllerHealHotkey = {"", ""}
+local ControllerRequestHealHotkey = {"", ""}
 local ControllerChangeTacticsHotkey = {"", ""}
 local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 if MCM then
@@ -42,7 +42,7 @@ if MCM then
     OnMeHotkey = MCM.Get("on_me_hotkey")
     AttackMyTargetHotkey = MCM.Get("attack_my_target_hotkey")
     AttackMoveHotkey = MCM.Get("attack_move_hotkey")
-    HealHotkey = MCM.Get("heal_hotkey")
+    RequestHealHotkey = MCM.Get("request_heal_hotkey")
     ChangeTacticsHotkey = MCM.Get("change_tactics_hotkey")
     ActionButtonHotkeys = {
         MCM.Get("action_1_hotkey"),
@@ -64,6 +64,8 @@ if MCM then
     ControllerOnMeHotkey = {MCM.Get("controller_on_me_hotkey"), MCM.Get("controller_on_me_hotkey_2")}
     ControllerAttackMyTargetHotkey = {MCM.Get("controller_attack_my_target_hotkey"), MCM.Get("controller_attack_my_target_hotkey_2")}
     ControllerAttackMoveHotkey = {MCM.Get("controller_attack_move_hotkey"), MCM.Get("controller_attack_move_hotkey_2")}
+    ControllerRequestHealHotkey = {MCM.Get("controller_request_heal_hotkey"), MCM.Get("controller_request_heal_hotkey_2")}
+    ControllerChangeTacticsHotkey = {MCM.Get("controller_change_tactics_hotkey"), MCM.Get("controller_change_tactics_hotkey_2")}
     ControllerActionButtonHotkeys = {
         {MCM.Get("controller_action_1_hotkey"), MCM.Get("controller_action_1_hotkey_2")},
         {MCM.Get("controller_action_2_hotkey"), MCM.Get("controller_action_2_hotkey_2")},
@@ -249,8 +251,8 @@ local function postAttackMove()
     Ext.ClientNet.PostMessageToServer("AttackMove", "")
 end
 
-local function postHeal()
-    Ext.ClientNet.PostMessageToServer("Heal", "")
+local function postRequestHeal()
+    Ext.ClientNet.PostMessageToServer("RequestHeal", "")
 end
 
 local function postChangeTactics()
@@ -269,8 +271,8 @@ local function postClickPosition()
     Ext.ClientNet.PostMessageToServer("ClickPosition", Ext.Json.Stringify(getPositionInfo()))
 end
 
-local function postCancel()
-    Ext.ClientNet.PostMessageToServer("Cancel", "")
+local function postCancelQueuedMovement()
+    Ext.ClientNet.PostMessageToServer("CancelQueuedMovement", "")
 end
 
 local function onKeyInput(e)
@@ -313,8 +315,8 @@ local function onKeyInput(e)
             postAttackMove()
             keybindingPressed = true
         end
-        if isKeybindingPressed(e, HealHotkey) then
-            postHeal()
+        if isKeybindingPressed(e, RequestHealHotkey) then
+            postRequestHeal()
             keybindingPressed = true
         end
         if isKeybindingPressed(e, ChangeTacticsHotkey) then
@@ -365,8 +367,8 @@ local function onControllerButtonPressed(button)
     if isControllerKeybindingPressed(ControllerAttackMoveHotkey) then
         postAttackMove()
     end
-    if isControllerKeybindingPressed(ControllerHealHotkey) then
-        postHeal()
+    if isControllerKeybindingPressed(ControllerRequestHealHotkey) then
+        postRequestHeal()
     end
     if isControllerKeybindingPressed(ControllerChangeTacticsHotkey) then
         postChangeTactics()
@@ -408,7 +410,7 @@ local function onMouseButtonInput(e)
                 e:PreventAction()
             end
         elseif e.Button == 3 then
-            postCancel()
+            postCancelQueuedMovement()
         end
     end
 end
@@ -479,8 +481,8 @@ local function onMCMSettingSaved(payload)
         AttackMyTargetHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "attack_move_hotkey" then
         AttackMoveHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
-    elseif payload.settingId == "heal_hotkey" then
-        HealHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "request_heal_hotkey" then
+        RequestHealHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "change_tactics_hotkey" then
         ChangeTacticsHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "controller_mod_toggle_hotkey" then
@@ -519,10 +521,10 @@ local function onMCMSettingSaved(payload)
         ControllerAttackMoveHotkey[1] = payload.value
     elseif payload.settingId == "controller_attack_move_hotkey_2" then
         ControllerAttackMoveHotkey[2] = payload.value
-    elseif payload.settingId == "controller_heal_hotkey" then
-        ControllerHealHotkey[1] = payload.value
-    elseif payload.settingId == "controller_heal_hotkey_2" then
-        ControllerHealHotkey[2] = payload.value
+    elseif payload.settingId == "controller_request_heal_hotkey" then
+        ControllerRequestHealHotkey[1] = payload.value
+    elseif payload.settingId == "controller_request_heal_hotkey_2" then
+        ControllerRequestHealHotkey[2] = payload.value
     elseif payload.settingId == "controller_change_tactics_hotkey" then
         ControllerChangeTacticsHotkey[1] = payload.value
     elseif payload.settingId == "controller_change_tactics_hotkey_2" then

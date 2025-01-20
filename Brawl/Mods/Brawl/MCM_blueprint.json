@@ -178,8 +178,8 @@
                             "Description": "Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)",
                             "Handles": {"DescriptionHandle": "hd7111993g8df4g4013gad20g0439cc4fe010", "NameHandle": "hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5"}
                         }, {
-                            "Id": "heal_hotkey",
-                            "Name": "Heal Hotkey",
+                            "Id": "request_heal_hotkey",
+                            "Name": "Request Heal Hotkey",
                             "Type": "keybinding",
                             "Default": {"ScanCode": "E", "Modifier": "LAlt"},
                             "Description": "Hotkey to instruct your companions to heal",
@@ -389,15 +389,15 @@
                             "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
                             "Handles": {"NameHandle": "h5c50e90bg939bg4f67g9b0cg8203649e4002", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
                         }, {
-                            "Id": "controller_heal_hotkey",
-                            "Name": "Heal Hotkey",
+                            "Id": "controller_request_heal_hotkey",
+                            "Name": "Request Heal Hotkey",
                             "Type": "enum",
                             "Default": "",
                             "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "TriggerLeft", "TriggerRight"]},
                             "Handles": {"NameHandle": "h0722b7b4g2ecdg461fga390ge6fb1c0c69ac"}
                         }, {
-                            "Id": "controller_heal_hotkey_2",
-                            "Name": "Heal Hotkey 2 (Optional)",
+                            "Id": "controller_request_heal_hotkey_2",
+                            "Name": "Request Heal Hotkey 2 (Optional)",
                             "Description": "If hotkey 2 is set, both buttons must be pressed together.  Leave hotkey 2 blank to just use a single controller button.",
                             "Type": "enum",
                             "Default": "",
