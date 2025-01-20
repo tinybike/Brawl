@@ -1119,7 +1119,7 @@ function stopPulseReposition(level)
 end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
-function pulseReposition(level)
+function pulseReposition(level, skipCompanions)
     checkForDownedOrDeadPlayers()
     if Brawlers[level] then
         for brawlerUuid, brawler in pairs(Brawlers[level]) do
@@ -1142,7 +1142,7 @@ function pulseReposition(level)
                     -- Player, ally, and neutral units are not actively looking for a fight
                     -- - Companions and allies use the same logic
                     -- - Neutrals just chilling
-                    elseif areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                    elseif not skipCompanions and areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                         -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                         if Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not FullAuto) then
                             debugPrint("Player is controlling directly: do not take action!")
@@ -1172,11 +1172,11 @@ function pulseReposition(level)
 end
 
 -- Reposition if needed every REPOSITION_INTERVAL ms
-function startPulseReposition(level)
+function startPulseReposition(level, skipCompanions)
     if PulseRepositionTimers[level] == nil then
-        debugPrint("startPulseReposition", level)
+        debugPrint("startPulseReposition", level, skipCompanions)
         PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
-            pulseReposition(level)
+            pulseReposition(level, skipCompanions)
         end, REPOSITION_INTERVAL)
     end
 end
@@ -1612,7 +1612,9 @@ function onLeftForceTurnBased(entityGuid)
                 startPulseAddNearby(entityUuid)
             end
         end
+        startPulseReposition(level, true)
         Ext.Timer.WaitFor(1000, function ()
+            stopPulseReposition(level)
             startPulseReposition(level)
         end)
         if areAnyPlayersBrawling() then
