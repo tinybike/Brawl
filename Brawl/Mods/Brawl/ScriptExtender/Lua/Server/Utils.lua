@@ -155,22 +155,6 @@ function playerMovementDistanceToSpeed(movementDistance)
     end
 end
 
-function getSpellRange(spellName)
-    if not spellName then
-        return "MeleeMainWeaponRange"
-    end
-    local spell = Ext.Stats.Get(spellName)
-    if isZoneSpell(spellName) then
-        return spell.Range
-    elseif spell.TargetRadius ~= "" then
-        return spell.TargetRadius
-    elseif spell.AreaRadius ~= "" then
-        return spell.AreaRadius
-    else
-        return "MeleeMainWeaponRange"
-    end
-end
-
 function isZoneSpell(spellName)
     return split(spellName, "_")[1] == "Zone"
 end
@@ -282,14 +266,6 @@ function isOnSameLevel(uuid1, uuid2)
     local level1 = Osi.GetRegion(uuid1)
     local level2 = Osi.GetRegion(uuid2)
     return level1 ~= nil and level2 ~= nil and level1 == level2
-end
-
-function isZoneSpell(spellName)
-    return split(spellName, "_")[1] == "Zone"
-end
-
-function isProjectileSpell(spellName)
-    return split(spellName, "_")[1] == "Projectile"
 end
 
 function getSpellNameBySlot(uuid, slot)
@@ -492,7 +468,7 @@ function getArchetype(uuid)
     end
     if not ARCHETYPE_WEIGHTS[archetype] then
         if archetype == "base" then
-            archetype = TavArchetype or "melee"
+            archetype = "melee"
         elseif archetype:find("ranged") ~= nil then
             archetype = "ranged"
         elseif archetype:find("healer") ~= nil then

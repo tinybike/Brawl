@@ -39,7 +39,7 @@ function onLakesideRitualTurn(uuid, turnsRemaining)
         end
     else
         local level = Osi.GetRegion(uuid)
-        removeBrawler(HALSIN_PORTAL_UUID, level)
+        removeBrawler(level, HALSIN_PORTAL_UUID)
         checkForEndOfBrawl(level)
     end
 end

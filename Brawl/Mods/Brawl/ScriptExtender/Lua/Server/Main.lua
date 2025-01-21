@@ -514,7 +514,7 @@ function isEnemySpellAvailable(uuid, spellName, spell, isSilenced)
     if isSilenced and spell.hasVerbalComponent then
         return false
     end
-    if spellType == "Healing" and not spell.isDirectHeal then
+    if spell.type == "Healing" and not spell.isDirectHeal then
         return false
     end
     if spell.outOfCombatOnly then
@@ -588,7 +588,7 @@ end
 function decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = getCompanionWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, targetDistanceToParty, allowAoE)
     debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
-    debugDump(ARCHETYPE_WEIGHTS[archetype])
+    debugDump(ARCHETYPE_WEIGHTS[brawler.archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
