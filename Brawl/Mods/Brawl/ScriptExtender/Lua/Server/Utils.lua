@@ -78,29 +78,10 @@ function isPugnacious(potentialEnemyUuid, uuid)
             return nil
         end
     end
-    -- if MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
+    -- if State.Settings.MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
     --     Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
     -- end
-    return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
-end
-
-function getPlayerByUserId(userId)
-    if Players then
-        for uuid, player in pairs(Players) do
-            if player.userId == userId and player.isControllingDirectly then
-                return player
-            end
-        end
-    end
-    return nil
-end
-
-function getBrawlerByUuid(uuid)
-    local level = Osi.GetRegion(uuid)
-    if level and Brawlers[level] then
-        return Brawlers[level][uuid]
-    end
-    return nil
+    return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
@@ -171,10 +152,6 @@ function isHealerArchetype(archetype)
     return archetype:find("healer") ~= nil
 end
 
-function isPlayerControllingDirectly(entityUuid)
-    return Players[entityUuid] ~= nil and Players[entityUuid].isControllingDirectly == true
-end
-
 function isBrawlingWithValidTarget(brawler)
     return brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid)
 end
@@ -241,13 +218,13 @@ end
 
 function modStatusMessage(message)
     Osi.QuestMessageHide("ModStatusMessage")
-    if ModStatusMessageTimer ~= nil then
-        Ext.Timer.Cancel(ModStatusMessageTimer)
-        ModStatusMessageTimer = nil
+    if State.Session.ModStatusMessageTimer ~= nil then
+        Ext.Timer.Cancel(State.Session.ModStatusMessageTimer)
+        State.Session.ModStatusMessageTimer = nil
     end
     Ext.Timer.WaitFor(50, function ()
         Osi.QuestMessageShow("ModStatusMessage", message)
-        ModStatusMessageTimer = Ext.Timer.WaitFor(MOD_STATUS_MESSAGE_DURATION, function ()
+        State.Session.ModStatusMessageTimer = Ext.Timer.WaitFor(MOD_STATUS_MESSAGE_DURATION, function ()
             Osi.QuestMessageHide("ModStatusMessage")
         end)
     end)
@@ -286,19 +263,6 @@ function getSpellNameBySlot(uuid, slot)
     end
 end
 
-function getSpellByName(name)
-    if name then
-        local spellStats = Ext.Stats.Get(name)
-        if spellStats then
-            local spellType = spellStats.VerbalIntent
-            if spellType and SpellTable[spellType] then
-                return SpellTable[spellType][name]
-            end
-        end
-    end
-    return nil
-end
-
 function getForwardVector(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
     local rotationQuat = entity.Transform.Transform.RotationQuat
@@ -322,8 +286,8 @@ end
 function getBrawlersSortedByDistance(entityUuid)
     local brawlersSortedByDistance = {}
     local level = Osi.GetRegion(entityUuid)
-    if Brawlers[level] then
-        for brawlerUuid, brawler in pairs(Brawlers[level]) do
+    if State.Session.Brawlers[level] then
+        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
             if isOnSameLevel(brawlerUuid, entityUuid) and isAliveAndCanFight(brawlerUuid) then
                 table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
             end
@@ -409,46 +373,8 @@ function isHealerArchetype(archetype)
     return archetype:find("healer") ~= nil
 end
 
-function isPlayerControllingDirectly(entityUuid)
-    return Players[entityUuid] ~= nil and Players[entityUuid].isControllingDirectly == true
-end
-
 function isToT()
     return Mods.ToT ~= nil and Mods.ToT.IsActive()
-end
-
-function checkForDownedOrDeadPlayers()
-    if Players then
-        for uuid, player in pairs(Players) do
-            if Osi.IsDead(uuid) == 1 or isDowned(uuid) then
-                Osi.PurgeOsirisQueue(uuid, 1)
-                Osi.FlushOsirisQueue(uuid)
-                Osi.LieOnGround(uuid)
-            end
-        end
-    end
-end
-
-function areAnyPlayersBrawling()
-    if Players then
-        for playerUuid, player in pairs(Players) do
-            local level = Osi.GetRegion(playerUuid)
-            if level and Brawlers[level] and Brawlers[level][playerUuid] then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-function getNumEnemiesRemaining(level)
-    local numEnemiesRemaining = 0
-    for brawlerUuid, brawler in pairs(Brawlers[level]) do
-        if isPugnacious(brawlerUuid) and brawler.isInBrawl then
-            numEnemiesRemaining = numEnemiesRemaining + 1
-        end
-    end
-    return numEnemiesRemaining
 end
 
 function isSilenced(uuid)
@@ -461,55 +387,6 @@ function isSilenced(uuid)
     return false
 end
 
-function getArchetype(uuid)
-    local archetype
-    if Players and Players[uuid] then
-        local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-        local partyArchetypes = modVars.PartyArchetypes
-        if partyArchetypes == nil then
-            partyArchetypes = {}
-            modVars.PartyArchetypes = partyArchetypes
-        else
-            archetype = partyArchetypes[uuid]
-        end
-    end
-    if archetype == nil or archetype == "" then
-        archetype = Osi.GetActiveArchetype(uuid)
-    end
-    if not ARCHETYPE_WEIGHTS[archetype] then
-        if archetype == "base" then
-            archetype = "melee"
-        elseif archetype:find("ranged") ~= nil then
-            archetype = "ranged"
-        elseif archetype:find("healer") ~= nil then
-            archetype = "healer"
-        elseif archetype:find("mage") ~= nil then
-            archetype = "mage"
-        elseif archetype:find("melee_magic") ~= nil then
-            archetype = "melee_magic"
-        elseif archetype:find("healer_melee") ~= nil then
-            archetype = "healer_melee"
-        else
-            debugPrint("Archetype missing from the list, using melee for now", archetype)
-            archetype = "melee"
-        end
-    end
-    return archetype
-end
-
-function hasDirectHeal(uuid, preparedSpells)
-    if isSilenced(uuid) then
-        return false
-    end
-    for _, preparedSpell in ipairs(preparedSpells) do
-        local spellName = preparedSpell.OriginatorPrototype
-        if SpellTable.Healing[spellName] ~= nil and checkSpellResources(uuid, spellName) then
-            return true
-        end
-    end
-    return false
-end
-
 function isHostileTarget(uuid, targetUuid)
     local isBrawlerPlayerOrAlly = isPlayerOrAlly(uuid)
     local isPotentialTargetPlayerOrAlly = isPlayerOrAlly(targetUuid)
@@ -517,9 +394,9 @@ function isHostileTarget(uuid, targetUuid)
     if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
         isHostile = false
     elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
+        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
     elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
-        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
+        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
     elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
         isHostile = Osi.IsEnemy(uuid, targetUuid) == 1
     else
@@ -531,7 +408,7 @@ end
 function whoNeedsHealing(uuid, level)
     local minTargetHpPct = 100.0
     local friendlyTargetUuid = nil
-    for targetUuid, target in pairs(Brawlers[level]) do
+    for targetUuid, target in pairs(State.Session.Brawlers[level]) do
         if isOnSameLevel(uuid, targetUuid) and Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
@@ -546,7 +423,7 @@ end
 function isFTBAllLockedIn()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        if not FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not isDowned(uuid) then
+        if not State.Session.FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not isDowned(uuid) then
             return false
         end
     end
@@ -559,17 +436,6 @@ end
 
 function isInFTB(entity)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
-end
-
-function isPartyInRealTime()
-    if Players then
-        for uuid, _ in pairs(Players) do
-            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
-                return false
-            end
-        end
-    end
-    return true
 end
 
 function isActionFinalized(entity)
