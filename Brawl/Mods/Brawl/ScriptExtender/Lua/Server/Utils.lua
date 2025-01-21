@@ -375,6 +375,16 @@ function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwa
     return nil
 end
 
+function convertSpellRangeToNumber(range)
+    if range == "RangedMainWeaponRange" then
+        return 18
+    elseif range == "MeleeMainWeaponRange" then
+        return 2
+    else
+        return tonumber(range)
+    end
+end
+
 function getSpellRange(spellName)
     if not spellName then
         return "MeleeMainWeaponRange"

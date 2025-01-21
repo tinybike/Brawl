@@ -437,16 +437,6 @@ function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     return weight
 end
 
-function convertSpellRangeToNumber(range)
-    if range == "RangedMainWeaponRange" then
-        return 18
-    elseif range == "MeleeMainWeaponRange" then
-        return 2
-    else
-        return tonumber(range)
-    end
-end
-
 -- NB: need to allow healing, buffs, debuffs etc for companions too
 function isCompanionSpellAvailable(uuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE)
     -- This should never happen but...
