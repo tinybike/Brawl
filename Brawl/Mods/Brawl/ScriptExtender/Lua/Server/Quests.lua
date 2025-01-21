@@ -11,7 +11,7 @@ function lakesideRitualCountdownFinished(uuid)
 end
 
 function onLakesideRitualTurn(uuid, turnsRemaining)
-    debugPrint("onLakesideRitualTurn", turnsRemaining)
+    debugPrint("onLakesideRitualTurn", turnsRemaining, Osi.QRY_HAV_IsRitualActive())
     -- 1. enemies need to attack portal sometimes
     -- 2. during pause the timer needs to stop counting down
     if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then

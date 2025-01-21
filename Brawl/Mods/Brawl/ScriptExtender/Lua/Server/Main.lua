@@ -1680,7 +1680,9 @@ function onGainedControl(targetGuid)
                     break
                 end
             end
-            MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
+            if MCM then
+                MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
+            end
         end
         Osi.PurgeOsirisQueue(targetUuid, 1)
         Osi.FlushOsirisQueue(targetUuid)
@@ -2156,4 +2158,6 @@ end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)
 Ext.Events.GameStateChanged:Subscribe(onGameStateChanged)
-Ext.ModEvents.BG3MCM["MCM_Setting_Saved"]:Subscribe(onMCMSettingSaved)
+if MCM then
+    Ext.ModEvents.BG3MCM["MCM_Setting_Saved"]:Subscribe(onMCMSettingSaved)
+end

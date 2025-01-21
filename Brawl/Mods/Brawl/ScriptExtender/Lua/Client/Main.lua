@@ -540,7 +540,8 @@ local function onMCMSettingSaved(payload)
     else
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if payload.settingId == "action_" .. actionButtonLabel .. "_hotkey" then
-                actionButtonHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+                actionButtonHotkey.ScanCode = payload.value.ScanCode
+                actionButtonHotkey.Modifier = payload.value.Modifier
             end
         end
     end
@@ -555,4 +556,6 @@ local function onSessionLoaded()
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)
-Ext.ModEvents.BG3MCM["MCM_Setting_Saved"]:Subscribe(onMCMSettingSaved)
+if MCM then
+    Ext.ModEvents.BG3MCM["MCM_Setting_Saved"]:Subscribe(onMCMSettingSaved)
+end

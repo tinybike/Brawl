@@ -224,7 +224,9 @@ local function onChangeTactics(data)
     for i, tactics in ipairs(COMPANION_TACTICS) do
         if CompanionTactics == tactics then
             CompanionTactics = i < #COMPANION_TACTICS and COMPANION_TACTICS[i + 1] or COMPANION_TACTICS[1]
-            MCM.Set("companion_tactics", CompanionTactics)
+            if MCM then
+                MCM.Set("companion_tactics", CompanionTactics)
+            end
             break
         end
     end
