@@ -95,9 +95,8 @@ local function endBrawl(level)
 end
 
 local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
-    local nearbyUnits = Utils.getNearby(entityUuid, nearbyRadius)
-    for _, nearby in ipairs(nearbyUnits) do
-        local uuid = nearby.uuid
+    local nearby = Utils.getNearby(entityUuid, nearbyRadius)
+    for _, uuid in ipairs(nearby) do
         if combatGuid == nil or Osi.CombatGetGuidFor(uuid) == combatGuid then
             addBrawler(uuid, true, replaceExistingBrawler)
         else
@@ -107,9 +106,8 @@ local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replace
 end
 
 local function addNearbyEnemiesToBrawlers(entityUuid, nearbyRadius)
-    local nearbyUnits = Utils.getNearby(entityUuid, nearbyRadius)
-    for _, nearby in ipairs(nearbyUnits) do
-        local uuid = nearby.uuid
+    local nearby = Utils.getNearby(entityUuid, nearbyRadius)
+    for _, uuid in ipairs(nearby) do
         if Utils.isPugnacious(uuid) then
             addBrawler(uuid)
         end

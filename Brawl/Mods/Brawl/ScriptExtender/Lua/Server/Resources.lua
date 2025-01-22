@@ -80,7 +80,7 @@ local function removeActionInProgress(uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
-        local actionsInProgres = State.Session.ActionsInProgress[uuid]
+        local actionsInProgress = State.Session.ActionsInProgress[uuid]
         for i, actionInProgress in ipairs(actionsInProgress) do
             if actionInProgress == spellName then
                 foundActionInProgress = true

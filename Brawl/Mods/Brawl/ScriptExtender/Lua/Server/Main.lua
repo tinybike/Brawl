@@ -564,13 +564,10 @@ end
 function onTeleportedToCamp(character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.Session.Brawlers ~= nil then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for level, brawlersInLevel in pairs(brawlersInLevel) do
-                if brawlersInLevel[entityUuid] ~= nil then
-                    Roster.removeBrawler(level, entityUuid)
-                    Roster.checkForEndOfBrawl(level)
-                end
+        for level, brawlersInLevel in pairs(State.Session.Brawlers) do
+            if brawlersInLevel[entityUuid] ~= nil then
+                Roster.removeBrawler(level, entityUuid)
+                Roster.checkForEndOfBrawl(level)
             end
         end
     end

@@ -1,5 +1,3 @@
-Ext.Require("Server/Utils.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName

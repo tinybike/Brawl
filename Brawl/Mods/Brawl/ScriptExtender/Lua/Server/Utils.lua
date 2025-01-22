@@ -72,20 +72,18 @@ local function getNearby(source, radius)
                 if distance <= radius and e.IsCharacter and e.Uuid then
                     local uuid = e.Uuid.EntityUuid
                     if uuid and isAliveAndCanFight(uuid) then
-                        nearby[#nearby + 1] = {uuid = uuid, distance = distance}
+                        nearby[#nearby + 1] = uuid
                     end
                 end
             end
         end
-        table.sort(nearby, function (a, b) return a.distance < b.distance end)
     end
     return nearby
 end
 
 local function checkNearby()
-    local nearbyUnits = getNearby(Osi.GetHostCharacter(), 50)
-    for _, nearby in ipairs(nearbyUnits) do
-        local uuid = nearby.uuid
+    local nearby = getNearby(Osi.GetHostCharacter(), 50)
+    for _, uuid in ipairs(nearby) do
         print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
     end
 end
@@ -216,14 +214,6 @@ local function clearOsirisQueue(uuid)
     Osi.FlushOsirisQueue(uuid)
 end
 
-local function isVisible(entityUuid)
-    return Osi.IsInvisible(entityUuid) == 0 and Osi.HasActiveStatus(entityUuid, "SNEAKING") == 0
-end
-
-local function isHealerArchetype(archetype)
-    return archetype:find("healer") ~= nil
-end
-
 local function isToT()
     return Mods.ToT ~= nil and Mods.ToT.IsActive()
 end
@@ -293,8 +283,6 @@ Utils = {
     getForwardVector = getForwardVector,
     getPointInFrontOf = getPointInFrontOf,
     clearOsirisQueue = clearOsirisQueue,
-    isVisible = isVisible,
-    isHealerArchetype = isHealerArchetype,
     isToT = isToT,
     isSilenced = isSilenced,
     createDummyObject = createDummyObject,

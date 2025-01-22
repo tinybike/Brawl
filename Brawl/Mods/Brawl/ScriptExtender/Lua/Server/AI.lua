@@ -421,7 +421,7 @@ local function whoNeedsHealing(uuid, level)
 end
 
 -- Attacking targets: prioritize close targets with less remaining HP
--- (Lwest weight = most desireable target)
+-- (Lowest weight = most desireable target)
 local function getWeightedTargets(brawler, potentialTargets)
     local weightedTargets = {}
     local isHealer = isHealerArchetype(brawler.archetype)
@@ -581,7 +581,7 @@ local function pulseAction(brawler)
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
                         debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
-                        Movement.repositionRelativeToTarget(brawler.uuid, playerUuid, "Target_Help")
+                        Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help")
                         return useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
                     end
                 end
