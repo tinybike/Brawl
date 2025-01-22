@@ -17,6 +17,7 @@ local function checkSpellCharge(casterUuid, spellName)
     end
     return false
 end
+
 local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
@@ -68,6 +69,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     end
     return true
 end
+
 local function removeActionInProgress(uuid, spellName)
     debugPrint("removeActionInProgress", uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
@@ -90,6 +92,7 @@ local function removeActionInProgress(uuid, spellName)
     end
     return false
 end
+
 local function deductCastedSpell(uuid, spellName)
     local entity = Ext.Entity.Get(uuid)
     local spell = State.getSpellByName(spellName)
@@ -135,8 +138,52 @@ local function deductCastedSpell(uuid, spellName)
     end
 end
 
+local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant, upcastLevel)
+    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
+        return false
+    end
+    if variant ~= nil then
+        spellName = variant
+    end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting at position", spellName, position[1], position[2], position[3])
+    clearOsirisQueue(casterUuid)
+    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
+    return true
+end
+
+local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+    if targetUuid == nil then
+        return false
+    end
+    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
+        return false
+    end
+    if variant ~= nil then
+        spellName = variant
+    end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
+    debugPrint("casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    clearOsirisQueue(casterUuid)
+    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    Osi.UseSpell(casterUuid, spellName, targetUuid)
+    -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
+    -- local x, y, z = getPointInFrontOf(casterUuid, 1.0)
+    -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
+    return true
+end
+
 Resources = {
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,
+    useSpellAndResourcesAtPosition = useSpellAndResourcesAtPosition,
+    useSpellAndResources = useSpellAndResources,
 }

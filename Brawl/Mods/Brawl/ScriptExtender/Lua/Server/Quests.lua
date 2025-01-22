@@ -3,11 +3,13 @@ local function nautiloidTransponderCountdownFinished(uuid)
         Osi.PROC_TUT_Helm_GameOver()
     end
 end
+
 local function lakesideRitualCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
         Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
     end
 end
+
 local function onLakesideRitualTurn(uuid, turnsRemaining)
     debugPrint("onLakesideRitualTurn", turnsRemaining, Osi.QRY_HAV_IsRitualActive())
     -- 1. enemies need to attack portal sometimes
@@ -19,7 +21,7 @@ local function onLakesideRitualTurn(uuid, turnsRemaining)
             Osi.PROC_HAV_LiftingTheCurse_DeclareRound(currentTurn)
             Ext.Timer.WaitFor(200, function ()
                 if Osi.IsInForceTurnBasedMode(uuid) == 0 then
-                    addNearbyToBrawlers(uuid, 30)
+                    Roster.addNearbyToBrawlers(uuid, 30)
                     local level = Osi.GetRegion(uuid)
                     if level and State.Session.Brawlers and State.Session.Brawlers[level] then
                         for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
@@ -37,22 +39,23 @@ local function onLakesideRitualTurn(uuid, turnsRemaining)
         end
     else
         local level = Osi.GetRegion(uuid)
-        removeBrawler(level, HALSIN_PORTAL_UUID)
-        checkForEndOfBrawl(level)
+        Roster.removeBrawler(level, HALSIN_PORTAL_UUID)
+        Roster.checkForEndOfBrawl(level)
     end
 end
+
 local function onNautiloidTransponderTurn(uuid, turnsRemaining)
     debugPrint("onNautiloidTransponderTurn", turnsRemaining)
     if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
         local level = Osi.GetRegion(uuid)
         if level == "TUT_Avernus_C" then
-            addNearbyToBrawlers(uuid, 30)
+            Roster.addNearbyToBrawlers(uuid, 30)
             if State.Session.Brawlers and State.Session.Brawlers[level] and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
                 if not State.Session.Brawlers[level][TUT_ZHALK_UUID] then
-                    addBrawler(TUT_ZHALK_UUID, true)
+                    Roster.addBrawler(TUT_ZHALK_UUID, true)
                 end
                 if not State.Session.Brawlers[level][TUT_MIND_FLAYER_UUID] then
-                    addBrawler(TUT_MIND_FLAYER_UUID, true)
+                    Roster.addBrawler(TUT_MIND_FLAYER_UUID, true)
                 end
                 State.Session.Brawlers[level][TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
                 State.Session.Brawlers[level][TUT_ZHALK_UUID].lockedOnTarget = true
@@ -65,15 +68,18 @@ local function onNautiloidTransponderTurn(uuid, turnsRemaining)
         end
     end
 end
+
 local function lakesideRitualCountdown(uuid, turnsRemaining)
     if turnsRemaining == LAKESIDE_RITUAL_COUNTDOWN_TURNS then
-        addBrawler(HALSIN_PORTAL_UUID, true)
+        Roster.addBrawler(HALSIN_PORTAL_UUID, true)
     end
     setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
 end
+
 local function nautiloidTransponderCountdown(uuid, turnsRemaining)
     setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
 end
+
 local function questTimerCancel(timer)
     if State.Session.Players then
         for uuid, _ in pairs(State.Session.Players) do
@@ -81,6 +87,7 @@ local function questTimerCancel(timer)
         end
     end
 end
+
 local function questTimerLaunch(timer, textKey, numRounds)
     if State.Session.Players then
         for uuid, _ in pairs(State.Session.Players) do
@@ -88,6 +95,7 @@ local function questTimerLaunch(timer, textKey, numRounds)
         end
     end
 end
+
 local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
     State.Session.CountdownTimer = {
         uuid = uuid,
@@ -98,6 +106,7 @@ local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
         end)
     }
 end
+
 local function stopCountdownTimer(uuid)
     if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid and State.Session.CountdownTimer.timer ~= nil then
         debugPrint("Stopping countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
@@ -105,6 +114,7 @@ local function stopCountdownTimer(uuid)
         State.Session.CountdownTimer.timer = nil
     end
 end
+
 local function resumeCountdownTimer(uuid)
     if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid then
         debugPrint("Resuming countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)

@@ -11,25 +11,26 @@ local function disableCompanionAI()
     for playerUuid, player in pairs(State.Session.Players) do
         local level = Osi.GetRegion(playerUuid)
         if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
-            Osi.PurgeOsirisQueue(playerUuid, 1)
-            Osi.FlushOsirisQueue(playerUuid)
+            clearOsirisQueue(playerUuid)
             stopPulseAction(State.Session.Brawlers[level][playerUuid])
         end
     end
     modStatusMessage("Companion AI Disabled")
 end
+
 local function enableCompanionAI()
     debugPrint("companion ai enabled")
     State.Settings.CompanionAIEnabled = true
     if State.Session.Players and areAnyState.Session.PlayersBrawling() then
         for playerUuid, player in pairs(State.Session.Players) do
             if not State.isPlayerControllingDirectly(playerUuid) then
-                addBrawler(playerUuid, true, true)
+                Roster.addBrawler(playerUuid, true, true)
             end
         end
     end
     modStatusMessage("Companion AI Enabled")
 end
+
 local function disableFullAuto()
     debugPrint("full auto disabled")
     State.Settings.FullAuto = false
@@ -37,24 +38,25 @@ local function disableFullAuto()
         if State.isPlayerControllingDirectly(playerUuid) then
             local level = Osi.GetRegion(playerUuid)
             if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
-                Osi.PurgeOsirisQueue(playerUuid, 1)
-                Osi.FlushOsirisQueue(playerUuid)
+                clearOsirisQueue(playerUuid)
                 stopPulseAction(State.Session.Brawlers[level][playerUuid])
             end
         end
     end
     modStatusMessage("Full Auto Disabled")
 end
+
 local function enableFullAuto()
     debugPrint("full auto enabled")
     State.Settings.FullAuto = true
     if State.Session.Players and State.areAnyPlayersBrawling() then
         for playerUuid, player in pairs(State.Session.Players) do
-            addBrawler(playerUuid, true, true)
+            Roster.addBrawler(playerUuid, true, true)
         end
     end
     modStatusMessage("Full Auto Enabled")
 end
+
 local function toggleCompanionAI()
     if State.Settings.CompanionAIEnabled then
         disableCompanionAI()
@@ -62,6 +64,7 @@ local function toggleCompanionAI()
         enableCompanionAI()
     end
 end
+
 local function toggleFullAuto()
     if State.Settings.FullAuto then
         disableFullAuto()
@@ -69,11 +72,13 @@ local function toggleFullAuto()
         enableFullAuto()
     end
 end
+
 local function disableMod()
     State.Settings.ModEnabled = false
     stopListeners()
     modStatusMessage("Brawl Disabled")
 end
+
 local function enableMod()
     State.Settings.ModEnabled = true
     startListeners()
@@ -83,11 +88,103 @@ local function enableMod()
     end
     modStatusMessage("Brawl Enabled")
 end
+
 local function toggleMod()
     if State.Settings.ModEnabled then
         disableMod()
     else
         enableMod()
+    end
+end
+
+local function buildClosestEnemyBrawlers(playerUuid)
+    if State.Session.PlayerMarkedTarget[playerUuid] and not isAliveAndCanFight(State.Session.PlayerMarkedTarget[playerUuid]) then
+        State.Session.PlayerMarkedTarget[playerUuid] = nil
+    end
+    local playerEntity = Ext.Entity.Get(playerUuid)
+    local playerPos = playerEntity.Transform.Transform.Translate
+    local playerForwardX, playerForwardY, playerForwardZ = getForwardVector(playerUuid)
+    local maxTargets = 10
+    local topTargets = {}
+    local level = Osi.GetRegion(playerUuid)
+    if State.Session.Brawlers[level] then
+        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+            if isOnSameLevel(brawlerUuid, playerUuid) and isAliveAndCanFight(brawlerUuid) and isPugnacious(brawlerUuid, playerUuid) then
+                local brawlerEntity = Ext.Entity.Get(brawlerUuid)
+                if brawlerEntity then
+                    local adjustedDistance = getAdjustedDistanceTo(playerPos, brawlerEntity.Transform.Transform.Translate, playerForwardX, playerForwardY, playerForwardZ)
+                    if adjustedDistance ~= nil then
+                        local inserted = false
+                        for i = 1, #topTargets do
+                            if adjustedDistance < topTargets[i].adjustedDistance then
+                                table.insert(topTargets, i, {uuid = brawlerUuid, adjustedDistance = adjustedDistance})
+                                inserted = true
+                                break
+                            end
+                        end
+                        if not inserted and #topTargets < maxTargets then
+                            table.insert(topTargets, {uuid = brawlerUuid, adjustedDistance = adjustedDistance})
+                        end
+                        if #topTargets > maxTargets then
+                            topTargets[#topTargets] = nil
+                        end
+                    end
+                end
+            end
+        end
+    end
+    State.Session.ClosestEnemyBrawlers[playerUuid] = {}
+    for i, target in ipairs(topTargets) do
+        State.Session.ClosestEnemyBrawlers[playerUuid][i] = target.uuid
+    end
+    if #State.Session.ClosestEnemyBrawlers[playerUuid] > 0 and State.Session.PlayerMarkedTarget[playerUuid] == nil then
+        State.Session.PlayerMarkedTarget[playerUuid] = State.Session.ClosestEnemyBrawlers[playerUuid][1]
+    end
+    debugPrint("Closest enemy brawlers to player", playerUuid, getDisplayName(playerUuid))
+    debugDump(State.Session.ClosestEnemyBrawlers)
+    debugPrint("Current target:", State.Session.PlayerMarkedTarget[playerUuid])
+    Ext.Timer.WaitFor(3000, function ()
+        State.Session.ClosestEnemyBrawlers[playerUuid] = nil
+    end)
+end
+
+local function selectNextEnemyBrawler(playerUuid, isNext)
+    local nextTargetIndex = nil
+    local nextTargetUuid = nil
+    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(State.Session.ClosestEnemyBrawlers[playerUuid]) do
+        if State.Session.PlayerMarkedTarget[playerUuid] == enemyBrawlerUuid then
+            debugPrint("found current target", State.Session.PlayerMarkedTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, State.Session.ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
+            if isNext then
+                debugPrint("getting NEXT target")
+                if enemyBrawlerIndex < #State.Session.ClosestEnemyBrawlers[playerUuid] then
+                    nextTargetIndex = enemyBrawlerIndex + 1
+                else
+                    nextTargetIndex = 1
+                end
+            else
+                debugPrint("getting PREVIOUS target")
+                if enemyBrawlerIndex > 1 then
+                    nextTargetIndex = enemyBrawlerIndex - 1
+                else
+                    nextTargetIndex = #State.Session.ClosestEnemyBrawlers[playerUuid]
+                end
+            end
+            debugPrint("target index", nextTargetIndex)
+            debugDump(State.Session.ClosestEnemyBrawlers)
+            nextTargetUuid = State.Session.ClosestEnemyBrawlers[playerUuid][nextTargetIndex]
+            debugPrint("target uuid", nextTargetUuid)
+            break
+        end
+    end
+    if nextTargetUuid then
+        if State.Session.PlayerMarkedTarget[playerUuid] ~= nil then
+            Osi.RemoveStatus(State.Session.PlayerMarkedTarget[playerUuid], "LOW_HAG_MUSHROOM_VFX")
+        end
+        debugPrint("pinging next target", nextTargetUuid)
+        local x, y, z = Osi.GetPosition(nextTargetUuid)
+        Osi.RequestPing(x, y, z, nextTargetUuid, playerUuid)
+        Osi.ApplyStatus(nextTargetUuid, "LOW_HAG_MUSHROOM_VFX", -1)
+        State.Session.PlayerMarkedTarget[playerUuid] = nextTargetUuid
     end
 end
 
@@ -104,6 +201,22 @@ local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
         end
     end
 end
+
+local function lockCompanionsOnTarget(level, targetUuid)
+    for uuid, _ in pairs(State.Session.Players) do
+        if isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
+            if not State.Session.Brawlers[level][uuid] then
+                Roster.addBrawler(uuid, true)
+            end
+            if State.Session.Brawlers[level][uuid] and uuid ~= targetUuid then
+                State.Session.Brawlers[level][uuid].targetUuid = targetUuid
+                State.Session.Brawlers[level][uuid].lockedOnTarget = true
+                debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+            end
+        end
+    end
+end
+
 local function setAttackMoveTarget(playerUuid, targetUuid)
     debugPrint("Set attack-move target", playerUuid, targetUuid)
     setAwaitingTarget(playerUuid, false)
@@ -111,11 +224,12 @@ local function setAttackMoveTarget(playerUuid, targetUuid)
     if level and targetUuid and not isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
         applyAttackMoveTargetVfx(targetUuid)
         if not State.Session.Brawlers[level][targetUuid] then
-            addBrawler(targetUuid, true)
+            Roster.addBrawler(targetUuid, true)
         end
         lockCompanionsOnTarget(level, targetUuid)
     end
 end
+
 local function onActionButton(data, isController)
     local player = State.getPlayerByUserId(peerToUserId(data.UserID))
     if player then
@@ -133,19 +247,20 @@ local function onActionButton(data, isController)
                 local spell = State.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
-                    return useSpellAndResources(player.uuid, player.uuid, spellName)
+                    return Resources.useSpellAndResources(player.uuid, player.uuid, spellName)
                 end
                 -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
-                --     return useSpellAndResources(player.uuid, nil, spellName)
+                --     return Resources.useSpellAndResources(player.uuid, nil, spellName)
                 -- end
                 if State.Session.PlayerMarkedTarget[player.uuid] == nil or Osi.IsDead(State.Session.PlayerMarkedTarget[player.uuid]) == 1 then
                     buildClosestEnemyBrawlers(player.uuid)
                 end
-                return useSpellAndResources(player.uuid, State.Session.PlayerMarkedTarget[player.uuid], spellName)
+                return Resources.useSpellAndResources(player.uuid, State.Session.PlayerMarkedTarget[player.uuid], spellName)
             end
         end
     end
 end
+
 local function onAttackMyTarget(data)
     if State.Session.Players and State.Session.Brawlers then
         local player = State.getPlayerByUserId(peerToUserId(data.UserID))
@@ -164,6 +279,7 @@ local function onAttackMyTarget(data)
         end
     end
 end
+
 local function onClickPosition(data)
     local player = State.getPlayerByUserId(peerToUserId(data.UserID))
     if player and player.uuid then
@@ -186,12 +302,14 @@ local function onClickPosition(data)
         end
     end
 end
+
 local function onCancelQueuedMovement(data)
     local player = State.getPlayerByUserId(peerToUserId(data.UserID))
     if player and player.uuid then
         Pause.cancelQueuedMovement(player.uuid)
     end
 end
+
 local function onOnMe(data)
     if State.Session.Players then
         local player = State.getPlayerByUserId(peerToUserId(data.UserID))
@@ -201,6 +319,7 @@ local function onOnMe(data)
         end
     end
 end
+
 local function onAttackMove(data)
     if State.Session.Players then
         local player = State.getPlayerByUserId(peerToUserId(data.UserID))
@@ -209,6 +328,7 @@ local function onAttackMove(data)
         end
     end
 end
+
 local function onRequestHeal(data)
     debugPrint("Requesting Heal")
     local userId = peerToUserId(data.UserID)
@@ -220,13 +340,14 @@ local function onRequestHeal(data)
         local player = State.getPlayerByUserId(userId)
         if player and player.uuid then
             State.Session.HealRequested[userId] = true
-            addPlayersInEnterCombatRangeToBrawlers(player.uuid)
+            Roster.addPlayersInEnterCombatRangeToBrawlers(player.uuid)
             State.Session.HealRequestedTimer[userId] = Ext.Timer.WaitFor(9000, function ()
                 State.Session.HealRequested[userId] = false
             end)
         end
     end
 end
+
 local function onChangeTactics(data)
     for i, tactics in ipairs(COMPANION_TACTICS) do
         if State.Settings.CompanionTactics == tactics then
@@ -239,6 +360,7 @@ local function onChangeTactics(data)
     end
     modStatusMessage(State.Settings.CompanionTactics .. " Tactics")
 end
+
 local function onModToggle(data)
     if MCM then
         MCM.Set("mod_enabled", not State.Settings.ModEnabled)
@@ -246,6 +368,7 @@ local function onModToggle(data)
         toggleMod()
     end
 end
+
 local function onCompanionAIToggle(data)
     if MCM then
         MCM.Set("companion_ai_enabled", not State.Settings.CompanionAIEnabled)
@@ -253,6 +376,7 @@ local function onCompanionAIToggle(data)
         toggleCompanionAI()
     end
 end
+
 local function onFullAutoToggle(data)
     if MCM then
         MCM.Set("full_auto", not State.Settings.FullAuto)
@@ -269,6 +393,7 @@ local function onMCMModEnabled(value)
         disableMod()
     end
 end
+
 local function onMCMCompanionAIEnabled(value)
     State.Settings.CompanionAIEnabled = value
     if State.Settings.CompanionAIEnabled then
@@ -277,10 +402,12 @@ local function onMCMCompanionAIEnabled(value)
         disableCompanionAI()
     end
 end
+
 local function onMCMTruePause(value)
     State.Settings.TruePause = value
     Pause.checkTruePauseParty()
 end
+
 local function onMCMHitpointsMultiplier(value)
     State.Settings.HitpointsMultiplier = value
     State.setupPartyMembersHitpoints()
@@ -292,6 +419,7 @@ local function onMCMHitpointsMultiplier(value)
         end
     end
 end
+
 local function onMCMFullAuto(value)
     State.Settings.FullAuto = value
     if State.Settings.FullAuto then
@@ -300,6 +428,7 @@ local function onMCMFullAuto(value)
         disableFullAuto()
     end
 end
+
 local function onMCMActiveCharacterArchetype(archetype)
     local uuid = Osi.GetHostCharacter()
     if uuid ~= nil and archetype ~= nil and archetype ~= "" then
@@ -316,6 +445,7 @@ local function onMCMActiveCharacterArchetype(archetype)
         end
     end
 end
+
 local function onMCMMaxPartySize(maxPartySize)
     State.Settings.MaxPartySize = maxPartySize
     State.setMaxPartySize()

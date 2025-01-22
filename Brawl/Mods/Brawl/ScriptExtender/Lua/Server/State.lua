@@ -82,6 +82,7 @@ local function hasTargetCondition(targetConditionString, condition)
     end
     return false
 end
+
 local function isSafeAoESpell(spellName)
     for _, safeAoESpell in ipairs(SAFE_AOE_SPELLS) do
         if spellName == safeAoESpell then
@@ -90,6 +91,7 @@ local function isSafeAoESpell(spellName)
     end
     return false
 end
+
 local function getSpellInfo(spellType, spellName)
     local spell = Ext.Stats.Get(spellName)
     if spell and spell.VerbalIntent == spellType then
@@ -160,6 +162,7 @@ local function getSpellInfo(spellType, spellName)
     end
     return nil
 end
+
 local function getAllSpellsOfType(spellType)
     local allSpellsOfType = {}
     for _, spellName in ipairs(Ext.Stats.GetStats("SpellData")) do
@@ -232,20 +235,22 @@ local function getArchetype(uuid)
     end
     return archetype
 end
+
 local function setMovementSpeedThresholds()
     Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[getDifficulty()]
 end
+
 local function checkForDownedOrDeadPlayers()
     if Session.Players then
         for uuid, player in pairs(Session.Players) do
             if Osi.IsDead(uuid) == 1 or isDowned(uuid) then
-                Osi.PurgeOsirisQueue(uuid, 1)
-                Osi.FlushOsirisQueue(uuid)
+                clearOsirisQueue(uuid)
                 Osi.LieOnGround(uuid)
             end
         end
     end
 end
+
 local function areAnyPlayersBrawling()
     if Session.Players then
         for playerUuid, player in pairs(Session.Players) do
@@ -257,6 +262,7 @@ local function areAnyPlayersBrawling()
     end
     return false
 end
+
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
@@ -266,9 +272,11 @@ local function getNumEnemiesRemaining(level)
     end
     return numEnemiesRemaining
 end
+
 local function isPlayerControllingDirectly(entityUuid)
     return Session.Players[entityUuid] ~= nil and Session.Players[entityUuid].isControllingDirectly == true
 end
+
 local function getPlayerByUserId(userId)
     if Session.Players then
         for uuid, player in pairs(Session.Players) do
@@ -279,6 +287,7 @@ local function getPlayerByUserId(userId)
     end
     return nil
 end
+
 local function getBrawlerByUuid(uuid)
     local level = Osi.GetRegion(uuid)
     if level and Session.Brawlers[level] then
@@ -286,6 +295,7 @@ local function getBrawlerByUuid(uuid)
     end
     return nil
 end
+
 local function isPartyInRealTime()
     if Session.Players then
         for uuid, _ in pairs(Session.Players) do
@@ -296,6 +306,7 @@ local function isPartyInRealTime()
     end
     return true
 end
+
 local function getSpellByName(name)
     if name then
         local spellStats = Ext.Stats.Get(name)
@@ -308,6 +319,7 @@ local function getSpellByName(name)
     end
     return nil
 end
+
 local function hasDirectHeal(uuid, preparedSpells)
     if isSilenced(uuid) then
         return false
@@ -320,6 +332,7 @@ local function hasDirectHeal(uuid, preparedSpells)
     end
     return false
 end
+
 local function buildSpellTable()
     local spellTable = {}
     for _, spellType in pairs(ALL_SPELL_TYPES) do
@@ -327,6 +340,7 @@ local function buildSpellTable()
     end
     Session.SpellTable = spellTable
 end
+
 local function resetSpellData()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars and modVars.SpellRequirements then
@@ -343,6 +357,7 @@ local function resetSpellData()
         modVars.SpellRequirements = nil
     end
 end
+
 local function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
@@ -366,6 +381,7 @@ local function revertHitpoints(entityUuid)
         -- debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
     end
 end
+
 local function modifyHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars.ModifiedHitpoints == nil then
@@ -392,6 +408,7 @@ local function modifyHitpoints(entityUuid)
         -- debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
     end
 end
+
 local function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
         local partyMemberUuid = Osi.GetUUID(partyMember[1])
@@ -423,6 +440,7 @@ local function setupPartyMembersHitpoints()
         end, Ext.Entity.Get(partyMemberUuid))
     end
 end
+
 local function revertAllModifiedHitpoints()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars.ModifiedHitpoints and next(modVars.ModifiedHitpoints) ~= nil then
@@ -434,19 +452,12 @@ local function revertAllModifiedHitpoints()
         Ext.Entity.Unsubscribe(listener)
     end
 end
-local function resetPlayersMovementSpeed()
-    for playerUuid, player in pairs(Players) do
-        local entity = Ext.Entity.Get(playerUuid)
-        if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
-            entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
-            player.movementSpeedRun = nil
-        end
-    end
-end
+
 local function setMaxPartySize()
     Osi.SetMaxPartySizeOverride(MaxPartySize)
 	Osi.PROC_CheckPartyFull()
 end
+
 local function setupPlayer(guid)
     local uuid = Osi.GetUUID(guid)
     if uuid then
@@ -462,12 +473,14 @@ local function setupPlayer(guid)
         Osi.SetCanJoinCombat(uuid, 1)
     end
 end
+
 local function resetPlayers()
     Session.Players = {}
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         setupPlayer(player[1])
     end
 end
+
 local function setIsControllingDirectly()
     if Session.Players ~= nil and next(Session.Players) ~= nil then
         for playerUuid, player in pairs(Session.Players) do
@@ -504,7 +517,6 @@ State = {
     modifyHitpoints = modifyHitpoints,
     setupPartyMembersHitpoints = setupPartyMembersHitpoints,
     revertAllModifiedHitpoints = revertAllModifiedHitpoints,
-    resetPlayersMovementSpeed = resetPlayersMovementSpeed,
     setMaxPartySize = setMaxPartySize,
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,

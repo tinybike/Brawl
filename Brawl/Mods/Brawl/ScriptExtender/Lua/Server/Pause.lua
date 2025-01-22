@@ -1,6 +1,7 @@
 local function isLocked(entity)
     return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
 end
+
 local function unlock(entity)
     if isLocked(entity) then
         entity.TurnBased.IsInCombat_M = true
@@ -18,10 +19,12 @@ local function unlock(entity)
         end
     end
 end
+
 local function lock(entity)
     entity.TurnBased.IsInCombat_M = false
     State.Session.FTBLockedIn[entity.Uuid.EntityUuid] = true
 end
+
 local function stopTruePause(entityUuid)
     if Osi.IsPartyMember(entityUuid, 1) == 1 then
         if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
@@ -38,12 +41,14 @@ local function stopTruePause(entityUuid)
         end
     end
 end
+
 local function allEnterFTB()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
         Osi.ForceTurnBasedMode(uuid, 1)
     end
 end
+
 local function allExitFTB()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
@@ -52,11 +57,13 @@ local function allExitFTB()
         stopTruePause(uuid)
     end
 end
+
 local function cancelQueuedMovement(uuid)
     if State.Session.MovementQueue[uuid] ~= nil and Osi.IsInForceTurnBasedMode(uuid) == 1 then
         State.Session.MovementQueue[uuid] = nil
     end
 end
+
 local function midActionLock(entity)
     local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
     if spellCastState.Targets then
@@ -67,9 +74,11 @@ local function midActionLock(entity)
         end
     end
 end
+
 local function isInFTB(entity)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
+
 local function enqueueMovement(entity)
     local uuid = entity.Uuid.EntityUuid
     if uuid and isInFTB(entity) and (not isLocked(entity) or State.Session.MovementQueue[uuid]) then
@@ -80,6 +89,7 @@ local function enqueueMovement(entity)
         end
     end
 end
+
 local function isFTBAllLockedIn()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
@@ -89,9 +99,11 @@ local function isFTBAllLockedIn()
     end
     return true
 end
+
 local function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
+
 local function startTruePause(entityUuid)
     -- eoc::ActionResourcesComponent: Replicated
     -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
@@ -133,6 +145,7 @@ local function startTruePause(entityUuid)
         end
     end
 end
+
 local function checkTruePauseParty()
     if State.Settings.TruePause then
         for uuid, _ in pairs(State.Session.Players) do

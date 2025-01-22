@@ -330,30 +330,9 @@ function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwa
     return nil
 end
 
-function convertSpellRangeToNumber(range)
-    if range == "RangedMainWeaponRange" then
-        return 18
-    elseif range == "MeleeMainWeaponRange" then
-        return 2
-    else
-        return tonumber(range)
-    end
-end
-
-function getSpellRange(spellName)
-    if not spellName then
-        return "MeleeMainWeaponRange"
-    end
-    local spell = Ext.Stats.Get(spellName)
-    if isZoneSpell(spellName) then
-        return spell.Range
-    elseif spell.TargetRadius ~= "" then
-        return spell.TargetRadius
-    elseif spell.AreaRadius ~= "" then
-        return spell.AreaRadius
-    else
-        return "MeleeMainWeaponRange"
-    end
+function clearOsirisQueue(uuid)
+    Osi.PurgeOsirisQueue(uuid, 1)
+    Osi.FlushOsirisQueue(uuid)
 end
 
 function isVisible(entityUuid)
@@ -378,39 +357,6 @@ function isSilenced(uuid)
     return false
 end
 
-function isHostileTarget(uuid, targetUuid)
-    local isBrawlerPlayerOrAlly = isPlayerOrAlly(uuid)
-    local isPotentialTargetPlayerOrAlly = isPlayerOrAlly(targetUuid)
-    local isHostile = false
-    if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
-        isHostile = false
-    elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
-    elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
-        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
-    elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = Osi.IsEnemy(uuid, targetUuid) == 1
-    else
-        debugPrint("getWeightedTargets: what happened here?", uuid, targetUuid, getDisplayName(uuid), getDisplayName(targetUuid))
-    end
-    return isHostile
-end
-
-function whoNeedsHealing(uuid, level)
-    local minTargetHpPct = 100.0
-    local friendlyTargetUuid = nil
-    for targetUuid, target in pairs(State.Session.Brawlers[level]) do
-        if isOnSameLevel(uuid, targetUuid) and Osi.IsAlly(uuid, targetUuid) == 1 then
-            local targetHpPct = Osi.GetHitpointsPercentage(targetUuid)
-            if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
-                minTargetHpPct = targetHpPct
-                friendlyTargetUuid = targetUuid
-            end
-        end
-    end
-    return friendlyTargetUuid
-end
-
 function createDummyObject(position)
     local dummyUuid = Osi.CreateAt(INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
     local dummyEntity = Ext.Entity.Get(dummyUuid)
@@ -424,4 +370,18 @@ end
 
 function showNotification(uuid, text, duration)
     Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+end
+
+function applyAttackMoveTargetVfx(targetUuid)
+    -- Osi.ApplyStatus(targetUuid, "HEROES_FEAST_CHEST", 1)
+    Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+    Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+end
+
+function applyOnMeTargetVfx(targetUuid)
+    Osi.ApplyStatus(targetUuid, "GUIDED_STRIKE", 1)
+    Osi.ApplyStatus(targetUuid, "MAG_ARCANE_VAMPIRISM_VFX", 1)
+    -- Osi.ApplyStatus(targetUuid, "END_HIGHHALLINTERIOR_DROPPODTARGET_VFX", 1)
+    -- Osi.ApplyStatus(targetUuid, "PASSIVE_DISCIPLE_OF_LIFE", 1)
+    -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end

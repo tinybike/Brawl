@@ -6,6 +6,7 @@ local function getMovementSpeed(entityUuid)
     -- debugPrint("getMovementSpeed", entityUuid, movementDistance, movementSpeed)
     return movementSpeed
 end
+
 local function findPathToPosition(playerUuid, position, callback)
     local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
     if validX ~= nil and validY ~= nil and validZ ~= nil then
@@ -21,20 +22,21 @@ local function findPathToPosition(playerUuid, position, callback)
         end
     end
 end
-local function moveToTargetUuid(uuid, targetUuid, clearQueue)
-    if clearQueue then
-        Osi.PurgeOsirisQueue(uuid, 1)
-        Osi.FlushOsirisQueue(uuid)
+
+local function moveToTargetUuid(uuid, targetUuid, override)
+    if override then
+        clearOsirisQueue(uuid)
     end
     Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "")
 end
-local function moveToPosition(uuid, position, clearQueue)
-    if clearQueue then
-        Osi.PurgeOsirisQueue(uuid, 1)
-        Osi.FlushOsirisQueue(uuid)
+
+local function moveToPosition(uuid, position, override)
+    if override then
+        clearOsirisQueue(uuid)
     end
     Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
 end
+
 local function moveCompanionsToPlayer(playerUuid)
     for uuid, _ in pairs(State.Session.Players) do
         if not State.isPlayerControllingDirectly(uuid) then
@@ -42,6 +44,7 @@ local function moveCompanionsToPlayer(playerUuid)
         end
     end
 end
+
 local function moveCompanionsToPosition(position)
     for uuid, _ in pairs(State.Session.Players) do
         if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
@@ -49,12 +52,14 @@ local function moveCompanionsToPosition(position)
         end
     end
 end
+
 local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     if x ~= nil and y ~= nil and z ~= nil then
         moveToPosition(moverUuid, {x, y, z}, true)
     end
 end
+
 local function holdPosition(entityUuid)
     if not isPlayerOrAlly(entityUuid) then
         -- Example monk looping animations (can these be interruptable?)
@@ -63,6 +68,26 @@ local function holdPosition(entityUuid)
         -- animMK = "7bb52cd4-0b1c-4926-9165-fa92b75876a3"
         Osi.PlayAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, "")
         -- Osi.PlayLoopingAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID)
+    end
+end
+
+local function setPlayerRunToSprint(entityUuid)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity and entity.ServerCharacter then
+        if State.Session.Players[entityUuid].movementSpeedRun == nil then
+            State.Session.Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
+        end
+        entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
+    end
+end
+
+local function resetPlayersMovementSpeed()
+    for playerUuid, player in pairs(State.Session.Players) do
+        local entity = Ext.Entity.Get(playerUuid)
+        if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
+            entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
+            player.movementSpeedRun = nil
+        end
     end
 end
 
@@ -75,4 +100,6 @@ Movement = {
     moveCompanionsToPosition = moveCompanionsToPosition,
     moveToDistanceFromTarget = moveToDistanceFromTarget,
     holdPosition = holdPosition,
+    setPlayerRunToSprint = setPlayerRunToSprint,
+    resetPlayersMovementSpeed = resetPlayersMovementSpeed,
 }
