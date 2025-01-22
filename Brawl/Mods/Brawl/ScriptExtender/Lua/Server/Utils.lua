@@ -69,7 +69,7 @@ local function getNearby(source, radius)
                 local dy = sourcePosition[2] - position[2]
                 local dz = sourcePosition[3] - position[3]
                 local distance = sqrt(dx*dx + dy*dy + dz*dz)
-                if distance <= radius and e.IsCharacter and and e.Uuid then
+                if distance <= radius and e.IsCharacter and e.Uuid then
                     local uuid = e.Uuid.EntityUuid
                     if uuid and isAliveAndCanFight(uuid) then
                         nearby[#nearby + 1] = {uuid = uuid, distance = distance}

@@ -1,3 +1,5 @@
+Ext.Require("Server/Utils.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -238,7 +240,7 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
 end
 
 local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
-    local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+    local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player then
         local brawler = State.getBrawlerByUuid(player.uuid)
         if brawler and not brawler.isPaused then
@@ -300,7 +302,7 @@ local function getSpellNameBySlot(uuid, slot)
 end
 
 local function onActionButton(data, isController)
-    local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+    local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player then
         -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
         if isController then
@@ -332,7 +334,7 @@ end
 
 local function onAttackMyTarget(data)
     if State.Session.Players and State.Session.Brawlers then
-        local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+        local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         local level = Osi.GetRegion(player.uuid)
         if level and State.Session.Brawlers[level] and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             local currentTarget
@@ -350,7 +352,7 @@ local function onAttackMyTarget(data)
 end
 
 local function onClickPosition(data)
-    local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+    local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player and player.uuid then
         local playerUuid = player.uuid
         local clickPosition = Ext.Json.Parse(data.Payload)
@@ -373,7 +375,7 @@ local function onClickPosition(data)
 end
 
 local function onCancelQueuedMovement(data)
-    local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+    local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player and player.uuid then
         Pause.cancelQueuedMovement(player.uuid)
     end
@@ -381,7 +383,7 @@ end
 
 local function onOnMe(data)
     if State.Session.Players then
-        local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+        local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             Utils.applyOnMeTargetVfx(player.uuid)
             Movement.moveCompanionsToPlayer(player.uuid)
@@ -391,7 +393,7 @@ end
 
 local function onAttackMove(data)
     if State.Session.Players then
-        local player = State.getPlayerByUserId(peerToUserId(data.UserID))
+        local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             setAwaitingTarget(player.uuid, true)
         end
@@ -400,7 +402,7 @@ end
 
 local function onRequestHeal(data)
     debugPrint("Requesting Heal")
-    local userId = peerToUserId(data.UserID)
+    local userId = Utils.peerToUserId(data.UserID)
     if userId then
         if State.Session.HealRequestedTimer[userId] then
             Ext.Timer.Cancel(State.Session.HealRequestedTimer[userId])

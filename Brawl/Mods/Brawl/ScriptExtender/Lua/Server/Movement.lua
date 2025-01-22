@@ -184,7 +184,7 @@ local function resetPlayersMovementSpeed()
 end
 
 local function setMovementSpeedThresholds()
-    State.Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[getDifficulty()]
+    State.Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[Utils.getDifficulty()]
 end
 
 Movement = {

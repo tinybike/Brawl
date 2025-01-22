@@ -100,14 +100,14 @@ end
 local function getSpellInfo(spellType, spellName)
     local spell = Ext.Stats.Get(spellName)
     if spell and spell.VerbalIntent == spellType then
-        local useCosts = split(spell.UseCosts, ";")
+        local useCosts = Utils.split(spell.UseCosts, ";")
         local costs = {
             ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
             LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
         }
         -- local hitCost = nil -- divine smite only..?
         for _, useCost in ipairs(useCosts) do
-            local useCostTable = split(useCost, ":")
+            local useCostTable = Utils.split(useCost, ":")
             local useCostLabel = useCostTable[1]
             local useCostAmount = tonumber(useCostTable[#useCostTable])
             if useCostLabel == "SpellSlotsGroup" then
@@ -174,7 +174,7 @@ local function getAllSpellsOfType(spellType)
         local spell = Ext.Stats.Get(spellName)
         if spell and spell.VerbalIntent == spellType then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
-                local containerSpellNames = split(spell.ContainerSpells, ";")
+                local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
                     allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName)
                 end
