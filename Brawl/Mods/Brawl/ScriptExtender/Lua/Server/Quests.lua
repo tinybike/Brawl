@@ -1,3 +1,7 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local isAliveAndCanFight = Utils.isAliveAndCanFight
+
 local function nautiloidTransponderCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() then
         Osi.PROC_TUT_Helm_GameOver()
@@ -23,12 +27,15 @@ local function onLakesideRitualTurn(uuid, turnsRemaining)
                 if Osi.IsInForceTurnBasedMode(uuid) == 0 then
                     Roster.addNearbyToBrawlers(uuid, 30)
                     local level = Osi.GetRegion(uuid)
-                    if level and State.Session.Brawlers and State.Session.Brawlers[level] then
-                        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
-                            if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
-                                if math.random() > 0.85 then
-                                    brawler.targetUuid = HALSIN_PORTAL_UUID
-                                    brawler.lockedOnTarget = true
+                    if level and State.Session.Brawlers then
+                        local brawlersInLevel = State.Session.Brawlers[level]
+                        if brawlersInLevel then
+                            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                                if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
+                                    if math.random() > 0.85 then
+                                        brawler.targetUuid = HALSIN_PORTAL_UUID
+                                        brawler.lockedOnTarget = true
+                                    end
                                 end
                             end
                         end
@@ -50,17 +57,20 @@ local function onNautiloidTransponderTurn(uuid, turnsRemaining)
         local level = Osi.GetRegion(uuid)
         if level == "TUT_Avernus_C" then
             Roster.addNearbyToBrawlers(uuid, 30)
-            if State.Session.Brawlers and State.Session.Brawlers[level] and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
-                if not State.Session.Brawlers[level][TUT_ZHALK_UUID] then
-                    Roster.addBrawler(TUT_ZHALK_UUID, true)
+            if State.Session.Brawlers then
+                local brawlersInLevel = State.Session.Brawlers[level]
+                if brawlersInLevel and isAliveAndCanFight(TUT_ZHALK_UUID) and isAliveAndCanFight(TUT_MIND_FLAYER_UUID) then
+                    if not brawlersInLevel[TUT_ZHALK_UUID] then
+                        Roster.addBrawler(TUT_ZHALK_UUID, true)
+                    end
+                    if not brawlersInLevel[TUT_MIND_FLAYER_UUID] then
+                        Roster.addBrawler(TUT_MIND_FLAYER_UUID, true)
+                    end
+                    brawlersInLevel[TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
+                    brawlersInLevel[TUT_ZHALK_UUID].lockedOnTarget = true
+                    brawlersInLevel[TUT_MIND_FLAYER_UUID].targetUuid = TUT_ZHALK_UUID
+                    brawlersInLevel[TUT_MIND_FLAYER_UUID].lockedOnTarget = true
                 end
-                if not State.Session.Brawlers[level][TUT_MIND_FLAYER_UUID] then
-                    Roster.addBrawler(TUT_MIND_FLAYER_UUID, true)
-                end
-                State.Session.Brawlers[level][TUT_ZHALK_UUID].targetUuid = TUT_MIND_FLAYER_UUID
-                State.Session.Brawlers[level][TUT_ZHALK_UUID].lockedOnTarget = true
-                State.Session.Brawlers[level][TUT_MIND_FLAYER_UUID].targetUuid = TUT_ZHALK_UUID
-                State.Session.Brawlers[level][TUT_MIND_FLAYER_UUID].lockedOnTarget = true
             end
             nautiloidTransponderCountdown(uuid, turnsRemaining)
         else
@@ -81,16 +91,18 @@ local function nautiloidTransponderCountdown(uuid, turnsRemaining)
 end
 
 local function questTimerCancel(timer)
-    if State.Session.Players then
-        for uuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    if players then
+        for uuid, _ in pairs(players) do
             Osi.ObjectTimerCancel(uuid, timer)
         end
     end
 end
 
 local function questTimerLaunch(timer, textKey, numRounds)
-    if State.Session.Players then
-        for uuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    if players then
+        for uuid, _ in pairs(players) do
             Osi.ObjectQuestTimerLaunch(uuid, timer, textKey, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
         end
     end

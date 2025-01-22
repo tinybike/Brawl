@@ -1,5 +1,10 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local isSilenced = Utils.isSilenced
+
 -- Settings
-Settings = {
+local Settings = {
     ModEnabled = true,
     CompanionAIEnabled = true,
     TruePause = true,
@@ -31,7 +36,7 @@ if MCM then
 end
 
 -- Session state
-Session = {
+local Session = {
     SpellTable = {},
     Listeners = {},
     Brawlers = {},
@@ -236,15 +241,12 @@ local function getArchetype(uuid)
     return archetype
 end
 
-local function setMovementSpeedThresholds()
-    Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[getDifficulty()]
-end
-
 local function checkForDownedOrDeadPlayers()
-    if Session.Players then
-        for uuid, player in pairs(Session.Players) do
-            if Osi.IsDead(uuid) == 1 or isDowned(uuid) then
-                clearOsirisQueue(uuid)
+    local players = Session.Players
+    if players then
+        for uuid, player in pairs(players) do
+            if Osi.IsDead(uuid) == 1 or Utils.isDowned(uuid) then
+                Utils.clearOsirisQueue(uuid)
                 Osi.LieOnGround(uuid)
             end
         end
@@ -266,7 +268,7 @@ end
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if isPugnacious(brawlerUuid) and brawler.isInBrawl then
+        if Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end
@@ -454,7 +456,7 @@ local function revertAllModifiedHitpoints()
 end
 
 local function setMaxPartySize()
-    Osi.SetMaxPartySizeOverride(MaxPartySize)
+    Osi.SetMaxPartySizeOverride(State.Settings.MaxPartySize)
 	Osi.PROC_CheckPartyFull()
 end
 
@@ -521,5 +523,6 @@ State = {
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,
     setIsControllingDirectly = setIsControllingDirectly,
+    Settings = Settings,
     Session = Session,
 }

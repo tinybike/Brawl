@@ -1,3 +1,8 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local isAliveAndCanFight = Utils.isAliveAndCanFight
+
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
@@ -43,17 +48,18 @@ end
 
 local function removeBrawler(level, entityUuid)
     local combatGuid = nil
-    if State.Session.Brawlers[level] ~= nil then
-        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if brawler.targetUuid == entityUuid then
                 brawler.targetUuid = nil
                 brawler.lockedOnTarget = nil
-                clearOsirisQueue(brawlerUuid)
+                Utils.clearOsirisQueue(brawlerUuid)
             end
         end
-        if State.Session.Brawlers[level][entityUuid] then
-            stopPulseAction(State.Session.Brawlers[level][entityUuid])
-            State.Session.Brawlers[level][entityUuid] = nil
+        if brawlersInLevel[entityUuid] then
+            stopPulseAction(brawlersInLevel[entityUuid])
+            brawlersInLevel[entityUuid] = nil
         end
         Osi.SetCanJoinCombat(entityUuid, 1)
         if Osi.IsPartyMember(entityUuid, 1) == 0 then
@@ -67,14 +73,16 @@ local function removeBrawler(level, entityUuid)
 end
 
 local function endBrawl(level)
-    if State.Session.Brawlers[level] then
-        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
             removeBrawler(level, brawlerUuid)
         end
         debugPrint("Ended brawl")
-        debugDump(State.Session.Brawlers[level])
+        debugDump(brawlersInLevel)
     end
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, player in pairs(players) do
         if player.isPaused then
             Osi.ForceTurnBasedMode(playerUuid, 0)
             break
@@ -87,27 +95,30 @@ local function endBrawl(level)
 end
 
 local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
-    for _, nearby in ipairs(getNearby(entityUuid, nearbyRadius)) do
-        if nearby.Entity.IsCharacter and isAliveAndCanFight(nearby.Guid) then
-            if combatGuid == nil or Osi.CombatGetGuidFor(nearby.Guid) == combatGuid then
-                addBrawler(nearby.Guid, true, replaceExistingBrawler)
-            else
-                addBrawler(nearby.Guid, false, replaceExistingBrawler)
-            end
+    local nearbyUnits = Utils.getNearby(entityUuid, nearbyRadius)
+    for _, nearby in ipairs(nearbyUnits) do
+        local uuid = nearby.uuid
+        if combatGuid == nil or Osi.CombatGetGuidFor(uuid) == combatGuid then
+            addBrawler(uuid, true, replaceExistingBrawler)
+        else
+            addBrawler(uuid, false, replaceExistingBrawler)
         end
     end
 end
 
 local function addNearbyEnemiesToBrawlers(entityUuid, nearbyRadius)
-    for _, nearby in ipairs(getNearby(entityUuid, nearbyRadius)) do
-        if nearby.Entity.IsCharacter and isAliveAndCanFight(nearby.Guid) and isPugnacious(nearby.Guid) then
-            addBrawler(nearby.Guid, false, false)
+    local nearbyUnits = Utils.getNearby(entityUuid, nearbyRadius)
+    for _, nearby in ipairs(nearbyUnits) do
+        local uuid = nearby.uuid
+        if Utils.isPugnacious(uuid) then
+            addBrawler(uuid)
         end
     end
 end
 
 local function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
-    for playerUuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, _ in pairs(players) do
         local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
         if distanceTo ~= nil and distanceTo < ENTER_COMBAT_RANGE then
             addBrawler(playerUuid)
@@ -125,7 +136,8 @@ end
 
 local function initBrawlers(level)
     State.Session.Brawlers[level] = {}
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, player in pairs(players) do
         if player.isControllingDirectly then
             startPulseAddNearby(playerUuid)
         end

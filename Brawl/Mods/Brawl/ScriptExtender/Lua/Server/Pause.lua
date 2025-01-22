@@ -1,3 +1,6 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+
 local function isLocked(entity)
     return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
 end
@@ -14,7 +17,7 @@ local function unlock(entity)
                 State.Session.ActionResourcesListeners[uuid] = nil
             end
             local moveTo = State.Session.MovementQueue[uuid]
-            Movement.moveToPosition(uuid, moveTo,)
+            Movement.moveToPosition(uuid, moveTo, false)
             State.Session.MovementQueue[uuid] = nil
         end
     end
@@ -93,7 +96,7 @@ end
 local function isFTBAllLockedIn()
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        if not State.Session.FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not isDowned(uuid) then
+        if not State.Session.FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not Utils.isDowned(uuid) then
             return false
         end
     end
@@ -147,18 +150,21 @@ local function startTruePause(entityUuid)
 end
 
 local function checkTruePauseParty()
-    if State.Settings.TruePause then
-        for uuid, _ in pairs(State.Session.Players) do
-            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
-                startTruePause(uuid)
-            else
-                stopTruePause(uuid)
+    local players = State.Session.Players
+    if players then
+        if State.Settings.TruePause then
+            for uuid, _ in pairs(players) do
+                if Osi.IsInForceTurnBasedMode(uuid) == 1 then
+                    startTruePause(uuid)
+                else
+                    stopTruePause(uuid)
+                end
             end
-        end
-    else
-        for uuid, _ in pairs(State.Session.Players) do
-            stopTruePause(uuid)
-            unlock(Ext.Entity.Get(uuid))
+        else
+            for uuid, _ in pairs(players) do
+                stopTruePause(uuid)
+                unlock(Ext.Entity.Get(uuid))
+            end
         end
     end
 end

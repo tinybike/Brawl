@@ -1,3 +1,8 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local clearOsirisQueue = Utils.clearOsirisQueue
+
 local function checkSpellCharge(casterUuid, spellName)
     -- debugPrint("checking spell charge", casterUuid, spellName)
     if spellName then
@@ -75,7 +80,8 @@ local function removeActionInProgress(uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
-        for i, actionInProgress in ipairs(State.Session.ActionsInProgress[uuid]) do
+        local actionsInProgres = State.Session.ActionsInProgress[uuid]
+        for i, actionInProgress in ipairs(actionsInProgress) do
             if actionInProgress == spellName then
                 foundActionInProgress = true
                 actionsInProgressIndex = i
@@ -84,8 +90,8 @@ local function removeActionInProgress(uuid, spellName)
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, getDisplayName(uuid), State.Session.ActionsInProgress[uuid])
-                table.remove(State.Session.ActionsInProgress[uuid], i)
+                debugPrint("remove action in progress", i, getDisplayName(uuid), actionsInProgress[i])
+                table.remove(actionsInProgress, i)
             end
             return true
         end
@@ -175,7 +181,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
-    -- local x, y, z = getPointInFrontOf(casterUuid, 1.0)
+    -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
     return true
 end

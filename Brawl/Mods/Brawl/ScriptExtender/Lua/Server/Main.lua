@@ -1,3 +1,8 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local isToT = Utils.isToT
+
 function stopPulseAction(brawler, remainInBrawl)
     if not remainInBrawl then
         brawler.isInBrawl = false
@@ -82,26 +87,30 @@ function startPulseReposition(level, skipCompanions)
 end
 
 function stopAllPulseAddNearbyTimers()
-    for _, timer in pairs(State.Session.PulseAddNearbyTimers) do
+    local pulseAddNearbyTimers = State.Session.PulseAddNearbyTimers
+    for _, timer in pairs(pulseAddNearbyTimers) do
         Ext.Timer.Cancel(timer)
     end
 end
 
 function stopAllPulseRepositionTimers()
-    for level, timer in pairs(State.Session.PulseRepositionTimers) do
+    local pulseRepositionTimers = State.Session.PulseRepositionTimers
+    for level, timer in pairs(pulseRepositionTimers) do
         Roster.endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
 end
 
 function stopAllPulseActionTimers()
-    for uuid, timer in pairs(State.Session.PulseActionTimers) do
+    local pulseActionTimers = State.Session.PulseActionTimers
+    for _, timer in pairs(pulseActionTimers) do
         Ext.Timer.Cancel(timer)
     end
 end
 
 function stopAllBrawlFizzlers()
-    for level, timer in pairs(State.Session.BrawlFizzler) do
+    local brawlFizzler = State.Session.BrawlFizzler
+    for level, timer in pairs(brawlFizzler) do
         Roster.endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
@@ -125,7 +134,8 @@ end
 
 function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, _ in pairs(players) do
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
@@ -156,7 +166,7 @@ function onStarted(level)
     State.setMaxPartySize()
     State.resetPlayers()
     State.setIsControllingDirectly()
-    setMovementSpeedThresholds()
+    Movement.setMovementSpeedThresholds()
     Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
     Roster.initBrawlers(level)
@@ -268,13 +278,14 @@ function onEnteredForceTurnBased(entityGuid)
         if State.Settings.TruePause then
             Pause.startTruePause(entityUuid)
         end
-        if State.Session.Brawlers[level] then
-            for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
-                if brawlerUuid ~= entityUuid and not State.Session.Brawlers[level][brawlerUuid].isPaused then
-                    clearOsirisQueue(brawlerUuid)
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
+                    Utils.clearOsirisQueue(brawlerUuid)
                     stopPulseAction(brawler, true)
                     if State.Session.Players[brawlerUuid] then
-                        State.Session.Brawlers[level][brawlerUuid].isPaused = true
+                        brawlersInLevel[brawlerUuid].isPaused = true
                         Osi.ForceTurnBasedMode(brawlerUuid, 1)
                     end
                 end
@@ -311,8 +322,9 @@ function onLeftForceTurnBased(entityGuid)
             if isToT() then
                 startToTTimers()
             end
-            if State.Session.Brawlers[level] then
-                for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, brawler in pairs(brawlersInLevel) do
                     if State.Session.Players[brawlerUuid] then
                         if not State.isPlayerControllingDirectly(brawlerUuid) then
                             Ext.Timer.WaitFor(2000, function ()
@@ -320,7 +332,7 @@ function onLeftForceTurnBased(entityGuid)
                                 startPulseAction(brawler)
                             end)
                         end
-                        State.Session.Brawlers[level][brawlerUuid].isPaused = false
+                        brawlersInLevel[brawlerUuid].isPaused = false
                         if brawlerUuid ~= entityUuid then
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
@@ -347,7 +359,7 @@ function onDied(entityGuid)
         -- this at least makes them lie prone (and dead-appearing units still appear dead)
         Ext.Timer.WaitFor(LIE_ON_GROUND_TIMEOUT, function ()
             debugPrint("LieOnGround", entityUuid)
-            clearOsirisQueue(entityUuid)
+            Utils.clearOsirisQueue(entityUuid)
             Osi.LieOnGround(entityUuid)
         end)
         Roster.removeBrawler(level, entityUuid)
@@ -382,25 +394,27 @@ function onGainedControl(targetGuid)
                 MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
             end
         end
-        clearOsirisQueue(targetUuid)
+        Utils.clearOsirisQueue(targetUuid)
         local targetUserId = Osi.GetReservedUserID(targetUuid)
-        if State.Session.Players[targetUuid] ~= nil and targetUserId ~= nil then
-            State.Session.Players[targetUuid].isControllingDirectly = true
+        local players = State.Session.Players
+        if players[targetUuid] ~= nil and targetUserId ~= nil then
+            players[targetUuid].isControllingDirectly = true
             startPulseAddNearby(targetUuid)
             local level = Osi.GetRegion(targetUuid)
-            for playerUuid, player in pairs(State.Session.Players) do
+            local brawlersInLevel = State.Session.Brawlers[level]
+            for playerUuid, player in pairs(players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
                     player.isControllingDirectly = false
-                    if level and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] and State.Session.Brawlers[level][playerUuid].isInBrawl then
+                    if level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
                         stopPulseAddNearby(playerUuid)
-                        startPulseAction(State.Session.Brawlers[level][playerUuid])
+                        startPulseAction(brawlersInLevel[playerUuid])
                     end
                 end
             end
-            if level and State.Session.Brawlers[level] and State.Session.Brawlers[level][targetUuid] and not State.Settings.FullAuto then
-                stopPulseAction(State.Session.Brawlers[level][targetUuid], true)
+            if level and brawlersInLevel and brawlersInLevel[targetUuid] and not State.Settings.FullAuto then
+                stopPulseAction(brawlersInLevel[targetUuid], true)
             end
-            -- debugDump(State.Session.Players)
+            -- debugDump(players)
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
@@ -503,10 +517,11 @@ function onDialogStarted(dialog, dialogInstanceId)
     if level then
         stopPulseReposition(level)
         stopBrawlFizzler(level)
-        if State.Session.Brawlers[level] then
-            for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 stopPulseAction(brawler, true)
-                clearOsirisQueue(brawlerUuid)
+                Utils.clearOsirisQueue(brawlerUuid)
             end
         end
         -- NB: no way to just pause timers, and spinning up a new timer will appear to have a new maximum value...
@@ -524,8 +539,9 @@ function onDialogEnded(dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         startPulseReposition(level)
-        if State.Session.Brawlers[level] then
-            for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 if brawler.isInBrawl and not State.isPlayerControllingDirectly(brawlerUuid) then
                     startPulseAction(brawler)
                 end
@@ -548,10 +564,13 @@ end
 function onTeleportedToCamp(character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.Session.Brawlers ~= nil then
-        for level, brawlersInLevel in pairs(State.Session.Brawlers) do
-            if brawlersInLevel[entityUuid] ~= nil then
-                Roster.removeBrawler(level, entityUuid)
-                Roster.checkForEndOfBrawl(level)
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for level, brawlersInLevel in pairs(brawlersInLevel) do
+                if brawlersInLevel[entityUuid] ~= nil then
+                    Roster.removeBrawler(level, entityUuid)
+                    Roster.checkForEndOfBrawl(level)
+                end
             end
         end
     end
@@ -631,7 +650,8 @@ end
 
 function stopListeners()
     cleanupAll()
-    for _, listener in pairs(State.Session.Listeners) do
+    local listeners = State.Session.Listeners
+    for _, listener in pairs(listeners) do
         listener.stop(listener.handle)
     end
 end

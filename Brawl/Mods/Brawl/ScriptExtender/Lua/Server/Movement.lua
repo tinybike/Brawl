@@ -1,3 +1,34 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local isPlayerOrAlly = Utils.isPlayerOrAlly
+local clearOsirisQueue = Utils.clearOsirisQueue
+local getSpellRange = Utils.getSpellRange
+
+local function playerMovementDistanceToSpeed(movementDistance)
+    if movementDistance > 10 then
+        return "Sprint"
+    elseif movementDistance > 6 then
+        return "Run"
+    elseif movementDistance > 3 then
+        return "Walk"
+    else
+        return "Stroll"
+    end
+end
+
+local function enemyMovementDistanceToSpeed(movementDistance)
+    if movementDistance > State.Session.MovementSpeedThresholds.Sprint then
+        return "Sprint"
+    elseif movementDistance > State.Session.MovementSpeedThresholds.Run then
+        return "Run"
+    elseif movementDistance > State.Session.MovementSpeedThresholds.Walk then
+        return "Walk"
+    else
+        return "Stroll"
+    end
+end
+
 local function getMovementSpeed(entityUuid)
     -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
     local entity = Ext.Entity.Get(entityUuid)
@@ -15,7 +46,7 @@ local function findPathToPosition(playerUuid, position, callback)
         if State.Session.MovementQueue[playerUuid] ~= nil or State.Session.AwaitingTarget[playerUuid] then
             Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
                 if not path or not path.GoalFound then
-                    return showNotification(playerUuid, "Can't get there", 2)
+                    return Utils.showNotification(playerUuid, "Can't get there", 2)
                 end
                 callback(validPosition)
             end)
@@ -38,7 +69,8 @@ local function moveToPosition(uuid, position, override)
 end
 
 local function moveCompanionsToPlayer(playerUuid)
-    for uuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for uuid, _ in pairs(players) do
         if not State.isPlayerControllingDirectly(uuid) then
             moveToTargetUuid(uuid, playerUuid, true)
         end
@@ -46,11 +78,22 @@ local function moveCompanionsToPlayer(playerUuid)
 end
 
 local function moveCompanionsToPosition(position)
-    for uuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for uuid, _ in pairs(players) do
         if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
             moveToPosition(uuid, position, true)
         end
     end
+end
+
+local function calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
+    local xMover, yMover, zMover = Osi.GetPosition(moverUuid)
+    local xTarget, yTarget, zTarget = Osi.GetPosition(targetUuid)
+    local dx = xMover - xTarget
+    local dy = yMover - yTarget
+    local dz = zMover - zTarget
+    local fracDistance = goalDistance / math.sqrt(dx*dx + dy*dy + dz*dz)
+    return Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 0, moverUuid, 1)
 end
 
 local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
@@ -71,6 +114,54 @@ local function holdPosition(entityUuid)
     end
 end
 
+local function repositionRelativeToTarget(brawlerUuid, targetUuid)
+    local archetype = Osi.GetActiveArchetype(brawlerUuid)
+    local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
+    if archetype == "melee" then
+        if distanceToTarget > MELEE_RANGE then
+            Osi.FlushOsirisQueue(brawlerUuid)
+            moveToTargetUuid(brawlerUuid, targetUuid, false)
+        else
+            holdPosition(brawlerUuid)
+        end
+    else
+        debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
+        if distanceToTarget <= MELEE_RANGE then
+            holdPosition(brawlerUuid)
+        elseif distanceToTarget < RANGED_RANGE_MIN then
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        elseif distanceToTarget < RANGED_RANGE_MAX then
+            holdPosition(brawlerUuid)
+        else
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+        end
+    end
+end
+
+local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
+    local range = getSpellRange(spellName)
+    local rangeNumber
+    -- clearOsirisQueue(attackerUuid)
+    local attackerCanMove = Osi.CanMove(attackerUuid) == 1
+    if range == "MeleeMainWeaponRange" then
+        moveToTargetUuid(attackerUuid, targetUuid, true)
+    elseif range == "RangedMainWeaponRange" then
+        rangeNumber = 18
+    else
+        rangeNumber = tonumber(range)
+        local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+        if distanceToTarget > rangeNumber and attackerCanMove then
+            debugPrint("moveIntoPositionForSpell distance > range, moving to...")
+            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+        end
+    end
+    local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
+    if not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
+        debugPrint("moveIntoPositionForSpell can't see target, moving closer")
+        moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2)
+    end
+end
+
 local function setPlayerRunToSprint(entityUuid)
     local entity = Ext.Entity.Get(entityUuid)
     if entity and entity.ServerCharacter then
@@ -82,13 +173,18 @@ local function setPlayerRunToSprint(entityUuid)
 end
 
 local function resetPlayersMovementSpeed()
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, player in pairs(players) do
         local entity = Ext.Entity.Get(playerUuid)
         if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
             entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
             player.movementSpeedRun = nil
         end
     end
+end
+
+local function setMovementSpeedThresholds()
+    State.Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[getDifficulty()]
 end
 
 Movement = {
@@ -99,7 +195,10 @@ Movement = {
     moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,
     moveToDistanceFromTarget = moveToDistanceFromTarget,
+    moveIntoPositionForSpell = moveIntoPositionForSpell,
     holdPosition = holdPosition,
+    repositionRelativeToTarget = repositionRelativeToTarget,
     setPlayerRunToSprint = setPlayerRunToSprint,
     resetPlayersMovementSpeed = resetPlayersMovementSpeed,
+    setMovementSpeedThresholds = setMovementSpeedThresholds,
 }

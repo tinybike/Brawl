@@ -1,3 +1,24 @@
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
+local getDisplayName = Utils.getDisplayName
+local isAliveAndCanFight = Utils.isAliveAndCanFight
+local isOnSameLevel = Utils.isOnSameLevel
+local isPugnacious = Utils.isPugnacious
+
+local function modStatusMessage(message)
+    Osi.QuestMessageHide("ModStatusMessage")
+    if State.Session.ModStatusMessageTimer ~= nil then
+        Ext.Timer.Cancel(State.Session.ModStatusMessageTimer)
+        State.Session.ModStatusMessageTimer = nil
+    end
+    Ext.Timer.WaitFor(50, function ()
+        Osi.QuestMessageShow("ModStatusMessage", message)
+        State.Session.ModStatusMessageTimer = Ext.Timer.WaitFor(MOD_STATUS_MESSAGE_DURATION, function ()
+            Osi.QuestMessageHide("ModStatusMessage")
+        end)
+    end)
+end
+
 local function setAwaitingTarget(uuid, isAwaitingTarget)
     if uuid ~= nil then
         State.Session.AwaitingTarget[uuid] = isAwaitingTarget
@@ -8,10 +29,11 @@ end
 local function disableCompanionAI()
     debugPrint("companion ai disabled")
     State.Settings.CompanionAIEnabled = false
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, player in pairs(players) do
         local level = Osi.GetRegion(playerUuid)
         if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
-            clearOsirisQueue(playerUuid)
+            Utils.clearOsirisQueue(playerUuid)
             stopPulseAction(State.Session.Brawlers[level][playerUuid])
         end
     end
@@ -21,8 +43,9 @@ end
 local function enableCompanionAI()
     debugPrint("companion ai enabled")
     State.Settings.CompanionAIEnabled = true
-    if State.Session.Players and areAnyState.Session.PlayersBrawling() then
-        for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    if players and State.areAnyPlayersBrawling() then
+        for playerUuid, player in pairs(players) do
             if not State.isPlayerControllingDirectly(playerUuid) then
                 Roster.addBrawler(playerUuid, true, true)
             end
@@ -34,11 +57,12 @@ end
 local function disableFullAuto()
     debugPrint("full auto disabled")
     State.Settings.FullAuto = false
-    for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for playerUuid, player in pairs(players) do
         if State.isPlayerControllingDirectly(playerUuid) then
             local level = Osi.GetRegion(playerUuid)
             if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
-                clearOsirisQueue(playerUuid)
+                Utils.clearOsirisQueue(playerUuid)
                 stopPulseAction(State.Session.Brawlers[level][playerUuid])
             end
         end
@@ -49,8 +73,9 @@ end
 local function enableFullAuto()
     debugPrint("full auto enabled")
     State.Settings.FullAuto = true
-    if State.Session.Players and State.areAnyPlayersBrawling() then
-        for playerUuid, player in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    if players and State.areAnyPlayersBrawling() then
+        for playerUuid, player in pairs(players) do
             Roster.addBrawler(playerUuid, true, true)
         end
     end
@@ -97,18 +122,41 @@ local function toggleMod()
     end
 end
 
+local function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourceForwardY, sourceForwardZ)
+    local deltaX = targetPos[1] - sourcePos[1]
+    local deltaY = targetPos[2] - sourcePos[2]
+    local deltaZ = targetPos[3] - sourcePos[3]
+    local squaredDistance = deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ
+    if squaredDistance < 1600 then -- 40^2 = 1600
+        local distance = math.sqrt(squaredDistance)
+        local vecToTargetX = deltaX/distance
+        local vecToTargetY = deltaY/distance
+        local vecToTargetZ = deltaZ/distance
+        local dotProduct = sourceForwardX*vecToTargetX + sourceForwardY*vecToTargetY + sourceForwardZ*vecToTargetZ
+        local weight = 0.5 -- on (0, 1)
+        local adjustedDistance = distance*(1 + dotProduct*weight)
+        if adjustedDistance < 0 then
+            adjustedDistance = 0
+        end
+        debugPrint("Raw distance", distance, "dotProduct", dotProduct, "adjustedDistance", adjustedDistance)
+        return adjustedDistance
+    end
+    return nil
+end
+
 local function buildClosestEnemyBrawlers(playerUuid)
     if State.Session.PlayerMarkedTarget[playerUuid] and not isAliveAndCanFight(State.Session.PlayerMarkedTarget[playerUuid]) then
         State.Session.PlayerMarkedTarget[playerUuid] = nil
     end
     local playerEntity = Ext.Entity.Get(playerUuid)
     local playerPos = playerEntity.Transform.Transform.Translate
-    local playerForwardX, playerForwardY, playerForwardZ = getForwardVector(playerUuid)
+    local playerForwardX, playerForwardY, playerForwardZ = Utils.getForwardVector(playerUuid)
     local maxTargets = 10
     local topTargets = {}
     local level = Osi.GetRegion(playerUuid)
-    if State.Session.Brawlers[level] then
-        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if isOnSameLevel(brawlerUuid, playerUuid) and isAliveAndCanFight(brawlerUuid) and isPugnacious(brawlerUuid, playerUuid) then
                 local brawlerEntity = Ext.Entity.Get(brawlerUuid)
                 if brawlerEntity then
@@ -151,12 +199,13 @@ end
 local function selectNextEnemyBrawler(playerUuid, isNext)
     local nextTargetIndex = nil
     local nextTargetUuid = nil
-    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(State.Session.ClosestEnemyBrawlers[playerUuid]) do
+    local closestEnemyBrawlers = State.Session.ClosestEnemyBrawlers[playerUuid]
+    for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(closestEnemyBrawlers) do
         if State.Session.PlayerMarkedTarget[playerUuid] == enemyBrawlerUuid then
-            debugPrint("found current target", State.Session.PlayerMarkedTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, State.Session.ClosestEnemyBrawlers[playerUuid][enemyBrawlerIndex])
+            debugPrint("found current target", State.Session.PlayerMarkedTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, closestEnemyBrawlers[enemyBrawlerIndex])
             if isNext then
                 debugPrint("getting NEXT target")
-                if enemyBrawlerIndex < #State.Session.ClosestEnemyBrawlers[playerUuid] then
+                if enemyBrawlerIndex < #closestEnemyBrawlers then
                     nextTargetIndex = enemyBrawlerIndex + 1
                 else
                     nextTargetIndex = 1
@@ -166,12 +215,12 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
                 if enemyBrawlerIndex > 1 then
                     nextTargetIndex = enemyBrawlerIndex - 1
                 else
-                    nextTargetIndex = #State.Session.ClosestEnemyBrawlers[playerUuid]
+                    nextTargetIndex = #closestEnemyBrawlers
                 end
             end
             debugPrint("target index", nextTargetIndex)
             debugDump(State.Session.ClosestEnemyBrawlers)
-            nextTargetUuid = State.Session.ClosestEnemyBrawlers[playerUuid][nextTargetIndex]
+            nextTargetUuid = closestEnemyBrawlers[nextTargetIndex]
             debugPrint("target uuid", nextTargetUuid)
             break
         end
@@ -203,14 +252,16 @@ local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
 end
 
 local function lockCompanionsOnTarget(level, targetUuid)
-    for uuid, _ in pairs(State.Session.Players) do
+    local players = State.Session.Players
+    for uuid, _ in pairs(players) do
         if isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
-            if not State.Session.Brawlers[level][uuid] then
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if not brawlersInLevel[uuid] then
                 Roster.addBrawler(uuid, true)
             end
-            if State.Session.Brawlers[level][uuid] and uuid ~= targetUuid then
-                State.Session.Brawlers[level][uuid].targetUuid = targetUuid
-                State.Session.Brawlers[level][uuid].lockedOnTarget = true
+            if brawlersInLevel[uuid] and uuid ~= targetUuid then
+                brawlersInLevel[uuid].targetUuid = targetUuid
+                brawlersInLevel[uuid].lockedOnTarget = true
                 debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
             end
         end
@@ -221,12 +272,30 @@ local function setAttackMoveTarget(playerUuid, targetUuid)
     debugPrint("Set attack-move target", playerUuid, targetUuid)
     setAwaitingTarget(playerUuid, false)
     local level = Osi.GetRegion(playerUuid)
-    if level and targetUuid and not isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
-        applyAttackMoveTargetVfx(targetUuid)
+    if level and targetUuid and not Utils.isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
+        Utils.applyAttackMoveTargetVfx(targetUuid)
         if not State.Session.Brawlers[level][targetUuid] then
             Roster.addBrawler(targetUuid, true)
         end
         lockCompanionsOnTarget(level, targetUuid)
+    end
+end
+
+local function getSpellNameBySlot(uuid, slot)
+    local entity = Ext.Entity.Get(uuid)
+    -- NB: is this always index 6?
+    if entity and entity.HotbarContainer and entity.HotbarContainer.Containers and entity.HotbarContainer.Containers.DefaultBarContainer then
+        local customBar = entity.HotbarContainer.Containers.DefaultBarContainer[6]
+        local spellName = nil
+        for _, element in ipairs(customBar.Elements) do
+            if element.Slot == slot then
+                if element.SpellId then
+                    return element.SpellId.OriginatorPrototype
+                else
+                    return nil
+                end
+            end
+        end
     end
 end
 
@@ -249,7 +318,7 @@ local function onActionButton(data, isController)
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
                     return Resources.useSpellAndResources(player.uuid, player.uuid, spellName)
                 end
-                -- if isZoneSpell(spellName) or isProjectileSpell(spellName) then
+                -- if Utils.isZoneSpell(spellName) or Utils.isProjectileSpell(spellName) then
                 --     return Resources.useSpellAndResources(player.uuid, nil, spellName)
                 -- end
                 if State.Session.PlayerMarkedTarget[player.uuid] == nil or Osi.IsDead(State.Session.PlayerMarkedTarget[player.uuid]) == 1 then
@@ -294,7 +363,7 @@ local function onClickPosition(data)
                         Pause.enqueueMovement(Ext.Entity.Get(playerUuid))
                     elseif State.Session.AwaitingTarget[playerUuid] then
                         setAwaitingTarget(playerUuid, false)
-                        applyAttackMoveTargetVfx(createDummyObject(validPosition))
+                        Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
                         Movement.moveCompanionsToPosition(validPosition)
                     end
                 end)
@@ -314,7 +383,7 @@ local function onOnMe(data)
     if State.Session.Players then
         local player = State.getPlayerByUserId(peerToUserId(data.UserID))
         if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
-            applyOnMeTargetVfx(player.uuid)
+            Utils.applyOnMeTargetVfx(player.uuid)
             Movement.moveCompanionsToPlayer(player.uuid)
         end
     end
@@ -412,10 +481,13 @@ local function onMCMHitpointsMultiplier(value)
     State.Settings.HitpointsMultiplier = value
     State.setupPartyMembersHitpoints()
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if State.Session.Brawlers and State.Session.Brawlers[level] then
-        for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
-            State.revertHitpoints(brawlerUuid)
-            State.modifyHitpoints(brawlerUuid)
+    if State.Session.Brawlers then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                State.revertHitpoints(brawlerUuid)
+                State.modifyHitpoints(brawlerUuid)
+            end
         end
     end
 end
@@ -470,7 +542,7 @@ Commands = {
         AttackMove = onAttackMove,
         RequestHeal = onRequestHeal,
         ChangeTactics = onChangeTactics,
-    }
+    },
     MCMSettingSaved = {
         mod_enabled = onMCMModEnabled,
         companion_ai_enabled = onMCMCompanionAIEnabled,
@@ -486,5 +558,5 @@ Commands = {
         max_party_size = onMCMMaxPartySize,
         murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
         turn_based_swarm_mode = function (v) State.Settings.TurnBasedSwarmMode = v end,
-    }
+    },
 }
