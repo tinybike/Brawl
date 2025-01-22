@@ -586,7 +586,7 @@ function onPROC_Subregion_Entered(characterGuid, _)
     local uuid = Osi.GetUUID(characterGuid)
     local level = Osi.GetRegion(uuid)
     if level and State.Session.Players and State.Session.Players[uuid] then
-        pulseReposition(level)
+        AI.pulseReposition(level)
     end
 end
 

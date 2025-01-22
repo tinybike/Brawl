@@ -456,7 +456,7 @@ local function revertAllModifiedHitpoints()
 end
 
 local function setMaxPartySize()
-    Osi.SetMaxPartySizeOverride(State.Settings.MaxPartySize)
+    Osi.SetMaxPartySizeOverride(Settings.MaxPartySize)
 	Osi.PROC_CheckPartyFull()
 end
 

@@ -252,17 +252,19 @@ local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
 end
 
 local function lockCompanionsOnTarget(level, targetUuid)
-    local players = State.Session.Players
-    for uuid, _ in pairs(players) do
-        if isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if not brawlersInLevel[uuid] then
-                Roster.addBrawler(uuid, true)
-            end
-            if brawlersInLevel[uuid] and uuid ~= targetUuid then
-                brawlersInLevel[uuid].targetUuid = targetUuid
-                brawlersInLevel[uuid].lockedOnTarget = true
-                debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+    if targetUuid and isAliveAndCanFight(targetUuid) then
+        local players = State.Session.Players
+        local brawlersInLevel = State.Session.Brawlers[level]
+        for uuid, _ in pairs(players) do
+            if isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
+                if not brawlersInLevel[uuid] then
+                    Roster.addBrawler(uuid, true)
+                end
+                if brawlersInLevel[uuid] and uuid ~= targetUuid then
+                    brawlersInLevel[uuid].targetUuid = targetUuid
+                    brawlersInLevel[uuid].lockedOnTarget = true
+                    debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
+                end
             end
         end
     end
