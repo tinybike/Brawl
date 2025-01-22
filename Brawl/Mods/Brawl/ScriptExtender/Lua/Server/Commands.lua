@@ -1,3 +1,10 @@
+local function setAwaitingTarget(uuid, isAwaitingTarget)
+    if uuid ~= nil then
+        State.Session.AwaitingTarget[uuid] = isAwaitingTarget
+        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
+    end
+end
+
 local function disableCompanionAI()
     debugPrint("companion ai disabled")
     State.Settings.CompanionAIEnabled = false
@@ -166,13 +173,13 @@ local function onClickPosition(data)
             if State.Session.AwaitingTarget[playerUuid] and clickPosition.uuid then
                 setAttackMoveTarget(playerUuid, clickPosition.uuid)
             elseif clickPosition.position then
-                findPathToPosition(playerUuid, clickPosition.position, function (validPosition)
+                Movement.findPathToPosition(playerUuid, clickPosition.position, function (validPosition)
                     if State.Session.MovementQueue[playerUuid] ~= nil then
-                        enqueueMovement(Ext.Entity.Get(playerUuid))
+                        Pause.enqueueMovement(Ext.Entity.Get(playerUuid))
                     elseif State.Session.AwaitingTarget[playerUuid] then
                         setAwaitingTarget(playerUuid, false)
                         applyAttackMoveTargetVfx(createDummyObject(validPosition))
-                        moveCompanionsToPosition(validPosition)
+                        Movement.moveCompanionsToPosition(validPosition)
                     end
                 end)
             end
@@ -182,7 +189,7 @@ end
 local function onCancelQueuedMovement(data)
     local player = State.getPlayerByUserId(peerToUserId(data.UserID))
     if player and player.uuid then
-        cancelQueuedMovement(player.uuid)
+        Pause.cancelQueuedMovement(player.uuid)
     end
 end
 local function onOnMe(data)
@@ -190,7 +197,7 @@ local function onOnMe(data)
         local player = State.getPlayerByUserId(peerToUserId(data.UserID))
         if player and player.uuid and Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             applyOnMeTargetVfx(player.uuid)
-            moveCompanionsToPlayer(player.uuid)
+            Movement.moveCompanionsToPlayer(player.uuid)
         end
     end
 end
@@ -272,7 +279,7 @@ local function onMCMCompanionAIEnabled(value)
 end
 local function onMCMTruePause(value)
     State.Settings.TruePause = value
-    checkTruePauseParty()
+    Pause.checkTruePauseParty()
 end
 local function onMCMHitpointsMultiplier(value)
     State.Settings.HitpointsMultiplier = value
@@ -314,37 +321,40 @@ local function onMCMMaxPartySize(maxPartySize)
     State.setMaxPartySize()
 end
 
-NetMessage = {
-    ModToggle = onModToggle,
-    CompanionAIToggle = onCompanionAIToggle,
-    FullAutoToggle = onFullAutoToggle,
-    ExitFTB = function (_) allExitFTB() end,
-    EnterFTB = function (_) allEnterFTB() end,
-    ClickPosition = onClickPosition,
-    CancelQueuedMovement = onCancelQueuedMovement,
-    ActionButton = function (data) onActionButton(data, false) end,
-    ControllerActionButton = function (data) onActionButton(data, true) end,
-    TargetCloserEnemy = function (data) targetCloserOrFartherEnemy(data, false) end,
-    TargetFartherEnemy = function (data) targetCloserOrFartherEnemy(data, true) end,
-    OnMe = onOnMe,
-    AttackMyTarget = onAttackMyTarget,
-    AttackMove = onAttackMove,
-    RequestHeal = onRequestHeal,
-    ChangeTactics = onChangeTactics,
-}
-MCMSettingSaved = {
-    mod_enabled = onMCMModEnabled,
-    companion_ai_enabled = onMCMCompanionAIEnabled,
-    true_pause = onMCMTruePause,
-    auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
-    action_interval = function (v) State.Settings.ActionInterval = v end,
-    hitpoints_multiplier = onMCMHitpointsMultiplier,
-    full_auto = onMCMFullAuto,
-    active_character_archetype = onMCMActiveCharacterArchetype,
-    companion_tactics = function (v) State.Settings.CompanionTactics = v end,
-    companion_ai_max_spell_level = function (v) State.Settings.CompanionAIMaxSpellLevel = v end,
-    hogwild_mode = function (v) State.Settings.HogwildMode = v end,
-    max_party_size = onMCMMaxPartySize,
-    murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
-    turn_based_swarm_mode = function (v) State.Settings.TurnBasedSwarmMode = v end,
+Commands = {
+    setAwaitingTarget = setAwaitingTarget,
+    NetMessage = {
+        ModToggle = onModToggle,
+        CompanionAIToggle = onCompanionAIToggle,
+        FullAutoToggle = onFullAutoToggle,
+        ExitFTB = function (_) Pause.allExitFTB() end,
+        EnterFTB = function (_) Pause.allEnterFTB() end,
+        ClickPosition = onClickPosition,
+        CancelQueuedMovement = onCancelQueuedMovement,
+        ActionButton = function (data) onActionButton(data, false) end,
+        ControllerActionButton = function (data) onActionButton(data, true) end,
+        TargetCloserEnemy = function (data) targetCloserOrFartherEnemy(data, false) end,
+        TargetFartherEnemy = function (data) targetCloserOrFartherEnemy(data, true) end,
+        OnMe = onOnMe,
+        AttackMyTarget = onAttackMyTarget,
+        AttackMove = onAttackMove,
+        RequestHeal = onRequestHeal,
+        ChangeTactics = onChangeTactics,
+    }
+    MCMSettingSaved = {
+        mod_enabled = onMCMModEnabled,
+        companion_ai_enabled = onMCMCompanionAIEnabled,
+        true_pause = onMCMTruePause,
+        auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
+        action_interval = function (v) State.Settings.ActionInterval = v end,
+        hitpoints_multiplier = onMCMHitpointsMultiplier,
+        full_auto = onMCMFullAuto,
+        active_character_archetype = onMCMActiveCharacterArchetype,
+        companion_tactics = function (v) State.Settings.CompanionTactics = v end,
+        companion_ai_max_spell_level = function (v) State.Settings.CompanionAIMaxSpellLevel = v end,
+        hogwild_mode = function (v) State.Settings.HogwildMode = v end,
+        max_party_size = onMCMMaxPartySize,
+        murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
+        turn_based_swarm_mode = function (v) State.Settings.TurnBasedSwarmMode = v end,
+    }
 }

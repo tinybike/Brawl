@@ -230,15 +230,6 @@ function modStatusMessage(message)
     end)
 end
 
-function getMovementSpeed(entityUuid)
-    -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
-    local entity = Ext.Entity.Get(entityUuid)
-    local movementDistance = entity.ActionResources.Resources[MOVEMENT_DISTANCE_UUID][1].Amount
-    local movementSpeed = isPlayerOrAlly(entityUuid) and playerMovementDistanceToSpeed(movementDistance) or enemyMovementDistanceToSpeed(movementDistance)
-    -- debugPrint("getMovementSpeed", entityUuid, movementDistance, movementSpeed)
-    return movementSpeed
-end
-
 function isOnSameLevel(uuid1, uuid2)
     local level1 = Osi.GetRegion(uuid1)
     local level2 = Osi.GetRegion(uuid2)
@@ -418,28 +409,6 @@ function whoNeedsHealing(uuid, level)
         end
     end
     return friendlyTargetUuid
-end
-
-function isFTBAllLockedIn()
-    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-        local uuid = Osi.GetUUID(player[1])
-        if not State.Session.FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not isDowned(uuid) then
-            return false
-        end
-    end
-    return true
-end
-
-function isLocked(entity)
-    return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
-end
-
-function isInFTB(entity)
-    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
-end
-
-function isActionFinalized(entity)
-    return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
 
 function createDummyObject(position)

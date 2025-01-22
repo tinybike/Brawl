@@ -12,49 +12,6 @@ function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
-function setAwaitingTarget(uuid, isAwaitingTarget)
-    if uuid ~= nil then
-        State.Session.AwaitingTarget[uuid] = isAwaitingTarget
-        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
-    end
-end
-
-function findPathToPosition(playerUuid, position, callback)
-    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
-    if validX ~= nil and validY ~= nil and validZ ~= nil then
-        local validPosition = {validX, validY, validZ}
-        State.Session.LastClickPosition[playerUuid] = {position = validPosition}
-        if State.Session.MovementQueue[playerUuid] ~= nil or State.Session.AwaitingTarget[playerUuid] then
-            Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
-                if not path or not path.GoalFound then
-                    return showNotification(playerUuid, "Can't get there", 2)
-                end
-                callback(validPosition)
-            end)
-        end
-    end
-end
-
-function moveCompanionsToPlayer(playerUuid)
-    for uuid, _ in pairs(State.Session.Players) do
-        if not State.isPlayerControllingDirectly(uuid) then
-            Osi.PurgeOsirisQueue(uuid, 1)
-            Osi.FlushOsirisQueue(uuid)
-            Osi.CharacterMoveTo(uuid, playerUuid, getMovementSpeed(uuid), "")
-        end
-    end
-end
-
-function moveCompanionsToPosition(position)
-    for uuid, _ in pairs(State.Session.Players) do
-        if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-            Osi.PurgeOsirisQueue(uuid, 1)
-            Osi.FlushOsirisQueue(uuid)
-            Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
-        end
-    end
-end
-
 function lockCompanionsOnTarget(level, targetUuid)
     for uuid, _ in pairs(State.Session.Players) do
         if isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
@@ -67,26 +24,6 @@ function lockCompanionsOnTarget(level, targetUuid)
                 debugPrint("Set target to", uuid, getDisplayName(uuid), targetUuid, getDisplayName(targetUuid))
             end
         end
-    end
-end
-
-function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
-    local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
-    if x ~= nil and y ~= nil and z ~= nil then
-        Osi.PurgeOsirisQueue(moverUuid, 1)
-        Osi.FlushOsirisQueue(moverUuid)
-        Osi.CharacterMoveToPosition(moverUuid, x, y, z, getMovementSpeed(moverUuid), "")
-    end
-end
-
--- Example monk looping animations (can these be interruptable?)
--- (https://bg3.norbyte.dev/search?iid=Resource.6b05dbcc-19ef-475f-62a2-d18c1e640aa7)
--- animMK = "e85be5a8-6e48-4da4-8486-0d168159df4e"
--- animMK = "7bb52cd4-0b1c-4926-9165-fa92b75876a3"
-function holdPosition(entityUuid)
-    if not isPlayerOrAlly(entityUuid) then
-        Osi.PlayAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, "")
-        -- Osi.PlayLoopingAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID)
     end
 end
 
@@ -241,7 +178,7 @@ function moveToTarget(attackerUuid, targetUuid, spellName)
     Osi.FlushOsirisQueue(attackerUuid)
     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
     if range == "MeleeMainWeaponRange" then
-        Osi.CharacterMoveTo(attackerUuid, targetUuid, getMovementSpeed(attackerUuid), "")
+        Movement.moveToTargetUuid(attackerUuid, targetUuid)
     elseif range == "RangedMainWeaponRange" then
         rangeNumber = 18
     else
@@ -249,13 +186,13 @@ function moveToTarget(attackerUuid, targetUuid, spellName)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
         if distanceToTarget > rangeNumber and attackerCanMove then
             debugPrint("moveToTarget distance > range, moving to...")
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+            Movement.moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end
     end
     local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
     if not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
         debugPrint("moveToTarget can't see target, moving closer")
-        moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber or 2)
+        Movement.moveToDistanceFromTarget(attackerUuid, targetUuid, targetRadiusNumber or 2)
     end
 end
 
@@ -733,7 +670,7 @@ function findTarget(brawler)
             end
         end
         -- debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
-        holdPosition(brawler.uuid)
+        Movement.holdPosition(brawler.uuid)
         return false
     end
 end
@@ -801,7 +738,7 @@ function pulseAction(brawler)
 end
 
 function startPulseAction(brawler)
-    if Osi.IsPlayer(brawler.uuid) == 1 and not CompanionAIEnabled then
+    if Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
     end
     if IS_TRAINING_DUMMY[brawler.uuid] then
@@ -878,20 +815,20 @@ function repositionRelativeToTarget(brawlerUuid, targetUuid)
     if archetype == "melee" then
         if distanceToTarget > MELEE_RANGE then
             Osi.FlushOsirisQueue(brawlerUuid)
-            Osi.CharacterMoveTo(brawlerUuid, targetUuid, getMovementSpeed(brawlerUuid), "")
+            Movement.moveToTargetUuid(brawlerUuid, targetUuid, false)
         else
-            holdPosition(brawlerUuid)
+            Movement.holdPosition(brawlerUuid)
         end
     else
         debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
         if distanceToTarget <= MELEE_RANGE then
-            holdPosition(brawlerUuid)
+            Movement.holdPosition(brawlerUuid)
         elseif distanceToTarget < RANGED_RANGE_MIN then
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+            Movement.moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
         elseif distanceToTarget < RANGED_RANGE_MAX then
-            holdPosition(brawlerUuid)
+            Movement.holdPosition(brawlerUuid)
         else
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+            Movement.moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
         end
     end
 end
@@ -1064,13 +1001,13 @@ function pulseReposition(level, skipCompanions)
                             stopPulseAction(brawler, true)
                         else
                             if not brawler.isInBrawl then
-                                if Osi.IsPlayer(brawlerUuid) == 0 or CompanionAIEnabled then
+                                if Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
                                     -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
                                     -- shouldDelay?
                                     startPulseAction(brawler)
                                 end
-                            elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and CompanionAIEnabled then
-                                holdPosition(brawlerUuid)
+                            elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
+                                Movement.holdPosition(brawlerUuid)
                                 -- repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         end
@@ -1145,149 +1082,6 @@ function cleanupAll()
     State.resetSpellData()
 end
 
-function allEnterFTB()
-    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-        local uuid = Osi.GetUUID(player[1])
-        Osi.ForceTurnBasedMode(uuid, 1)
-    end
-end
-
-function cancelQueuedMovement(uuid)
-    if State.Session.MovementQueue[uuid] ~= nil and Osi.IsInForceTurnBasedMode(uuid) == 1 then
-        State.Session.MovementQueue[uuid] = nil
-    end
-end
-
-function unlock(entity)
-    if isLocked(entity) then
-        entity.TurnBased.IsInCombat_M = true
-        entity:Replicate("TurnBased")
-        local uuid = entity.Uuid.EntityUuid
-        State.Session.FTBLockedIn[uuid] = false
-        if State.Session.MovementQueue[uuid] then
-            if State.Session.ActionResourcesListeners[uuid] ~= nil then
-                Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
-                State.Session.ActionResourcesListeners[uuid] = nil
-            end
-            local moveTo = State.Session.MovementQueue[uuid]
-            Osi.CharacterMoveToPosition(uuid, moveTo[1], moveTo[2], moveTo[3], getMovementSpeed(uuid), "")
-            State.Session.MovementQueue[uuid] = nil
-        end
-    end
-end
-
-function allExitFTB()
-    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-        local uuid = Osi.GetUUID(player[1])
-        unlock(Ext.Entity.Get(uuid))
-        Osi.ForceTurnBasedMode(uuid, 0)
-        stopTruePause(uuid)
-    end
-end
-
-function lock(entity)
-    entity.TurnBased.IsInCombat_M = false
-    State.Session.FTBLockedIn[entity.Uuid.EntityUuid] = true
-end
-
-function midActionLock(entity)
-    local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
-    if spellCastState.Targets then
-        local target = spellCastState.Targets[1]
-        if target and (target.Position or target.Target) then
-            lock(entity)
-            State.Session.MovementQueue[entity.Uuid.EntityUuid] = nil
-        end
-    end
-end
-
-function enqueueMovement(entity)
-    local uuid = entity.Uuid.EntityUuid
-    if uuid and isInFTB(entity) and (not isLocked(entity) or State.Session.MovementQueue[uuid]) then
-        if State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
-            lock(entity)
-            local position = State.Session.LastClickPosition[uuid].position
-            State.Session.MovementQueue[uuid] = {position[1], position[2], position[3]}
-        end
-    end
-end
-
-function startTruePause(entityUuid)
-    -- eoc::ActionResourcesComponent: Replicated
-    -- eoc::spell_cast::TargetsChangedEventOneFrameComponent: Created
-    -- eoc::spell_cast::PreviewEndEventOneFrameComponent: Created
-    -- eoc::TurnBasedComponent: Replicated (all characters)
-    -- movement only triggers ActionResources
-    --      only pay attention to this if it doesn't occur after a spellcastmovement
-    -- move-then-act triggers SpellCastMovement, (TurnBased?), ActionResources
-    --      if SpellCastMovement triggered, then ignore the next action resources trigger
-    -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
-    if State.Settings.TruePause and Osi.IsPartyMember(entityUuid, 1) == 1 then
-        if State.Session.SpellCastMovementListeners[entityUuid] == nil then
-            local entity = Ext.Entity.Get(entityUuid)
-            State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
-                if caster and caster.TurnBased then
-                    State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
-                end
-                if isFTBAllLockedIn() then
-                    debugPrint("All locked in, auto-exiting FTB...")
-                    allExitFTB()
-                end
-            end, entity)
-            State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
-                enqueueMovement(caster)
-            end, entity)
-            -- NB: can specify only the specific cast entity?
-            State.Session.SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
-                local caster = cast.SpellCastState.Caster
-                if caster.Uuid.EntityUuid == entityUuid then
-                    if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-                        Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-                        State.Session.ActionResourcesListeners[entityUuid] = nil
-                    end
-                    if isInFTB(caster) and isActionFinalized(caster) then
-                        midActionLock(caster)
-                    end
-                end
-            end)
-        end
-    end
-end
-
-function stopTruePause(entityUuid)
-    if Osi.IsPartyMember(entityUuid, 1) == 1 then
-        if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-            State.Session.ActionResourcesListeners[entityUuid] = nil
-        end
-        if State.Session.TurnBasedListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
-            State.Session.TurnBasedListeners[entityUuid] = nil
-        end
-        if State.Session.SpellCastMovementListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.SpellCastMovementListeners[entityUuid])
-            State.Session.SpellCastMovementListeners[entityUuid] = nil
-        end
-    end
-end
-
-function checkTruePauseParty()
-    if State.Settings.TruePause then
-        for uuid, _ in pairs(State.Session.Players) do
-            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
-                startTruePause(uuid)
-            else
-                stopTruePause(uuid)
-            end
-        end
-    else
-        for uuid, _ in pairs(State.Session.Players) do
-            stopTruePause(uuid)
-            unlock(Ext.Entity.Get(uuid))
-        end
-    end
-end
-
 function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
     for playerUuid, player in pairs(State.Session.Players) do
@@ -1339,7 +1133,7 @@ function onStarted(level)
     State.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
     initBrawlers(level)
-    checkTruePauseParty()
+    Pause.checkTruePauseParty()
     debugDump(State.Session.Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -1432,7 +1226,7 @@ function onEnteredForceTurnBased(entityGuid)
             return Osi.ForceTurnBasedMode(entityUuid, 0)
         end
         if State.Session.AwaitingTarget[entityUuid] then
-            setAwaitingTarget(entityUuid, false)
+            Commands.setAwaitingTarget(entityUuid, false)
         end
         Quests.stopCountdownTimer(entityUuid)
         if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
@@ -1444,7 +1238,9 @@ function onEnteredForceTurnBased(entityGuid)
         if isToT() then
             stopToTTimers()
         end
-        startTruePause(entityUuid)
+        if State.Settings.TruePause then
+            Pause.startTruePause(entityUuid)
+        end
         if State.Session.Brawlers[level] then
             for brawlerUuid, brawler in pairs(State.Session.Brawlers[level]) do
                 if brawlerUuid ~= entityUuid and not State.Session.Brawlers[level][brawlerUuid].isPaused then
@@ -1953,14 +1749,14 @@ function onGameStateChanged(e)
 end
 
 function onMCMSettingSaved(payload)
-    if payload and payload.modUUID == ModuleUUID and payload.settingId and MCMSettingSaved[payload.settingId] then
-        MCMSettingSaved[payload.settingId](payload.value)
+    if payload and payload.modUUID == ModuleUUID and payload.settingId and Commands.MCMSettingSaved[payload.settingId] then
+        Commands.MCMSettingSaved[payload.settingId](payload.value)
     end
 end
 
 function onNetMessage(data)
-    if NetMessage[data.Channel] then
-        NetMessage[data.Channel](data)
+    if Commands.NetMessage[data.Channel] then
+        Commands.NetMessage[data.Channel](data)
     end
 end
 
