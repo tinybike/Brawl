@@ -468,8 +468,11 @@ function onDownedChanged(character, isDowned)
     end
 end
 
+-- use Osi.RemovePassive for initial technical combat to remove stealth checks maybe?
+-- Osi.ApplyStatus(GetHostCharacter(), "EXTRA_ATTACK", 100, 1, "")
+
 function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
-    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    print("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
@@ -477,6 +480,19 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
             Roster.addBrawler(attackerUuid, true)
             Roster.addBrawler(defenderUuid, true)
         end
+        -- if State.Session.ExtraAttacksRemaining[storyActionID] then
+        --     State.Session.ExtraAttacksRemaining[storyActionID] = false
+        --     local brawler = State.getBrawlerByUuid(attackerUuid)
+        --     if brawler.numExtraAttacks > 0 then
+        --         print("Executing extra attack")
+        --         Utils.clearOsirisQueue(attackerUuid)
+        --         -- NB: exclude this from the extra attack trigger - how?
+        --         Osi.Attack(attackerUuid, defenderUuid, 0)
+        --     end
+        -- end
+        -- if State.Session.ExtraAttacksRemaining[attackerUuid] then
+        --     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+        -- end
         if Osi.IsPlayer(attackerUuid) == 1 then
             State.Session.PlayerCurrentTarget[attackerUuid] = defenderUuid
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
@@ -500,6 +516,50 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
+end
+
+function onUsingSpellOnTarget(caster, target, spell, spellType, spellElement, storyActionID)
+    print("UsingSpellOnTarget", caster, target, spell, spellType, spellElement, storyActionID)
+    local uuid = Osi.GetUUID(caster)
+    -- NB: use SpellTable lookup instead
+    local isExtraAttackTrigger = Osi.SpellHasSpellFlag(spell, "IsAttack") == 1 or Osi.SpellHasSpellFlag(spell, "IsDefaultWeaponAction") == 1
+    if isExtraAttackTrigger then
+        if State.Session.ExtraAttacksRemaining[uuid] == nil then
+            print("not", storyActionID)
+            local brawler = State.getBrawlerByUuid(uuid)
+            if brawler.numExtraAttacks > 0 then
+                State.Session.ExtraAttacksRemaining[uuid] = brawler.numExtraAttacks
+                -- Osi.ApplyStatus(caster, "EXTRA_ATTACK", 6, 1, "")
+                print("Triggered extra attacks!", State.Session.ExtraAttacksRemaining[uuid])
+            end
+        end
+        if State.Session.ExtraAttacksRemaining[uuid] ~= nil then
+            print("extra attacks reamining", storyActionID, State.Session.ExtraAttacksRemaining[uuid])
+            if State.Session.ExtraAttacksRemaining[uuid] > 1 then
+                State.Session.ExtraAttacksRemaining[uuid] = State.Session.ExtraAttacksRemaining[uuid] - 1
+            else
+                State.Session.ExtraAttacksRemaining[uuid] = nil
+            end
+            Ext.Timer.WaitFor(1000, function ()
+                Osi.FlushOsirisQueue(caster)
+                Osi.Attack(caster, target, 0)
+            end)
+        end
+    end
+end
+
+function onKilledBy(defender, attackOwner, attacker, storyActionID)
+    print("KilledBy", defender, attackOwner, attacker, storyActionID)
+    State.Session.ExtraAttacksRemaining[Osi.GetUUID(attacker)] = nil
+    State.Session.ExtraAttacksRemaining[Osi.GetUUID(defender)] = nil
+end
+
+function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
+    print("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
+end
+
+function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
+    debugPrint("UsingSpell", caster, spell, spellType, spellElement, storyActionID)
 end
 
 function onCastedSpell(casterGuid, spellName, _, _, _)
@@ -645,6 +705,46 @@ function onFlagSet(flag, speaker, dialogInstance)
     end
 end
 
+function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
+    debugPrint("onCharacterOnCrimeSensibleActionNotification", character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
+end
+
+function onCrimeIsRegistered(victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
+    debugPrint("CrimeIsRegistered", victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
+end
+
+function onCrimeProcessingStarted(crimeID, actedOnImmediately)
+    debugPrint("CrimeProcessingStarted", crimeID, actedOnImmediately)
+end
+
+function onOnCrimeConfrontationDone(crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
+    debugPrint("OnCrimeConfrontationDone", crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
+end
+
+function onOnCrimeInvestigatorSwitchedState(crimeID, investigator, fromState, toState)
+    debugPrint("OnCrimeInvestigatorSwitchedState", crimeID, investigator, fromState, toState)
+end
+
+function onOnCrimeMergedWith(oldCrimeID, newCrimeID)
+    debugPrint("OnCrimeMergedWith", oldCrimeID, newCrimeID)
+end
+
+function onOnCrimeRemoved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+    debugPrint("OnCrimeRemoved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+end
+
+function onOnCrimeResetInterrogationForCriminal(crimeID, criminal)
+    debugPrint("OnCrimeResetInterrogationForCriminal", crimeID, criminal)
+end
+
+function onOnCrimeResolved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+    debugPrint("OnCrimeResolved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+end
+
+function onOnCriminalMergedWithCrime(crimeID, criminal)
+    debugPrint("OnCriminalMergedWithCrime", crimeID, criminal)
+end
+
 function stopListeners()
     cleanupAll()
     local listeners = State.Session.Listeners
@@ -716,8 +816,24 @@ function startListeners()
         handle = Ext.Osiris.RegisterListener("DownedChanged", 2, "after", onDownedChanged),
         stop = Ext.Osiris.UnregisterListener,
     }
+    State.Session.Listeners.KilledBy = {
+        handle = Ext.Osiris.RegisterListener("KilledBy", 4, "after", onKilledBy),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     State.Session.Listeners.AttackedBy = {
         handle = Ext.Osiris.RegisterListener("AttackedBy", 7, "after", onAttackedBy),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.UsingSpellOnTarget = {
+        handle = Ext.Osiris.RegisterListener("UsingSpellOnTarget", 6, "after", onUsingSpellOnTarget),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.UsingSpellOnZoneWithTarget = {
+        handle = Ext.Osiris.RegisterListener("UsingSpellOnZoneWithTarget", 6, "after", onUsingSpellOnZoneWithTarget),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.UsingSpell = {
+        handle = Ext.Osiris.RegisterListener("UsingSpell", 5, "after", onUsingSpell),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.CastedSpell = {
@@ -778,6 +894,46 @@ function startListeners()
     -- }
     State.Session.Listeners.FlagSet = {
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
+        handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CrimeIsRegistered = {
+        handle = Ext.Osiris.RegisterListener("CrimeIsRegistered", 8, "after", onCrimeIsRegistered),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CrimeProcessingStarted = {
+        handle = Ext.Osiris.RegisterListener("CrimeProcessingStarted", 2, "after", onCrimeProcessingStarted),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeConfrontationDone = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeConfrontationDone", 7, "after", onOnCrimeConfrontationDone),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeInvestigatorSwitchedState = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeInvestigatorSwitchedState", 4, "after", onOnCrimeInvestigatorSwitchedState),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeMergedWith = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeMergedWith", 2, "after", onOnCrimeMergedWith),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeRemoved = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeRemoved", 6, "after", onOnCrimeRemoved),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeResetInterrogationForCriminal = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeResetInterrogationForCriminal", 2, "after", onOnCrimeResetInterrogationForCriminal),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCrimeResolved = {
+        handle = Ext.Osiris.RegisterListener("OnCrimeResolved", 6, "after", onOnCrimeResolved),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.OnCriminalMergedWithCrime = {
+        handle = Ext.Osiris.RegisterListener("OnCriminalMergedWithCrime", 2, "after", onOnCriminalMergedWithCrime),
         stop = Ext.Osiris.UnregisterListener,
     }
 end

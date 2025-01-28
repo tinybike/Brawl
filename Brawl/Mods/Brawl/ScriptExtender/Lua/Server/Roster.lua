@@ -3,6 +3,17 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isAliveAndCanFight = Utils.isAliveAndCanFight
 
+local function getNumExtraAttacks(entityUuid)
+    if Osi.HasPassive(entityUuid, "ExtraAttack_3") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack_3") == 1 then
+        return 3
+    elseif Osi.HasPassive(entityUuid, "ExtraAttack_2") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack_2") == 1 then
+        return 2
+    elseif Osi.HasPassive(entityUuid, "ExtraAttack") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack") == 1 then
+        return 1
+    end
+    return 0
+end
+
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
@@ -14,7 +25,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         end
         if okToAdd then
             local displayName = getDisplayName(entityUuid)
-            debugPrint("Adding Brawler", entityUuid, displayName)
             local brawler = {
                 uuid = entityUuid,
                 displayName = displayName,
@@ -23,7 +33,9 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 isInBrawl = isInBrawl,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
+                numExtraAttacks = getNumExtraAttacks(entityUuid),
             }
+            debugPrint("Adding Brawler", entityUuid, displayName, brawler.numExtraAttacks)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)

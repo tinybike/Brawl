@@ -62,6 +62,7 @@ local Session = {
     HealRequested = {},
     HealRequestedTimer = {},
     CountdownTimer = {},
+    ExtraAttacksRemaining = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ModStatusMessageTimer = nil,
@@ -97,27 +98,64 @@ local function isSafeAoESpell(spellName)
     return false
 end
 
+local function hasStringInSpellRoll(spell, target)
+    if spell and spell.SpellRoll and spell.SpellRoll.Default then
+        return string.find(spell.SpellRoll.Default, target, 1, true) ~= nil
+    end
+    return false
+end
+
+local function spellId(spell, spellName)
+    return spell.Name == spellName
+end
+
+local function extraAttackSpellCheck(spell)
+    return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
+end
+
+local function parseSpellUseCosts(spell)
+    local useCosts = Utils.split(spell.UseCosts, ";")
+    local costs = {
+        ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
+        LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
+    }
+    -- local hitCost = nil -- divine smite only..?
+    for _, useCost in ipairs(useCosts) do
+        local useCostTable = Utils.split(useCost, ":")
+        local useCostLabel = useCostTable[1]
+        local useCostAmount = tonumber(useCostTable[#useCostTable])
+        if useCostLabel == "SpellSlotsGroup" then
+            -- e.g. SpellSlotsGroup:1:1:2
+            -- NB: what are the first two numbers?
+            costs.SpellSlot = useCostAmount
+        else
+            costs[useCostLabel] = useCostAmount
+        end
+    end
+    return costs
+end
+
+local function hasUseCosts(spell, targetCost)
+    if spell and spell.UseCosts then
+        local costs = parseSpellUseCosts(spell)
+        if costs then
+            for cost, _ in pairs(costs) do
+                if cost == targetCost then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function extraAttackCheck(spell)
+    return extraAttackSpellCheck(spell) and hasUseCosts(spell, "ActionPoint")
+end
+
 local function getSpellInfo(spellType, spellName)
     local spell = Ext.Stats.Get(spellName)
     if spell and spell.VerbalIntent == spellType then
-        local useCosts = Utils.split(spell.UseCosts, ";")
-        local costs = {
-            ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
-            LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
-        }
-        -- local hitCost = nil -- divine smite only..?
-        for _, useCost in ipairs(useCosts) do
-            local useCostTable = Utils.split(useCost, ":")
-            local useCostLabel = useCostTable[1]
-            local useCostAmount = tonumber(useCostTable[#useCostTable])
-            if useCostLabel == "SpellSlotsGroup" then
-                -- e.g. SpellSlotsGroup:1:1:2
-                -- NB: what are the first two numbers?
-                costs.SpellSlot = useCostAmount
-            else
-                costs[useCostLabel] = useCostAmount
-            end
-        end
         local outOfCombatOnly = false
         for _, req in ipairs(spell.Requirements) do
             if req.Requirement == "Combat" and req.Not == true then
@@ -141,11 +179,12 @@ local function getSpellInfo(spellType, spellName)
             isEvocation = spell.SpellSchool == "Evocation",
             isSafeAoE = isSafeAoESpell(spellName),
             targetRadius = spell.TargetRadius,
-            costs = costs,
+            costs = parseSpellUseCosts(spell),
             type = spellType,
             hasVerbalComponent = hasVerbalComponent,
             -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
             -- damage = spell.TooltipDamageList,
+            triggersExtraAttack = extraAttackCheck(spell),
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
