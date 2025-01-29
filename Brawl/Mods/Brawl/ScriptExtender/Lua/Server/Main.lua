@@ -116,7 +116,7 @@ function stopAllBrawlFizzlers()
     end
 end
 
-function cleanupAll()
+local function cleanupAll()
     stopAllPulseAddNearbyTimers()
     stopAllPulseRepositionTimers()
     stopAllPulseActionTimers()
@@ -132,7 +132,44 @@ function cleanupAll()
     State.resetSpellData()
 end
 
-function onCombatStarted(combatGuid)
+local function stopToTTimers()
+    if State.Session.ToTRoundTimer ~= nil then
+        Ext.Timer.Cancel(State.Session.ToTRoundTimer)
+        State.Session.ToTRoundTimer = nil
+    end
+    if State.Session.ToTTimer ~= nil then
+        Ext.Timer.Cancel(State.Session.ToTTimer)
+        State.Session.ToTTimer = nil
+    end
+end
+
+local function startToTTimers()
+    debugPrint("startToTTimers")
+    stopToTTimers()
+    if not Mods.ToT.Player.InCamp() then
+        State.Session.ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
+            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+                debugPrint("Moving ToT forward")
+                Mods.ToT.Scenario.ForwardCombat()
+                Ext.Timer.WaitFor(1500, function ()
+                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+                end)
+            end
+            startToTTimers()
+        end)
+        if Mods.ToT.PersistentVars.Scenario then
+            local isPrepRound = (Mods.ToT.PersistentVars.Scenario.Round == 0) and (next(Mods.ToT.PersistentVars.Scenario.SpawnedEnemies) == nil)
+            if isPrepRound then
+                State.Session.ToTTimer = Ext.Timer.WaitFor(0, function ()
+                    debugPrint("adding nearby...")
+                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+                end, 8500)
+            end
+        end
+    end
+end
+
+local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
@@ -159,7 +196,7 @@ function onCombatStarted(combatGuid)
     end
 end
 
-function onStarted(level)
+local function onStarted(level)
     debugPrint("onStarted")
     State.resetSpellData()
     State.buildSpellTable()
@@ -175,7 +212,7 @@ function onStarted(level)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
 
-function onResetCompleted()
+local function onResetCompleted()
     debugPrint("ResetCompleted")
     -- Printer:Start()
     -- SpellPrinter:Start()
@@ -183,7 +220,7 @@ function onResetCompleted()
 end
 
 -- New user joined (multiplayer)
-function onUserReservedFor(entity, _, _)
+local function onUserReservedFor(entity, _, _)
     State.setIsControllingDirectly()
     local entityUuid = entity.Uuid.EntityUuid
     if State.Session.Players and State.Session.Players[entityUuid] then
@@ -192,49 +229,12 @@ function onUserReservedFor(entity, _, _)
     end
 end
 
-function onLevelGameplayStarted(level, _)
+local function onLevelGameplayStarted(level, _)
     debugPrint("LevelGameplayStarted", level)
     onStarted(level)
 end
 
-function stopToTTimers()
-    if State.Session.ToTRoundTimer ~= nil then
-        Ext.Timer.Cancel(State.Session.ToTRoundTimer)
-        State.Session.ToTRoundTimer = nil
-    end
-    if State.Session.ToTTimer ~= nil then
-        Ext.Timer.Cancel(State.Session.ToTTimer)
-        State.Session.ToTTimer = nil
-    end
-end
-
-function startToTTimers()
-    debugPrint("startToTTimers")
-    stopToTTimers()
-    if not Mods.ToT.Player.InCamp() then
-        State.Session.ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
-            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-                debugPrint("Moving ToT forward")
-                Mods.ToT.Scenario.ForwardCombat()
-                Ext.Timer.WaitFor(1500, function ()
-                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
-                end)
-            end
-            startToTTimers()
-        end)
-        if Mods.ToT.PersistentVars.Scenario then
-            local isPrepRound = (Mods.ToT.PersistentVars.Scenario.Round == 0) and (next(Mods.ToT.PersistentVars.Scenario.SpawnedEnemies) == nil)
-            if isPrepRound then
-                State.Session.ToTTimer = Ext.Timer.WaitFor(0, function ()
-                    debugPrint("adding nearby...")
-                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
-                end, 8500)
-            end
-        end
-    end
-end
-
-function onCombatRoundStarted(combatGuid, round)
+local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     if not isToT() then
         ENTER_COMBAT_RANGE = 20
@@ -244,16 +244,16 @@ function onCombatRoundStarted(combatGuid, round)
     end
 end
 
-function onCombatEnded(combatGuid)
+local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
 end
 
-function onEnteredCombat(entityGuid, combatGuid)
+local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
     Roster.addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
-function onEnteredForceTurnBased(entityGuid)
+local function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
@@ -294,7 +294,7 @@ function onEnteredForceTurnBased(entityGuid)
     end
 end
 
-function onLeftForceTurnBased(entityGuid)
+local function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
@@ -345,12 +345,12 @@ function onLeftForceTurnBased(entityGuid)
     end
 end
 
-function onTurnEnded(entityGuid)
+local function onTurnEnded(entityGuid)
     -- NB: how's this work for the "environmental turn"?
     debugPrint("TurnEnded", entityGuid)
 end
 
-function onDied(entityGuid)
+local function onDied(entityGuid)
     debugPrint("Died", entityGuid)
     local level = Osi.GetRegion(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
@@ -368,7 +368,7 @@ function onDied(entityGuid)
 end
 
 -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
-function onGainedControl(targetGuid)
+local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
@@ -420,7 +420,7 @@ function onGainedControl(targetGuid)
     end
 end
 
-function onCharacterJoinedParty(character)
+local function onCharacterJoinedParty(character)
     debugPrint("CharacterJoinedParty", character)
     local uuid = Osi.GetUUID(character)
     if uuid then
@@ -437,7 +437,7 @@ function onCharacterJoinedParty(character)
     end
 end
 
-function onCharacterLeftParty(character)
+local function onCharacterLeftParty(character)
     debugPrint("CharacterLeftParty", character)
     local uuid = Osi.GetUUID(character)
     if uuid then
@@ -451,7 +451,7 @@ function onCharacterLeftParty(character)
     end
 end
 
-function onDownedChanged(character, isDowned)
+local function onDownedChanged(character, isDowned)
     local entityUuid = Osi.GetUUID(character)
     debugPrint("DownedChanged", character, isDowned, entityUuid)
     local player = State.Session.Players[entityUuid]
@@ -468,11 +468,47 @@ function onDownedChanged(character, isDowned)
     end
 end
 
--- use Osi.RemovePassive for initial technical combat to remove stealth checks maybe?
--- Osi.ApplyStatus(GetHostCharacter(), "EXTRA_ATTACK", 100, 1, "")
+local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
+    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil then
+        local spellName = State.Session.StoryActionIDSpellName[storyActionID]
+        if spellName ~= nil then
+            State.Session.StoryActionIDSpellName[storyActionID] = nil
+            local spell = State.getSpellByName(spellName)
+            if spell ~= nil and spell.triggersExtraAttack == true then
+                if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
+                    local brawler = State.getBrawlerByUuid(attackerUuid)
+                    if brawler and brawler.numExtraAttacks > 0 then
+                        if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                            print("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks)
+                            State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks
+                        end
+                    end
+                end
+                if State.Session.ExtraAttacksRemaining[attackerUuid] ~= nil then
+                    print("Extra attacks remaining",  attackerUuid, spellName, storyActionID, State.Session.ExtraAttacksRemaining[attackerUuid])
+                    Ext.Timer.WaitFor(1000, function ()
+                        if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
+                            if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                                print("*************EXECUTING EXTRA ATTACK", State.Session.ExtraAttacksRemaining[attackerUuid])
+                                State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
+                                Osi.FlushOsirisQueue(attackerUuid)
+                                Osi.Attack(attackerUuid, defenderUuid, 0)
+                            else
+                                State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                            end
+                        else
+                            print("extra attacks COMPLETE")
+                            State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end
 
-function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
-    print("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
@@ -480,19 +516,6 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
             Roster.addBrawler(attackerUuid, true)
             Roster.addBrawler(defenderUuid, true)
         end
-        -- if State.Session.ExtraAttacksRemaining[storyActionID] then
-        --     State.Session.ExtraAttacksRemaining[storyActionID] = false
-        --     local brawler = State.getBrawlerByUuid(attackerUuid)
-        --     if brawler.numExtraAttacks > 0 then
-        --         print("Executing extra attack")
-        --         Utils.clearOsirisQueue(attackerUuid)
-        --         -- NB: exclude this from the extra attack trigger - how?
-        --         Osi.Attack(attackerUuid, defenderUuid, 0)
-        --     end
-        -- end
-        -- if State.Session.ExtraAttacksRemaining[attackerUuid] then
-        --     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-        -- end
         if Osi.IsPlayer(attackerUuid) == 1 then
             State.Session.PlayerCurrentTarget[attackerUuid] = defenderUuid
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
@@ -516,54 +539,33 @@ function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageA
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
+    handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
 end
 
-function onUsingSpellOnTarget(caster, target, spell, spellType, spellElement, storyActionID)
-    print("UsingSpellOnTarget", caster, target, spell, spellType, spellElement, storyActionID)
-    local uuid = Osi.GetUUID(caster)
-    -- NB: use SpellTable lookup instead
-    local isExtraAttackTrigger = Osi.SpellHasSpellFlag(spell, "IsAttack") == 1 or Osi.SpellHasSpellFlag(spell, "IsDefaultWeaponAction") == 1
-    if isExtraAttackTrigger then
-        if State.Session.ExtraAttacksRemaining[uuid] == nil then
-            print("not", storyActionID)
-            local brawler = State.getBrawlerByUuid(uuid)
-            if brawler.numExtraAttacks > 0 then
-                State.Session.ExtraAttacksRemaining[uuid] = brawler.numExtraAttacks
-                -- Osi.ApplyStatus(caster, "EXTRA_ATTACK", 6, 1, "")
-                print("Triggered extra attacks!", State.Session.ExtraAttacksRemaining[uuid])
-            end
-        end
-        if State.Session.ExtraAttacksRemaining[uuid] ~= nil then
-            print("extra attacks reamining", storyActionID, State.Session.ExtraAttacksRemaining[uuid])
-            if State.Session.ExtraAttacksRemaining[uuid] > 1 then
-                State.Session.ExtraAttacksRemaining[uuid] = State.Session.ExtraAttacksRemaining[uuid] - 1
-            else
-                State.Session.ExtraAttacksRemaining[uuid] = nil
-            end
-            Ext.Timer.WaitFor(1000, function ()
-                Osi.FlushOsirisQueue(caster)
-                Osi.Attack(caster, target, 0)
-            end)
-        end
+local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
+    print("UsingSpellOnTarget", casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
+    handleExtraAttacks(Osi.GetUUID(casterGuid), Osi.GetUUID(targetGuid), spellName)
+    if spellName ~= nil then
+        State.Session.StoryActionIDSpellName[storyActionID] = spellName
     end
 end
 
-function onKilledBy(defender, attackOwner, attacker, storyActionID)
-    print("KilledBy", defender, attackOwner, attacker, storyActionID)
-    State.Session.ExtraAttacksRemaining[Osi.GetUUID(attacker)] = nil
-    State.Session.ExtraAttacksRemaining[Osi.GetUUID(defender)] = nil
+local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID)
+    print("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
+    State.Session.ExtraAttacksRemaining[Osi.GetUUID(attackerGuid)] = nil
+    State.Session.ExtraAttacksRemaining[Osi.GetUUID(defenderGuid)] = nil
 end
 
-function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
+local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
     print("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
 end
 
-function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
+local function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
     debugPrint("UsingSpell", caster, spell, spellType, spellElement, storyActionID)
 end
 
-function onCastedSpell(casterGuid, spellName, _, _, _)
-    debugPrint("CastedSpell", casterGuid, spellName, _, _, _)
+local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint("CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
     debugDump(State.Session.ActionsInProgress[casterUuid])
     if Resources.removeActionInProgress(casterUuid, spellName) then
@@ -571,7 +573,7 @@ function onCastedSpell(casterGuid, spellName, _, _, _)
     end
 end
 
-function onDialogStarted(dialog, dialogInstanceId)
+local function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
@@ -594,7 +596,7 @@ function onDialogStarted(dialog, dialogInstanceId)
     end
 end
 
-function onDialogEnded(dialog, dialogInstanceId)
+local function onDialogEnded(dialog, dialogInstanceId)
     debugPrint("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
@@ -616,12 +618,12 @@ function onDialogEnded(dialog, dialogInstanceId)
     end
 end
 
-function onDifficultyChanged(difficulty)
+local function onDifficultyChanged(difficulty)
     debugPrint("DifficultyChanged", difficulty)
     setMovementSpeedThresholds()
 end
 
-function onTeleportedToCamp(character)
+local function onTeleportedToCamp(character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.Session.Brawlers ~= nil then
         for level, brawlersInLevel in pairs(State.Session.Brawlers) do
@@ -633,7 +635,7 @@ function onTeleportedToCamp(character)
     end
 end
 
-function onTeleportedFromCamp(character)
+local function onTeleportedFromCamp(character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.areAnyPlayersBrawling() then
         Roster.addBrawler(entityUuid, false)
@@ -641,7 +643,7 @@ function onTeleportedFromCamp(character)
 end
 
 -- thank u focus
-function onPROC_Subregion_Entered(characterGuid, _)
+local function onPROC_Subregion_Entered(characterGuid, _)
     debugPrint("PROC_Subregion_Entered", characterGuid)
     local uuid = Osi.GetUUID(characterGuid)
     local level = Osi.GetRegion(uuid)
@@ -650,13 +652,13 @@ function onPROC_Subregion_Entered(characterGuid, _)
     end
 end
 
-function onLevelUnloading(level)
+local function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
     State.Session.Brawlers[level] = nil
     stopPulseReposition(level)
 end
 
-function onObjectTimerFinished(objectGuid, timer)
+local function onObjectTimerFinished(objectGuid, timer)
     debugPrint("ObjectTimerFinished", objectGuid, timer)
     if timer == "TUT_Helm_Timer" then
         Quests.nautiloidTransponderCountdownFinished(Osi.GetUUID(objectGuid))
@@ -665,27 +667,27 @@ function onObjectTimerFinished(objectGuid, timer)
     end
 end
 
--- function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
+-- local function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
 --     debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
 -- end
 
--- function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
+-- local function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
 --     debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
 -- end
 
--- function onQuestAccepted(character, questID)
+-- local function onQuestAccepted(character, questID)
 --     debugPrint("QuestAccepted", character, questID)
 -- end
 
--- function onFlagCleared(flag, speaker, dialogInstance)
+-- local function onFlagCleared(flag, speaker, dialogInstance)
 --     debugPrint("FlagCleared", flag, speaker, dialogInstance)
 -- end
 
--- function onFlagLoadedInPresetEvent(object, flag)
+-- local function onFlagLoadedInPresetEvent(object, flag)
 --     debugPrint("FlagLoadedInPresetEvent", object, flag)
 -- end
 
-function onFlagSet(flag, speaker, dialogInstance)
+local function onFlagSet(flag, speaker, dialogInstance)
     debugPrint("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
         Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", LAKESIDE_RITUAL_COUNTDOWN_TURNS)
@@ -705,47 +707,47 @@ function onFlagSet(flag, speaker, dialogInstance)
     end
 end
 
-function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
+local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
     debugPrint("onCharacterOnCrimeSensibleActionNotification", character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
 end
 
-function onCrimeIsRegistered(victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
+local function onCrimeIsRegistered(victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
     debugPrint("CrimeIsRegistered", victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
 end
 
-function onCrimeProcessingStarted(crimeID, actedOnImmediately)
+local function onCrimeProcessingStarted(crimeID, actedOnImmediately)
     debugPrint("CrimeProcessingStarted", crimeID, actedOnImmediately)
 end
 
-function onOnCrimeConfrontationDone(crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
+local function onOnCrimeConfrontationDone(crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
     debugPrint("OnCrimeConfrontationDone", crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
 end
 
-function onOnCrimeInvestigatorSwitchedState(crimeID, investigator, fromState, toState)
+local function onOnCrimeInvestigatorSwitchedState(crimeID, investigator, fromState, toState)
     debugPrint("OnCrimeInvestigatorSwitchedState", crimeID, investigator, fromState, toState)
 end
 
-function onOnCrimeMergedWith(oldCrimeID, newCrimeID)
+local function onOnCrimeMergedWith(oldCrimeID, newCrimeID)
     debugPrint("OnCrimeMergedWith", oldCrimeID, newCrimeID)
 end
 
-function onOnCrimeRemoved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+local function onOnCrimeRemoved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
     debugPrint("OnCrimeRemoved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
 end
 
-function onOnCrimeResetInterrogationForCriminal(crimeID, criminal)
+local function onOnCrimeResetInterrogationForCriminal(crimeID, criminal)
     debugPrint("OnCrimeResetInterrogationForCriminal", crimeID, criminal)
 end
 
-function onOnCrimeResolved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
+local function onOnCrimeResolved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
     debugPrint("OnCrimeResolved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
 end
 
-function onOnCriminalMergedWithCrime(crimeID, criminal)
+local function onOnCriminalMergedWithCrime(crimeID, criminal)
     debugPrint("OnCriminalMergedWithCrime", crimeID, criminal)
 end
 
-function stopListeners()
+local function stopListeners()
     cleanupAll()
     local listeners = State.Session.Listeners
     for _, listener in pairs(listeners) do
@@ -753,7 +755,7 @@ function stopListeners()
     end
 end
 
-function startListeners()
+local function startListeners()
     debugPrint("Starting listeners...")
     State.Session.Listeners.ResetCompleted = {}
     State.Session.Listeners.ResetCompleted.handle = Ext.Events.ResetCompleted:Subscribe(onResetCompleted)
@@ -938,25 +940,25 @@ function startListeners()
     }
 end
 
-function onGameStateChanged(e)
+local function onGameStateChanged(e)
     if e and e.ToState == "UnloadLevel" then
         cleanupAll()
     end
 end
 
-function onMCMSettingSaved(payload)
+local function onMCMSettingSaved(payload)
     if payload and payload.modUUID == ModuleUUID and payload.settingId and Commands.MCMSettingSaved[payload.settingId] then
         Commands.MCMSettingSaved[payload.settingId](payload.value)
     end
 end
 
-function onNetMessage(data)
+local function onNetMessage(data)
     if Commands.NetMessage[data.Channel] then
         Commands.NetMessage[data.Channel](data)
     end
 end
 
-function onSessionLoaded()
+local function onSessionLoaded()
     Ext.Events.NetMessage:Subscribe(onNetMessage)
     if State.Settings.ModEnabled then
         startListeners()

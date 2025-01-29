@@ -63,6 +63,7 @@ local Session = {
     HealRequestedTimer = {},
     CountdownTimer = {},
     ExtraAttacksRemaining = {},
+    StoryActionIDSpellName = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ModStatusMessageTimer = nil,
