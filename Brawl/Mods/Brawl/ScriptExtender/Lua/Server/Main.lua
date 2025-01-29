@@ -196,7 +196,7 @@ local function onCombatStarted(combatGuid)
     end
 end
 
-local function onStarted(level)
+function onStarted(level)
     debugPrint("onStarted")
     State.resetSpellData()
     State.buildSpellTable()
@@ -747,7 +747,7 @@ local function onOnCriminalMergedWithCrime(crimeID, criminal)
     debugPrint("OnCriminalMergedWithCrime", crimeID, criminal)
 end
 
-local function stopListeners()
+function stopListeners()
     cleanupAll()
     local listeners = State.Session.Listeners
     for _, listener in pairs(listeners) do
@@ -755,7 +755,7 @@ local function stopListeners()
     end
 end
 
-local function startListeners()
+function startListeners()
     debugPrint("Starting listeners...")
     State.Session.Listeners.ResetCompleted = {}
     State.Session.Listeners.ResetCompleted.handle = Ext.Events.ResetCompleted:Subscribe(onResetCompleted)
