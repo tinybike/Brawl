@@ -169,7 +169,7 @@ local function startToTTimers()
     end
 end
 
-local function onCombatStarted(combatGuid)
+function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
@@ -493,6 +493,9 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
                                 State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
                                 Osi.FlushOsirisQueue(attackerUuid)
                                 Osi.Attack(attackerUuid, defenderUuid, 0)
+                                -- NB: use normal decision-making instead of Osi.Attack?
+                                -- need PulseAction modified to only include ExtraAttack triggering spells
+                                -- AI.PulseAction(State.getBrawlerByUuid(attackerUuid))
                             else
                                 State.Session.ExtraAttacksRemaining[attackerUuid] = nil
                             end
@@ -508,7 +511,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
 end
 
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
-    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    print("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
@@ -539,12 +542,14 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
-    handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
+    if attackerUuid ~= nil and (not State.isPlayerControllingDirectly(attackerUuid) or State.Settings.FullAuto) then
+        handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
+    end
 end
 
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
     print("UsingSpellOnTarget", casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
-    handleExtraAttacks(Osi.GetUUID(casterGuid), Osi.GetUUID(targetGuid), spellName)
+    -- handleExtraAttacks(Osi.GetUUID(casterGuid), Osi.GetUUID(targetGuid), spellName)
     if spellName ~= nil then
         State.Session.StoryActionIDSpellName[storyActionID] = spellName
     end
