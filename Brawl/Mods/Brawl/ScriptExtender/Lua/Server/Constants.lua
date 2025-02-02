@@ -1,4 +1,4 @@
-DEBUG_LOGGING = true
+DEBUG_LOGGING = false
 REPOSITION_INTERVAL = 2500
 BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 LIE_ON_GROUND_TIMEOUT = 3500
