@@ -14,6 +14,12 @@ function stopPulseAction(brawler, remainInBrawl)
     end
 end
 
+-- NB: scale this using initiative? what happens to initiative rolls since we're out of combat?
+local function randomizeActionInterval(proportion)
+    local multiplier = 1 + proportion*(2*math.random() - 1)
+    return math.floor(State.Settings.ActionInterval*multiplier + 0.5)
+end
+
 function startPulseAction(brawler)
     if Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
@@ -23,10 +29,9 @@ function startPulseAction(brawler)
     end
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
-        local noisedActionInterval = math.floor(State.Settings.ActionInterval*(0.7 + math.random()*0.6) + 0.5)
+        local noisedActionInterval = randomizeActionInterval(0.3)
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, noisedActionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
-            -- debugPrint("pulse action", brawler.uuid, brawler.displayName)
             AI.pulseAction(brawler)
         end, noisedActionInterval)
     end
@@ -34,7 +39,6 @@ end
 
 function stopBrawlFizzler(level)
     if State.Session.BrawlFizzler[level] ~= nil then
-        -- debugPrint("Something happened, stopping brawl fizzler...")
         Ext.Timer.Cancel(State.Session.BrawlFizzler[level])
         State.Session.BrawlFizzler[level] = nil
     end
@@ -451,6 +455,15 @@ local function onCharacterLeftParty(character)
     end
 end
 
+local function onRollResult(eventName, roller, rollSubject, resultType, isActiveRoll, criticality)
+    print("RollResult", eventName, roller, rollSubject, resultType, isActiveRoll, criticality)
+    -- local uuid = Osi.GetUUID(roller)
+    -- local brawler = State.getBrawlerByUuid(uuid)
+    -- if brawler then
+    --     brawler.initiativeRoll = ?
+    -- end
+end
+
 local function onDownedChanged(character, isDowned)
     local entityUuid = Osi.GetUUID(character)
     debugPrint("DownedChanged", character, isDowned, entityUuid)
@@ -817,6 +830,10 @@ function startListeners()
     }
     State.Session.Listeners.CharacterLeftParty = {
         handle = Ext.Osiris.RegisterListener("CharacterLeftParty", 1, "after", onCharacterLeftParty),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.RollResult = {
+        handle = Ext.Osiris.RegisterListener("RollResult", 6, "after", onRollResult),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.DownedChanged = {

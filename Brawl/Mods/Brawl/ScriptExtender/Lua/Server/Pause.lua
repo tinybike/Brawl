@@ -117,35 +117,30 @@ local function startTruePause(entityUuid)
     -- move-then-act triggers SpellCastMovement, (TurnBased?), ActionResources
     --      if SpellCastMovement triggered, then ignore the next action resources trigger
     -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
-    if Osi.IsPartyMember(entityUuid, 1) == 1 then
-        if State.Session.SpellCastMovementListeners[entityUuid] == nil then
-            local entity = Ext.Entity.Get(entityUuid)
-            State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
-                if caster and caster.TurnBased then
-                    State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
+    if Osi.IsPartyMember(entityUuid, 1) == 1 and State.Session.SpellCastMovementListeners[entityUuid] == nil then
+        local entity = Ext.Entity.Get(entityUuid)
+        State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
+            if caster and caster.TurnBased then
+                State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
+            end
+            if isFTBAllLockedIn() then
+                allExitFTB()
+            end
+        end, entity)
+        State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", enqueueMovement, entity)
+        -- NB: can specify only the specific cast entity?
+        State.Session.SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
+            local caster = cast.SpellCastState.Caster
+            if caster.Uuid.EntityUuid == entityUuid then
+                if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
+                    Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
+                    State.Session.ActionResourcesListeners[entityUuid] = nil
                 end
-                if isFTBAllLockedIn() then
-                    debugPrint("All locked in, auto-exiting FTB...")
-                    allExitFTB()
+                if isInFTB(caster) and isActionFinalized(caster) then
+                    midActionLock(caster)
                 end
-            end, entity)
-            State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (caster, _, _)
-                enqueueMovement(caster)
-            end, entity)
-            -- NB: can specify only the specific cast entity?
-            State.Session.SpellCastMovementListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
-                local caster = cast.SpellCastState.Caster
-                if caster.Uuid.EntityUuid == entityUuid then
-                    if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-                        Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-                        State.Session.ActionResourcesListeners[entityUuid] = nil
-                    end
-                    if isInFTB(caster) and isActionFinalized(caster) then
-                        midActionLock(caster)
-                    end
-                end
-            end)
-        end
+            end
+        end)
     end
 end
 
