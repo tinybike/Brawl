@@ -2,6 +2,32 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local isAliveAndCanFight = Utils.isAliveAndCanFight
 
+local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
+    State.Session.CountdownTimer = {
+        uuid = uuid,
+        turnsRemaining = turnsRemaining,
+        resume = onNextTurn,
+        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
+            onNextTurn(uuid, turnsRemaining - 1)
+        end)
+    }
+end
+
+local function stopCountdownTimer(uuid)
+    if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid and State.Session.CountdownTimer.timer ~= nil then
+        debugPrint("Stopping countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
+        Ext.Timer.Cancel(State.Session.CountdownTimer.timer)
+        State.Session.CountdownTimer.timer = nil
+    end
+end
+
+local function resumeCountdownTimer(uuid)
+    if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid then
+        debugPrint("Resuming countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
+        State.Session.CountdownTimer.resume(State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
+    end
+end
+
 local function nautiloidTransponderCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() then
         Osi.PROC_TUT_Helm_GameOver()
@@ -105,32 +131,6 @@ local function questTimerLaunch(timer, textKey, numRounds)
         for uuid, _ in pairs(players) do
             Osi.ObjectQuestTimerLaunch(uuid, timer, textKey, COUNTDOWN_TURN_INTERVAL*numRounds, 1)
         end
-    end
-end
-
-local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
-    State.Session.CountdownTimer = {
-        uuid = uuid,
-        turnsRemaining = turnsRemaining,
-        resume = onNextTurn,
-        timer = Ext.Timer.WaitFor(COUNTDOWN_TURN_INTERVAL, function ()
-            onNextTurn(uuid, turnsRemaining - 1)
-        end)
-    }
-end
-
-local function stopCountdownTimer(uuid)
-    if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid and State.Session.CountdownTimer.timer ~= nil then
-        debugPrint("Stopping countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
-        Ext.Timer.Cancel(State.Session.CountdownTimer.timer)
-        State.Session.CountdownTimer.timer = nil
-    end
-end
-
-local function resumeCountdownTimer(uuid)
-    if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid then
-        debugPrint("Resuming countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
-        State.Session.CountdownTimer.resume(State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
     end
 end
 
