@@ -2,7 +2,7 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local isAliveAndCanFight = Utils.isAliveAndCanFight
 
-local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
+function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
     State.Session.CountdownTimer = {
         uuid = uuid,
         turnsRemaining = turnsRemaining,
@@ -13,7 +13,7 @@ local function setCountdownTimer(uuid, turnsRemaining, onNextTurn)
     }
 end
 
-local function stopCountdownTimer(uuid)
+function stopCountdownTimer(uuid)
     if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid and State.Session.CountdownTimer.timer ~= nil then
         debugPrint("Stopping countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
         Ext.Timer.Cancel(State.Session.CountdownTimer.timer)
@@ -21,26 +21,37 @@ local function stopCountdownTimer(uuid)
     end
 end
 
-local function resumeCountdownTimer(uuid)
+function resumeCountdownTimer(uuid)
     if State.Session.CountdownTimer.uuid ~= nil and uuid == State.Session.CountdownTimer.uuid then
         debugPrint("Resuming countdown", State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
         State.Session.CountdownTimer.resume(State.Session.CountdownTimer.uuid, State.Session.CountdownTimer.turnsRemaining)
     end
 end
 
-local function nautiloidTransponderCountdownFinished(uuid)
+function nautiloidTransponderCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() then
         Osi.PROC_TUT_Helm_GameOver()
     end
 end
 
-local function lakesideRitualCountdownFinished(uuid)
+function lakesideRitualCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
         Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
     end
 end
 
-local function onLakesideRitualTurn(uuid, turnsRemaining)
+function lakesideRitualCountdown(uuid, turnsRemaining)
+    if turnsRemaining == LAKESIDE_RITUAL_COUNTDOWN_TURNS then
+        Roster.addBrawler(HALSIN_PORTAL_UUID, true)
+    end
+    setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
+end
+
+function nautiloidTransponderCountdown(uuid, turnsRemaining)
+    setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
+end
+
+function onLakesideRitualTurn(uuid, turnsRemaining)
     debugPrint("onLakesideRitualTurn", turnsRemaining, Osi.QRY_HAV_IsRitualActive())
     -- 1. enemies need to attack portal sometimes
     -- 2. during pause the timer needs to stop counting down
@@ -77,7 +88,7 @@ local function onLakesideRitualTurn(uuid, turnsRemaining)
     end
 end
 
-local function onNautiloidTransponderTurn(uuid, turnsRemaining)
+function onNautiloidTransponderTurn(uuid, turnsRemaining)
     debugPrint("onNautiloidTransponderTurn", turnsRemaining)
     if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
         local level = Osi.GetRegion(uuid)
@@ -105,18 +116,7 @@ local function onNautiloidTransponderTurn(uuid, turnsRemaining)
     end
 end
 
-local function lakesideRitualCountdown(uuid, turnsRemaining)
-    if turnsRemaining == LAKESIDE_RITUAL_COUNTDOWN_TURNS then
-        Roster.addBrawler(HALSIN_PORTAL_UUID, true)
-    end
-    setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
-end
-
-local function nautiloidTransponderCountdown(uuid, turnsRemaining)
-    setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
-end
-
-local function questTimerCancel(timer)
+function questTimerCancel(timer)
     local players = State.Session.Players
     if players then
         for uuid, _ in pairs(players) do
@@ -125,7 +125,7 @@ local function questTimerCancel(timer)
     end
 end
 
-local function questTimerLaunch(timer, textKey, numRounds)
+function questTimerLaunch(timer, textKey, numRounds)
     local players = State.Session.Players
     if players then
         for uuid, _ in pairs(players) do
