@@ -1,3 +1,10 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+-- local Resources = require("Server/Resources.lua")
+-- local Movement = require("Server/Movement.lua")
+-- local Roster = require("Server/Roster.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -32,8 +39,8 @@ end
 local function getResistanceWeight(spell, entity)
     if entity and entity.Resistances and entity.Resistances.Resistances then
         local resistances = entity.Resistances.Resistances
-        if spell.damageType ~= "None" and resistances[DAMAGE_TYPES[spell.damageType]] and resistances[DAMAGE_TYPES[spell.damageType]][1] then
-            local resistance = resistances[DAMAGE_TYPES[spell.damageType]][1]
+        if spell.damageType ~= "None" and resistances[Constants.DAMAGE_TYPES[spell.damageType]] and resistances[Constants.DAMAGE_TYPES[spell.damageType]][1] then
+            local resistance = resistances[Constants.DAMAGE_TYPES[spell.damageType]][1]
             if resistance == "ImmuneToNonMagical" or resistance == "ImmuneToMagical" then
                 return -1000
             elseif resistance == "ResistantToNonMagical" or resistance == "ResistantToMagical" then
@@ -66,22 +73,22 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     -- Maybe should weight proportional to distance required to get there...?
     local weight = 0
     if spell.targetRadius == "RangedMainWeaponRange" then
-        weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeapon
-        if distanceToTarget > RANGED_RANGE_MIN and distanceToTarget < RANGED_RANGE_MAX then
-            weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeaponInRange
+        weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].rangedWeapon
+        if distanceToTarget > Constants.RANGED_RANGE_MIN and distanceToTarget < Constants.RANGED_RANGE_MAX then
+            weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].rangedWeaponInRange
         else
-            weight = weight + ARCHETYPE_WEIGHTS[archetype].rangedWeaponOutOfRange
+            weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].rangedWeaponOutOfRange
         end
     elseif spell.targetRadius == "MeleeMainWeaponRange" then
-        weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeapon
-        if distanceToTarget <= MELEE_RANGE then
-            weight = weight + ARCHETYPE_WEIGHTS[archetype].meleeWeaponInRange
+        weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].meleeWeapon
+        if distanceToTarget <= Constants.MELEE_RANGE then
+            weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].meleeWeaponInRange
         end
     else
         local targetRadius = tonumber(spell.targetRadius)
         if targetRadius then
             if distanceToTarget <= targetRadius then
-                weight = weight + ARCHETYPE_WEIGHTS[archetype].spellInRange
+                weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].spellInRange
             end
         else
             debugPrint("Target radius didn't convert to number, what is this?")
@@ -90,7 +97,7 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType)
     end
     -- Favor using spells or non-spells?
     if spell.isSpell then
-        weight = weight + ARCHETYPE_WEIGHTS[archetype].isSpell
+        weight = weight + Constants.ARCHETYPE_WEIGHTS[archetype].isSpell
     end
     -- If this spell has a damage type, favor vulnerable enemies
     -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
@@ -150,7 +157,7 @@ local function isCompanionSpellAvailable(uuid, spellName, spell, isSilenced, dis
     --  2. If the target is out-of-range, can we hit him without moving outside of the perimeter? Then ok to use
     if State.Settings.CompanionTactics == "Defense" then
         local range = convertSpellRangeToNumber(getSpellRange(spellName))
-        if distanceToTarget > range and targetDistanceToParty > (range + DEFENSE_TACTICS_MAX_DISTANCE) then
+        if distanceToTarget > range and targetDistanceToParty > (range + Constants.DEFENSE_TACTICS_MAX_DISTANCE) then
             return false
         end
     end
@@ -250,7 +257,7 @@ end
 local function decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = getCompanionWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, targetDistanceToParty, allowAoE)
     debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
-    debugDump(ARCHETYPE_WEIGHTS[brawler.archetype])
+    debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
@@ -349,8 +356,8 @@ end
 local function getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile)
     if not isHostile and targetHpPct == 100.0 then
         return nil
-    else
-        return nil
+    -- else
+    --     return nil
     end
     local weightedTarget = 2*distanceToTarget + 0.25*targetHp
     if not canSeeTarget then
@@ -374,7 +381,7 @@ local function getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct,
     local weightedTarget
     local targetDistanceToParty = Osi.GetDistanceTo(targetUuid, closestAlivePlayer)
     -- Only include potential targets that are within X meters of the party
-    if targetDistanceToParty ~= nil and targetDistanceToParty < DEFENSE_TACTICS_MAX_DISTANCE then
+    if targetDistanceToParty ~= nil and targetDistanceToParty < Constants.DEFENSE_TACTICS_MAX_DISTANCE then
         weightedTarget = 3*distanceToTarget + 0.25*targetHp
         if not canSeeTarget then
             weightedTarget = weightedTarget*1.8
@@ -549,14 +556,14 @@ end
 -- Enemies are pugnacious jerks and looking for a fight >:(
 local function checkForBrawlToJoin(brawler)
     local closestPlayerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
-    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < ENTER_COMBAT_RANGE then
+    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < Constants.ENTER_COMBAT_RANGE then
         debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestPlayerUuid, closestDistance)
         Roster.addBrawler(closestPlayerUuid)
         local players = State.Session.Players
         for playerUuid, player in pairs(players) do
             if playerUuid ~= closestPlayerUuid then
                 local distanceTo = Osi.GetDistanceTo(brawler.uuid, playerUuid)
-                if distanceTo < ENTER_COMBAT_RANGE then
+                if distanceTo < Constants.ENTER_COMBAT_RANGE then
                     Roster.addBrawler(playerUuid)
                 end
             end
@@ -579,7 +586,7 @@ local function pulseAction(brawler)
             if isPlayerOrAlly(brawler.uuid) then
                 local players = State.Session.Players
                 for playerUuid, player in pairs(players) do
-                    if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < HELP_DOWNED_MAX_RANGE then
+                    if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < Constants.HELP_DOWNED_MAX_RANGE then
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
                         debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
@@ -619,7 +626,7 @@ local function pulseReposition(level, skipCompanions)
     if State.Session.Brawlers[level] then
         local brawlersInLevel = State.Session.Brawlers[level]
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
-            if not IS_TRAINING_DUMMY[brawlerUuid] then
+            if not Constants.IS_TRAINING_DUMMY[brawlerUuid] then
                 if isAliveAndCanFight(brawlerUuid) then
                     -- Enemy units are actively looking for a fight and will attack if you get too close to them
                     if isPugnacious(brawlerUuid) then
@@ -627,7 +634,7 @@ local function pulseReposition(level, skipCompanions)
                             debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
                             -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
-                            if closestDistance > 2*ENTER_COMBAT_RANGE then
+                            if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
                                 debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
                                 Roster.removeBrawler(level, brawlerUuid)
                             end
@@ -670,7 +677,7 @@ local function pulseAddNearby(uuid)
     Roster.addNearbyEnemiesToBrawlers(uuid, 30)
 end
 
-AI = {
+return {
     actOnHostileTarget = actOnHostileTarget,
     actOnFriendlyTarget = actOnFriendlyTarget,
     findTarget = findTarget,

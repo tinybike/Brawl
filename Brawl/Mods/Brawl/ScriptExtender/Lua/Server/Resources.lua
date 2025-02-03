@@ -1,3 +1,7 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -119,7 +123,7 @@ local function deductCastedSpell(uuid, spellName)
             elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
                     if entity.ActionResources and entity.ActionResources.Resources then
-                        local spellSlots = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
                         if spellSlots then
                             for _, spellSlot in ipairs(spellSlots) do
                                 if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
@@ -131,7 +135,7 @@ local function deductCastedSpell(uuid, spellName)
                     end
                 else
                     if entity.ActionResources and entity.ActionResources.Resources then
-                        local resources = entity.ActionResources.Resources[ACTION_RESOURCES[costType]]
+                        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
                         if resources then
                             local resource = resources[1] -- NB: always index 1?
                             resource.Amount = resource.Amount - costValue
@@ -186,7 +190,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     return true
 end
 
-Resources = {
+return {
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,

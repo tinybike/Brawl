@@ -1,3 +1,9 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+-- local Movement = require("Server/Movement.lua")
+-- local Listeners = require("Server/Listeners.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -130,7 +136,7 @@ local function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
         local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
-        if distanceTo ~= nil and distanceTo < ENTER_COMBAT_RANGE then
+        if distanceTo ~= nil and distanceTo < Constants.ENTER_COMBAT_RANGE then
             addBrawler(playerUuid)
         end
     end
@@ -152,14 +158,14 @@ local function initBrawlers(level)
             startPulseAddNearby(playerUuid)
         end
         if Osi.IsInCombat(playerUuid) == 1 then
-            onCombatStarted(Osi.CombatGetGuidFor(playerUuid))
+            Listeners.onCombatStarted(Osi.CombatGetGuidFor(playerUuid))
             break
         end
     end
     startPulseReposition(level)
 end
 
-Roster = {
+return {
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
     endBrawl = endBrawl,

@@ -1,3 +1,7 @@
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+-- local Movement = require("Server/Movement.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
@@ -164,7 +168,7 @@ local function checkTruePauseParty()
     end
 end
 
-Pause = {
+return {
     allEnterFTB = allEnterFTB,
     allExitFTB = allExitFTB,
     cancelQueuedMovement = cancelQueuedMovement,

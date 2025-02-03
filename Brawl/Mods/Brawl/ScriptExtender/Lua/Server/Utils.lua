@@ -1,11 +1,14 @@
+-- local Constants = require("Server/Constants.lua")
+-- local State = require("Server/State.lua")
+
 local function debugPrint(...)
-    if DEBUG_LOGGING then
+    if Constants.DEBUG_LOGGING then
         print(...)
     end
 end
 
 local function debugDump(...)
-    if DEBUG_LOGGING then
+    if Constants.DEBUG_LOGGING then
         _D(...)
     end
 end
@@ -27,7 +30,7 @@ local function getDisplayName(entityUuid)
 end
 
 local function isAliveAndCanFight(entityUuid)
-    if IS_TRAINING_DUMMY[entityUuid] == true then
+    if Constants.IS_TRAINING_DUMMY[entityUuid] == true then
         return true
     end
     local isDead = Osi.IsDead(entityUuid)
@@ -229,7 +232,7 @@ local function isSilenced(uuid)
 end
 
 local function createDummyObject(position)
-    local dummyUuid = Osi.CreateAt(INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
+    local dummyUuid = Osi.CreateAt(Constants.INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
     local dummyEntity = Ext.Entity.Get(dummyUuid)
     dummyEntity.GameObjectVisual.Scale = 0.0
     dummyEntity:Replicate("GameObjectVisual")
@@ -257,7 +260,7 @@ local function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
-Utils = {
+return {
     debugPrint = debugPrint,
     debugDump = debugDump,
     dumpAllEntityKeys = dumpAllEntityKeys,

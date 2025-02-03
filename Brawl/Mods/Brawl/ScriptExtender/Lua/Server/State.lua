@@ -1,3 +1,7 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local Resources = require("Server/Resources.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -67,7 +71,7 @@ local Session = {
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ModStatusMessageTimer = nil,
-    MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY,
+    MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
 -- Persistent state
@@ -91,7 +95,7 @@ local function hasTargetCondition(targetConditionString, condition)
 end
 
 local function isSafeAoESpell(spellName)
-    for _, safeAoESpell in ipairs(SAFE_AOE_SPELLS) do
+    for _, safeAoESpell in ipairs(Constants.SAFE_AOE_SPELLS) do
         if spellName == safeAoESpell then
             return true
         end
@@ -260,7 +264,7 @@ local function getArchetype(uuid)
     if archetype == nil or archetype == "" then
         archetype = Osi.GetActiveArchetype(uuid)
     end
-    if not ARCHETYPE_WEIGHTS[archetype] then
+    if not Constants.ARCHETYPE_WEIGHTS[archetype] then
         if archetype == "base" then
             archetype = "melee"
         elseif archetype:find("ranged") ~= nil then
@@ -377,7 +381,7 @@ end
 
 local function buildSpellTable()
     local spellTable = {}
-    for _, spellType in pairs(ALL_SPELL_TYPES) do
+    for _, spellType in pairs(Constants.ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType)
     end
     Session.SpellTable = spellTable
@@ -541,9 +545,8 @@ local function setIsControllingDirectly()
     end
 end
 
-State = {
+return {
     getArchetype = getArchetype,
-    setMovementSpeedThresholds = setMovementSpeedThresholds,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
     getNumEnemiesRemaining = getNumEnemiesRemaining,
