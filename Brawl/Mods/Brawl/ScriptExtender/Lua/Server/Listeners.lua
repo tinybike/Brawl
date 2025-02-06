@@ -322,6 +322,14 @@ local function onDownedChanged(character, isDowned)
     end
 end
 
+local function attackRoll(attackerUuid, defenderUuid)
+    local attackerEntity = Ext.Entity.Get(attackerUuid)
+    local defenderEntity = Ext.Entity.Get(defenderUuid)
+    if defenderEntity and defenderEntity.Resistances then
+        local defenderAC = defenderEntity.Resistances.AC
+    end
+end
+
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil then
         local spellName = State.Session.StoryActionIDSpellName[storyActionID]
@@ -397,6 +405,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
     if attackerUuid ~= nil and (not State.isPlayerControllingDirectly(attackerUuid) or State.Settings.FullAuto) then
+    -- if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
     end
 end

@@ -13,7 +13,8 @@ local Settings = {
     CompanionAIEnabled = true,
     TruePause = true,
     AutoPauseOnDowned = true,
-    ActionInterval = 6000,
+    ActionInterval = 6.0,
+    InitiativeDie = 20,
     FullAuto = false,
     HitpointsMultiplier = 1.0,
     CompanionTactics = "Defense",
@@ -29,6 +30,7 @@ if MCM then
     Settings.TruePause = MCM.Get("true_pause")
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     Settings.ActionInterval = MCM.Get("action_interval")
+    Settings.InitiativeDie = MCM.Get("initiative_die")
     Settings.FullAuto = MCM.Get("full_auto")
     Settings.HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     Settings.CompanionTactics = MCM.Get("companion_tactics")

@@ -356,8 +356,8 @@ end
 local function getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile)
     if not isHostile and targetHpPct == 100.0 then
         return nil
-    -- else
-    --     return nil
+    else
+        return nil
     end
     local weightedTarget = 2*distanceToTarget + 0.25*targetHp
     if not canSeeTarget then

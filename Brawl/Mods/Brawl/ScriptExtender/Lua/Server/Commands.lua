@@ -560,6 +560,7 @@ return {
         true_pause = onMCMTruePause,
         auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
         action_interval = function (v) State.Settings.ActionInterval = v end,
+        initiative_die = function (v) State.Settings.InitiativeDie = v end,
         hitpoints_multiplier = onMCMHitpointsMultiplier,
         full_auto = onMCMFullAuto,
         active_character_archetype = onMCMActiveCharacterArchetype,

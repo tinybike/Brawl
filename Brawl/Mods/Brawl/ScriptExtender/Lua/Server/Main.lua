@@ -26,12 +26,6 @@ function stopPulseAction(brawler, remainInBrawl)
     end
 end
 
--- NB: scale this using initiative? what happens to initiative rolls since we're out of combat?
-local function randomizeActionInterval(proportion)
-    local multiplier = 1 + proportion*(2*math.random() - 1)
-    return math.floor(State.Settings.ActionInterval*multiplier + 0.5)
-end
-
 function startPulseAction(brawler)
     if Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
@@ -41,11 +35,10 @@ function startPulseAction(brawler)
     end
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
-        local noisedActionInterval = randomizeActionInterval(0.3)
-        debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, noisedActionInterval)
+        debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAction(brawler)
-        end, noisedActionInterval)
+        end, brawler.actionInterval)
     end
 end
 
