@@ -322,12 +322,56 @@ local function onDownedChanged(character, isDowned)
     end
 end
 
-local function attackRoll(attackerUuid, defenderUuid)
+function attackRoll(attackerUuid, defenderUuid)
     local attackerEntity = Ext.Entity.Get(attackerUuid)
     local defenderEntity = Ext.Entity.Get(defenderUuid)
     if defenderEntity and defenderEntity.Resistances then
         local defenderAC = defenderEntity.Resistances.AC
     end
+    -- Get player's attack boosts
+    local amountOfDices = 0
+    local diceAdditionalValue = 0
+    local diceValue = 0
+    for i, v in pairs(attackerEntity.BoostsContainer.Boosts) do
+        for i2, v2 in pairs(v.Boosts) do
+            if v.Type == "RollBonus" then
+                if v2.RollBonusBoost and v2.RollBonusBoost.RollType == "Attack" then
+                    if v2.RollBonusBoost.Amount and v2.RollBonusBoost.Amount.Params then
+                        local params = v2.RollBonusBoost.Amount.Params
+                        for i3, v3 in ipairs(params) do
+                            if v3 == "Roll" then
+                                _D(params[i3 + 1])
+                                amountOfDices = params[i3 + 1].AmountOfDices
+                                diceAdditionalValue = params[i3 + 1].DiceAdditionalValue
+                                diceValue = params[i3 + 1].DiceValue
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    print("player's boosts", amountOfDices, diceAdditionalValue, diceValue)
+    -- Get weapon's attack boosts
+    local weaponEnchantmentBoost = 0
+    local equippedWeaponUuid = Osi.GetEquippedWeapon(attackerUuid)
+    if equippedWeaponUuid ~= nil then
+        local weaponEntity = Ext.Entity.Get(equippedWeaponUuid)
+        if weaponEntity and weaponEntity.BoostsContainer and weaponEntity.BoostsContainer.Boosts then
+            for i, v in ipairs(weaponEntity.BoostsContainer.Boosts) do
+                if v and v.Boosts then
+                    for i2, v2 in ipairs(v.Boosts) do
+                        if v2 and v2.WeaponEnchantmentBoost and v2.WeaponEnchantmentBoost.Value then
+                            _D(v2:GetAllComponents())
+                            weaponEnchantmentBoost = v2.WeaponEnchantmentBoost.Value
+                        end
+                    end
+                end
+            end
+        end
+    end
+    print("weapon's boosts", weaponEnchantmentBoost)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
