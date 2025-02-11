@@ -374,8 +374,35 @@ function attackRoll(attackerUuid, defenderUuid)
     print("weapon's boosts", weaponEnchantmentBoost)
 end
 
-local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
-    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil then
+local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+    if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
+        Ext.Timer.WaitFor(150, function ()
+            if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
+                Osi.PlaySound(defenderUuid, "Action_Impact_Slash")
+                Ext.Timer.WaitFor(150, function ()
+                    if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                        State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
+                        print("ApplyDamage", defenderUuid, damageAmount, damageType)
+                        Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
+                        Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
+                        -- Osi.ApplyStatus(defenderUuid, "PASSIVE_FULL_SWING_ATTACK", 1)
+                        -- Osi.ApplyStatus(defenderUuid, "INTERRUPT_BARDIC_INSPIRATION_COMBAT_ATTACK", 1)
+                        reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                    else
+                        State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                    end
+                end)
+            end
+        end)
+    else
+        print("Extra attacks COMPLETE")
+        State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+    end
+end
+
+local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         local spellName = State.Session.StoryActionIDSpellName[storyActionID]
         if spellName ~= nil then
             State.Session.StoryActionIDSpellName[storyActionID] = nil
@@ -392,24 +419,25 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
                 end
                 if State.Session.ExtraAttacksRemaining[attackerUuid] ~= nil then
                     print("Extra attacks remaining",  attackerUuid, spellName, storyActionID, State.Session.ExtraAttacksRemaining[attackerUuid])
-                    Ext.Timer.WaitFor(1000, function ()
-                        if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
-                            if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                                print("*************EXECUTING EXTRA ATTACK", State.Session.ExtraAttacksRemaining[attackerUuid])
-                                State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
-                                Osi.FlushOsirisQueue(attackerUuid)
-                                Osi.Attack(attackerUuid, defenderUuid, 0)
-                                -- NB: use normal decision-making instead of Osi.Attack?
-                                -- need PulseAction modified to only include ExtraAttack triggering spells
-                                -- AI.PulseAction(State.getBrawlerByUuid(attackerUuid))
-                            else
-                                State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-                            end
-                        else
-                            print("extra attacks COMPLETE")
-                            State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-                        end
-                    end)
+                    reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                    -- Ext.Timer.WaitFor(1000, function ()
+                    --     if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
+                    --         if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                    --             print("*************EXECUTING EXTRA ATTACK", State.Session.ExtraAttacksRemaining[attackerUuid])
+                    --             State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
+                    --             Osi.FlushOsirisQueue(attackerUuid)
+                    --             Osi.Attack(attackerUuid, defenderUuid, 0)
+                    --             -- NB: use normal decision-making instead of Osi.Attack?
+                    --             -- need PulseAction modified to only include ExtraAttack triggering spells
+                    --             -- AI.PulseAction(State.getBrawlerByUuid(attackerUuid))
+                    --         else
+                    --             State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                    --         end
+                    --     else
+                    --         print("extra attacks COMPLETE")
+                    --         State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                    --     end
+                    -- end)
                 end
             end
         end
@@ -448,9 +476,9 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
-    if attackerUuid ~= nil and (not State.isPlayerControllingDirectly(attackerUuid) or State.Settings.FullAuto) then
-    -- if attackerUuid ~= nil then
-        handleExtraAttacks(attackerUuid, defenderUuid, storyActionID)
+    -- if attackerUuid ~= nil and (not State.isPlayerControllingDirectly(attackerUuid) or State.Settings.FullAuto) then
+    if attackerUuid ~= nil then
+        handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
     end
 end
 
