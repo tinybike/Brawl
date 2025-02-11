@@ -173,6 +173,7 @@ local function isNpcSpellUsable(spell)
     if spell == "Target_LOW_RamazithsTower_Nightsong_Globe_1" then return false end
     if spell == "Target_Dip_NPC" then return false end
     if spell == "Projectile_SneakAttack" then return false end
+    if spell == "Rush_Charger_Push" then return false end
     return true
 end
 
@@ -211,15 +212,17 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
     local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
-        local spell = nil
-        for _, spellType in ipairs(spellTypes) do
-            spell = State.Session.SpellTable[spellType][spellName]
-            if spell ~= nil then
-                break
+        if isNpcSpellUsable(spellName) then
+            local spell = nil
+            for _, spellType in ipairs(spellTypes) do
+                spell = State.Session.SpellTable[spellType][spellName]
+                if spell ~= nil then
+                    break
+                end
             end
-        end
-        if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
-            weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
+            if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
+                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType)
+            end
         end
     end
     return weightedSpells
@@ -356,8 +359,8 @@ end
 local function getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile)
     if not isHostile and targetHpPct == 100.0 then
         return nil
-    else
-        return nil
+    -- else
+    --     return nil
     end
     local weightedTarget = 2*distanceToTarget + 0.25*targetHp
     if not canSeeTarget then
