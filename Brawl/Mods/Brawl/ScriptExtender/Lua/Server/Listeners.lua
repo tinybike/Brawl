@@ -386,13 +386,19 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
                         print("ApplyDamage", defenderUuid, damageAmount, damageType)
                         Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
                         Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
-                        -- Osi.ApplyStatus(defenderUuid, "PASSIVE_FULL_SWING_ATTACK", 1)
+                        -- Osi.ApplyStatus(GetHostCharacter(), "Slash_New_TargetEffect", 1)
+                        -- -- Osi.ApplyStatus(defenderUuid, "PASSIVE_FULL_SWING_ATTACK", 1)
+                        -- x,y,z=Osi.GetPosition(GetHostCharacter())
+                        -- Osi.PlayEffectAtPosition("Slash_New_TargetEffect", x, y, z, 1)
+                        -- Osi.PlayEffect(GetHostCharacter(), "Slash_New_TargetEffect", "", 1)
                         -- Osi.ApplyStatus(defenderUuid, "INTERRUPT_BARDIC_INSPIRATION_COMBAT_ATTACK", 1)
                         reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                     else
                         State.Session.ExtraAttacksRemaining[attackerUuid] = nil
                     end
                 end)
+            else
+                State.Session.ExtraAttacksRemaining[attackerUuid] = nil
             end
         end)
     else
