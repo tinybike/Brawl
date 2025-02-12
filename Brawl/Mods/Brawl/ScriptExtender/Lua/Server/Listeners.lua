@@ -322,7 +322,7 @@ local function onDownedChanged(character, isDowned)
     end
 end
 
-function attackRoll(attackerUuid, defenderUuid)
+local function attackRoll(attackerUuid, defenderUuid)
     local attackerEntity = Ext.Entity.Get(attackerUuid)
     local defenderEntity = Ext.Entity.Get(defenderUuid)
     if defenderEntity and defenderEntity.Resistances then
@@ -374,12 +374,29 @@ function attackRoll(attackerUuid, defenderUuid)
     print("weapon's boosts", weaponEnchantmentBoost)
 end
 
+local function playAttackSound(attackerUuid, defenderUuid, damageType)
+    if damageType == "Slashing" then
+        Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
+        Osi.PlaySound(defenderUuid, "Action_Impact_Slash")
+    elseif damageType == "Piercing" then
+        Osi.PlaySound(attackerUuid, "Action_Cast_PiercingThrust")
+        Osi.PlaySound(defenderUuid, "Action_Impact_PiercingThrust")
+    else
+        Osi.PlaySound(attackerUuid, "Action_Cast_Smash")
+        Osi.PlaySound(defenderUuid, "Action_Impact_Smash")
+        -- Osi.PlaySound(attackerUuid, "Action_Cast_Bash")
+        -- Osi.PlaySound(defenderUuid, "Action_Impact_Bash")
+    end
+end
+
+-- NB need different sounds (and visuals?) for blunt vs sharp attacks
+-- ideally should re-do the attack rolls each time, maybe not practical tho
+-- does this work properly when using attacks that have multiple targets? i.e. whirlwind should only trigger extra attacks against one target (select randomly?)
 local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
     if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
         Ext.Timer.WaitFor(150, function ()
             if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
-                Osi.PlaySound(defenderUuid, "Action_Impact_Slash")
+                playAttackSound(attackerUuid, defenderUuid, damageType)
                 Ext.Timer.WaitFor(150, function ()
                     if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
                         State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
@@ -391,6 +408,9 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
                         -- x,y,z=Osi.GetPosition(GetHostCharacter())
                         -- Osi.PlayEffectAtPosition("Slash_New_TargetEffect", x, y, z, 1)
                         -- Osi.PlayEffect(GetHostCharacter(), "Slash_New_TargetEffect", "", 1)
+                        -- Osi.PlayEffect(GetHostCharacter(), "645ef5b2-8914-46bf-b99d-8355ad853f92", "", 1)
+                        -- Osi.ApplyStatus(GetHostCharacter(), "6fd87e0b-2c57-6284-1d47-92ecf25ee7df", 1)
+                        -- Osi.PlayEffect(GetHostCharacter(), "6fd87e0b-2c57-6284-1d47-92ecf25ee7df", "", 1)
                         -- Osi.ApplyStatus(defenderUuid, "INTERRUPT_BARDIC_INSPIRATION_COMBAT_ATTACK", 1)
                         reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                     else
@@ -433,9 +453,6 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
                     --             State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
                     --             Osi.FlushOsirisQueue(attackerUuid)
                     --             Osi.Attack(attackerUuid, defenderUuid, 0)
-                    --             -- NB: use normal decision-making instead of Osi.Attack?
-                    --             -- need PulseAction modified to only include ExtraAttack triggering spells
-                    --             -- AI.PulseAction(State.getBrawlerByUuid(attackerUuid))
                     --         else
                     --             State.Session.ExtraAttacksRemaining[attackerUuid] = nil
                     --         end
