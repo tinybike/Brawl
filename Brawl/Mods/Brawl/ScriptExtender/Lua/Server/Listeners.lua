@@ -345,9 +345,8 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
             Ext.Timer.WaitFor(150, function ()
                 if checkExtraAttacksReady(attackerUuid, defenderUuid) then
                     State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
-                    -- NB: why does this need to be //2??
-                    print("Applying damage", defenderUuid, damageAmount//2, damageType)
-                    Osi.ApplyDamage(defenderUuid, damageAmount//2, damageType, "")
+                    debugPrint("Applying damage", defenderUuid, damageAmount, damageType)
+                    Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
                     Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
                     reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                 else

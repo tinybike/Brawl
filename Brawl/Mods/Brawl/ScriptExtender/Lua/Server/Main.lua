@@ -141,7 +141,7 @@ function cleanupAll()
     State.resetSpellData()
 end
 
-local function stopToTTimers()
+function stopToTTimers()
     if State.Session.ToTRoundTimer ~= nil then
         Ext.Timer.Cancel(State.Session.ToTRoundTimer)
         State.Session.ToTRoundTimer = nil
@@ -152,7 +152,7 @@ local function stopToTTimers()
     end
 end
 
-local function startToTTimers()
+function startToTTimers()
     debugPrint("startToTTimers")
     stopToTTimers()
     if not Mods.ToT.Player.InCamp() then

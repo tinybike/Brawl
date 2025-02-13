@@ -69,7 +69,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
                 end
             else
                 local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
-                if availableResourceValue < costValue then
+                if availableResourceValue ~= nil and availableResourceValue < costValue then
                     debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
                     return false
                 end
