@@ -6,6 +6,10 @@ Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and 
 
 ## Videos
 
+### 16) Extra Attacks
+
+[![Real time combat test 16](https://img.youtube.com/vi/jjiP6YzO6r0/0.jpg)](https://www.youtube.com/watch?v=jjiP6YzO6r0)
+
 ### 15) Slow Motion
 
 [![Real time combat test 15](https://img.youtube.com/vi/al1sRLiZ9_k/0.jpg)](https://www.youtube.com/watch?v=al1sRLiZ9_k)
