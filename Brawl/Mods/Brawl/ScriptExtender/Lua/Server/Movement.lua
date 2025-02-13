@@ -154,7 +154,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
     else
         rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if distanceToTarget > rangeNumber and attackerCanMove then
+        if distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
             debugPrint("moveIntoPositionForSpell distance > range, moving to...")
             moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end

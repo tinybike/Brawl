@@ -125,7 +125,7 @@ function stopAllBrawlFizzlers()
     end
 end
 
-local function cleanupAll()
+function cleanupAll()
     stopAllPulseAddNearbyTimers()
     stopAllPulseRepositionTimers()
     stopAllPulseActionTimers()

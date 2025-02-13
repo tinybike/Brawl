@@ -160,9 +160,39 @@ local function extraAttackCheck(spell)
     return extraAttackSpellCheck(spell) and hasUseCosts(spell, "ActionPoint")
 end
 
+local function isSpellOfType(spell, spellType)
+    if not spell then
+        return false
+    end
+    local isOfType = spell.VerbalIntent == spellType
+    if not isOfType and spellType == "Damage" then
+        local spellFlags = spell.SpellFlags
+        if spellFlags then
+            for _, flag in ipairs(spellFlags) do
+                if flag == "IsHarmful" then
+                    isOfType = true
+                    break
+                end
+            end
+        end
+    end
+    return isOfType
+end
+
+local function getSpellTypeByName(name)
+    local spellStats = Ext.Stats.Get(name)
+    if spellStats then
+        local spellType = spellStats.VerbalIntent
+        if spellType == "None" and isSpellOfType(spellStats, "Damage") then
+            spellType = "Damage"
+        end
+        return spellType
+    end
+end
+
 local function getSpellInfo(spellType, spellName)
     local spell = Ext.Stats.Get(spellName)
-    if spell and spell.VerbalIntent == spellType then
+    if isSpellOfType(spell, spellType) then
         local outOfCombatOnly = false
         for _, req in ipairs(spell.Requirements) do
             if req.Requirement == "Combat" and req.Not == true then
@@ -218,7 +248,7 @@ local function getAllSpellsOfType(spellType)
     local allSpellsOfType = {}
     for _, spellName in ipairs(Ext.Stats.GetStats("SpellData")) do
         local spell = Ext.Stats.Get(spellName)
-        if spell and spell.VerbalIntent == spellType then
+        if isSpellOfType(spell, spellType) then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
                 local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
@@ -357,12 +387,9 @@ end
 
 local function getSpellByName(name)
     if name then
-        local spellStats = Ext.Stats.Get(name)
-        if spellStats then
-            local spellType = spellStats.VerbalIntent
-            if spellType and Session.SpellTable[spellType] then
-                return Session.SpellTable[spellType][name]
-            end
+        local spellType = getSpellTypeByName(name)
+        if spellType and Session.SpellTable[spellType] then
+            return Session.SpellTable[spellType][name]
         end
     end
     return nil

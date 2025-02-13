@@ -297,12 +297,7 @@ local function onCharacterLeftParty(character)
 end
 
 local function onRollResult(eventName, roller, rollSubject, resultType, isActiveRoll, criticality)
-    print("RollResult", eventName, roller, rollSubject, resultType, isActiveRoll, criticality)
-    -- local uuid = Osi.GetUUID(roller)
-    -- local brawler = State.getBrawlerByUuid(uuid)
-    -- if brawler then
-    --     brawler.initiativeRoll = ?
-    -- end
+    debugPrint("RollResult", eventName, roller, rollSubject, resultType, isActiveRoll, criticality)
 end
 
 local function onDownedChanged(character, isDowned)
@@ -322,58 +317,6 @@ local function onDownedChanged(character, isDowned)
     end
 end
 
-local function attackRoll(attackerUuid, defenderUuid)
-    local attackerEntity = Ext.Entity.Get(attackerUuid)
-    local defenderEntity = Ext.Entity.Get(defenderUuid)
-    if defenderEntity and defenderEntity.Resistances then
-        local defenderAC = defenderEntity.Resistances.AC
-    end
-    -- Get player's attack boosts
-    local amountOfDices = 0
-    local diceAdditionalValue = 0
-    local diceValue = 0
-    for i, v in pairs(attackerEntity.BoostsContainer.Boosts) do
-        for i2, v2 in pairs(v.Boosts) do
-            if v.Type == "RollBonus" then
-                if v2.RollBonusBoost and v2.RollBonusBoost.RollType == "Attack" then
-                    if v2.RollBonusBoost.Amount and v2.RollBonusBoost.Amount.Params then
-                        local params = v2.RollBonusBoost.Amount.Params
-                        for i3, v3 in ipairs(params) do
-                            if v3 == "Roll" then
-                                _D(params[i3 + 1])
-                                amountOfDices = params[i3 + 1].AmountOfDices
-                                diceAdditionalValue = params[i3 + 1].DiceAdditionalValue
-                                diceValue = params[i3 + 1].DiceValue
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    print("player's boosts", amountOfDices, diceAdditionalValue, diceValue)
-    -- Get weapon's attack boosts
-    local weaponEnchantmentBoost = 0
-    local equippedWeaponUuid = Osi.GetEquippedWeapon(attackerUuid)
-    if equippedWeaponUuid ~= nil then
-        local weaponEntity = Ext.Entity.Get(equippedWeaponUuid)
-        if weaponEntity and weaponEntity.BoostsContainer and weaponEntity.BoostsContainer.Boosts then
-            for i, v in ipairs(weaponEntity.BoostsContainer.Boosts) do
-                if v and v.Boosts then
-                    for i2, v2 in ipairs(v.Boosts) do
-                        if v2 and v2.WeaponEnchantmentBoost and v2.WeaponEnchantmentBoost.Value then
-                            _D(v2:GetAllComponents())
-                            weaponEnchantmentBoost = v2.WeaponEnchantmentBoost.Value
-                        end
-                    end
-                end
-            end
-        end
-    end
-    print("weapon's boosts", weaponEnchantmentBoost)
-end
-
 local function playAttackSound(attackerUuid, defenderUuid, damageType)
     if damageType == "Slashing" then
         Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
@@ -384,83 +327,94 @@ local function playAttackSound(attackerUuid, defenderUuid, damageType)
     else
         Osi.PlaySound(attackerUuid, "Action_Cast_Smash")
         Osi.PlaySound(defenderUuid, "Action_Impact_Smash")
-        -- Osi.PlaySound(attackerUuid, "Action_Cast_Bash")
-        -- Osi.PlaySound(defenderUuid, "Action_Impact_Bash")
     end
 end
 
--- NB need different sounds (and visuals?) for blunt vs sharp attacks
--- ideally should re-do the attack rolls each time, maybe not practical tho
--- does this work properly when using attacks that have multiple targets? i.e. whirlwind should only trigger extra attacks against one target (select randomly?)
+local function hasExtraAttacksRemaining(uuid)
+    return State.Session.ExtraAttacksRemaining[uuid] ~= nil and State.Session.ExtraAttacksRemaining[uuid] > 0
+end
+
+local function checkExtraAttacksReady(attackerUuid, defenderUuid)
+    return hasExtraAttacksRemaining(attackerUuid) and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid)
+end
+
 local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
-    if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
-        Ext.Timer.WaitFor(150, function ()
-            if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                playAttackSound(attackerUuid, defenderUuid, damageType)
-                Ext.Timer.WaitFor(150, function ()
-                    if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                        State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
-                        print("ApplyDamage", defenderUuid, damageAmount, damageType)
-                        Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
-                        Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
-                        -- Osi.ApplyStatus(GetHostCharacter(), "Slash_New_TargetEffect", 1)
-                        -- -- Osi.ApplyStatus(defenderUuid, "PASSIVE_FULL_SWING_ATTACK", 1)
-                        -- x,y,z=Osi.GetPosition(GetHostCharacter())
-                        -- Osi.PlayEffectAtPosition("Slash_New_TargetEffect", x, y, z, 1)
-                        -- Osi.PlayEffect(GetHostCharacter(), "Slash_New_TargetEffect", "", 1)
-                        -- Osi.PlayEffect(GetHostCharacter(), "645ef5b2-8914-46bf-b99d-8355ad853f92", "", 1)
-                        -- Osi.ApplyStatus(GetHostCharacter(), "6fd87e0b-2c57-6284-1d47-92ecf25ee7df", 1)
-                        -- Osi.PlayEffect(GetHostCharacter(), "6fd87e0b-2c57-6284-1d47-92ecf25ee7df", "", 1)
-                        -- Osi.ApplyStatus(defenderUuid, "INTERRUPT_BARDIC_INSPIRATION_COMBAT_ATTACK", 1)
-                        reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
-                    else
-                        State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-                    end
-                end)
-            else
-                State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-            end
-        end)
-    else
-        print("Extra attacks COMPLETE")
-        State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+    Ext.Timer.WaitFor(150, function ()
+        if checkExtraAttacksReady(attackerUuid, defenderUuid) then
+            playAttackSound(attackerUuid, defenderUuid, damageType)
+            Ext.Timer.WaitFor(150, function ()
+                if checkExtraAttacksReady(attackerUuid, defenderUuid) then
+                    State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
+                    -- NB: why does this need to be //2??
+                    print("Applying damage", defenderUuid, damageAmount//2, damageType)
+                    Osi.ApplyDamage(defenderUuid, damageAmount//2, damageType, "")
+                    Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
+                    reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                else
+                    State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                end
+            end)
+        else
+            State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+        end
+    end)
+end
+
+local function decreaseActionResource(uuid, resourceType, amount)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
+        if resources then
+            resources[1].Amount = resources[1].Amount - amount
+        end
     end
+    entity:Replicate("ActionResources")
+end
+
+local function useActionPointSurplus(uuid, resourceType)
+    local pointSurplus = math.floor(Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
+    if pointSurplus > 0 then
+        decreaseActionResource(uuid, resourceType, pointSurplus)
+    end
+    return pointSurplus
+end
+
+local function useBonusAttacks(uuid)
+    local numBonusAttacks = 0
+    if Osi.GetEquippedWeapon(uuid) ~= nil then
+        if Osi.HasActiveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK") == 1 then
+            Osi.RemoveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+        if Osi.HasActiveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK") == 1 then
+            Osi.RemoveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+    else
+        if Osi.HasActiveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE") == 1 then
+            Osi.RemoveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+    end
+    return numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint") + useActionPointSurplus(uuid, "BonusActionPoint")
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         local spellName = State.Session.StoryActionIDSpellName[storyActionID]
         if spellName ~= nil then
+            debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
             State.Session.StoryActionIDSpellName[storyActionID] = nil
             local spell = State.getSpellByName(spellName)
             if spell ~= nil and spell.triggersExtraAttack == true then
                 if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
                     local brawler = State.getBrawlerByUuid(attackerUuid)
-                    if brawler and brawler.numExtraAttacks > 0 then
-                        if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                            print("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks)
-                            State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks
-                        end
+                    if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                        local numBonusAttacks = useBonusAttacks(attackerUuid)
+                        debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
+                        State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
+                        reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                     end
-                end
-                if State.Session.ExtraAttacksRemaining[attackerUuid] ~= nil then
-                    print("Extra attacks remaining",  attackerUuid, spellName, storyActionID, State.Session.ExtraAttacksRemaining[attackerUuid])
-                    reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
-                    -- Ext.Timer.WaitFor(1000, function ()
-                    --     if State.Session.ExtraAttacksRemaining[attackerUuid] > 0 then
-                    --         if Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                    --             print("*************EXECUTING EXTRA ATTACK", State.Session.ExtraAttacksRemaining[attackerUuid])
-                    --             State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
-                    --             Osi.FlushOsirisQueue(attackerUuid)
-                    --             Osi.Attack(attackerUuid, defenderUuid, 0)
-                    --         else
-                    --             State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-                    --         end
-                    --     else
-                    --         print("extra attacks COMPLETE")
-                    --         State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-                    --     end
-                    -- end)
                 end
             end
         end
@@ -468,7 +422,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
 end
 
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
-    print("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
@@ -499,28 +453,26 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
         end
         startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
-    -- if attackerUuid ~= nil and (not State.isPlayerControllingDirectly(attackerUuid) or State.Settings.FullAuto) then
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
     end
 end
 
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
-    print("UsingSpellOnTarget", casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
-    -- handleExtraAttacks(Osi.GetUUID(casterGuid), Osi.GetUUID(targetGuid), spellName)
+    debugPrint("UsingSpellOnTarget", casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
     if spellName ~= nil then
         State.Session.StoryActionIDSpellName[storyActionID] = spellName
     end
 end
 
 local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID)
-    print("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
+    debugPrint("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
     State.Session.ExtraAttacksRemaining[Osi.GetUUID(attackerGuid)] = nil
     State.Session.ExtraAttacksRemaining[Osi.GetUUID(defenderGuid)] = nil
 end
 
 local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
-    print("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
+    debugPrint("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
 end
 
 local function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
