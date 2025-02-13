@@ -1,3 +1,12 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+-- local Resources = require("Server/Resources.lua")
+-- local Movement = require("Server/Movement.lua")
+-- local Roster = require("Server/Roster.lua")
+-- local Pause = require("Server/Pause.lua")
+-- local Listeners = require("Server/Listeners.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -13,7 +22,7 @@ local function modStatusMessage(message)
     end
     Ext.Timer.WaitFor(50, function ()
         Osi.QuestMessageShow("ModStatusMessage", message)
-        State.Session.ModStatusMessageTimer = Ext.Timer.WaitFor(MOD_STATUS_MESSAGE_DURATION, function ()
+        State.Session.ModStatusMessageTimer = Ext.Timer.WaitFor(Constants.MOD_STATUS_MESSAGE_DURATION, function ()
             Osi.QuestMessageHide("ModStatusMessage")
         end)
     end)
@@ -100,16 +109,16 @@ end
 
 local function disableMod()
     State.Settings.ModEnabled = false
-    stopListeners()
+    Listeners.stopListeners()
     modStatusMessage("Brawl Disabled")
 end
 
 local function enableMod()
     State.Settings.ModEnabled = true
-    startListeners()
+    Listeners.startListeners()
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
-        onStarted(level)
+        Listeners.onStarted(level)
     end
     modStatusMessage("Brawl Enabled")
 end
@@ -312,8 +321,8 @@ local function onActionButton(data, isController)
             end
         end
         local actionButtonLabel = tonumber(data.Payload)
-        if ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
-            local spellName = getSpellNameBySlot(player.uuid, ACTION_BUTTON_TO_SLOT[actionButtonLabel])
+        if Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and isAliveAndCanFight(player.uuid) then
+            local spellName = getSpellNameBySlot(player.uuid, Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel])
             if spellName ~= nil then
                 local spell = State.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
@@ -420,9 +429,9 @@ local function onRequestHeal(data)
 end
 
 local function onChangeTactics(data)
-    for i, tactics in ipairs(COMPANION_TACTICS) do
+    for i, tactics in ipairs(Constants.COMPANION_TACTICS) do
         if State.Settings.CompanionTactics == tactics then
-            State.Settings.CompanionTactics = i < #COMPANION_TACTICS and COMPANION_TACTICS[i + 1] or COMPANION_TACTICS[1]
+            State.Settings.CompanionTactics = i < #Constants.COMPANION_TACTICS and Constants.COMPANION_TACTICS[i + 1] or Constants.COMPANION_TACTICS[1]
             if MCM then
                 MCM.Set("companion_tactics", State.Settings.CompanionTactics)
             end
@@ -525,7 +534,7 @@ local function onMCMMaxPartySize(maxPartySize)
     State.setMaxPartySize()
 end
 
-Commands = {
+return {
     setAwaitingTarget = setAwaitingTarget,
     NetMessage = {
         ModToggle = onModToggle,
@@ -551,6 +560,7 @@ Commands = {
         true_pause = onMCMTruePause,
         auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
         action_interval = function (v) State.Settings.ActionInterval = v end,
+        initiative_die = function (v) State.Settings.InitiativeDie = v end,
         hitpoints_multiplier = onMCMHitpointsMultiplier,
         full_auto = onMCMFullAuto,
         active_character_archetype = onMCMActiveCharacterArchetype,

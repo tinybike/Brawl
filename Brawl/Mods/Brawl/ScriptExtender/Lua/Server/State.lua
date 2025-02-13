@@ -1,3 +1,7 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local Resources = require("Server/Resources.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -9,7 +13,8 @@ local Settings = {
     CompanionAIEnabled = true,
     TruePause = true,
     AutoPauseOnDowned = true,
-    ActionInterval = 6000,
+    ActionInterval = 6.0,
+    InitiativeDie = 20,
     FullAuto = false,
     HitpointsMultiplier = 1.0,
     CompanionTactics = "Defense",
@@ -25,6 +30,7 @@ if MCM then
     Settings.TruePause = MCM.Get("true_pause")
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     Settings.ActionInterval = MCM.Get("action_interval")
+    Settings.InitiativeDie = MCM.Get("initiative_die")
     Settings.FullAuto = MCM.Get("full_auto")
     Settings.HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     Settings.CompanionTactics = MCM.Get("companion_tactics")
@@ -62,10 +68,12 @@ local Session = {
     HealRequested = {},
     HealRequestedTimer = {},
     CountdownTimer = {},
+    ExtraAttacksRemaining = {},
+    StoryActionIDSpellName = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ModStatusMessageTimer = nil,
-    MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS.EASY,
+    MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
 -- Persistent state
@@ -89,7 +97,7 @@ local function hasTargetCondition(targetConditionString, condition)
 end
 
 local function isSafeAoESpell(spellName)
-    for _, safeAoESpell in ipairs(SAFE_AOE_SPELLS) do
+    for _, safeAoESpell in ipairs(Constants.SAFE_AOE_SPELLS) do
         if spellName == safeAoESpell then
             return true
         end
@@ -97,27 +105,94 @@ local function isSafeAoESpell(spellName)
     return false
 end
 
-local function getSpellInfo(spellType, spellName)
-    local spell = Ext.Stats.Get(spellName)
-    if spell and spell.VerbalIntent == spellType then
-        local useCosts = Utils.split(spell.UseCosts, ";")
-        local costs = {
-            ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
-            LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
-        }
-        -- local hitCost = nil -- divine smite only..?
-        for _, useCost in ipairs(useCosts) do
-            local useCostTable = Utils.split(useCost, ":")
-            local useCostLabel = useCostTable[1]
-            local useCostAmount = tonumber(useCostTable[#useCostTable])
-            if useCostLabel == "SpellSlotsGroup" then
-                -- e.g. SpellSlotsGroup:1:1:2
-                -- NB: what are the first two numbers?
-                costs.SpellSlot = useCostAmount
-            else
-                costs[useCostLabel] = useCostAmount
+local function hasStringInSpellRoll(spell, target)
+    if spell and spell.SpellRoll and spell.SpellRoll.Default then
+        return string.find(spell.SpellRoll.Default, target, 1, true) ~= nil
+    end
+    return false
+end
+
+local function spellId(spell, spellName)
+    return spell.Name == spellName
+end
+
+local function extraAttackSpellCheck(spell)
+    return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
+end
+
+local function parseSpellUseCosts(spell)
+    local useCosts = Utils.split(spell.UseCosts, ";")
+    local costs = {
+        ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
+        LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
+    }
+    -- local hitCost = nil -- divine smite only..?
+    for _, useCost in ipairs(useCosts) do
+        local useCostTable = Utils.split(useCost, ":")
+        local useCostLabel = useCostTable[1]
+        local useCostAmount = tonumber(useCostTable[#useCostTable])
+        if useCostLabel == "SpellSlotsGroup" then
+            -- e.g. SpellSlotsGroup:1:1:2
+            -- NB: what are the first two numbers?
+            costs.SpellSlot = useCostAmount
+        else
+            costs[useCostLabel] = useCostAmount
+        end
+    end
+    return costs
+end
+
+local function hasUseCosts(spell, targetCost)
+    if spell and spell.UseCosts then
+        local costs = parseSpellUseCosts(spell)
+        if costs then
+            for cost, _ in pairs(costs) do
+                if cost == targetCost then
+                    return true
+                end
             end
         end
+    end
+    return false
+end
+
+local function extraAttackCheck(spell)
+    return extraAttackSpellCheck(spell) and hasUseCosts(spell, "ActionPoint")
+end
+
+local function isSpellOfType(spell, spellType)
+    if not spell then
+        return false
+    end
+    local isOfType = spell.VerbalIntent == spellType
+    if not isOfType and spellType == "Damage" then
+        local spellFlags = spell.SpellFlags
+        if spellFlags then
+            for _, flag in ipairs(spellFlags) do
+                if flag == "IsHarmful" then
+                    isOfType = true
+                    break
+                end
+            end
+        end
+    end
+    return isOfType
+end
+
+local function getSpellTypeByName(name)
+    local spellStats = Ext.Stats.Get(name)
+    if spellStats then
+        local spellType = spellStats.VerbalIntent
+        if spellType == "None" and isSpellOfType(spellStats, "Damage") then
+            spellType = "Damage"
+        end
+        return spellType
+    end
+end
+
+local function getSpellInfo(spellType, spellName)
+    local spell = Ext.Stats.Get(spellName)
+    if isSpellOfType(spell, spellType) then
         local outOfCombatOnly = false
         for _, req in ipairs(spell.Requirements) do
             if req.Requirement == "Combat" and req.Not == true then
@@ -141,11 +216,12 @@ local function getSpellInfo(spellType, spellName)
             isEvocation = spell.SpellSchool == "Evocation",
             isSafeAoE = isSafeAoESpell(spellName),
             targetRadius = spell.TargetRadius,
-            costs = costs,
+            costs = parseSpellUseCosts(spell),
             type = spellType,
             hasVerbalComponent = hasVerbalComponent,
             -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
             -- damage = spell.TooltipDamageList,
+            triggersExtraAttack = extraAttackCheck(spell),
         }
         if spellType == "Healing" then
             spellInfo.isDirectHeal = false
@@ -172,7 +248,7 @@ local function getAllSpellsOfType(spellType)
     local allSpellsOfType = {}
     for _, spellName in ipairs(Ext.Stats.GetStats("SpellData")) do
         local spell = Ext.Stats.Get(spellName)
-        if spell and spell.VerbalIntent == spellType then
+        if isSpellOfType(spell, spellType) then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
                 local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
@@ -220,7 +296,7 @@ local function getArchetype(uuid)
     if archetype == nil or archetype == "" then
         archetype = Osi.GetActiveArchetype(uuid)
     end
-    if not ARCHETYPE_WEIGHTS[archetype] then
+    if not Constants.ARCHETYPE_WEIGHTS[archetype] then
         if archetype == "base" then
             archetype = "melee"
         elseif archetype:find("ranged") ~= nil then
@@ -311,12 +387,9 @@ end
 
 local function getSpellByName(name)
     if name then
-        local spellStats = Ext.Stats.Get(name)
-        if spellStats then
-            local spellType = spellStats.VerbalIntent
-            if spellType and Session.SpellTable[spellType] then
-                return Session.SpellTable[spellType][name]
-            end
+        local spellType = getSpellTypeByName(name)
+        if spellType and Session.SpellTable[spellType] then
+            return Session.SpellTable[spellType][name]
         end
     end
     return nil
@@ -337,7 +410,7 @@ end
 
 local function buildSpellTable()
     local spellTable = {}
-    for _, spellType in pairs(ALL_SPELL_TYPES) do
+    for _, spellType in pairs(Constants.ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType)
     end
     Session.SpellTable = spellTable
@@ -501,9 +574,8 @@ local function setIsControllingDirectly()
     end
 end
 
-State = {
+return {
     getArchetype = getArchetype,
-    setMovementSpeedThresholds = setMovementSpeedThresholds,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
     getNumEnemiesRemaining = getNumEnemiesRemaining,

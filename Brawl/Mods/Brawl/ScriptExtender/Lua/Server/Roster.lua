@@ -1,7 +1,40 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+-- local Movement = require("Server/Movement.lua")
+-- local Listeners = require("Server/Listeners.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isAliveAndCanFight = Utils.isAliveAndCanFight
+
+local function getNumExtraAttacks(entityUuid)
+    if Osi.HasPassive(entityUuid, "ExtraAttack_3") == 1 or Osi.HasPassive(entityUuid, "WildStrike_3") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack_3") == 1 then
+        return 3
+    elseif Osi.HasPassive(entityUuid, "ExtraAttack_2") == 1 or Osi.HasPassive(entityUuid, "WildStrike_2") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack_2") == 1 then
+        return 2
+    elseif Osi.HasPassive(entityUuid, "ExtraAttack") == 1 or Osi.HasPassive(entityUuid, "WildStrike") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack") == 1 then
+        return 1
+    end
+    return 0
+end
+
+local function calculateActionInterval(initiative)
+    local r = Constants.ACTION_INTERVAL_RESCALING
+    local scale = 1 + r - 4*r*initiative/(2*initiative + State.Settings.InitiativeDie + 1)
+    return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
+end
+
+-- NB: is there a way to look up the initative die instead of defining it in the mod...?
+local function rollForInitiative(uuid)
+    local initiative = math.random(1, State.Settings.InitiativeDie)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.Stats and entity.Stats.InitiativeBonus ~= nil then
+        initiative = initiative + entity.Stats.InitiativeBonus
+    end
+    return initiative
+end
 
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
@@ -14,7 +47,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         end
         if okToAdd then
             local displayName = getDisplayName(entityUuid)
-            debugPrint("Adding Brawler", entityUuid, displayName)
             local brawler = {
                 uuid = entityUuid,
                 displayName = displayName,
@@ -23,7 +55,10 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 isInBrawl = isInBrawl,
                 isPaused = Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
+                numExtraAttacks = getNumExtraAttacks(entityUuid),
+                actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
             }
+            debugPrint("Adding Brawler", entityUuid, displayName, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
@@ -118,7 +153,7 @@ local function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
         local distanceTo = Osi.GetDistanceTo(brawlerUuid, playerUuid)
-        if distanceTo ~= nil and distanceTo < ENTER_COMBAT_RANGE then
+        if distanceTo ~= nil and distanceTo < Constants.ENTER_COMBAT_RANGE then
             addBrawler(playerUuid)
         end
     end
@@ -140,14 +175,14 @@ local function initBrawlers(level)
             startPulseAddNearby(playerUuid)
         end
         if Osi.IsInCombat(playerUuid) == 1 then
-            onCombatStarted(Osi.CombatGetGuidFor(playerUuid))
+            Listeners.onCombatStarted(Osi.CombatGetGuidFor(playerUuid))
             break
         end
     end
     startPulseReposition(level)
 end
 
-Roster = {
+return {
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
     endBrawl = endBrawl,

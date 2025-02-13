@@ -1,3 +1,7 @@
+-- local Constants = require("Server/Constants.lua")
+-- local Utils = require("Server/Utils.lua")
+-- local State = require("Server/State.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
@@ -32,7 +36,7 @@ end
 local function getMovementSpeed(entityUuid)
     -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
     local entity = Ext.Entity.Get(entityUuid)
-    local movementDistance = entity.ActionResources.Resources[MOVEMENT_DISTANCE_UUID][1].Amount
+    local movementDistance = entity.ActionResources.Resources[Constants.MOVEMENT_DISTANCE_UUID][1].Amount
     local movementSpeed = isPlayerOrAlly(entityUuid) and playerMovementDistanceToSpeed(movementDistance) or enemyMovementDistanceToSpeed(movementDistance)
     -- debugPrint("getMovementSpeed", entityUuid, movementDistance, movementSpeed)
     return movementSpeed
@@ -109,8 +113,8 @@ local function holdPosition(entityUuid)
         -- (https://bg3.norbyte.dev/search?iid=Resource.6b05dbcc-19ef-475f-62a2-d18c1e640aa7)
         -- animMK = "e85be5a8-6e48-4da4-8486-0d168159df4e"
         -- animMK = "7bb52cd4-0b1c-4926-9165-fa92b75876a3"
-        Osi.PlayAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, "")
-        -- Osi.PlayLoopingAnimation(entityUuid, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID, LOOPING_COMBAT_ANIMATION_ID)
+        Osi.PlayAnimation(entityUuid, Constants.LOOPING_COMBAT_ANIMATION_ID, "")
+        -- Osi.PlayLoopingAnimation(entityUuid, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID, Constants.LOOPING_COMBAT_ANIMATION_ID)
     end
 end
 
@@ -118,7 +122,7 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawlerUuid)
     local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
     if archetype == "melee" then
-        if distanceToTarget > MELEE_RANGE then
+        if distanceToTarget > Constants.MELEE_RANGE then
             Osi.FlushOsirisQueue(brawlerUuid)
             moveToTargetUuid(brawlerUuid, targetUuid, false)
         else
@@ -126,14 +130,14 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
         end
     else
         debugPrint("misc bucket reposition", brawlerUuid, getDisplayName(brawlerUuid))
-        if distanceToTarget <= MELEE_RANGE then
+        if distanceToTarget <= Constants.MELEE_RANGE then
             holdPosition(brawlerUuid)
-        elseif distanceToTarget < RANGED_RANGE_MIN then
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
-        elseif distanceToTarget < RANGED_RANGE_MAX then
+        elseif distanceToTarget < Constants.RANGED_RANGE_MIN then
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, Constants.RANGED_RANGE_SWEETSPOT)
+        elseif distanceToTarget < Constants.RANGED_RANGE_MAX then
             holdPosition(brawlerUuid)
         else
-            moveToDistanceFromTarget(brawlerUuid, targetUuid, RANGED_RANGE_SWEETSPOT)
+            moveToDistanceFromTarget(brawlerUuid, targetUuid, Constants.RANGED_RANGE_SWEETSPOT)
         end
     end
 end
@@ -150,7 +154,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
     else
         rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if distanceToTarget > rangeNumber and attackerCanMove then
+        if distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
             debugPrint("moveIntoPositionForSpell distance > range, moving to...")
             moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end
@@ -184,10 +188,10 @@ local function resetPlayersMovementSpeed()
 end
 
 local function setMovementSpeedThresholds()
-    State.Session.MovementSpeedThresholds = MOVEMENT_SPEED_THRESHOLDS[Utils.getDifficulty()]
+    State.Session.MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS[Utils.getDifficulty()]
 end
 
-Movement = {
+return {
     getMovementSpeed = getMovementSpeed,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
