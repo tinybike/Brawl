@@ -45,6 +45,13 @@
                             "Description": "If checked, the game will automatically pause when the character the player is controlling goes down",
                             "Handles": {"DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c", "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"}
                         }, {
+                            "Id": "auto_pause_on_screen_transition",
+                            "Name": "Automatic Pause On Combat Screen Transition",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, the game will automatically pause after a screen transition when you're near hostile NPCs (e.g., after a dialog screen closes, on area transition, etc)",
+                            "Handles": {"DescriptionHandle": "h6b4fc0fage96fg40eeg86a8g6dd1804b712b", "NameHandle": "he5ea2535gd9bfg44f1gac62gb84324b5c24a"}
+                        }, {
                             "Id": "action_interval",
                             "Name": "AI Turn Length",
                             "Type": "slider_float",
@@ -64,7 +71,7 @@
                                 "Min": 1,
                                 "Max": 100
                             },
-                            "Description": "How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiatve roll, up to +/- 30%.  Turn lengths can never drop below 1 second.",
+                            "Description": "How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiative roll, up to +/- 30%.  Turn lengths can never drop below 1 second.",
                             "Handles": {"DescriptionHandle": "h465bcfc0g798cg4a52g84ebgbf067324fbd8", "NameHandle": "hbf455959gf646g4907gae8cg6df26b6ee158"}
                         }, {
                             "Id": "full_auto",

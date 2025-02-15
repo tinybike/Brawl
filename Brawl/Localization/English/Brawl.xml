@@ -9,11 +9,13 @@
     <content contentuid="h9f0b74e2g0973g4847g8c88g12e26d743cb7" version="1">Hotkey for toggling the companion AI on/off</content>
     <content contentuid="h358f0669gbeffg4e34g9d77g3f7d1960c100" version="1">If checked, the game will automatically pause when the character the player is controlling goes down</content>
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
+    <content contentuid="h6b4fc0fage96fg40eeg86a8g6dd1804b712b" version="1">If checked, the game will automatically pause after a screen transition when you're near hostile NPCs (e.g., after a dialog screen closes, on area transition, etc)</content>
+    <content contentuid="he5ea2535gd9bfg44f1gac62gb84324b5c24a" version="1">Automatic Pause On Combat Screen Transition</content>
     <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in seconds, before adjusting for initiative.  The default is 6.0, meaning the AI will act once every 6 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.  (Note: values below 3 are not recommended and may cause strange behavior.)</content>
     <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
     <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>
     <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
-    <content contentuid="h465bcfc0g798cg4a52g84ebgbf067324fbd8" version="1">How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiatve roll, up to +/- 30%.  Turn lengths can never drop below 1 second.</content>
+    <content contentuid="h465bcfc0g798cg4a52g84ebgbf067324fbd8" version="1">How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiative roll, up to +/- 30%.  Turn lengths can never drop below 1 second.</content>
     <content contentuid="hbf455959gf646g4907gae8cg6df26b6ee158" version="1">Initiative Die</content>
     <content contentuid="hc26cac3bg1de2g4808g852fga815daf697bd" version="1">Hotkey for toggling Full Auto on and off</content>
     <content contentuid="hd2d7dc1ag806eg4339gb306g679658313ab2" version="1">Fully Automated Brawls Toggle Hotkey</content>

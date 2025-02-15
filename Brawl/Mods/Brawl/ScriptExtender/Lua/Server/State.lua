@@ -12,7 +12,8 @@ local Settings = {
     ModEnabled = true,
     CompanionAIEnabled = true,
     TruePause = true,
-    AutoPauseOnDowned = true,
+    AutoPauseOnDowned = false,
+    AutoPauseOnScreenTransition = false,
     ActionInterval = 6.0,
     InitiativeDie = 20,
     FullAuto = false,
@@ -29,6 +30,7 @@ if MCM then
     Settings.CompanionAIEnabled = MCM.Get("companion_ai_enabled")
     Settings.TruePause = MCM.Get("true_pause")
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
+    Settings.AutoPauseOnScreenTransition = MCM.Get("auto_pause_on_screen_transition")
     Settings.ActionInterval = MCM.Get("action_interval")
     Settings.InitiativeDie = MCM.Get("initiative_die")
     Settings.FullAuto = MCM.Get("full_auto")

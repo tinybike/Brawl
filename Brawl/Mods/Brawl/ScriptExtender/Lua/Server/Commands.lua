@@ -559,6 +559,7 @@ return {
         companion_ai_enabled = onMCMCompanionAIEnabled,
         true_pause = onMCMTruePause,
         auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
+        auto_pause_on_screen_transition = function (v) State.Settings.AutoPauseOnScreenTransition = v end,
         action_interval = function (v) State.Settings.ActionInterval = v end,
         initiative_die = function (v) State.Settings.InitiativeDie = v end,
         hitpoints_multiplier = onMCMHitpointsMultiplier,

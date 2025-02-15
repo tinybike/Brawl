@@ -511,15 +511,22 @@ local function onDialogStarted(dialog, dialogInstanceId)
 end
 
 local function onDialogEnded(dialog, dialogInstanceId)
-    debugPrint("DialogEnded", dialog, dialogInstanceId)
+    print("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
-        startPulseReposition(level)
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if brawler.isInBrawl and not State.isPlayerControllingDirectly(brawlerUuid) then
-                    startPulseAction(brawler)
+        if State.Settings.AutoPauseOnScreenTransition then
+            print("fuck u")
+            -- NB: if this fires AFTER the pulse actions have started (e.g. laezel intro fight) then it works fine
+            --     if this fires BEFORE the pulse actions have started (e.g. nautiloid finale) then the pulses override the pause, should fix
+            Pause.allEnterFTB()
+        else
+            startPulseReposition(level)
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                    if brawler.isInBrawl and not State.isPlayerControllingDirectly(brawlerUuid) then
+                        startPulseAction(brawler)
+                    end
                 end
             end
         end
@@ -530,6 +537,10 @@ local function onDialogEnded(dialog, dialogInstanceId)
         --     end
         -- end
     end
+end
+
+local function onAutomatedDialogEnded(dialog, dialogInstanceId)
+    debugPrint("AutomatedDialogEnded", dialog, dialogInstanceId)
 end
 
 local function onDifficultyChanged(difficulty)
@@ -562,7 +573,12 @@ local function onPROC_Subregion_Entered(characterGuid, _)
     local uuid = Osi.GetUUID(characterGuid)
     local level = Osi.GetRegion(uuid)
     if level and State.Session.Players and State.Session.Players[uuid] then
-        AI.pulseReposition(level)
+        -- if State.Settings.AutoPauseOnScreenTransition then
+        --     Pause.allEnterFTB()
+        --     Pause.checkTruePauseParty()
+        -- else
+            AI.pulseReposition(level)
+        -- end
     end
 end
 
@@ -766,6 +782,10 @@ local function startListeners()
     }
     State.Session.Listeners.DialogEnded = {
         handle = Ext.Osiris.RegisterListener("DialogEnded", 2, "after", onDialogEnded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.AutomatedDialogEnded = {
+        handle = Ext.Osiris.RegisterListener("AutomatedDialogEnded", 2, "after", onAutomatedDialogEnded),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.DifficultyChanged = {

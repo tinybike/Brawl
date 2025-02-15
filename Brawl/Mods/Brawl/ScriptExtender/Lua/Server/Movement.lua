@@ -153,10 +153,12 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
         rangeNumber = 18
     else
         rangeNumber = tonumber(range)
-        local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
-            debugPrint("moveIntoPositionForSpell distance > range, moving to...")
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+        if rangeNumber ~= nil then
+            local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+            if distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
+                debugPrint("moveIntoPositionForSpell distance > range, moving to...")
+                moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+            end
         end
     end
     local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1

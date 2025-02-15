@@ -35,7 +35,7 @@ function startPulseAction(brawler)
     end
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
-        debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
+        print("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAction(brawler)
         end, brawler.actionInterval)
@@ -88,7 +88,7 @@ end
 -- Reposition if needed every REPOSITION_INTERVAL ms
 function startPulseReposition(level, skipCompanions)
     if State.Session.PulseRepositionTimers[level] == nil then
-        debugPrint("startPulseReposition", level, skipCompanions)
+        print("startPulseReposition", level, skipCompanions)
         State.Session.PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
             AI.pulseReposition(level, skipCompanions)
         end, Constants.REPOSITION_INTERVAL)
