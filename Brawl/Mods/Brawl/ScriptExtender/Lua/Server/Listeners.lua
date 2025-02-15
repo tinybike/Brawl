@@ -15,7 +15,7 @@ local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
 local function onCombatStarted(combatGuid)
-    debugPrint("CombatStarted", combatGuid)
+    print("CombatStarted", combatGuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
         Roster.addBrawler(playerUuid, true)
@@ -34,9 +34,9 @@ local function onCombatStarted(combatGuid)
                     end
                 end)
             end)
-        else
-            Constants.ENTER_COMBAT_RANGE = 100
-            startToTTimers()
+        -- else
+        --     Constants.ENTER_COMBAT_RANGE = 100
+        --     startToTTimers()
         end
     end
 end
@@ -80,11 +80,12 @@ local function onLevelGameplayStarted(level, _)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
+    print("CombatRoundStarted", combatGuid, round)
     if not isToT() then
         Constants.ENTER_COMBAT_RANGE = 20
         onCombatStarted(combatGuid)
     else
+        Constants.ENTER_COMBAT_RANGE = 100
         startToTTimers()
     end
 end

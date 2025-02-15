@@ -22,6 +22,7 @@ local isBrawlingWithValidTarget = Utils.isBrawlingWithValidTarget
 local isSilenced = Utils.isSilenced
 local isPlayerControllingDirectly = State.isPlayerControllingDirectly
 local clearOsirisQueue = Utils.clearOsirisQueue
+local isToT = Utils.isToT
 
 local function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
@@ -445,7 +446,7 @@ local function getWeightedTargets(brawler, potentialTargets)
         if brawler.uuid ~= potentialTargetUuid and isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
-            if (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+            if isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                 local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
                 if isHostile or State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)

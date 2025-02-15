@@ -135,10 +135,14 @@ local function deductCastedSpell(uuid, spellName)
                     end
                 else
                     if entity.ActionResources and entity.ActionResources.Resources then
-                        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
-                        if resources then
-                            local resource = resources[1] -- NB: always index 1?
-                            resource.Amount = resource.Amount - costValue
+                        if Constants.ACTION_RESOURCES[costType] == nil then
+                            print("What is this?", costType, uuid, spellName)
+                        else
+                            local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
+                            if resources then
+                                local resource = resources[1] -- NB: always index 1?
+                                resource.Amount = resource.Amount - costValue
+                            end
                         end
                     end
                 end

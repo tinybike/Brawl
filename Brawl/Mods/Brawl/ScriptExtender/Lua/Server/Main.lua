@@ -157,8 +157,13 @@ function startToTTimers()
     stopToTTimers()
     if not Mods.ToT.Player.InCamp() then
         State.Session.ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
-            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-                debugPrint("Moving ToT forward")
+            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round > 0 and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+                print("Moving ToT forward", Mods.ToT.PersistentVars.Scenario, Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
+                -- local combatId = Osi.CombatGetGuidFor(Mods.ToT.PersistentVars.Scenario.CombatHelper)
+                -- helperFaction = Osi.GetFaction(Mods.ToT.PersistentVars.Scenario.CombatHelper)
+                -- playerFaction = Osi.GetFaction(GetHostCharacter())
+                -- Osi.SetHostileAndEnterCombat(helperFaction, playerFaction, Mods.ToT.PersistentVars.Scenario.CombatHelper, GetHostCharacter())
+                -- print("got combat id", combatId)
                 Mods.ToT.Scenario.ForwardCombat()
                 Ext.Timer.WaitFor(1500, function ()
                     Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
@@ -168,11 +173,27 @@ function startToTTimers()
         end)
         if Mods.ToT.PersistentVars.Scenario then
             local isPrepRound = (Mods.ToT.PersistentVars.Scenario.Round == 0) and (next(Mods.ToT.PersistentVars.Scenario.SpawnedEnemies) == nil)
+            print("prep", isPrepRound)
             if isPrepRound then
-                State.Session.ToTTimer = Ext.Timer.WaitFor(0, function ()
-                    debugPrint("adding nearby...")
-                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
-                end, 8500)
+                local players = State.Session.Players
+                for playerUuid, _ in pairs(players) do
+                    Osi.SetCanJoinCombat(playerUuid, 1)
+                end
+                local helperUuid = Mods.ToT.PersistentVars.Scenario.CombatHelper
+                local hostUuid = Osi.GetHostCharacter()
+                Osi.SetHostileAndEnterCombat(Osi.GetFaction(helperUuid), Osi.GetFaction(hostUuid), helperUuid, hostUuid)
+                Mods.ToT.Scenario.DetectCombatId()
+                _D(Mods.ToT.PersistentVars.Scenario)
+                print(Mods.ToT.PersistentVars.Scenario.CombatId)
+                Ext.Timer.WaitFor(1500, function ()
+                    for playerUuid, _ in pairs(players) do
+                        Osi.SetCanJoinCombat(playerUuid, 0)
+                    end
+                end)
+                -- State.Session.ToTTimer = Ext.Timer.WaitFor(0, function ()
+                --     print("prep round timer expired, adding nearby...")
+                --     Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150)
+                -- end, 8500)
             end
         end
     end
