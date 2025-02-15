@@ -129,7 +129,7 @@ local function parseSpellUseCosts(spell)
     -- local hitCost = nil -- divine smite only..?
     for _, useCost in ipairs(useCosts) do
         local useCostTable = Utils.split(useCost, ":")
-        local useCostLabel = useCostTable[1]
+        local useCostLabel = useCostTable[1]:match("^%s*(.-)%s*$")
         local useCostAmount = tonumber(useCostTable[#useCostTable])
         if useCostLabel == "SpellSlotsGroup" then
             -- e.g. SpellSlotsGroup:1:1:2
