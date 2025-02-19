@@ -196,13 +196,21 @@ local function onNetMessage(data)
     end
 end
 
-local function onSessionLoaded()
-    Ext.Events.NetMessage:Subscribe(onNetMessage)
+local function startSession()
+    if not State or not State.Settings then
+        print("State not loaded, retrying...")
+        return Ext.Timer.WaitFor(250, startSession)
+    end
     if State.Settings.ModEnabled then
         Listeners.startListeners()
     else
         Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", State.resetPlayers)
     end
+end
+
+local function onSessionLoaded()
+    Ext.Events.NetMessage:Subscribe(onNetMessage)
+    startSession()
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)
