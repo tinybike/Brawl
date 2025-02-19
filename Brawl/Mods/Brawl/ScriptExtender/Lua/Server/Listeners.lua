@@ -663,7 +663,7 @@ end
 
 local function onLeveledUp(character)
     debugPrint("LeveledUp", character)
-    if character == Osi.GetHostCharacter() then
+    if character ~= nil and Osi.GetUUID(character) == Osi.GetHostCharacter() then
         State.buildSpellTable()
     end
 end

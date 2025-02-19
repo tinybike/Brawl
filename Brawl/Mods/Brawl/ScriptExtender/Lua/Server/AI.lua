@@ -486,6 +486,9 @@ local function getWeightedTargets(brawler, potentialTargets)
     if isPlayerOrAlly(brawler.uuid) then
         if State.Settings.CompanionTactics == "Balanced" then
             anchorCharacterUuid = Osi.GetClosestAlivePlayer(brawler.uuid)
+            if anchorCharacterUuid == nil then
+                anchorCharacterUuid = Osi.GetHostCharacter()
+            end
         elseif State.Settings.CompanionTactics == "Defense" then
             if State.Session.Players and State.Session.Players[brawler.uuid] and State.Session.Players[brawler.uuid].userId then
                 local player = State.getPlayerByUserId(State.Session.Players[brawler.uuid].userId)
@@ -493,9 +496,9 @@ local function getWeightedTargets(brawler, potentialTargets)
                     anchorCharacterUuid = player.uuid
                 end
             end
-        end
-        if anchorCharacterUuid == nil then
-            anchorCharacterUuid = Osi.GetHostCharacter()
+            if anchorCharacterUuid == nil then
+                anchorCharacterUuid = Osi.GetHostCharacter()
+            end
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
