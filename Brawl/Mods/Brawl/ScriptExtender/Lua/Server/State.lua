@@ -279,6 +279,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isCharacterOnly = hasTargetCondition(spell.TargetConditions, "Character()"),
             outOfCombatOnly = outOfCombatOnly,
             -- damageType = spell.DamageType,
+            isGapCloser = spell.SpellType == "Rush",
             isSpell = spell.SpellSchool ~= "None",
             isEvocation = spell.SpellSchool == "Evocation",
             isSafeAoE = isSafeAoESpell(spellName),

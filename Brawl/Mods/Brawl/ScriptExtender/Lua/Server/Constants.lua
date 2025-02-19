@@ -11,6 +11,7 @@ Constants.MOD_STATUS_MESSAGE_DURATION = 2000
 Constants.ENTER_COMBAT_RANGE = 20
 Constants.NEARBY_RADIUS = 35
 Constants.MELEE_RANGE = 1.5
+Constants.GAP_CLOSER_DISTANCE = 5
 Constants.RANGED_RANGE_MAX = 25
 Constants.RANGED_RANGE_SWEETSPOT = 10
 Constants.RANGED_RANGE_MIN = 10
@@ -55,6 +56,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = 10,
         spellInRange = 10,
         triggersExtraAttack = 0,
+        weaponOrUnarmedDamage = -10,
+        spellDamage = 3,
+        gapCloser = 0,
     },
     ranged = {
         rangedWeapon = 10,
@@ -65,6 +69,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = -5,
         spellInRange = 5,
         triggersExtraAttack = 5,
+        weaponOrUnarmedDamage = 5,
+        spellDamage = 0,
+        gapCloser = 0,
     },
     healer_melee = {
         rangedWeapon = -5,
@@ -75,6 +82,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = 4,
         spellInRange = 8,
         triggersExtraAttack = 2,
+        weaponOrUnarmedDamage = 3,
+        spellDamage = 1,
+        gapCloser = 2,
     },
     healer = {
         rangedWeapon = 3,
@@ -85,6 +95,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = 8,
         spellInRange = 8,
         triggersExtraAttack = 0,
+        weaponOrUnarmedDamage = 0,
+        spellDamage = 2,
+        gapCloser = 0,
     },
     melee = {
         rangedWeapon = -5,
@@ -95,6 +108,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = -10,
         spellInRange = 5,
         triggersExtraAttack = 10,
+        weaponOrUnarmedDamage = 10,
+        spellDamage = 0,
+        gapCloser = 10,
     },
     melee_magic = {
         rangedWeapon = -5,
@@ -105,6 +121,9 @@ Constants.ARCHETYPE_WEIGHTS = {
         isSpell = 5,
         spellInRange = 5,
         triggersExtraAttack = 5,
+        weaponOrUnarmedDamage = 5,
+        spellDamage = 1,
+        gapCloser = 10,
     },
 }
 Constants.ARCHETYPE_WEIGHTS.beast = Constants.ARCHETYPE_WEIGHTS.melee

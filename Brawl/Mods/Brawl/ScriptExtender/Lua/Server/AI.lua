@@ -74,8 +74,22 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
     local weight = 0
-    if spell.triggersExtraAttack and numExtraAttacks > 0 then
-        weight = numExtraAttacks*archetypeWeights.triggersExtraAttack
+    -- NB: factor in amount of healing for healing spells also?
+    if spellType == "Damage" then
+        if spell.triggersExtraAttack and numExtraAttacks > 0 then
+            weight = numExtraAttacks*archetypeWeights.triggersExtraAttack
+        end
+        if spell.isWeaponOrUnarmedDamage then
+            weight = weight + archetypeWeights.weaponOrUnarmedDamage
+        end
+        weight = weight + archetypeWeights.spellDamage*spell.averageDamage
+    end
+    if spell.isGapCloser then
+        if distanceToTarget > Constants.GAP_CLOSER_DISTANCE then
+            weight = weight + archetypeWeights.gapCloser
+        else
+            weight = weight - archetypeWeights.gapCloser
+        end
     end
     if spell.targetRadius == "RangedMainWeaponRange" then
         weight = weight + archetypeWeights.rangedWeapon
@@ -264,9 +278,9 @@ end
 
 local function decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = getCompanionWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE)
-    print("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
+    debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
     debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
-    _D(weightedSpells)
+    debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -384,7 +398,7 @@ local function getBalancedWeightedTarget(distanceToTarget, targetHp, targetHpPct
         return nil
     end
     if not anchorCharacterUuid then
-        print("(Balanced) Anchor character not found, reverting to Offense weighting")
+        debugPrint("(Balanced) Anchor character not found, reverting to Offense weighting")
         return getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, isHealer, isHostile)
     end
     local weightedTarget
@@ -409,7 +423,7 @@ local function getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct,
         return nil
     end
     if not anchorCharacterUuid then
-        print("(Defense) Anchor character not found, reverting to Offense weighting")
+        debugPrint("(Defense) Anchor character not found, reverting to Offense weighting")
         return getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, isHealer, isHostile)
     end
     local weightedTarget
@@ -472,19 +486,16 @@ local function getWeightedTargets(brawler, potentialTargets)
     if isPlayerOrAlly(brawler.uuid) then
         if State.Settings.CompanionTactics == "Balanced" then
             anchorCharacterUuid = Osi.GetClosestAlivePlayer(brawler.uuid)
-            print("Balanced tactics, got anchor", anchorCharacterUuid)
         elseif State.Settings.CompanionTactics == "Defense" then
             if State.Session.Players and State.Session.Players[brawler.uuid] and State.Session.Players[brawler.uuid].userId then
                 local player = State.getPlayerByUserId(State.Session.Players[brawler.uuid].userId)
                 if player then
                     anchorCharacterUuid = player.uuid
-                    print("Defense tactics, got anchor", anchorCharacterUuid)
                 end
             end
         end
         if anchorCharacterUuid == nil then
             anchorCharacterUuid = Osi.GetHostCharacter()
-            print("Using host as default anchor", anchorCharacterUuid)
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
