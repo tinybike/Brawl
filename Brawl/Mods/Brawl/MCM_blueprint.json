@@ -93,7 +93,7 @@
                             "Id": "companion_tactics",
                             "Name": "Companion Tactics",
                             "Type": "enum",
-                            "Default": "Defense",
+                            "Default": "Balanced",
                             "Options": {"Choices": ["Offense", "Balanced", "Defense"]},
                             "Description": "High-level behavior for the companion AI.  Offense: prioritize killing enemies even if it means charging off by yourself.  Balanced: engage enemies that are within MAX_DISTANCE meters of the nearest party member; once engaged, try to stay on the target.  Defense: prioritize party cohesion; only engage enemies that are within MAX_DISTANCE meters of the player; disengage if the enemy moves farther away.  MAX_DISTANCE is set in the next setting.",
                             "Handles": {"DescriptionHandle": "h6794c735g3288g4b07gb7c3ge060e416e904", "NameHandle": "hc01f084cg13c4g42a1g8197g960e8f993d9c"}
