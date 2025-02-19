@@ -17,7 +17,6 @@ Constants.RANGED_RANGE_MIN = 10
 Constants.HELP_DOWNED_MAX_RANGE = 20
 Constants.MUST_BE_AN_ERROR_MAX_DISTANCE_FROM_PLAYER = 100
 -- Constants.AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER = 3
-Constants.DEFENSE_TACTICS_MAX_DISTANCE = 15
 Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS = 15
 Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS = 5
 Constants.MOVEMENT_DISTANCE_UUID = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185"
@@ -44,7 +43,7 @@ Constants.IS_TRAINING_DUMMY = {}
 Constants.IS_TRAINING_DUMMY[Constants.MAKESHIFT_TRAINING_DUMMY_UUID] = true
 Constants.IS_TRAINING_DUMMY[Constants.HALSIN_PORTAL_UUID] = true
 Constants.PLAYER_ARCHETYPES = {"", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic"}
-Constants.COMPANION_TACTICS = {"Offense", "Defense"}
+Constants.COMPANION_TACTICS = {"Offense", "Balanced", "Defense"}
 Constants.ALL_SPELL_TYPES = {"Buff", "Debuff", "Control", "Damage", "Healing", "Summon", "Utility"}
 Constants.ARCHETYPE_WEIGHTS = {
     mage = {
@@ -55,6 +54,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 5,
         isSpell = 10,
         spellInRange = 10,
+        triggersExtraAttack = 0,
     },
     ranged = {
         rangedWeapon = 10,
@@ -64,6 +64,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 5,
         isSpell = -5,
         spellInRange = 5,
+        triggersExtraAttack = 5,
     },
     healer_melee = {
         rangedWeapon = -5,
@@ -73,6 +74,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 8,
         isSpell = 4,
         spellInRange = 8,
+        triggersExtraAttack = 2,
     },
     healer = {
         rangedWeapon = 3,
@@ -82,6 +84,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 4,
         isSpell = 8,
         spellInRange = 8,
+        triggersExtraAttack = 0,
     },
     melee = {
         rangedWeapon = -5,
@@ -91,6 +94,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 10,
         isSpell = -10,
         spellInRange = 5,
+        triggersExtraAttack = 10,
     },
     melee_magic = {
         rangedWeapon = -5,
@@ -100,6 +104,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         meleeWeaponInRange = 10,
         isSpell = 5,
         spellInRange = 5,
+        triggersExtraAttack = 5,
     },
 }
 Constants.ARCHETYPE_WEIGHTS.beast = Constants.ARCHETYPE_WEIGHTS.melee

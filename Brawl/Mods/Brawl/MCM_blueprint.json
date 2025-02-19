@@ -94,9 +94,17 @@
                             "Name": "Companion Tactics",
                             "Type": "enum",
                             "Default": "Defense",
-                            "Options": {"Choices": ["Offense", "Defense"]},
-                            "Description": "High-level behavior for the companion AI.  Offense: all-out attack, prioritize killing enemies.  Defense: prioritize staying with the group, don't run off alone to attack.",
+                            "Options": {"Choices": ["Offense", "Balanced", "Defense"]},
+                            "Description": "High-level behavior for the companion AI.  Offense: prioritize killing enemies even if it means charging off by yourself.  Balanced: engage enemies that are within MAX_DISTANCE meters of the nearest party member; once engaged, try to stay on the target.  Defense: prioritize party cohesion; only engage enemies that are within MAX_DISTANCE meters of the player; disengage if the enemy moves farther away.  MAX_DISTANCE is set in the next setting.",
                             "Handles": {"DescriptionHandle": "h6794c735g3288g4b07gb7c3ge060e416e904", "NameHandle": "hc01f084cg13c4g42a1g8197g960e8f993d9c"}
+                        }, {
+                            "Id": "defensive_tactics_max_distance",
+                            "Name": "Defensive Tactics - Max Distance",
+                            "Type": "slider_int",
+                            "Default": 15,
+                            "Options": {"Min": 1, "Max": 30},
+                            "Description": "If Companion Tactics is set to 'Balanced' or 'Defense', AI-controlled party members will only engage enemies that are within this distance of the nearest party member or the player, respectively",
+                            "Handles": {"DescriptionHandle": "hf781ea2ag4572g44eaga1b9g27f7490b78b2", "NameHandle": "h4bbbab16g51e8g4671g847agdf9ea4352e39"}
                         }, {
                             "Id": "companion_ai_max_spell_level",
                             "Name": "Companion AI Maximum Allowed Spell Level",

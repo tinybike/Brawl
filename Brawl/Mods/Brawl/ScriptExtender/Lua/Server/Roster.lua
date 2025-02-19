@@ -159,6 +159,20 @@ local function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     end
 end
 
+local function disableLockedOnTarget(uuid)
+    print("disabling lock", uuid)
+    local level = Osi.GetRegion(uuid)
+    if level and isAliveAndCanFight(uuid) then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel[uuid] then
+            if brawlersInLevel[uuid].lockedOnTarget then
+                print("Disabling locked on target", uuid, getDisplayName(uuid))
+            end
+            brawlersInLevel[uuid].lockedOnTarget = false
+        end
+    end
+end
+
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = State.getNumEnemiesRemaining(level)
     debugPrint("Number of enemies remaining:", numEnemiesRemaining)
@@ -189,6 +203,7 @@ return {
     addNearbyToBrawlers = addNearbyToBrawlers,
     addNearbyEnemiesToBrawlers = addNearbyEnemiesToBrawlers,
     addPlayersInEnterCombatRangeToBrawlers = addPlayersInEnterCombatRangeToBrawlers,
+    disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,
     initBrawlers = initBrawlers,
 }

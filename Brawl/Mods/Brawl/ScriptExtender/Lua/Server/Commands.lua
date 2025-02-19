@@ -279,6 +279,15 @@ local function lockCompanionsOnTarget(level, targetUuid)
     end
 end
 
+local function allCompanionsDisableLockedOnTarget()
+    local players = State.Session.Players
+    if players then
+        for uuid, _ in pairs(players) do
+            Roster.disableLockedOnTarget(uuid)
+        end
+    end
+end
+
 local function setAttackMoveTarget(playerUuid, targetUuid)
     debugPrint("Set attack-move target", playerUuid, targetUuid)
     setAwaitingTarget(playerUuid, false)
@@ -374,6 +383,7 @@ local function onClickPosition(data)
                         Pause.enqueueMovement(Ext.Entity.Get(playerUuid))
                     elseif State.Session.AwaitingTarget[playerUuid] then
                         setAwaitingTarget(playerUuid, false)
+                        allCompanionsDisableLockedOnTarget()
                         Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
                         Movement.moveCompanionsToPosition(validPosition)
                     end
@@ -430,13 +440,13 @@ end
 
 local function onChangeTactics(data)
     for i, tactics in ipairs(Constants.COMPANION_TACTICS) do
-        if State.Settings.CompanionTactics == tactics then
-            State.Settings.CompanionTactics = i < #Constants.COMPANION_TACTICS and Constants.COMPANION_TACTICS[i + 1] or Constants.COMPANION_TACTICS[1]
-            if MCM then
-                MCM.Set("companion_tactics", State.Settings.CompanionTactics)
-            end
+        if tactics == State.Settings.CompanionTactics then
+            State.Settings.CompanionTactics = Constants.COMPANION_TACTICS[(i % #Constants.COMPANION_TACTICS) + 1]
             break
         end
+    end
+    if MCM then
+        MCM.Set("companion_tactics", State.Settings.CompanionTactics)
     end
     modStatusMessage(State.Settings.CompanionTactics .. " Tactics")
 end
@@ -565,6 +575,7 @@ return {
         full_auto = onMCMFullAuto,
         active_character_archetype = onMCMActiveCharacterArchetype,
         companion_tactics = function (v) State.Settings.CompanionTactics = v end,
+        defensive_tactics_max_distance = function (v) State.Settings.DefensiveTacticsMaxDistance = v end,
         companion_ai_max_spell_level = function (v) State.Settings.CompanionAIMaxSpellLevel = v end,
         hogwild_mode = function (v) State.Settings.HogwildMode = v end,
         max_party_size = onMCMMaxPartySize,

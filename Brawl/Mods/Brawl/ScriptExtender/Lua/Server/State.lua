@@ -18,6 +18,7 @@ local Settings = {
     FullAuto = false,
     HitpointsMultiplier = 1.0,
     CompanionTactics = "Defense",
+    DefensiveTacticsMaxDistance = 10,
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
@@ -34,6 +35,7 @@ if MCM then
     Settings.FullAuto = MCM.Get("full_auto")
     Settings.HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     Settings.CompanionTactics = MCM.Get("companion_tactics")
+    Settings.DefensiveTacticsMaxDistance = MCM.Get("defensive_tactics_max_distance")
     Settings.CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     Settings.HogwildMode = MCM.Get("hogwild_mode")
     Settings.MaxPartySize = MCM.Get("max_party_size")
@@ -190,7 +192,71 @@ local function getSpellTypeByName(name)
     end
 end
 
-local function getSpellInfo(spellType, spellName)
+local function calculateMean(value)
+    local numDice, numSides = tostring(value):match("(%d+)d(%d+)")
+    if numDice and numSides then
+        numDice = tonumber(numDice)
+        numSides = tonumber(numSides)
+        return numDice*(numSides + 1)/2
+    end
+    return tonumber(value)
+end
+
+local function getCantripDamage(level)
+    if level >= 10 then
+        return 13.5  -- 3d8
+    elseif level >= 5 then
+        return 9     -- 2d8
+    else
+        return 4.5   -- 1d8
+    end
+end
+
+local function isWeaponOrUnarmed(value)
+    local keywords = {
+        "MainMeleeWeapon",
+        "MainMeleeWeaponDamageType",
+        "OffhandMeleeWeapon",
+        "OffhandMeleeWeaponDamageType",
+        "MainRangedWeapon",
+        "MainRangedWeaponDamageType",
+        "OffhandRangedWeapon",
+        "OffhandRangedWeaponDamageType",
+        "UnarmedDamage",
+        "MartialArtsUnarmedDamage",
+    }
+    for _, marker in ipairs(keywords) do
+        if value:find(marker) then
+            return true
+        end
+    end
+    return false
+end
+
+local function parseTooltipDamage(damageString, level)
+    damageString = damageString:gsub("LevelMapValue%((%w+)%)", function (variableName)
+        if variableName == "D8Cantrip" then
+            return tostring(getCantripDamage(level))
+        end
+    end)
+    local isWeaponOrUnarmedDamage = false
+    local totalDamage = 0
+    for rawArg in damageString:gmatch("DealDamage%(([^%)]+)%)") do
+        local damageValue = rawArg:match("([^,]+)")
+        if damageValue then
+            if isWeaponOrUnarmed(damageValue) then
+                isWeaponOrUnarmedDamage = true
+            end
+            local meanVal = calculateMean(damageValue)
+            if meanVal then
+                totalDamage = totalDamage + meanVal
+            end
+        end
+    end
+    return isWeaponOrUnarmedDamage, totalDamage
+end
+
+local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
         local outOfCombatOnly = false
@@ -205,6 +271,7 @@ local function getSpellInfo(spellType, spellName)
                 hasVerbalComponent = true
             end
         end
+        local isWeaponOrUnarmedDamage, averageDamage = parseTooltipDamage(spell.TooltipDamageList, hostLevel)
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -219,8 +286,8 @@ local function getSpellInfo(spellType, spellName)
             costs = parseSpellUseCosts(spell),
             type = spellType,
             hasVerbalComponent = hasVerbalComponent,
-            -- need to parse this, e.g. DealDamage(LevelMapValue(D8Cantrip),Cold), DealDamage(8d6,Fire), etc
-            -- damage = spell.TooltipDamageList,
+            averageDamage = averageDamage,
+            isWeaponOrUnarmedDamage = isWeaponOrUnarmedDamage,
             triggersExtraAttack = extraAttackCheck(spell),
         }
         if spellType == "Healing" then
@@ -244,7 +311,7 @@ local function getSpellInfo(spellType, spellName)
     return nil
 end
 
-local function getAllSpellsOfType(spellType)
+local function getAllSpellsOfType(spellType, hostLevel)
     local allSpellsOfType = {}
     for _, spellName in ipairs(Ext.Stats.GetStats("SpellData")) do
         local spell = Ext.Stats.Get(spellName)
@@ -252,10 +319,10 @@ local function getAllSpellsOfType(spellType)
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
                 local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
-                    allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName)
+                    allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName, hostLevel)
                 end
             else
-                allSpellsOfType[spellName] = getSpellInfo(spellType, spellName)
+                allSpellsOfType[spellName] = getSpellInfo(spellType, spellName, hostLevel)
                 if spell.Requirements and #spell.Requirements ~= 0 then
                     local requirements = spell.Requirements
                     local removeIndex = 0
@@ -409,9 +476,10 @@ local function hasDirectHeal(uuid, preparedSpells)
 end
 
 local function buildSpellTable()
+    local hostLevel = Osi.GetLevel(Osi.GetHostCharacter())
     local spellTable = {}
     for _, spellType in pairs(Constants.ALL_SPELL_TYPES) do
-        spellTable[spellType] = getAllSpellsOfType(spellType)
+        spellTable[spellType] = getAllSpellsOfType(spellType, hostLevel)
     end
     Session.SpellTable = spellTable
 end

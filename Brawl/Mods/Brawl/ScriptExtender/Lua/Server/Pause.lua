@@ -28,8 +28,10 @@ local function unlock(entity)
 end
 
 local function lock(entity)
+    local uuid = entity.Uuid.EntityUuid
+    Roster.disableLockedOnTarget(uuid)
     entity.TurnBased.IsInCombat_M = false
-    State.Session.FTBLockedIn[entity.Uuid.EntityUuid] = true
+    State.Session.FTBLockedIn[uuid] = true
 end
 
 local function stopTruePause(entityUuid)

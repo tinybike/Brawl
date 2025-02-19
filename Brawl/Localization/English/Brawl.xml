@@ -24,8 +24,10 @@
     <content contentuid="h65ee56d8gbbbeg4e6agb486ge33349a73d09" version="1">If checked, your characters will queue up actions during pause, and fire them when unpaused, similar to how combat worked in Baldur's Gate 1 and 2.</content>
     <content contentuid="h7a39e407g21e0g4f3bg98fdg7cd473b01043" version="1">True Pause</content>
     <content contentuid="h319b051cg905fg4b5dg87c9g10c0daad6ccb" version="1">Companion AI Toggle Hotkey</content>
-    <content contentuid="h6794c735g3288g4b07gb7c3ge060e416e904" version="1">High-level behavior for the companion AI.  All-Out Attack: kill or be killed.  Stick Together: prioritize staying with the group, don't run off alone to attack.</content>
+    <content contentuid="h6794c735g3288g4b07gb7c3ge060e416e904" version="1">High-level behavior for the companion AI.  Offense: prioritize killing enemies even if it means charging off by yourself.  Balanced: engage enemies that are within MAX_DISTANCE meters of the nearest party member; once engaged, try to stay on the target.  Defense: prioritize party cohesion; only engage enemies that are within MAX_DISTANCE meters of the player; disengage if the enemy moves farther away.  MAX_DISTANCE is set in the next setting.</content>
     <content contentuid="hc01f084cg13c4g42a1g8197g960e8f993d9c" version="1">Companion Tactics</content>
+    <content contentuid="hf781ea2ag4572g44eaga1b9g27f7490b78b2" version="1">If Companion Tactics is set to 'Balanced' or 'Defense', AI-controlled party members will only engage enemies that are within this distance of the nearest party member or the player, respectively</content>
+    <content contentuid="h4bbbab16g51e8g4671g847agdf9ea4352e39" version="1">Defensive Tactics - Max Distance</content>
     <content contentuid="h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0" version="1">The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots.</content>
     <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level</content>
     <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the companion AI will freely use any of their spells/abilities with zero resource costs.</content>

@@ -661,6 +661,13 @@ local function onOnCriminalMergedWithCrime(crimeID, criminal)
     debugPrint("OnCriminalMergedWithCrime", crimeID, criminal)
 end
 
+local function onLeveledUp(character)
+    debugPrint("LeveledUp", character)
+    if character == Osi.GetHostCharacter() then
+        State.buildSpellTable()
+    end
+end
+
 local function stopListeners()
     cleanupAll()
     local listeners = State.Session.Listeners
@@ -854,6 +861,10 @@ local function startListeners()
     }
     State.Session.Listeners.OnCriminalMergedWithCrime = {
         handle = Ext.Osiris.RegisterListener("OnCriminalMergedWithCrime", 2, "after", onOnCriminalMergedWithCrime),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.LeveledUp = {
+        handle = Ext.Osiris.RegisterListener("LeveledUp", 1, "after", onLeveledUp),
         stop = Ext.Osiris.UnregisterListener,
     }
 end
