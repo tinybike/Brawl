@@ -67,6 +67,7 @@ local Session = {
     LastClickPosition = {},
     ActiveCombatGroups = {},
     AwaitingTarget = {},
+    RemainingMovement = {},
     HealRequested = {},
     HealRequestedTimer = {},
     CountdownTimer = {},

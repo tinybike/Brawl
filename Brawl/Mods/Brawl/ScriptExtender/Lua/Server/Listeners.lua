@@ -148,9 +148,10 @@ local function onLeftForceTurnBased(entityGuid)
             State.Session.Players[entityUuid].isFreshSummon = false
         end
         Quests.resumeCountdownTimer(entityUuid)
-        if State.Session.FTBLockedIn[entityUuid] then
+        if State.Session.FTBLockedIn[entityUuid] ~= nil then
             State.Session.FTBLockedIn[entityUuid] = nil
         end
+        State.Session.RemainingMovement[entityUuid] = nil
         if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
             State.Session.Brawlers[level][entityUuid].isInBrawl = true
             if State.isPlayerControllingDirectly(entityUuid) then
