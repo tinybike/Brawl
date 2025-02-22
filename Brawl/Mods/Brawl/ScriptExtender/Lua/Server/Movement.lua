@@ -42,20 +42,27 @@ local function getMovementSpeed(entityUuid)
     return movementSpeed
 end
 
-local function findPathToPosition(playerUuid, position, callback)
-    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
-    if validX ~= nil and validY ~= nil and validZ ~= nil then
-        local validPosition = {validX, validY, validZ}
-        State.Session.LastClickPosition[playerUuid] = {position = validPosition}
-        if State.Session.MovementQueue[playerUuid] ~= nil or State.Session.AwaitingTarget[playerUuid] then
-            Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
-                if not path or not path.GoalFound then
-                    return Utils.showNotification(playerUuid, "Can't get there", 2)
-                end
-                callback(validPosition)
-            end)
+local function getRemainingMovement(entity)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources
+        if entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+            return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
         end
     end
+end
+
+local function findPathToPosition(playerUuid, position, callback)
+    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+    if validX == nil or validY == nil or validZ == nil then
+        return callback("Can't get there", nil)
+    end
+    local validPosition = {validX, validY, validZ}
+    Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
+        if not path or not path.GoalFound then
+            return callback("Can't get there", nil)
+        end
+        callback(nil, validPosition)
+    end)
 end
 
 local function moveToTargetUuid(uuid, targetUuid, override)
@@ -196,6 +203,7 @@ end
 
 return {
     getMovementSpeed = getMovementSpeed,
+    getRemainingMovement = getRemainingMovement,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
     findPathToPosition = findPathToPosition,

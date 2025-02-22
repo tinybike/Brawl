@@ -375,18 +375,18 @@ local function onClickPosition(data)
         local playerUuid = player.uuid
         local clickPosition = Ext.Json.Parse(data.Payload)
         if clickPosition then
+            State.Session.LastClickPosition[playerUuid] = {position = clickPosition.position}
             if State.Session.AwaitingTarget[playerUuid] and clickPosition.uuid then
                 setAttackMoveTarget(playerUuid, clickPosition.uuid)
-            elseif clickPosition.position then
-                Movement.findPathToPosition(playerUuid, clickPosition.position, function (validPosition)
-                    if State.Session.MovementQueue[playerUuid] ~= nil then
-                        Pause.enqueueMovement(Ext.Entity.Get(playerUuid))
-                    elseif State.Session.AwaitingTarget[playerUuid] then
-                        setAwaitingTarget(playerUuid, false)
-                        allCompanionsDisableLockedOnTarget()
-                        Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
-                        Movement.moveCompanionsToPosition(validPosition)
+            elseif clickPosition.position and State.Session.AwaitingTarget[playerUuid] then
+                Movement.findPathToPosition(playerUuid, clickPosition.position, function (err, validPosition)
+                    if err then
+                        return Utils.showNotification(playerUuid, err, 2)
                     end
+                    setAwaitingTarget(playerUuid, false)
+                    allCompanionsDisableLockedOnTarget()
+                    Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
+                    Movement.moveCompanionsToPosition(validPosition)
                 end)
             end
         end

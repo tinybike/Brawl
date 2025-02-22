@@ -74,8 +74,13 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 Osi.SetCanJoinCombat(entityUuid, 0)
             end
             State.Session.Brawlers[level][entityUuid] = brawler
-            if isInBrawl and State.Session.PulseActionTimers[entityUuid] == nil and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
-                startPulseAction(brawler)
+            if isInBrawl and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
+                if State.Session.PulseActionTimers[entityUuid] == nil then
+                    startPulseAction(brawler)
+                end
+                if State.Session.BrawlFizzler[level] == nil then
+                    startBrawlFizzler(level)
+                end
             end
         end
     end
@@ -108,24 +113,18 @@ local function removeBrawler(level, entityUuid)
 end
 
 local function endBrawl(level)
+    debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
             removeBrawler(level, brawlerUuid)
         end
-        debugPrint("Ended brawl")
         debugDump(brawlersInLevel)
-    end
-    local players = State.Session.Players
-    for playerUuid, player in pairs(players) do
-        if player.isPaused then
-            Osi.ForceTurnBasedMode(playerUuid, 0)
-            break
-        end
     end
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
+    stopPulseReposition(level)
     stopBrawlFizzler(level)
 end
 

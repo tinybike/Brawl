@@ -148,9 +148,10 @@ local function onLeftForceTurnBased(entityGuid)
             State.Session.Players[entityUuid].isFreshSummon = false
         end
         Quests.resumeCountdownTimer(entityUuid)
-        if State.Session.FTBLockedIn[entityUuid] then
+        if State.Session.FTBLockedIn[entityUuid] ~= nil then
             State.Session.FTBLockedIn[entityUuid] = nil
         end
+        State.Session.RemainingMovement[entityUuid] = nil
         if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
             State.Session.Brawlers[level][entityUuid].isInBrawl = true
             if State.isPlayerControllingDirectly(entityUuid) then
@@ -162,6 +163,7 @@ local function onLeftForceTurnBased(entityGuid)
             stopPulseReposition(level)
             startPulseReposition(level)
         end)
+        -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
         if State.areAnyPlayersBrawling() then
             startBrawlFizzler(level)
             if isToT() then
@@ -179,6 +181,7 @@ local function onLeftForceTurnBased(entityGuid)
                         end
                         brawlersInLevel[brawlerUuid].isPaused = false
                         if brawlerUuid ~= entityUuid then
+                            debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
                     else
@@ -450,7 +453,8 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
                 Roster.addNearbyToBrawlers(defenderUuid, 30)
             end
         end
-        startBrawlFizzler(Osi.GetRegion(attackerUuid))
+        -- print("attacked by fizz")
+        -- startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
@@ -573,7 +577,7 @@ local function onLevelUnloading(level)
 end
 
 local function onObjectTimerFinished(objectGuid, timer)
-    debugPrint("ObjectTimerFinished", objectGuid, timer)
+    -- debugPrint("ObjectTimerFinished", objectGuid, timer)
     if timer == "TUT_Helm_Timer" then
         Quests.nautiloidTransponderCountdownFinished(Osi.GetUUID(objectGuid))
     elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
