@@ -44,6 +44,7 @@ end
 
 function stopBrawlFizzler(level)
     if State.Session.BrawlFizzler[level] ~= nil then
+        debugPrint("stopping brawl fizz")
         Ext.Timer.Cancel(State.Session.BrawlFizzler[level])
         State.Session.BrawlFizzler[level] = nil
     end
@@ -105,7 +106,6 @@ end
 function stopAllPulseRepositionTimers()
     local pulseRepositionTimers = State.Session.PulseRepositionTimers
     for level, timer in pairs(pulseRepositionTimers) do
-        Roster.endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
 end
@@ -120,7 +120,6 @@ end
 function stopAllBrawlFizzlers()
     local brawlFizzler = State.Session.BrawlFizzler
     for level, timer in pairs(brawlFizzler) do
-        Roster.endBrawl(level)
         Ext.Timer.Cancel(timer)
     end
 end

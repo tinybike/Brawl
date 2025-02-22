@@ -383,7 +383,6 @@ local function onClickPosition(data)
                     if err then
                         return Utils.showNotification(playerUuid, err, 2)
                     end
-                    print("ok")
                     setAwaitingTarget(playerUuid, false)
                     allCompanionsDisableLockedOnTarget()
                     Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
@@ -397,7 +396,6 @@ end
 local function onCancelQueuedMovement(data)
     local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player and player.uuid then
-        print("cancel queued movement for", player.uuid)
         Pause.cancelQueuedMovement(player.uuid)
     end
 end

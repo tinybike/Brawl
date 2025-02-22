@@ -54,21 +54,15 @@ end
 local function findPathToPosition(playerUuid, position, callback)
     local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
     if validX == nil or validY == nil or validZ == nil then
-        print("Can't get there")
         return callback("Can't get there", nil)
     end
     local validPosition = {validX, validY, validZ}
-    -- State.Session.LastClickPosition[playerUuid] = {position = validPosition}
-    -- if State.Session.MovementQueue[playerUuid] ~= nil or State.Session.AwaitingTarget[playerUuid] then
-    print("begin pathfinding")
     Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
         if not path or not path.GoalFound then
-            print("can't get there")
             return callback("Can't get there", nil)
         end
         callback(nil, validPosition)
     end)
-    -- end
 end
 
 local function moveToTargetUuid(uuid, targetUuid, override)
