@@ -163,7 +163,7 @@
                             "Id": "mod_toggle_hotkey",
                             "Name": "Mod Toggle Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "F9", "Modifier": ""},
+                            "Default": {"ScanCode": "F11", "Modifier": ""},
                             "Description": "Hotkey for toggling the mod on/off",
                             "Handles": {"DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0", "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"}
                         }
@@ -176,7 +176,7 @@
                             "Id": "companion_ai_toggle_hotkey",
                             "Name": "Companion AI Toggle Hotkey",
                             "Type": "keybinding",
-                            "Default": {"ScanCode": "F11", "Modifier": ""},
+                            "Default": {"ScanCode": "F11", "Modifier": "LShift"},
                             "Description": "Hotkey for toggling the companion AI on/off",
                             "Handles": {"DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7", "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"}
                         }, {

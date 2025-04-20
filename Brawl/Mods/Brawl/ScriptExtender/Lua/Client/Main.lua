@@ -1,5 +1,5 @@
-local ModToggleHotkey = {ScanCode = "F9", Modifier = "NONE"}
-local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
+local ModToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
+local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "LShift"}
 local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
 local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
 local TargetCloserEnemyHotkey = {ScanCode = "COMMA", Modifier = "NONE"}

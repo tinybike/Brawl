@@ -172,6 +172,8 @@ local function onLeftForceTurnBased(entityGuid)
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel then
                 for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                    -- NB: account for NPCs not in party / not controlled / start timer immediately
+                    -- does State.Session.Players have NPCs in it (like Wyll in his intro fight)?
                     if State.Session.Players[brawlerUuid] then
                         if not State.isPlayerControllingDirectly(brawlerUuid) then
                             Ext.Timer.WaitFor(2000, function ()
