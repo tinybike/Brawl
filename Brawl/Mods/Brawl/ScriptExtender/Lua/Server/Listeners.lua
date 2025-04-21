@@ -183,7 +183,7 @@ local function onLeftForceTurnBased(entityGuid)
                         end
                         brawlersInLevel[brawlerUuid].isPaused = false
                         if brawlerUuid ~= entityUuid then
-                            debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
+                            print("setting FTB to 0 for", brawlerUuid, entityUuid)
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
                     else

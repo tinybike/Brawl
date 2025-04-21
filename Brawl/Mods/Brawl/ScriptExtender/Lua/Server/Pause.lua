@@ -63,12 +63,30 @@ local function allEnterFTB()
 end
 
 local function allExitFTB()
-    debugPrint("allExitFTB")
+    print("allExitFTB")
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
         unlock(Ext.Entity.Get(uuid))
         Osi.ForceTurnBasedMode(uuid, 0)
         stopTruePause(uuid)
+    end
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    startPulseReposition(level, true)
+    Ext.Timer.WaitFor(1000, function ()
+        stopPulseReposition(level)
+        startPulseReposition(level)
+    end)
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            if not State.Session.Players[brawlerUuid] then
+                print("allExitFTB, start pulse for", brawlerUuid, Utils.getDisplayName(brawlerUuid))
+                Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                -- startPulseAction(brawler)
+                -- Osi.Attack("b94be646-df13-4ddd-a154-a05c961d0822", Osi.GetHostCharacter(), 0)
+                -- Osi.Attack(brawlerUuid, Osi.GetHostCharacter(), 0)
+            end
+        end
     end
 end
 
@@ -143,7 +161,7 @@ local function startTruePause(entityUuid)
             if caster and caster.TurnBased then
                 State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
                 if isFTBAllLockedIn() then
-                    debugPrint("all locked in, exiting") 
+                    debugPrint("all locked in, exiting")
                     allExitFTB()
                 end
             end

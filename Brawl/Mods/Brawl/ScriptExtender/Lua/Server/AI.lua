@@ -309,12 +309,12 @@ local function actOnHostileTarget(brawler, target)
             local allowAoE = Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
             local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
             local targetDistanceToParty = Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
-            debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
+            print("target distance to party", targetDistanceToParty, playerClosestToTarget)
             actionToTake = decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
-            debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
+            print("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
             actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
-            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
+            print("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
         end
         if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
             local numUsableSpells = 0
@@ -333,7 +333,7 @@ local function actOnHostileTarget(brawler, target)
             elseif numUsableSpells == 1 then
                 actionToTake = usableSpells[1]
             end
-            debugPrint("backup ActionToTake", actionToTake, numUsableSpells)
+            print("backup ActionToTake", actionToTake, numUsableSpells)
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
         if actionToTake then
@@ -582,7 +582,7 @@ local function findTarget(brawler)
             if State.Session.Brawlers[level] then
                 local friendlyTargetUuid = whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and State.Session.Brawlers[level][friendlyTargetUuid] then
-                    debugPrint("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
+                    print("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
                     if actOnFriendlyTarget(brawler, State.Session.Brawlers[level][friendlyTargetUuid]) then
                         State.Session.HealRequested[userId] = false
                         return true
@@ -595,24 +595,24 @@ local function findTarget(brawler)
         local weightedTargets = getWeightedTargets(brawler, State.Session.Brawlers[level])
         local targetUuid = decideOnTarget(weightedTargets)
         -- debugDump(weightedTargets)
-        -- debugPrint("got target", targetUuid)
+        print("got target", targetUuid)
         if targetUuid and State.Session.Brawlers[level][targetUuid] then
             local result
             if isHostileTarget(brawler.uuid, targetUuid) then
                 result = actOnHostileTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                -- debugPrint("result (hostile)", result)
+                print("result (hostile)", result)
                 if result == true then
                     brawler.targetUuid = targetUuid
                 end
             else
                 result = actOnFriendlyTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                -- debugPrint("result (friendly)", result)
+                print("result (friendly)", result)
             end
             if result == true then
                 return true
             end
         end
-        -- debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
+        print("can't find a target, holding position", brawler.uuid, brawler.displayName)
         Movement.holdPosition(brawler.uuid)
         return false
     end
@@ -648,6 +648,7 @@ local function pulseAction(brawler)
     if brawler and brawler.uuid then
         local level = Osi.GetRegion(brawler.uuid)
         if level and not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and (not isPlayerControllingDirectly(brawler.uuid) or State.Settings.FullAuto) then
+            print("we going", brawler.uuid)
             -- NB: if we allow healing spells etc used by companions, roll this code in, instead of special-casing it here...
             if isPlayerOrAlly(brawler.uuid) then
                 local players = State.Session.Players
@@ -655,7 +656,7 @@ local function pulseAction(brawler)
                     if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < Constants.HELP_DOWNED_MAX_RANGE then
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
-                        debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
+                        print("Helping target", playerUuid, getDisplayName(playerUuid))
                         Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help")
                         return useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
                     end
@@ -665,29 +666,29 @@ local function pulseAction(brawler)
             end
             -- Doesn't currently have an attack target, so let's find one
             if brawler.targetUuid == nil then
-                debugPrint("Find target (no current target)", brawler.uuid, brawler.displayName)
-                return AI.findTarget(brawler)
+                print("Find target (no current target)", brawler.uuid, brawler.displayName)
+                return findTarget(brawler)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel and isOnSameLevel(brawler.uuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                 if brawler.lockedOnTarget then
-                    debugPrint("Locked-on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                    return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    print("Locked-on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
                 if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
-                    debugPrint("Find target (defense tactics)", brawler.uuid, brawler.displayName)
-                    return AI.findTarget(brawler)
+                    print("Find target (defense tactics)", brawler.uuid, brawler.displayName)
+                    return findTarget(brawler)
                 end
                 if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
-                    debugPrint("Remaining on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                    return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    print("Remaining on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one
-            debugPrint("Find target (current target invalid)", brawler.uuid, brawler.displayName)
+            print("Find target (current target invalid)", brawler.uuid, brawler.displayName)
             brawler.targetUuid = nil
-            return AI.findTarget(brawler)
+            return findTarget(brawler)
         end
         -- If this brawler is dead or unable to fight, stop this pulse
         stopPulseAction(brawler)
