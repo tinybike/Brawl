@@ -470,7 +470,8 @@ local function hasDirectHeal(uuid, preparedSpells)
     end
     for _, preparedSpell in ipairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
-        if Session.SpellTable.Healing[spellName] ~= nil and Resources.hasEnoughToCastSpell(uuid, spellName) then
+        local spell = Session.SpellTable.Healing[spellName]
+        if spell ~= nil and spell.isDirectHeal and not spell.isSelfOnly and Resources.hasEnoughToCastSpell(uuid, spellName) then
             return true
         end
     end

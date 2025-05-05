@@ -65,6 +65,7 @@ local function getHighestWeightSpell(weightedSpells)
             selectedSpell = spellName
         end
     end
+    -- print("selected spell", selectedSpell, maxWeight)
     return (selectedSpell ~= "Target_MainHandAttack") and selectedSpell
 end
 
@@ -240,6 +241,7 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
                 end
             end
             if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
+                -- print("get spell weight for", uuid, spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
             end
         end
@@ -316,7 +318,7 @@ local function actOnHostileTarget(brawler, target)
             actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
         end
-        if actionToTake == nil and Osi.IsPlayer(brawler.uuid) == 0 then
+        if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 then
             local numUsableSpells = 0
             local usableSpells = {}
             for _, preparedSpell in pairs(preparedSpells) do
@@ -365,7 +367,7 @@ local function actOnFriendlyTarget(brawler, target)
             actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
         end
         debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
-        if actionToTake ~= nil then
+        if actionToTake then
             Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
             return true
@@ -600,19 +602,19 @@ local function findTarget(brawler)
             local result
             if isHostileTarget(brawler.uuid, targetUuid) then
                 result = actOnHostileTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                -- debugPrint("result (hostile)", result)
+                debugPrint("result (hostile)", result)
                 if result == true then
                     brawler.targetUuid = targetUuid
                 end
             else
                 result = actOnFriendlyTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                -- debugPrint("result (friendly)", result)
+                debugPrint("result (friendly)", result)
             end
             if result == true then
                 return true
             end
         end
-        -- debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
+        debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
         Movement.holdPosition(brawler.uuid)
         return false
     end
