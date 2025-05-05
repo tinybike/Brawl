@@ -666,28 +666,28 @@ local function pulseAction(brawler)
             -- Doesn't currently have an attack target, so let's find one
             if brawler.targetUuid == nil then
                 debugPrint("Find target (no current target)", brawler.uuid, brawler.displayName)
-                return AI.findTarget(brawler)
+                return findTarget(brawler)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel and isOnSameLevel(brawler.uuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                 if brawler.lockedOnTarget then
                     debugPrint("Locked-on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                    return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
                 if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
                     debugPrint("Find target (defense tactics)", brawler.uuid, brawler.displayName)
-                    return AI.findTarget(brawler)
+                    return findTarget(brawler)
                 end
                 if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
                     debugPrint("Remaining on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
-                    return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one
             debugPrint("Find target (current target invalid)", brawler.uuid, brawler.displayName)
             brawler.targetUuid = nil
-            return AI.findTarget(brawler)
+            return findTarget(brawler)
         end
         -- If this brawler is dead or unable to fight, stop this pulse
         stopPulseAction(brawler)
