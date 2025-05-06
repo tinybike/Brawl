@@ -285,6 +285,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isEvocation = spell.SpellSchool == "Evocation",
             isSafeAoE = isSafeAoESpell(spellName),
             targetRadius = spell.TargetRadius,
+            range = spell.Range,
             costs = parseSpellUseCosts(spell),
             type = spellType,
             hasVerbalComponent = hasVerbalComponent,
@@ -464,15 +465,23 @@ local function getSpellByName(name)
     return nil
 end
 
-local function hasDirectHeal(uuid, preparedSpells)
+local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly)
     if isSilenced(uuid) then
         return false
     end
     for _, preparedSpell in ipairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         local spell = Session.SpellTable.Healing[spellName]
-        if spell ~= nil and spell.isDirectHeal and not spell.isSelfOnly and Resources.hasEnoughToCastSpell(uuid, spellName) then
-            return true
+        local isUsableHeal = (spell ~= nil) and spell.isDirectHeal
+        if isUsableHeal and excludeSelfOnly then
+            isUsableHeal = isUsableHeal and not spell.isSelfOnly
+        end
+        if isUsableHeal then
+            if Settings.HogwildMode then
+                return true
+            elseif Resources.hasEnoughToCastSpell(uuid, spellName) then
+                return true
+            end
         end
     end
     return false

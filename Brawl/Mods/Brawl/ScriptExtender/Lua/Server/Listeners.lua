@@ -829,46 +829,46 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
-        handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.CrimeIsRegistered = {
-        handle = Ext.Osiris.RegisterListener("CrimeIsRegistered", 8, "after", onCrimeIsRegistered),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.CrimeProcessingStarted = {
-        handle = Ext.Osiris.RegisterListener("CrimeProcessingStarted", 2, "after", onCrimeProcessingStarted),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeConfrontationDone = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeConfrontationDone", 7, "after", onOnCrimeConfrontationDone),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeInvestigatorSwitchedState = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeInvestigatorSwitchedState", 4, "after", onOnCrimeInvestigatorSwitchedState),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeMergedWith = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeMergedWith", 2, "after", onOnCrimeMergedWith),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeRemoved = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeRemoved", 6, "after", onOnCrimeRemoved),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeResetInterrogationForCriminal = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeResetInterrogationForCriminal", 2, "after", onOnCrimeResetInterrogationForCriminal),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCrimeResolved = {
-        handle = Ext.Osiris.RegisterListener("OnCrimeResolved", 6, "after", onOnCrimeResolved),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.OnCriminalMergedWithCrime = {
-        handle = Ext.Osiris.RegisterListener("OnCriminalMergedWithCrime", 2, "after", onOnCriminalMergedWithCrime),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
+    --     handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.CrimeIsRegistered = {
+    --     handle = Ext.Osiris.RegisterListener("CrimeIsRegistered", 8, "after", onCrimeIsRegistered),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.CrimeProcessingStarted = {
+    --     handle = Ext.Osiris.RegisterListener("CrimeProcessingStarted", 2, "after", onCrimeProcessingStarted),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeConfrontationDone = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeConfrontationDone", 7, "after", onOnCrimeConfrontationDone),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeInvestigatorSwitchedState = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeInvestigatorSwitchedState", 4, "after", onOnCrimeInvestigatorSwitchedState),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeMergedWith = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeMergedWith", 2, "after", onOnCrimeMergedWith),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeRemoved = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeRemoved", 6, "after", onOnCrimeRemoved),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeResetInterrogationForCriminal = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeResetInterrogationForCriminal", 2, "after", onOnCrimeResetInterrogationForCriminal),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCrimeResolved = {
+    --     handle = Ext.Osiris.RegisterListener("OnCrimeResolved", 6, "after", onOnCrimeResolved),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
+    -- State.Session.Listeners.OnCriminalMergedWithCrime = {
+    --     handle = Ext.Osiris.RegisterListener("OnCriminalMergedWithCrime", 2, "after", onOnCriminalMergedWithCrime),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     State.Session.Listeners.LeveledUp = {
         handle = Ext.Osiris.RegisterListener("LeveledUp", 1, "after", onLeveledUp),
         stop = Ext.Osiris.UnregisterListener,

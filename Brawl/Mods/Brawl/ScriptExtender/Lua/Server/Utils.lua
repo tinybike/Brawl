@@ -149,7 +149,7 @@ local function isProjectileSpell(spellName)
 end
 
 local function convertSpellRangeToNumber(range)
-    if range == "RangedMainWeaponRange" then
+    if range == "RangedMainWeaponRange" or range == "ThrownObjectRange" then
         return 18
     elseif range == "MeleeMainWeaponRange" then
         return 2

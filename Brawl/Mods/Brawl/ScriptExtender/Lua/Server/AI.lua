@@ -66,7 +66,7 @@ local function getHighestWeightSpell(weightedSpells)
         end
     end
     -- print("selected spell", selectedSpell, maxWeight)
-    return (selectedSpell ~= "Target_MainHandAttack") and selectedSpell
+    return selectedSpell
 end
 
 -- should account for damage range
@@ -104,6 +104,14 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
         if distanceToTarget <= Constants.MELEE_RANGE then
             weight = weight + archetypeWeights.meleeWeaponInRange
         end
+    -- NB: should the weights be different from ranged and thrown (e.g. tavern brawler spec)?
+    elseif spell.targetRadius == "ThrownObjectRange" then
+        weight = weight + archetypeWeights.rangedWeapon
+        if distanceToTarget > Constants.THROWN_RANGE_MIN and distanceToTarget < Constants.THROWN_RANGE_MAX then
+            weight = weight + archetypeWeights.rangedWeaponInRange
+        else
+            weight = weight + archetypeWeights.rangedWeaponOutOfRange
+        end
     else
         local targetRadius = tonumber(spell.targetRadius)
         if targetRadius then
@@ -111,8 +119,15 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
                 weight = weight + archetypeWeights.spellInRange
             end
         else
-            debugPrint("Target radius didn't convert to number, what is this?")
-            debugPrint(spell.targetRadius)
+            local range = tonumber(spell.range)
+            if range then
+                if distanceToTarget <= range then
+                    weight = weight + archetypeWeights.spellInRange
+                end
+            else
+                debugPrint("Target radius and range didn't convert to number, what is this?")
+                debugDump(spell)
+            end
         end
     end
     -- Favor using spells or non-spells?
@@ -241,7 +256,7 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
                 end
             end
             if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
-                -- print("get spell weight for", uuid, spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
+                debugPrint("get spell weight for", uuid, spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
             end
         end
@@ -338,10 +353,10 @@ local function actOnHostileTarget(brawler, target)
             debugPrint("backup ActionToTake", actionToTake, numUsableSpells)
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
-        if actionToTake then
-            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
-        else
+        if not actionToTake or actionToTake == "Target_MainHandAttack" then
             Osi.Attack(brawler.uuid, target.uuid, 0)
+        else
+            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end
         return true
     end
@@ -356,8 +371,12 @@ local function actOnFriendlyTarget(brawler, target)
         -- todo: Utility/Buff spells
         debugPrint("acting on friendly target", brawler.uuid, brawler.displayName, getDisplayName(target.uuid))
         local spellTypes = {"Healing"}
-        if not State.hasDirectHeal(brawler.uuid, preparedSpells) then
-            debugPrint("No direct heals found")
+        if brawler.uuid == target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, false) then
+            debugPrint("No direct heals found (self)")
+            return false
+        end
+        if brawler.uuid ~= target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, true) then
+            debugPrint("No direct heals found (other)")
             return false
         end
         local actionToTake = nil
@@ -504,12 +523,24 @@ local function getWeightedTargets(brawler, potentialTargets)
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        if brawler.uuid ~= potentialTargetUuid and isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
+        if brawler.uuid == potentialTargetUuid then
+            if State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, false) then
+                local targetHp = Osi.GetHitpoints(potentialTargetUuid)
+                local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
+                if State.Settings.CompanionTactics == "Offense" then
+                    weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false)
+                elseif State.Settings.CompanionTactics == "Defense" then
+                    weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
+                else
+                    weightedTargets[potentialTargetUuid] = getBalancedWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
+                end
+            end
+        elseif isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
             if (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                 local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
-                if isHostile or State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells) then
+                if isHostile or State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
                     if not isPlayerOrAlly(brawler.uuid) then
