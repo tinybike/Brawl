@@ -120,19 +120,19 @@ local function onEnteredForceTurnBased(entityGuid)
         if isToT() then
             stopToTTimers()
         end
-        if State.Settings.TruePause then
-            Pause.startTruePause(entityUuid)
-        end
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
-                    Utils.clearOsirisQueue(brawlerUuid)
-                    stopPulseAction(brawler, true)
-                    if State.Session.Players[brawlerUuid] then
-                        brawlersInLevel[brawlerUuid].isPaused = true
-                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                    end
+    end
+    if State.Settings.TruePause then
+        Pause.startTruePause(entityUuid)
+    end
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
+                Utils.clearOsirisQueue(brawlerUuid)
+                stopPulseAction(brawler, true)
+                if State.Session.Players[brawlerUuid] then
+                    brawlersInLevel[brawlerUuid].isPaused = true
+                    Osi.ForceTurnBasedMode(brawlerUuid, 1)
                 end
             end
         end
