@@ -101,38 +101,40 @@ end
 local function onEnteredForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
-        debugPrint("EnteredForceTurnBased", entityGuid)
-        if State.Session.Players[entityUuid].isFreshSummon then
-            State.Session.Players[entityUuid].isFreshSummon = false
-            return Osi.ForceTurnBasedMode(entityUuid, 0)
+    if level and entityUuid then
+        if State.Session.Players and State.Session.Players[entityUuid] then
+            debugPrint("EnteredForceTurnBased", entityGuid)
+            if State.Session.Players[entityUuid].isFreshSummon then
+                State.Session.Players[entityUuid].isFreshSummon = false
+                return Osi.ForceTurnBasedMode(entityUuid, 0)
+            end
+            if State.Session.AwaitingTarget[entityUuid] then
+                Commands.setAwaitingTarget(entityUuid, false)
+            end
+            Quests.stopCountdownTimer(entityUuid)
+            if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
+                State.Session.Brawlers[level][entityUuid].isInBrawl = false
+            end
+            stopPulseAddNearby(entityUuid)
+            stopPulseReposition(level)
+            stopBrawlFizzler(level)
+            if isToT() then
+                stopToTTimers()
+            end
         end
-        if State.Session.AwaitingTarget[entityUuid] then
-            Commands.setAwaitingTarget(entityUuid, false)
+        if State.Settings.TruePause then
+            Pause.startTruePause(entityUuid)
         end
-        Quests.stopCountdownTimer(entityUuid)
-        if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
-            State.Session.Brawlers[level][entityUuid].isInBrawl = false
-        end
-        stopPulseAddNearby(entityUuid)
-        stopPulseReposition(level)
-        stopBrawlFizzler(level)
-        if isToT() then
-            stopToTTimers()
-        end
-    end
-    if State.Settings.TruePause then
-        Pause.startTruePause(entityUuid)
-    end
-    local brawlersInLevel = State.Session.Brawlers[level]
-    if brawlersInLevel then
-        for brawlerUuid, brawler in pairs(brawlersInLevel) do
-            if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
-                Utils.clearOsirisQueue(brawlerUuid)
-                stopPulseAction(brawler, true)
-                if State.Session.Players[brawlerUuid] then
-                    brawlersInLevel[brawlerUuid].isPaused = true
-                    Osi.ForceTurnBasedMode(brawlerUuid, 1)
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
+                    Utils.clearOsirisQueue(brawlerUuid)
+                    stopPulseAction(brawler, true)
+                    if State.Session.Players[brawlerUuid] then
+                        brawlersInLevel[brawlerUuid].isPaused = true
+                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
+                    end
                 end
             end
         end
@@ -142,55 +144,58 @@ end
 local function onLeftForceTurnBased(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
-        debugPrint("LeftForceTurnBased", entityGuid)
-        if State.Session.Players[entityUuid].isFreshSummon then
-            State.Session.Players[entityUuid].isFreshSummon = false
-        end
-        Quests.resumeCountdownTimer(entityUuid)
-        if State.Session.FTBLockedIn[entityUuid] ~= nil then
-            State.Session.FTBLockedIn[entityUuid] = nil
-        end
-        State.Session.RemainingMovement[entityUuid] = nil
-        if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
-            State.Session.Brawlers[level][entityUuid].isInBrawl = true
-            if State.isPlayerControllingDirectly(entityUuid) then
-                startPulseAddNearby(entityUuid)
+    if level and entityUuid then
+        if State.Session.Players and State.Session.Players[entityUuid] then
+            debugPrint("LeftForceTurnBased", entityGuid)
+            if State.Session.Players[entityUuid].isFreshSummon then
+                State.Session.Players[entityUuid].isFreshSummon = false
             end
-        end
-        startPulseReposition(level, true)
-        Ext.Timer.WaitFor(1000, function ()
-            stopPulseReposition(level)
-            startPulseReposition(level)
-        end)
-        -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
-        if State.areAnyPlayersBrawling() then
-            startBrawlFizzler(level)
-            if isToT() then
-                startToTTimers()
+            Quests.resumeCountdownTimer(entityUuid)
+            if State.Session.FTBLockedIn[entityUuid] ~= nil then
+                State.Session.FTBLockedIn[entityUuid] = nil
             end
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if brawlersInLevel then
-                for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                    -- NB: account for NPCs not in party / not controlled / start timer immediately
-                    -- does State.Session.Players have NPCs in it (like Wyll in his intro fight)?
-                    if State.Session.Players[brawlerUuid] then
-                        if not State.isPlayerControllingDirectly(brawlerUuid) then
-                            Ext.Timer.WaitFor(2000, function ()
-                                Osi.FlushOsirisQueue(brawlerUuid)
-                                startPulseAction(brawler)
-                            end)
-                        end
-                        brawlersInLevel[brawlerUuid].isPaused = false
-                        if brawlerUuid ~= entityUuid then
-                            debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
-                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                        end
-                    else
-                        startPulseAction(brawler)
-                    end
+            State.Session.RemainingMovement[entityUuid] = nil
+            if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
+                State.Session.Brawlers[level][entityUuid].isInBrawl = true
+                if State.isPlayerControllingDirectly(entityUuid) then
+                    startPulseAddNearby(entityUuid)
                 end
             end
+            -- -- NB: this should only happen once, not once per entity!
+            -- startPulseReposition(level, true)
+            -- Ext.Timer.WaitFor(1000, function ()
+            --     stopPulseReposition(level)
+            --     startPulseReposition(level)
+            -- end)
+            -- -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
+            -- if State.areAnyPlayersBrawling() then
+            --     startBrawlFizzler(level)
+            --     if isToT() then
+            --         startToTTimers()
+            --     end
+            --     local brawlersInLevel = State.Session.Brawlers[level]
+            --     if brawlersInLevel then
+            --         for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            --             -- NB: account for NPCs not in party / not controlled / start timer immediately
+            --             -- does State.Session.Players have NPCs in it (like Wyll in his intro fight)?
+            --             if State.Session.Players[brawlerUuid] then
+            --                 if not State.isPlayerControllingDirectly(brawlerUuid) then
+            --                     Ext.Timer.WaitFor(2000, function ()
+            --                         Osi.FlushOsirisQueue(brawlerUuid)
+            --                         startPulseAction(brawler)
+            --                     end)
+            --                 end
+            --                 brawlersInLevel[brawlerUuid].isPaused = false
+            --                 if brawlerUuid ~= entityUuid then
+            --                     debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
+            --                     Osi.ForceTurnBasedMode(brawlerUuid, 0)
+            --                 end
+            --             else
+            --                 startPulseAction(brawler)
+            --             end
+            --         end
+            --     end
+            -- end
         end
     end
 end

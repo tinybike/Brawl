@@ -11,15 +11,15 @@ local isOnSameLevel = Utils.isOnSameLevel
 local isVisible = Utils.isVisible
 
 local function isLocked(entity)
-    debugPrint(entity.TurnBased.CanAct_M, entity.TurnBased.HadTurnInCombat, entity.TurnBased.IsInCombat_M)
-    return entity.TurnBased.CanAct_M and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsInCombat_M
+    debugPrint(entity.TurnBased.CanActInCombat, entity.TurnBased.HadTurnInCombat, entity.TurnBased.IsActiveCombatTurn)
+    return entity.TurnBased.CanActInCombat and entity.TurnBased.HadTurnInCombat and not entity.TurnBased.IsActiveCombatTurn
 end
 
 local function unlock(entity)
     debugPrint("unlock", entity.Uuid.EntityUuid, isLocked(entity))
     debugDump(entity.TurnBased)
-    if isLocked(entity) then
-        entity.TurnBased.IsInCombat_M = true
+    -- if isLocked(entity) then
+        entity.TurnBased.IsActiveCombatTurn = true
         entity:Replicate("TurnBased")
         local uuid = entity.Uuid.EntityUuid
         State.Session.FTBLockedIn[uuid] = false
@@ -34,14 +34,14 @@ local function unlock(entity)
             Movement.moveToPosition(uuid, moveTo, false)
             State.Session.MovementQueue[uuid] = nil
         end
-    end
+    -- end
 end
 
 local function lock(entity)
     local uuid = entity.Uuid.EntityUuid
     debugPrint("locking", uuid)
     Roster.disableLockedOnTarget(uuid)
-    entity.TurnBased.IsInCombat_M = false
+    entity.TurnBased.IsActiveCombatTurn = false
     State.Session.FTBLockedIn[uuid] = true
 end
 
@@ -86,6 +86,35 @@ local function allExitFTB()
             stopTruePause(brawlerUuid)
         end
     end
+    startPulseReposition(level, true)
+    Ext.Timer.WaitFor(1000, function ()
+        stopPulseReposition(level)
+        startPulseReposition(level)
+    end)
+    if State.areAnyPlayersBrawling() then
+        startBrawlFizzler(level)
+        if Utils.isToT() then
+            startToTTimers()
+        end
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                if State.Session.Players[brawlerUuid] then
+                    if not State.isPlayerControllingDirectly(brawlerUuid) then
+                        Ext.Timer.WaitFor(2000, function ()
+                            Osi.FlushOsirisQueue(brawlerUuid)
+                            startPulseAction(brawler)
+                        end)
+                    end
+                    brawlersInLevel[brawlerUuid].isPaused = false
+                    debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
+                    Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                else
+                    startPulseAction(brawler)
+                end
+            end
+        end
+    end
 end
 
 local function cancelQueuedMovement(uuid)
@@ -117,7 +146,7 @@ local function isFTBAllLockedIn()
     -- debugDump(State.Session.FTBLockedIn)
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
-        debugPrint("checking ftb for", uuid, Osi.IsInForceTurnBasedMode(uuid))
+        -- debugPrint("checking ftb for", uuid, Osi.IsInForceTurnBasedMode(uuid))
         if not State.Session.FTBLockedIn[uuid] and Osi.IsDead(uuid) == 0 and not Utils.isDowned(uuid) then
             return false
         end
@@ -154,7 +183,7 @@ local function startTruePause(entityUuid)
     end
     State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
         -- requested end turn isn't the only thing that can change here
-        debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
+        -- debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
         if caster and caster.TurnBased then
             State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
             if isFTBAllLockedIn() then
