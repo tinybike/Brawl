@@ -269,10 +269,6 @@ local function startTruePause(entityUuid)
                         debugPrint("Locked-on target, attacking", brawler.displayName, entityUuid, "->", getDisplayName(brawler.targetUuid))
                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                     end
-                    if isPlayerOrAlly(entityUuid) and State.Settings.CompanionTactics == "Defense" then
-                        debugPrint("Find target (defense tactics)", entityUuid, brawler.displayName)
-                        return AI.findTarget(brawler)
-                    end
                     if Osi.GetDistanceTo(entityUuid, brawler.targetUuid) <= 12 then
                         debugPrint("Remaining on target, attacking", brawler.displayName, entityUuid, "->", getDisplayName(brawler.targetUuid))
                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
