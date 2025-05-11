@@ -213,6 +213,7 @@ local function getPointInFrontOf(entityUuid, distance)
 end
 
 local function clearOsirisQueue(uuid)
+    debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end
