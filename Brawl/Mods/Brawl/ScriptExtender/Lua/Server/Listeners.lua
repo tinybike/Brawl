@@ -163,18 +163,21 @@ local function onLeftForceTurnBased(entityGuid)
                     startPulseAddNearby(entityUuid)
                 end
             end
-            -- -- NB: this should only happen once, not once per entity!
-            -- startPulseReposition(level, true)
-            -- Ext.Timer.WaitFor(1000, function ()
-            --     stopPulseReposition(level)
-            --     startPulseReposition(level)
-            -- end)
-            -- -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
+            if entityUuid == Osi.GetHostCharacter() then
+                startPulseReposition(level, true)
+                -- Ext.Timer.WaitFor(1000, function ()
+                --     stopPulseReposition(level)
+                --     startPulseReposition(level)
+                -- end)
+            end
+            -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
             if State.areAnyPlayersBrawling() then
-            --     startBrawlFizzler(level)
-            --     if isToT() then
-            --         startToTTimers()
-            --     end
+                if entityUuid == Osi.GetHostCharacter() then
+                    startBrawlFizzler(level)
+                    if isToT() then
+                        startToTTimers()
+                    end
+                end
                 local brawlersInLevel = State.Session.Brawlers[level]
                 if brawlersInLevel then
                     for brawlerUuid, brawler in pairs(brawlersInLevel) do
