@@ -193,8 +193,8 @@ local function onLeftForceTurnBased(entityGuid)
                                 Osi.ForceTurnBasedMode(brawlerUuid, 0)
                             end
                         else
-                            debugPrint("skipping startPulseAction", entityUuid)
-                            -- startPulseAction(brawler)
+                            -- debugPrint("****************skipping startPulseAction", entityUuid)
+                            startPulseAction(brawler)
                         end
                     end
                 end

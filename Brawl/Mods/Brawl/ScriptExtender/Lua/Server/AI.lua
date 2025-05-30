@@ -738,12 +738,13 @@ local function pulseReposition(level, skipCompanions)
                     -- Enemy units are actively looking for a fight and will attack if you get too close to them
                     if isPugnacious(brawlerUuid) then
                         if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
-                            debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
-                            -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                            local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
+                            local _, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
                             if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
                                 debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
                                 Roster.removeBrawler(level, brawlerUuid)
+                            else
+                                debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
+                                Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         else
                             debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
