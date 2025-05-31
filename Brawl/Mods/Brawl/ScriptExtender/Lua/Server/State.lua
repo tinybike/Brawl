@@ -522,7 +522,7 @@ local function uncapMovementDistance(entityUuid)
     end
     local movementDistances = modVars.MovementDistances
     if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
-        debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
+        -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
         if movementDistances[entityUuid] == nil then
@@ -544,8 +544,8 @@ local function capMovementDistance(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local movementDistances = modVars.MovementDistances
     if movementDistances and movementDistances[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
-        debugPrint("Cap movement distance", entityUuid)
-        debugDump(movementDistances[entityUuid])
+        -- debugPrint("Cap movement distance", entityUuid)
+        -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
         if movementDistances[entityUuid] == nil then
             movementDistances[entityUuid] = {}
@@ -557,7 +557,7 @@ local function capMovementDistance(entityUuid)
         entity:Replicate("ActionResources")
         movementDistances[entityUuid] = nil
         modVars.MovementDistances = movementDistances
-        debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
+        -- debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
@@ -622,14 +622,14 @@ local function uncapPartyMembersMovementDistances()
         end
         Session.PartyMembersMovementResourceListeners[partyMemberUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
             local uuid = entity.Uuid.EntityUuid
-            debugPrint("ActionResources changed", uuid)
+            -- debugPrint("ActionResources changed", uuid)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local movementDistances = modVars.MovementDistances
             if movementDistances and movementDistances[uuid] ~= nil and Constants.UNCAPPED_MOVEMENT_DISTANCE ~= Movement.getMovementDistanceMaxAmount(entity) then
                 debugDump(movementDistances[uuid])
                 if movementDistances[uuid].updating == false then
                     -- External change detected; re-apply modifications
-                    debugPrint("External MaxAmount movement distance change detected for", uuid, ". Re-uncapping...")
+                    -- debugPrint("External MaxAmount movement distance change detected for", uuid, ". Re-uncapping...")
                     movementDistances[uuid] = nil
                     modVars.MovementDistances = movementDistances
                     uncapMovementDistance(uuid)
