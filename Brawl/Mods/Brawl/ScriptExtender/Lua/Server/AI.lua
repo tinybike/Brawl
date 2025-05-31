@@ -728,7 +728,7 @@ local function pulseAction(brawler)
 end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
-local function pulseReposition(level, skipCompanions)
+local function pulseReposition(level)
     State.checkForDownedOrDeadPlayers()
     if State.Session.Brawlers[level] then
         local brawlersInLevel = State.Session.Brawlers[level]
@@ -753,7 +753,7 @@ local function pulseReposition(level, skipCompanions)
                     -- Player, ally, and neutral units are not actively looking for a fight
                     -- - Companions and allies use the same logic
                     -- - Neutrals just chilling
-                    elseif not skipCompanions and State.areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                    elseif State.areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                         -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                         if State.Session.Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
                             debugPrint("Player is controlling directly: do not take action!")

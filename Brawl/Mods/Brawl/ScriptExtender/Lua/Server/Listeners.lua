@@ -164,7 +164,8 @@ local function onLeftForceTurnBased(entityGuid)
                 end
             end
             if entityUuid == Osi.GetHostCharacter() then
-                startPulseReposition(level, true)
+                startPulseReposition(level)
+                -- startPulseReposition(level, true, false)
                 -- Ext.Timer.WaitFor(1000, function ()
                 --     stopPulseReposition(level)
                 --     startPulseReposition(level)
