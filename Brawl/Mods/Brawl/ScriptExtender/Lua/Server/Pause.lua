@@ -46,7 +46,6 @@ local function lock(entity)
 end
 
 local function stopTruePause(entityUuid)
-    -- if Osi.IsPartyMember(entityUuid, 1) == 1 then
     if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
         Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
         State.Session.ActionResourcesListeners[entityUuid] = nil
@@ -59,7 +58,6 @@ local function stopTruePause(entityUuid)
         Ext.Entity.Unsubscribe(State.Session.SpellCastMovementListeners[entityUuid])
         State.Session.SpellCastMovementListeners[entityUuid] = nil
     end
-    -- end
 end
 
 local function allEnterFTB()
