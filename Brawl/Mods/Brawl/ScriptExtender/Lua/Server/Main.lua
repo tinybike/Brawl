@@ -87,11 +87,11 @@ function stopPulseReposition(level)
 end
 
 -- Reposition if needed every REPOSITION_INTERVAL ms
-function startPulseReposition(level, skipCompanions)
+function startPulseReposition(level)
     if State.Session.PulseRepositionTimers[level] == nil then
-        debugPrint("startPulseReposition", level, skipCompanions)
+        debugPrint("startPulseReposition", level)
         State.Session.PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseReposition(level, skipCompanions)
+            AI.pulseReposition(level)
         end, Constants.REPOSITION_INTERVAL)
     end
 end
@@ -137,6 +137,7 @@ function cleanupAll()
         end
     end
     State.revertAllModifiedHitpoints()
+    State.recapPartyMembersMovementDistances()
     State.resetSpellData()
 end
 

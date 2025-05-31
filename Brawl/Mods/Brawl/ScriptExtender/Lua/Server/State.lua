@@ -59,6 +59,7 @@ local Session = {
     PlayerCurrentTarget = {},
     ActionsInProgress = {},
     MovementQueue = {},
+    PartyMembersMovementResourceListeners = {},
     PartyMembersHitpointsListeners = {},
     ActionResourcesListeners = {},
     TurnBasedListeners = {},
@@ -82,6 +83,7 @@ local Session = {
 -- Persistent state
 Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
 
 local function hasTargetCondition(targetConditionString, condition)
@@ -513,6 +515,52 @@ local function resetSpellData()
     end
 end
 
+local function uncapMovementDistance(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.MovementDistances == nil then
+        modVars.MovementDistances = {}
+    end
+    local movementDistances = modVars.MovementDistances
+    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
+        -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
+        local entity = Ext.Entity.Get(entityUuid)
+        local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
+        if movementDistances[entityUuid] == nil then
+            movementDistances[entityUuid] = {}
+        end
+        movementDistances[entityUuid].updating = true
+        modVars.MovementDistances = movementDistances
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+        entity:Replicate("ActionResources")
+        movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
+        movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
+        modVars.MovementDistances = movementDistances
+        _D(movementDistances)
+    end
+end
+
+local function capMovementDistance(entityUuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    local movementDistances = modVars.MovementDistances
+    if movementDistances and movementDistances[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+        -- debugPrint("Cap movement distance", entityUuid)
+        -- debugDump(movementDistances[entityUuid])
+        local entity = Ext.Entity.Get(entityUuid)
+        if movementDistances[entityUuid] == nil then
+            movementDistances[entityUuid] = {}
+        end
+        movementDistances[entityUuid].updating = true
+        modVars.MovementDistances = movementDistances
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
+        entity:Replicate("ActionResources")
+        movementDistances[entityUuid] = nil
+        modVars.MovementDistances = movementDistances
+        -- debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
+    end
+end
+
 local function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
@@ -564,6 +612,38 @@ local function modifyHitpoints(entityUuid)
     end
 end
 
+local function uncapPartyMembersMovementDistances()
+    for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
+        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        capMovementDistance(partyMemberUuid)
+        uncapMovementDistance(partyMemberUuid)
+        if Session.PartyMembersMovementResourceListeners[partyMemberUuid] ~= nil then
+            Ext.Entity.Unsubscribe(Session.PartyMembersMovementResourceListeners[partyMemberUuid])
+        end
+        Session.PartyMembersMovementResourceListeners[partyMemberUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+            local uuid = entity.Uuid.EntityUuid
+            -- debugPrint("ActionResources changed", uuid)
+            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            local movementDistances = modVars.MovementDistances
+            if movementDistances and movementDistances[uuid] ~= nil and Constants.UNCAPPED_MOVEMENT_DISTANCE ~= Movement.getMovementDistanceMaxAmount(entity) then
+                debugDump(movementDistances[uuid])
+                if movementDistances[uuid].updating == false then
+                    -- External change detected; re-apply modifications
+                    -- debugPrint("External MaxAmount movement distance change detected for", uuid, ". Re-uncapping...")
+                    movementDistances[uuid] = nil
+                    modVars.MovementDistances = movementDistances
+                    uncapMovementDistance(uuid)
+                end
+            end
+            modVars = Ext.Vars.GetModVariables(ModuleUUID)
+            movementDistances = modVars.MovementDistances
+            movementDistances[uuid] = movementDistances[uuid] or {}
+            movementDistances[uuid].updating = false
+            modVars.MovementDistances = movementDistances
+        end, Ext.Entity.Get(partyMemberUuid))
+    end
+end
+
 local function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
         local partyMemberUuid = Osi.GetUUID(partyMember[1])
@@ -593,6 +673,18 @@ local function setupPartyMembersHitpoints()
             modifiedHitpoints[uuid].updating = false
             modVars.ModifiedHitpoints = modifiedHitpoints
         end, Ext.Entity.Get(partyMemberUuid))
+    end
+end
+
+local function recapPartyMembersMovementDistances()
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.MovementDistances and next(modVars.MovementDistances) ~= nil then
+        for uuid, _ in pairs(modVars.MovementDistances) do
+            capMovementDistance(uuid)
+        end
+    end
+    for _, listener in pairs(Session.PartyMembersMovementResourceListeners) do
+        Ext.Entity.Unsubscribe(listener)
     end
 end
 
@@ -671,6 +763,8 @@ return {
     modifyHitpoints = modifyHitpoints,
     setupPartyMembersHitpoints = setupPartyMembersHitpoints,
     revertAllModifiedHitpoints = revertAllModifiedHitpoints,
+    uncapPartyMembersMovementDistances = uncapPartyMembersMovementDistances,
+    recapPartyMembersMovementDistances = recapPartyMembersMovementDistances,
     setMaxPartySize = setMaxPartySize,
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,

@@ -33,10 +33,18 @@ local function enemyMovementDistanceToSpeed(movementDistance)
     end
 end
 
+local function getMovementDistanceAmount(entity)
+    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+end
+
+local function getMovementDistanceMaxAmount(entity)
+    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+end
+
 local function getMovementSpeed(entityUuid)
     -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
     local entity = Ext.Entity.Get(entityUuid)
-    local movementDistance = entity.ActionResources.Resources[Constants.MOVEMENT_DISTANCE_UUID][1].Amount
+    local movementDistance = getMovementDistanceAmount(entity)
     local movementSpeed = isPlayerOrAlly(entityUuid) and playerMovementDistanceToSpeed(movementDistance) or enemyMovementDistanceToSpeed(movementDistance)
     -- debugPrint("getMovementSpeed", entityUuid, movementDistance, movementSpeed)
     return movementSpeed
@@ -46,7 +54,7 @@ local function getRemainingMovement(entity)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
-            return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+            return getMovementDistanceAmount(entity)
         end
     end
 end
@@ -203,6 +211,7 @@ end
 
 return {
     getMovementSpeed = getMovementSpeed,
+    getMovementDistanceMaxAmount = getMovementDistanceMaxAmount,
     getRemainingMovement = getRemainingMovement,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,

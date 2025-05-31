@@ -728,7 +728,7 @@ local function pulseAction(brawler)
 end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
-local function pulseReposition(level, skipCompanions)
+local function pulseReposition(level)
     State.checkForDownedOrDeadPlayers()
     if State.Session.Brawlers[level] then
         local brawlersInLevel = State.Session.Brawlers[level]
@@ -738,12 +738,13 @@ local function pulseReposition(level, skipCompanions)
                     -- Enemy units are actively looking for a fight and will attack if you get too close to them
                     if isPugnacious(brawlerUuid) then
                         if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
-                            debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
-                            -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                            local playerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
+                            local _, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
                             if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
                                 debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
                                 Roster.removeBrawler(level, brawlerUuid)
+                            else
+                                debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
+                                Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         else
                             debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
@@ -752,7 +753,7 @@ local function pulseReposition(level, skipCompanions)
                     -- Player, ally, and neutral units are not actively looking for a fight
                     -- - Companions and allies use the same logic
                     -- - Neutrals just chilling
-                    elseif not skipCompanions and State.areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                    elseif State.areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                         -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                         if State.Session.Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
                             debugPrint("Player is controlling directly: do not take action!")
@@ -762,12 +763,11 @@ local function pulseReposition(level, skipCompanions)
                             if not brawler.isInBrawl then
                                 if Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
                                     -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
-                                    -- shouldDelay?
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
-                                Movement.holdPosition(brawlerUuid)
-                                -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                                -- Movement.holdPosition(brawlerUuid)
+                                Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         end
                     end
