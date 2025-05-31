@@ -72,13 +72,21 @@ end
 
 local function allExitFTB()
     debugPrint("allExitFTB")
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local uuid = Osi.GetUUID(player[1])
+        unlock(Ext.Entity.Get(uuid))
+        Osi.ForceTurnBasedMode(uuid, 0)
+        stopTruePause(uuid)
+    end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
-        for brawlerUuid, brawler in pairs(brawlersInLevel) do
-            unlock(Ext.Entity.Get(brawlerUuid))
-            Osi.ForceTurnBasedMode(brawlerUuid, 0)
-            stopTruePause(brawlerUuid)
+        for brawlerUuid, _ in pairs(brawlersInLevel) do
+            if Osi.IsPlayer(brawlerUuid) == 0 then
+                unlock(Ext.Entity.Get(brawlerUuid))
+                Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                stopTruePause(brawlerUuid)
+            end
         end
     end
 end
