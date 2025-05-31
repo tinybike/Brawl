@@ -102,35 +102,6 @@ local function allExitFTB()
             stopTruePause(brawlerUuid)
         end
     end
-    -- startPulseReposition(level, true)
-    -- Ext.Timer.WaitFor(1000, function ()
-    --     stopPulseReposition(level)
-    --     startPulseReposition(level)
-    -- end)
-    if State.areAnyPlayersBrawling() then
-        startBrawlFizzler(level)
-        if Utils.isToT() then
-            startToTTimers()
-        end
-        -- local brawlersInLevel = State.Session.Brawlers[level]
-        -- if brawlersInLevel then
-        --     for brawlerUuid, brawler in pairs(brawlersInLevel) do
-        --         if State.Session.Players[brawlerUuid] then
-        --             if not State.isPlayerControllingDirectly(brawlerUuid) then
-        --                 Ext.Timer.WaitFor(2000, function ()
-        --                     Osi.FlushOsirisQueue(brawlerUuid)
-        --                     startPulseAction(brawler)
-        --                 end)
-        --             end
-        --             brawlersInLevel[brawlerUuid].isPaused = false
-        --             debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
-        --             Osi.ForceTurnBasedMode(brawlerUuid, 0)
-        --         else
-        --             startPulseAction(brawler)
-        --         end
-        --     end
-        -- end
-    end
 end
 
 local function cancelQueuedMovement(uuid)
