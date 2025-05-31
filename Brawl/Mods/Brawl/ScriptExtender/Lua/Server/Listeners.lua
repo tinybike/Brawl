@@ -51,6 +51,7 @@ local function onStarted(level)
     Movement.setMovementSpeedThresholds()
     Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
+    State.uncapPartyMembersMovementDistances()
     Roster.initBrawlers(level)
     Pause.checkTruePauseParty()
     debugDump(State.Session.Players)
@@ -163,17 +164,13 @@ local function onLeftForceTurnBased(entityGuid)
                     startPulseAddNearby(entityUuid)
                 end
             end
-            if entityUuid == Osi.GetHostCharacter() then
+            local isHostCharacter = entityUuid == Osi.GetHostCharacter()
+            if isHostCharacter then
                 startPulseReposition(level)
-                -- startPulseReposition(level, true, false)
-                -- Ext.Timer.WaitFor(1000, function ()
-                --     stopPulseReposition(level)
-                --     startPulseReposition(level)
-                -- end)
             end
             -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
             if State.areAnyPlayersBrawling() then
-                if entityUuid == Osi.GetHostCharacter() then
+                if isHostCharacter then
                     startBrawlFizzler(level)
                     if isToT() then
                         startToTTimers()
@@ -289,6 +286,7 @@ local function onCharacterJoinedParty(character)
         if State.Session.Players and not State.Session.Players[uuid] then
             State.setupPlayer(uuid)
             State.setupPartyMembersHitpoints()
+            State.uncapPartyMembersMovementDistances()
         end
         if State.areAnyPlayersBrawling() then
             Roster.addBrawler(uuid, true)

@@ -137,6 +137,7 @@ function cleanupAll()
         end
     end
     State.revertAllModifiedHitpoints()
+    State.recapPartyMembersMovementDistances()
     State.resetSpellData()
 end
 
