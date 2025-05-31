@@ -68,31 +68,10 @@ local function allEnterFTB()
         local uuid = Osi.GetUUID(player[1])
         Osi.ForceTurnBasedMode(uuid, 1)
     end
-    -- local level = Osi.GetRegion(Osi.GetHostCharacter())
-    -- local brawlersInLevel = State.Session.Brawlers[level]
-    -- if brawlersInLevel then
-    --     for brawlerUuid, brawler in pairs(brawlersInLevel) do
-    --         if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
-    --             -- debugPrint("ClearQueue from EnteredFTB")
-    --             -- Utils.clearOsirisQueue(brawlerUuid)
-    --             stopPulseAction(brawler, true)
-    --             if State.Session.Players[brawlerUuid] then
-    --                 brawlersInLevel[brawlerUuid].isPaused = true
-    --                 Osi.ForceTurnBasedMode(brawlerUuid, 1)
-    --             end
-    --         end
-    --     end
-    -- end
 end
 
 local function allExitFTB()
     debugPrint("allExitFTB")
-    -- for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-    --     local uuid = Osi.GetUUID(player[1])
-    --     unlock(Ext.Entity.Get(uuid))
-    --     Osi.ForceTurnBasedMode(uuid, 0)
-    --     stopTruePause(uuid)
-    -- end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
