@@ -6,6 +6,10 @@ Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and 
 
 ## Videos
 
+### 17) Fair Pause
+
+[![Real time combat test 17](https://img.youtube.com/vi/YO_bgRg3P2E/0.jpg)](https://www.youtube.com/watch?v=YO_bgRg3P2E)
+
 ### 16) Extra Attacks
 
 [![Real time combat test 16](https://img.youtube.com/vi/jjiP6YzO6r0/0.jpg)](https://www.youtube.com/watch?v=jjiP6YzO6r0)
