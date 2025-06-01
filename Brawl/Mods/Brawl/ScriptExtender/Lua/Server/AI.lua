@@ -69,6 +69,7 @@ local function getHighestWeightSpell(weightedSpells)
     return selectedSpell
 end
 
+-- use barbarian rage if available: if has Shout_Rage, in combat, and not already raging, then use rage
 -- should account for damage range
 local function getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
     -- Special target radius labels (NB: are there others besides these two?)
@@ -84,6 +85,9 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
             weight = weight + archetypeWeights.weaponOrUnarmedDamage
         end
         weight = weight + archetypeWeights.spellDamage*spell.averageDamage
+        if spell.isSafeAoE and spell.areaRadius > 1 then
+            weight = weight*spell.areaRadius
+        end
     end
     if spell.isGapCloser then
         if distanceToTarget > Constants.GAP_CLOSER_DISTANCE then
@@ -144,7 +148,7 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
     --     weight = weight - spell.level
     -- end
     if State.Settings.HogwildMode then
-        weight = weight + spell.level*3
+        weight = weight + spell.level*2
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
