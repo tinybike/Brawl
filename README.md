@@ -6,7 +6,7 @@ Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and 
 
 ## Videos
 
-### 17) Fair Pause
+### 17) AI Action Queue
 
 [![Real time combat test 17](https://img.youtube.com/vi/YO_bgRg3P2E/0.jpg)](https://www.youtube.com/watch?v=YO_bgRg3P2E)
 
