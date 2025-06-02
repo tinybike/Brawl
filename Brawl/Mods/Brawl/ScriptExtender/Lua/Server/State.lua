@@ -125,31 +125,31 @@ local function extraAttackSpellCheck(spell)
     return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
 end
 
-local function parseSpellUseCosts(spell)
-    local useCosts = Utils.split(spell.UseCosts, ";")
-    local costs = {
+local function parseSpellCosts(spell, costType)
+    local costs = Utils.split(spell[costType], ";")
+    local spellCosts = {
         ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
         LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
     }
     -- local hitCost = nil -- divine smite only..?
-    for _, useCost in ipairs(useCosts) do
-        local useCostTable = Utils.split(useCost, ":")
-        local useCostLabel = useCostTable[1]:match("^%s*(.-)%s*$")
-        local useCostAmount = tonumber(useCostTable[#useCostTable])
-        if useCostLabel == "SpellSlotsGroup" then
+    for _, cost in ipairs(costs) do
+        local costTable = Utils.split(cost, ":")
+        local costLabel = costTable[1]:match("^%s*(.-)%s*$")
+        local costAmount = tonumber(costTable[#costTable])
+        if costLabel == "SpellSlotsGroup" then
             -- e.g. SpellSlotsGroup:1:1:2
             -- NB: what are the first two numbers?
-            costs.SpellSlot = useCostAmount
+            spellCosts.SpellSlot = costAmount
         else
-            costs[useCostLabel] = useCostAmount
+            spellCosts[costLabel] = costAmount
         end
     end
-    return costs
+    return spellCosts
 end
 
 local function hasUseCosts(spell, targetCost)
     if spell and spell.UseCosts then
-        local costs = parseSpellUseCosts(spell)
+        local costs = parseSpellCosts(spell, "UseCosts")
         if costs then
             for cost, _ in pairs(costs) do
                 if cost == targetCost then
@@ -171,12 +171,15 @@ local function isSpellOfType(spell, spellType)
     end
     local isOfType = spell.VerbalIntent == spellType
     if not isOfType and spellType == "Damage" then
-        local spellFlags = spell.SpellFlags
-        if spellFlags then
-            for _, flag in ipairs(spellFlags) do
-                if flag == "IsHarmful" then
-                    isOfType = true
-                    break
+        if spell.SpellSuccess then
+            for j, spellSuccess in ipairs(spell.SpellSuccess) do
+                if spellSuccess.Functors then
+                    for i, functor in ipairs(spellSuccess.Functors) do
+                        if functor.TypeId == "DealDamage" then
+                            isOfType = true
+                            break
+                        end
+                    end
                 end
             end
         end
@@ -259,6 +262,61 @@ local function parseTooltipDamage(damageString, level)
     return isWeaponOrUnarmedDamage, totalDamage
 end
 
+local function checkForUnarmedDamage(spell)
+    if spell and spell.SpellSuccess then
+        for j, spellSuccess in ipairs(spell.SpellSuccess) do
+            if spellSuccess.Functors then
+                for i, functor in ipairs(spellSuccess.Functors) do
+                    if functor.TypeId == "DealDamage" and functor.WeaponType == "UnarmedDamage" then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function checkForApplyStatus(spell)
+    if spell and spell.SpellSuccess then
+        for j, spellSuccess in ipairs(spell.SpellSuccess) do
+            if spellSuccess.Functors then
+                for i, functor in ipairs(spellSuccess.Functors) do
+                    if functor.TypeId == "ApplyStatus" then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- NB: some weird stuff gets picked up by this, probably need a finer-grained classification
+-- (for example Teleportation_Revivify_Deva, Target_TAD_TransfuseHealth, Target_Regenerate all have RegainHitPoints functors -- what other examples are there...?)
+local function checkForDirectHeal(spell)
+    if spell and spell.SpellProperties then
+        local spellName = spell.Name
+        if spellName == "Teleportation_Revivify_Deva" or spellName == "Target_TAD_TransfuseHealth" or string.find(spellName, "Target_Regenerate", 1, true) == 1 then
+            return false
+        end
+        local spellProperties = spell.SpellProperties
+        if spellProperties then
+            for _, spellProperty in ipairs(spellProperties) do
+                local functors = spellProperty.Functors
+                if functors then
+                    for _, functor in ipairs(functors) do
+                        if functor.TypeId == "RegainHitPoints" then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -275,6 +333,19 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             end
         end
         local isWeaponOrUnarmedDamage, averageDamage = parseTooltipDamage(spell.TooltipDamageList, hostLevel)
+        local costs = parseSpellCosts(spell, "UseCosts")
+        local hitCosts = parseSpellCosts(spell, "HitCosts")
+        for hitCost, hitCostAmount in pairs(hitCosts) do
+            if hitCost == "LongRest" or hitCost == "ShortRest" then
+                costs[hitCost] = costs[hitCost] or hitCostAmount
+            else
+                -- Exclude weird edge cases, e.g. Projectile_EnsnaringStrike_4, Projectile_Smite_Banishing_7, etc.
+                if hitCostAmount and costs[hitCost] then
+                    return nil
+                end
+                costs[hitCost] = hitCostAmount
+            end
+        end
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -288,32 +359,56 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isSafeAoE = isSafeAoESpell(spellName),
             targetRadius = spell.TargetRadius,
             range = spell.Range,
-            costs = parseSpellUseCosts(spell),
+            costs = costs,
             type = spellType,
             hasVerbalComponent = hasVerbalComponent,
             averageDamage = averageDamage,
             isWeaponOrUnarmedDamage = isWeaponOrUnarmedDamage,
+            isUnarmedDamage = checkForUnarmedDamage(spell),
             triggersExtraAttack = extraAttackCheck(spell),
+            isDirectHeal = checkForDirectHeal(spell),
+            hasApplyStatus = checkForApplyStatus(spell),
         }
-        if spellType == "Healing" then
-            spellInfo.isDirectHeal = false
-            local spellProperties = spell.SpellProperties
-            if spellProperties then
-                for _, spellProperty in ipairs(spellProperties) do
-                    local functors = spellProperty.Functors
-                    if functors then
-                        for _, functor in ipairs(functors) do
-                            if functor.TypeId == "RegainHitPoints" then
-                                spellInfo.isDirectHeal = true
-                            end
-                        end
-                    end
-                end
-            end
-        end
         return spellInfo
     end
     return nil
+end
+
+local function deepEqual(a, b)
+    if type(a) ~= type(b) then
+        return false
+    end
+    if type(a) ~= "table" then
+        return a == b
+    end
+    for k, v in pairs(a) do
+        if not deepEqual(v, b[k]) then
+            return false
+        end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+local function removeDuplicates(list)
+    local unique = {}
+    for _, item in ipairs(list) do
+        local isDuplicate = false
+        for _, u in ipairs(unique) do
+            if deepEqual(item, u) then
+                isDuplicate = true
+                break
+            end
+        end
+        if not isDuplicate then
+            table.insert(unique, item)
+        end
+    end
+    return unique
 end
 
 local function getAllSpellsOfType(spellType, hostLevel)
@@ -329,7 +424,7 @@ local function getAllSpellsOfType(spellType, hostLevel)
             else
                 allSpellsOfType[spellName] = getSpellInfo(spellType, spellName, hostLevel)
                 if spell.Requirements and #spell.Requirements ~= 0 then
-                    local requirements = spell.Requirements
+                    local requirements = removeDuplicates(spell.Requirements)
                     local removeIndex = 0
                     for i, req in ipairs(requirements) do
                         if req.Requirement == "Combat" and req.Not == false then
@@ -381,6 +476,8 @@ local function getArchetype(uuid)
             archetype = "melee_magic"
         elseif archetype:find("healer_melee") ~= nil then
             archetype = "healer_melee"
+        elseif archetype:find("monk") ~= nil then
+            archetype = "monk"
         else
             debugPrint("Archetype missing from the list, using melee for now", archetype)
             archetype = "melee"
@@ -757,6 +854,8 @@ return {
     isPartyInRealTime = isPartyInRealTime,
     getSpellByName = getSpellByName,
     hasDirectHeal = hasDirectHeal,
+    parseSpellCosts = parseSpellCosts,
+    getAllSpellsOfType = getAllSpellsOfType,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
     revertHitpoints = revertHitpoints,

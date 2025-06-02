@@ -69,9 +69,8 @@ local function getHighestWeightSpell(weightedSpells)
     return selectedSpell
 end
 
--- use barbarian rage if available: if has Shout_Rage, in combat, and not already raging, then use rage
 -- should account for damage range
-local function getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
+local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
@@ -86,7 +85,14 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
         end
         weight = weight + archetypeWeights.spellDamage*spell.averageDamage
         if spell.isSafeAoE and spell.areaRadius > 1 then
-            weight = weight*spell.areaRadius
+            weight = weight + 3*spell.areaRadius
+        end
+        if spell.hasApplyStatus then
+            weight = weight + archetypeWeights.applyDebuff
+        end
+        -- If this spell is available at all, that means the target is resonating, so you probably want to go ahead and detonate it!
+        if spellName == "Target_KiResonation_Blast" then
+            weight = weight + 50
         end
     end
     if spell.isGapCloser then
@@ -156,7 +162,7 @@ local function getSpellWeight(spell, distanceToTarget, archetype, spellType, num
 end
 
 -- NB need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE)
+local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE)
     -- This should never happen but...
     if spellName == nil or spell == nil then
         return false
@@ -191,6 +197,9 @@ local function isCompanionSpellAvailable(uuid, spellName, spell, isSilenced, dis
             return false
         end
     end
+    if spellName == "Target_KiResonation_Blast" and Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
+        return false
+    end
     -- For defense tactics:
     --  1. Is the target already within range? Then ok to use
     --  2. If the target is out-of-range, can we hit him without moving outside of the perimeter? Then ok to use
@@ -216,7 +225,7 @@ local function isNpcSpellUsable(spell)
     return true
 end
 
-local function isEnemySpellAvailable(uuid, spellName, spell, isSilenced)
+local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced)
     if spellName == nil or spell == nil then
         return false
     end
@@ -227,6 +236,9 @@ local function isEnemySpellAvailable(uuid, spellName, spell, isSilenced)
         return false
     end
     if spell.outOfCombatOnly then
+        return false
+    end
+    if spellName == "Target_KiResonation_Blast" and Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
         return false
     end
     if not State.Settings.HogwildMode then
@@ -246,7 +258,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE)
+local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
@@ -259,9 +271,9 @@ local function getCompanionWeightedSpells(uuid, preparedSpells, distanceToTarget
                     break
                 end
             end
-            if isCompanionSpellAvailable(uuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
-                debugPrint("get spell weight for", uuid, spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
-                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
+            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
+                debugPrint("get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
             end
         end
     end
@@ -276,7 +288,7 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs/debuffs (NYI)
-local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks)
+local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
@@ -289,34 +301,35 @@ local function getWeightedSpells(uuid, preparedSpells, distanceToTarget, archety
                     break
                 end
             end
-            if isEnemySpellAvailable(uuid, spellName, spell, silenced) then
-                weightedSpells[spellName] = getSpellWeight(spell, distanceToTarget, archetype, spellType, numExtraAttacks)
+            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced) then
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
             end
         end
     end
     return weightedSpells
 end
 
-local function decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
-    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE)
+local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
+    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE)
     debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
     debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
-local function decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
-    local weightedSpells = getWeightedSpells(brawler.uuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks)
+local function decideActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes)
+    local weightedSpells = getWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks)
     return getHighestWeightSpell(weightedSpells)
 end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     debugPrint("useSpellOnTarget", attackerUuid, targetUuid, spellName)
     if State.Settings.HogwildMode then
+        print("use spell", attackerUuid, spellName, targetUuid)
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
-    else
-        Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)
+        return true
     end
+    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)
 end
 
 local function actOnHostileTarget(brawler, target)
@@ -326,15 +339,36 @@ local function actOnHostileTarget(brawler, target)
         local spellTypes = {"Control", "Damage"}
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+        -- Rage check for barbarians: if rage is available and we're not already raging, then we should use it
+        if brawler.rage ~= nil and Osi.HasActiveStatus(brawler.uuid, "CALM_EMOTIONS") == 0 then
+            print("********************RAGGGGE lol", brawler.rage)
+            if brawler.rage == "Shout_Rage" then
+                if Osi.HasActiveStatus(brawler.uuid, "RAGE") == 0 then
+                    result = useSpellOnTarget(brawler.uuid, brawler.uuid, brawler.rage)
+                    debugPrint("result (rage)", result)
+                    if result == true then
+                        return true
+                    end
+                end
+            elseif brawler.rage == "Shout_Rage_Frenzy" then
+                if Osi.HasActiveStatus(brawler.uuid, "RAGE_FRENZY") == 0 then
+                    result = useSpellOnTarget(brawler.uuid, brawler.uuid, brawler.rage)
+                    debugPrint("result (rage)", result)
+                    if result == true then
+                        return true
+                    end
+                end
+            end
+        end
         if Osi.IsPlayer(brawler.uuid) == 1 then
             local allowAoE = Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
             local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
             local targetDistanceToParty = Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
-            debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
-            actionToTake = decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
+            -- debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
+            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
+            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
         end
         if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 then
@@ -385,9 +419,9 @@ local function actOnFriendlyTarget(brawler, target)
         end
         local actionToTake = nil
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes, 0, true)
+            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, 0, true)
         else
-            actionToTake = decideActionOnTarget(brawler, preparedSpells, distanceToTarget, spellTypes)
+            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes)
         end
         debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
         if actionToTake then
@@ -751,7 +785,7 @@ local function pulseReposition(level)
                                 Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         else
-                            debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
+                            -- debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
                             checkForBrawlToJoin(brawler)
                         end
                     -- Player, ally, and neutral units are not actively looking for a fight
@@ -789,6 +823,7 @@ local function pulseAddNearby(uuid)
 end
 
 return {
+    getSpellWeight = getSpellWeight,
     actOnHostileTarget = actOnHostileTarget,
     actOnFriendlyTarget = actOnFriendlyTarget,
     findTarget = findTarget,
