@@ -760,7 +760,7 @@ local function pulseReposition(level)
                                 Roster.removeBrawler(level, brawlerUuid)
                             else
                                 debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
-                                Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                                -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         else
                             -- debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
@@ -782,8 +782,8 @@ local function pulseReposition(level)
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
-                                -- Movement.holdPosition(brawlerUuid)
-                                Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                                Movement.holdPosition(brawlerUuid)
+                                -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         end
                     end
