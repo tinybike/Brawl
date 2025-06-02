@@ -218,5 +218,6 @@ Constants.SAFE_AOE_SPELLS = {
     "Target_GuardianOfFaith",
     "Target_KiResonation_Blast",
 }
+Constants.RAGE_BOOSTS = {"RAGE", "RAGE_FRENZY", "RAGE_GIANT"}
 
 return Constants

@@ -546,6 +546,8 @@ end
 
 return {
     setAwaitingTarget = setAwaitingTarget,
+    enableMod = enableMod,
+    disableMod = disableMod,
     NetMessage = {
         ModToggle = onModToggle,
         CompanionAIToggle = onCompanionAIToggle,

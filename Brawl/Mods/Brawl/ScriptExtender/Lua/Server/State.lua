@@ -589,7 +589,7 @@ end
 local function buildSpellTable()
     local hostLevel = Osi.GetLevel(Osi.GetHostCharacter())
     local spellTable = {}
-    for _, spellType in pairs(Constants.ALL_SPELL_TYPES) do
+    for _, spellType in ipairs(Constants.ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType, hostLevel)
     end
     Session.SpellTable = spellTable

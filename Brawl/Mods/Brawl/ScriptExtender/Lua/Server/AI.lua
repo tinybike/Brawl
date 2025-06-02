@@ -325,7 +325,6 @@ end
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     debugPrint("useSpellOnTarget", attackerUuid, targetUuid, spellName)
     if State.Settings.HogwildMode then
-        print("use spell", attackerUuid, spellName, targetUuid)
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
         return true
     end
@@ -339,27 +338,6 @@ local function actOnHostileTarget(brawler, target)
         local spellTypes = {"Control", "Damage"}
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
-        -- Rage check for barbarians: if rage is available and we're not already raging, then we should use it
-        if brawler.rage ~= nil and Osi.HasActiveStatus(brawler.uuid, "CALM_EMOTIONS") == 0 then
-            print("********************RAGGGGE lol", brawler.rage)
-            if brawler.rage == "Shout_Rage" then
-                if Osi.HasActiveStatus(brawler.uuid, "RAGE") == 0 then
-                    result = useSpellOnTarget(brawler.uuid, brawler.uuid, brawler.rage)
-                    debugPrint("result (rage)", result)
-                    if result == true then
-                        return true
-                    end
-                end
-            elseif brawler.rage == "Shout_Rage_Frenzy" then
-                if Osi.HasActiveStatus(brawler.uuid, "RAGE_FRENZY") == 0 then
-                    result = useSpellOnTarget(brawler.uuid, brawler.uuid, brawler.rage)
-                    debugPrint("result (rage)", result)
-                    if result == true then
-                        return true
-                    end
-                end
-            end
-        end
         if Osi.IsPlayer(brawler.uuid) == 1 then
             local allowAoE = Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
             local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
