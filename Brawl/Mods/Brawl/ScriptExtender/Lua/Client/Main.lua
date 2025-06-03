@@ -1,24 +1,24 @@
-local ModToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
-local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "LShift"}
-local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
-local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
-local TargetCloserEnemyHotkey = {ScanCode = "COMMA", Modifier = "NONE"}
-local TargetFartherEnemyHotkey = {ScanCode = "PERIOD", Modifier = "NONE"}
-local OnMeHotkey = {ScanCode = "NUM_1", Modifier = "LAlt"}
-local AttackMyTargetHotkey = {ScanCode = "NUM_2", Modifier = "LAlt"}
-local AttackMoveHotkey = {ScanCode = "A", Modifier = "LAlt"}
-local RequestHealHotkey = {ScanCode = "E", Modifier = "LAlt"}
-local ChangeTacticsHotkey = {ScanCode = "C", Modifier = "LAlt"}
+local ModToggleHotkey = {Key = "F11", ModifierKeys = {"NONE"}}
+local CompanionAIToggleHotkey = {Key = "F11", ModifierKeys = {"LShift"}}
+local FullAutoToggleHotkey = {Key = "F6", ModifierKeys = {"NONE"}}
+local PauseToggleHotkey = {Key = "SPACE", ModifierKeys = {"LShift"}}
+local TargetCloserEnemyHotkey = {Key = "COMMA", ModifierKeys = {"NONE"}}
+local TargetFartherEnemyHotkey = {Key = "PERIOD", ModifierKeys = {"NONE"}}
+local OnMeHotkey = {Key = "NUM_1", ModifierKeys = {"LAlt"}}
+local AttackMyTargetHotkey = {Key = "NUM_2", ModifierKeys = {"LAlt"}}
+local AttackMoveHotkey = {Key = "A", ModifierKeys = {"LAlt"}}
+local RequestHealHotkey = {Key = "E", ModifierKeys = {"LAlt"}}
+local ChangeTacticsHotkey = {Key = "C", ModifierKeys = {"LAlt"}}
 local ActionButtonHotkeys = {
-    {ScanCode = "NUM_1", Modifier = "LShift"},
-    {ScanCode = "NUM_2", Modifier = "LShift"},
-    {ScanCode = "NUM_3", Modifier = "LShift"},
-    {ScanCode = "NUM_4", Modifier = "LShift"},
-    {ScanCode = "NUM_5", Modifier = "LShift"},
-    {ScanCode = "NUM_6", Modifier = "LShift"},
-    {ScanCode = "NUM_7", Modifier = "LShift"},
-    {ScanCode = "NUM_8", Modifier = "LShift"},
-    {ScanCode = "NUM_9", Modifier = "LShift"},
+    {Key = "NUM_1", ModifierKeys = {"LShift"}},
+    {Key = "NUM_2", ModifierKeys = {"LShift"}},
+    {Key = "NUM_3", ModifierKeys = {"LShift"}},
+    {Key = "NUM_4", ModifierKeys = {"LShift"}},
+    {Key = "NUM_5", ModifierKeys = {"LShift"}},
+    {Key = "NUM_6", ModifierKeys = {"LShift"}},
+    {Key = "NUM_7", ModifierKeys = {"LShift"}},
+    {Key = "NUM_8", ModifierKeys = {"LShift"}},
+    {Key = "NUM_9", ModifierKeys = {"LShift"}},
 }
 local ControllerModToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
@@ -162,7 +162,7 @@ function KeybindingManager:IsModifierPressed(e, modifiers)
 end
 
 local function isKeybindingPressed(e, keybinding)
-    if e.Key ~= keybinding.ScanCode then
+    if e.Key ~= keybinding.Key then
         return false
     end
     return KeybindingManager:IsModifierPressed(e, keybinding.Modifier)
@@ -218,53 +218,133 @@ local function postPauseToggle()
         Ext.ClientNet.PostMessageToServer("EnterFTB", "")
     end
 end
+MCM.SetKeybindingCallback("pause_toggle_hotkey", function (e)
+    postModToggle()
+    e:PreventAction()
+end)
 
 local function postModToggle()
     Ext.ClientNet.PostMessageToServer("ModToggle", "")
 end
+MCM.SetKeybindingCallback("mod_toggle_hotkey", function (e)
+    postModToggle()
+    e:PreventAction()
+end)
 
 local function postCompanionAIToggle()
     Ext.ClientNet.PostMessageToServer("CompanionAIToggle", "")
 end
+MCM.SetKeybindingCallback("companion_ai_toggle_hotkey", function (e)
+    postCompanionAIToggle()
+    e:PreventAction()
+end)
 
 local function postFullAutoToggle()
     Ext.ClientNet.PostMessageToServer("FullAutoToggle", "")
 end
+MCM.SetKeybindingCallback("full_auto_toggle_hotkey", function (e)
+    postFullAutoToggle()
+    e:PreventAction()
+end)
 
 local function postTargetCloserEnemy()
     Ext.ClientNet.PostMessageToServer("TargetCloserEnemy", "")
 end
+MCM.SetKeybindingCallback("target_closer_enemy_hotkey", function (e)
+    postTargetCloserEnemy()
+    e:PreventAction()
+end)
 
 local function postTargetFartherEnemy()
     Ext.ClientNet.PostMessageToServer("TargetFartherEnemy", "")
 end
+MCM.SetKeybindingCallback("target_farther_enemy_hotkey", function (e)
+    postTargetFartherEnemy()
+    e:PreventAction()
+end)
 
 local function postOnMe()
     Ext.ClientNet.PostMessageToServer("OnMe", "")
 end
+MCM.SetKeybindingCallback("on_me_hotkey", function (e)
+    postOnMe()
+    e:PreventAction()
+end)
 
 local function postAttackMyTarget()
     Ext.ClientNet.PostMessageToServer("AttackMyTarget", "")
 end
+MCM.SetKeybindingCallback("attack_my_target_hotkey", function (e)
+    postAttackMyTarget()
+    e:PreventAction()
+end)
 
 local function postAttackMove()
     Ext.ClientNet.PostMessageToServer("AttackMove", "")
 end
+MCM.SetKeybindingCallback("attack_move_hotkey", function (e)
+    postAttackMove()
+    e:PreventAction()
+end)
 
 local function postRequestHeal()
     Ext.ClientNet.PostMessageToServer("RequestHeal", "")
 end
+MCM.SetKeybindingCallback("request_heal_hotkey", function (e)
+    postRequestHeal()
+    e:PreventAction()
+end)
 
 local function postChangeTactics()
     Ext.ClientNet.PostMessageToServer("ChangeTactics", "")
 end
-
-local function postControllerActionButton(actionButtonLabel)
-    Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
-end
+MCM.SetKeybindingCallback("change_tactics_hotkey", function (e)
+    postChangeTactics()
+    e:PreventAction()
+end)
 
 local function postActionButton(actionButtonLabel)
     Ext.ClientNet.PostMessageToServer("ActionButton", tostring(actionButtonLabel))
+end
+MCM.SetKeybindingCallback("action_1_hotkey", function (e)
+    postActionButton(1)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_2_hotkey", function (e)
+    postActionButton(2)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_3_hotkey", function (e)
+    postActionButton(3)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_4_hotkey", function (e)
+    postActionButton(4)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_5_hotkey", function (e)
+    postActionButton(5)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_6_hotkey", function (e)
+    postActionButton(6)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_7_hotkey", function (e)
+    postActionButton(7)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_8_hotkey", function (e)
+    postActionButton(8)
+    e:PreventAction()
+end)
+MCM.SetKeybindingCallback("action_9_hotkey", function (e)
+    postActionButton(9)
+    e:PreventAction()
+end)
+
+local function postControllerActionButton(actionButtonLabel)
+    Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
 end
 
 local function postClickPosition()
@@ -273,66 +353,6 @@ end
 
 local function postCancelQueuedMovement()
     Ext.ClientNet.PostMessageToServer("CancelQueuedMovement", "")
-end
-
-local function onKeyInput(e)
-    if e.Repeat == false and e.Event == "KeyDown" then
-        local key = tostring(e.Key)
-        local keybindingPressed = false
-        if isKeybindingPressed(e, ModToggleHotkey) then
-            postModToggle()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, CompanionAIToggleHotkey) then
-            postCompanionAIToggle()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, FullAutoToggleHotkey) then
-            postFullAutoToggle()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, PauseToggleHotkey) then
-            postPauseToggle()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, TargetCloserEnemyHotkey) then
-            postTargetCloserEnemy()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, TargetFartherEnemyHotkey) then
-            postTargetFartherEnemy()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, OnMeHotkey) then
-            postOnMe()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, AttackMyTargetHotkey) then
-            postAttackMyTarget()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, AttackMoveHotkey) then
-            postAttackMove()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, RequestHealHotkey) then
-            postRequestHeal()
-            keybindingPressed = true
-        end
-        if isKeybindingPressed(e, ChangeTacticsHotkey) then
-            postChangeTactics()
-            keybindingPressed = true
-        end
-        for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
-            if isKeybindingPressed(e, actionButtonHotkey) then
-                postActionButton(actionButtonLabel)
-                keybindingPressed = true
-            end
-        end
-        if keybindingPressed then
-            e:PreventAction()
-        end
-    end
 end
 
 local function onControllerButtonPressed(button)
@@ -460,31 +480,33 @@ local function onNetMessage(data)
 end
 
 local function onMCMSettingSaved(payload)
+    print("MCM Setting Saved (client)")
+    _D(payload)
     if not payload or payload.modUUID ~= ModuleUUID or not payload.settingId then
         return
     end
     if payload.settingId == "mod_toggle_hotkey" then
-        ModToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        ModToggleHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "companion_ai_toggle_hotkey" then
-        CompanionAIToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        CompanionAIToggleHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "full_auto_toggle_hotkey" then
-        FullAutoToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        FullAutoToggleHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "pause_toggle_hotkey" then
-        PauseToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        PauseToggleHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "target_closer_enemy_hotkey" then
-        TargetCloserEnemyHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        TargetCloserEnemyHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "target_farther_enemy_hotkey" then
-        TargetFartherEnemyHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        TargetFartherEnemyHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "on_me_hotkey" then
-        OnMeHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        OnMeHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "attack_my_target_hotkey" then
-        AttackMyTargetHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        AttackMyTargetHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "attack_move_hotkey" then
-        AttackMoveHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        AttackMoveHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "request_heal_hotkey" then
-        RequestHealHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        RequestHealHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "change_tactics_hotkey" then
-        ChangeTacticsHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+        ChangeTacticsHotkey = {Key = payload.value.Keyboard.Key, ModifierKeys = payload.value.Keyboard.ModifierKeys}
     elseif payload.settingId == "controller_mod_toggle_hotkey" then
         ControllerModToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_mod_toggle_hotkey_2" then
@@ -540,15 +562,14 @@ local function onMCMSettingSaved(payload)
     else
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if payload.settingId == "action_" .. actionButtonLabel .. "_hotkey" then
-                actionButtonHotkey.ScanCode = payload.value.ScanCode
-                actionButtonHotkey.Modifier = payload.value.Modifier
+                actionButtonHotkey.Key = payload.value.Keyboard.Key
+                actionButtonHotkey.ModifierKeys = payload.value.Keyboard.ModifierKeys
             end
         end
     end
 end
 
 local function onSessionLoaded()
-    Ext.Events.KeyInput:Subscribe(onKeyInput)
     Ext.Events.ControllerButtonInput:Subscribe(onControllerButtonInput)
     Ext.Events.ControllerAxisInput:Subscribe(onControllerAxisInput)
     Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)

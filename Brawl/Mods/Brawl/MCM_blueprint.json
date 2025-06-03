@@ -17,6 +17,13 @@
                             "Default": true,
                             "Description": "Toggle the mod on/off without uninstalling it",
                             "Handles": {"DescriptionHandle": "h012f6360970348a09ec00cfbae32d13a078e", "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"}
+                        }, {
+                            "Id": "mod_toggle_hotkey",
+                            "Name": "Mod Toggle Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "F11", "ModifierKeys": []}},
+                            "Description": "Hotkey for toggling the mod on/off",
+                            "Handles": {"DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0", "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"}
                         }
                     ]
                 }, {
@@ -119,6 +126,129 @@
                             "Default": false,
                             "Description": "If checked, the companion AI will go hogwild, freely using any of their spells/abilities with zero resource costs.",
                             "Handles": {"DescriptionHandle": "h82826325ge87dg4b9fga2d4g1918131934e8", "NameHandle": "h3a37f938gf803g45f1gb3bage75ca7adae42"}
+                        },
+                        {
+                            "Id": "companion_ai_toggle_hotkey",
+                            "Name": "Companion AI Toggle Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "F11", "ModifierKeys": ["LShift"]}},
+                            "Description": "Hotkey for toggling the companion AI on/off",
+                            "Handles": {"DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7", "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"}
+                        }, {
+                            "Id": "on_me_hotkey",
+                            "Name": "On Me Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_1", "ModifierKeys": ["LAlt"]}},
+                            "Description": "Hotkey to instruct your companions to come to you",
+                            "Handles": {"DescriptionHandle": "hf7d30515g5e2ag4951gae39g47318360265f", "NameHandle": "h433ac630gc4ceg4724gb8aeg12e07759c7bb"}
+                        }, {
+                            "Id": "attack_my_target_hotkey",
+                            "Name": "Attack My Target Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_2", "ModifierKeys": ["LAlt"]}},
+                            "Description": "Hotkey to instruct your companions to attack your most recent target",
+                            "Handles": {"DescriptionHandle": "h30cd0d71g52c2g4d40gb050gab864feb71ca", "NameHandle": "hbef77ddaga0a5g4588g8697g61d822610c6e"}
+                        }, {
+                            "Id": "attack_move_hotkey",
+                            "Name": "Attack-Move Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "A", "ModifierKeys": ["LAlt"]}},
+                            "Description": "Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)",
+                            "Handles": {"DescriptionHandle": "hd7111993g8df4g4013gad20g0439cc4fe010", "NameHandle": "hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5"}
+                        }, {
+                            "Id": "request_heal_hotkey",
+                            "Name": "Request Heal Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "E", "ModifierKeys": ["LAlt"]}},
+                            "Description": "Hotkey to instruct your companions to heal",
+                            "Handles": {"DescriptionHandle": "h3ebbf8aeg5b9bg4db7ga9a3ga26bd7d53ad8", "NameHandle": "h0722b7b4g2ecdg461fga390ge6fb1c0c69ac"}
+                        }, {
+                            "Id": "change_tactics_hotkey",
+                            "Name": "Change Tactics Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "C", "ModifierKeys": ["LAlt"]}},
+                            "Description": "Hotkey to change your companions AI tactics setting",
+                            "Handles": {"DescriptionHandle": "hb32cfa26ge2ddg4d63gb4dbg8f8627f7366f", "NameHandle": "hb78e5343g38f9g47c2gafdag8d078d0de87d"}
+                        }, {
+                            "Id": "full_auto_toggle_hotkey",
+                            "Name": "Fully Automated Brawls Toggle Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "F6", "ModifierKeys": []}},
+                            "Description": "Hotkey for toggling Full Auto on and off",
+                            "Handles": {"DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd", "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"}
+                        }, {
+                            "Id": "pause_toggle_hotkey",
+                            "Name": "Pause Toggle Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "SPACE", "ModifierKeys": ["LShift"]}},
+                            "Description": "Hotkey for pause/unpause",
+                            "Handles": {"DescriptionHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d", "NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"}
+                        }, {
+                            "Id": "target_closer_enemy_hotkey",
+                            "Name": "Target Closer Enemy Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "COMMA", "ModifierKeys": []}},
+                            "Handles": {"NameHandle": "hadd62148gc2c4g4711g8d96gece4946a919d"}
+                        }, {
+                            "Id": "target_farther_enemy_hotkey",
+                            "Name": "Target Farther Enemy Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "PERIOD", "ModifierKeys": []}},
+                            "Handles": {"NameHandle": "hfe794853g9946g4220g94d3gf185c3884c8b"}
+                        }, {
+                            "Id": "action_1_hotkey",
+                            "Name": "Action 1 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_1", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "he1fd0118g426ag44f1gb63agc5631fa2ebc4"}
+                        }, {
+                            "Id": "action_2_hotkey",
+                            "Name": "Action 2 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_2", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "hb3c5c1bag0dbfg4857g9ab7g465ed5cc052d"}
+                        }, {
+                            "Id": "action_3_hotkey",
+                            "Name": "Action 3 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_3", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "h6483f109g1988g47c2gac6agdd4f6bb1b63f"}
+                        }, {
+                            "Id": "action_4_hotkey",
+                            "Name": "Action 4 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_4", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "h5bfd6c30g5379g48b8g9165gdea2e962760f"}
+                        }, {
+                            "Id": "action_5_hotkey",
+                            "Name": "Action 5 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_5", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "hebe77c4fgaf59g45c6g9691g4c157ff4098c"}
+                        }, {
+                            "Id": "action_6_hotkey",
+                            "Name": "Action 6 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_6", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "ha9888301g13d6g40d8g8353g5abf4835375f"}
+                        }, {
+                            "Id": "action_7_hotkey",
+                            "Name": "Action 7 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_7", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "h035cee56g0cf6g4b2ag866bg53f0c335bc90"}
+                        }, {
+                            "Id": "action_8_hotkey",
+                            "Name": "Action 8 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_8", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "h8662dedega937g4bb2g9246gf34c560e2f1c"}
+                        }, {
+                            "Id": "action_9_hotkey",
+                            "Name": "Action 9 Hotkey",
+                            "Type": "keybinding_v2",
+                            "Default": {"Keyboard": {"Key": "NUM_9", "ModifierKeys": ["LShift"]}},
+                            "Handles": {"NameHandle": "h21cb8829g772eg4334gbc1bg1bb5fcd00bfe"}
                         }
                     ]
                 }, {
@@ -147,177 +277,6 @@
                             "Default": false,
                             "Description": "If checked, the game will automa your party will take their turn simultaneously, and then enemies will have 6 seconds of real-time 'turn' simultaneously.  (Not Yet Implemented)",
                             "Handles": {"DescriptionHandle": "h69f81fcfgaa46g44c0g9ccag8d8749fedb2c", "NameHandle": "h934a9d9cg4d60g4d75gb628g7187b622cb14"}
-                        }
-                    ]
-                }
-            ]
-        }, {
-            "TabName": "Keybindings",
-            "TabId": "keybindings",
-            "Sections": [
-                {
-                    "SectionId": "mod_hotkey_section",
-                    "SectionName": "Enable Mod",
-                    "Settings": [
-                        {
-                            "Id": "mod_toggle_hotkey",
-                            "Name": "Mod Toggle Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "F11", "Modifier": ""},
-                            "Description": "Hotkey for toggling the mod on/off",
-                            "Handles": {"DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0", "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "companion_ai_hotkey_section",
-                    "SectionName": "Companion AI",
-                    "Settings": [
-                        {
-                            "Id": "companion_ai_toggle_hotkey",
-                            "Name": "Companion AI Toggle Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "F11", "Modifier": "LShift"},
-                            "Description": "Hotkey for toggling the companion AI on/off",
-                            "Handles": {"DescriptionHandle": "h9f0b74e2g0973g4847g8c88g12e26d743cb7", "NameHandle": "h319b051cg905fg4b5dg87c9g10c0daad6ccb"}
-                        }, {
-                            "Id": "on_me_hotkey",
-                            "Name": "On Me Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_1", "Modifier": "LAlt"},
-                            "Description": "Hotkey to instruct your companions to come to you",
-                            "Handles": {"DescriptionHandle": "hf7d30515g5e2ag4951gae39g47318360265f", "NameHandle": "h433ac630gc4ceg4724gb8aeg12e07759c7bb"}
-                        }, {
-                            "Id": "attack_my_target_hotkey",
-                            "Name": "Attack My Target Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_2", "Modifier": "LAlt"},
-                            "Description": "Hotkey to instruct your companions to attack your most recent target",
-                            "Handles": {"DescriptionHandle": "h30cd0d71g52c2g4d40gb050gab864feb71ca", "NameHandle": "hbef77ddaga0a5g4588g8697g61d822610c6e"}
-                        }, {
-                            "Id": "attack_move_hotkey",
-                            "Name": "Attack-Move Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "A", "Modifier": "LAlt"},
-                            "Description": "Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)",
-                            "Handles": {"DescriptionHandle": "hd7111993g8df4g4013gad20g0439cc4fe010", "NameHandle": "hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5"}
-                        }, {
-                            "Id": "request_heal_hotkey",
-                            "Name": "Request Heal Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "E", "Modifier": "LAlt"},
-                            "Description": "Hotkey to instruct your companions to heal",
-                            "Handles": {"DescriptionHandle": "h3ebbf8aeg5b9bg4db7ga9a3ga26bd7d53ad8", "NameHandle": "h0722b7b4g2ecdg461fga390ge6fb1c0c69ac"}
-                        }, {
-                            "Id": "change_tactics_hotkey",
-                            "Name": "Change Tactics Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "C", "Modifier": "LAlt"},
-                            "Description": "Hotkey to change your companions AI tactics setting",
-                            "Handles": {"DescriptionHandle": "hb32cfa26ge2ddg4d63gb4dbg8f8627f7366f", "NameHandle": "hb78e5343g38f9g47c2gafdag8d078d0de87d"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "full_auto_hotkey_section",
-                    "SectionName": "Fully Automated Brawls",
-                    "Settings": [
-                        {
-                            "Id": "full_auto_toggle_hotkey",
-                            "Name": "Fully Automated Brawls Toggle Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "F6", "Modifier": ""},
-                            "Description": "Hotkey for toggling Full Auto on and off",
-                            "Handles": {"DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd", "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "pause_hotkey_section",
-                    "SectionName": "Pause",
-                    "Settings": [
-                        {
-                            "Id": "pause_toggle_hotkey",
-                            "Name": "Pause Toggle Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "SPACE", "Modifier": "LShift"},
-                            "Description": "Hotkey for pause/unpause",
-                            "Handles": {"DescriptionHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d", "NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "change_enemy_target_hotkey_section",
-                    "SectionName": "Change Target Hotkeys",
-                    "Settings": [
-                        {
-                            "Id": "target_closer_enemy_hotkey",
-                            "Name": "Target Closer Enemy Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "COMMA", "Modifier": "NONE"},
-                            "Handles": {"NameHandle": "hadd62148gc2c4g4711g8d96gece4946a919d"}
-                        }, {
-                            "Id": "target_farther_enemy_hotkey",
-                            "Name": "Target Farther Enemy Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "PERIOD", "Modifier": "NONE"},
-                            "Handles": {"NameHandle": "hfe794853g9946g4220g94d3gf185c3884c8b"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "action_hotkey_section",
-                    "SectionName": "Action Hotkeys",
-                    "Settings": [
-                        {
-                            "Id": "action_1_hotkey",
-                            "Name": "Action 1 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_1", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "he1fd0118g426ag44f1gb63agc5631fa2ebc4"}
-                        }, {
-                            "Id": "action_2_hotkey",
-                            "Name": "Action 2 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_2", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "hb3c5c1bag0dbfg4857g9ab7g465ed5cc052d"}
-                        }, {
-                            "Id": "action_3_hotkey",
-                            "Name": "Action 3 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_3", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "h6483f109g1988g47c2gac6agdd4f6bb1b63f"}
-                        }, {
-                            "Id": "action_4_hotkey",
-                            "Name": "Action 4 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_4", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "h5bfd6c30g5379g48b8g9165gdea2e962760f"}
-                        }, {
-                            "Id": "action_5_hotkey",
-                            "Name": "Action 5 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_5", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "hebe77c4fgaf59g45c6g9691g4c157ff4098c"}
-                        }, {
-                            "Id": "action_6_hotkey",
-                            "Name": "Action 6 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_6", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "ha9888301g13d6g40d8g8353g5abf4835375f"}
-                        }, {
-                            "Id": "action_7_hotkey",
-                            "Name": "Action 7 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_7", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "h035cee56g0cf6g4b2ag866bg53f0c335bc90"}
-                        }, {
-                            "Id": "action_8_hotkey",
-                            "Name": "Action 8 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_8", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "h8662dedega937g4bb2g9246gf34c560e2f1c"}
-                        }, {
-                            "Id": "action_9_hotkey",
-                            "Name": "Action 9 Hotkey",
-                            "Type": "keybinding",
-                            "Default": {"ScanCode": "NUM_9", "Modifier": "LShift"},
-                            "Handles": {"NameHandle": "h21cb8829g772eg4334gbc1bg1bb5fcd00bfe"}
                         }
                     ]
                 }

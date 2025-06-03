@@ -192,6 +192,7 @@ end
 
 local function onNetMessage(data)
     if Commands.NetMessage[data.Channel] then
+        debugDump(data)
         Commands.NetMessage[data.Channel](data)
     end
 end
