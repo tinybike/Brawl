@@ -145,10 +145,10 @@ local function onEnteredForceTurnBased(entityGuid)
 end
 
 local function onLeftForceTurnBased(entityGuid)
+    debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
-        debugPrint("LeftForceTurnBased", entityGuid)
         if State.Session.Players[entityUuid].isFreshSummon then
             State.Session.Players[entityUuid].isFreshSummon = false
         end
@@ -178,14 +178,13 @@ local function onLeftForceTurnBased(entityGuid)
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel then
                 for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                    -- NB: account for NPCs not in party / not controlled / start timer immediately
-                    -- does State.Session.Players have NPCs in it (like Wyll in his intro fight)?
                     if State.Session.Players[brawlerUuid] then
-                        if not State.isPlayerControllingDirectly(brawlerUuid) then
-                            Ext.Timer.WaitFor(2000, function ()
-                                Osi.FlushOsirisQueue(brawlerUuid)
-                                startPulseAction(brawler)
-                            end)
+                        if not State.isPlayerControllingDirectly(brawlerUuid) or State.Settings.FullAuto then
+                            startPulseAction(brawler)
+                            -- Ext.Timer.WaitFor(2000, function ()
+                            --     Osi.FlushOsirisQueue(brawlerUuid)
+                            --     startPulseAction(brawler)
+                            -- end)
                         end
                         brawlersInLevel[brawlerUuid].isPaused = false
                         if brawlerUuid ~= entityUuid then
@@ -193,7 +192,6 @@ local function onLeftForceTurnBased(entityGuid)
                             Osi.ForceTurnBasedMode(brawlerUuid, 0)
                         end
                     else
-                        -- debugPrint("****************skipping startPulseAction", entityUuid)
                         startPulseAction(brawler)
                     end
                 end
