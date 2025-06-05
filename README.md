@@ -6,7 +6,7 @@ Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and 
 
 ## Videos
 
-### 18) Monks
+### 18) Monk archetype
 
 [![Real time combat test 18](https://img.youtube.com/vi/ogKuQur15qM/0.jpg)](https://www.youtube.com/watch?v=ogKuQur15qM)
 

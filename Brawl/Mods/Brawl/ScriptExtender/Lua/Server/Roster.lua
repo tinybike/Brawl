@@ -87,12 +87,21 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 Osi.SetCanJoinCombat(entityUuid, 0)
             end
             State.Session.Brawlers[level][entityUuid] = brawler
-            if isInBrawl and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
+            -- if isInBrawl and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
+            if Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
                 if State.Session.PulseActionTimers[entityUuid] == nil then
                     startPulseAction(brawler)
                 end
                 if State.Session.BrawlFizzler[level] == nil then
                     startBrawlFizzler(level)
+                end
+            else
+                Osi.ForceTurnBasedMode(entityUuid, 1)
+                if not State.Session.Players[entityUuid] then
+                    brawler.isPaused = true
+                    if State.Settings.TruePause then
+                        Pause.startTruePause(entityUuid)
+                    end
                 end
             end
         end

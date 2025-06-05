@@ -76,6 +76,7 @@ local Session = {
     StoryActionIDSpellName = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
+    ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }

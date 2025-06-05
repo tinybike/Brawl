@@ -86,6 +86,7 @@ local function onCombatRoundStarted(combatGuid, round)
         Constants.ENTER_COMBAT_RANGE = 20
         onCombatStarted(combatGuid)
     else
+        Constants.ENTER_COMBAT_RANGE = 100
         startToTTimers()
     end
 end
@@ -105,6 +106,7 @@ local function onEnteredForceTurnBased(entityGuid)
     if level and entityUuid then
         local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
         if isPlayer then
+            local isHostCharacter = entityUuid == Osi.GetHostCharacter()
             debugPrint("EnteredForceTurnBased", entityGuid)
             if State.Session.Players[entityUuid].isFreshSummon then
                 State.Session.Players[entityUuid].isFreshSummon = false
@@ -118,10 +120,12 @@ local function onEnteredForceTurnBased(entityGuid)
                 State.Session.Brawlers[level][entityUuid].isInBrawl = false
             end
             stopPulseAddNearby(entityUuid)
-            stopPulseReposition(level)
-            stopBrawlFizzler(level)
-            if isToT() then
-                stopToTTimers()
+            if isHostCharacter then
+                stopPulseReposition(level)
+                stopBrawlFizzler(level)
+                if isToT() then
+                    stopToTTimers()
+                end
             end
         end
         if State.Settings.TruePause then
@@ -446,20 +450,20 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
                 State.Session.IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
             end
             -- NB: is this needed?
-            if isToT() then
-                -- Roster.addNearbyToBrawlers(attackerUuid, 30, nil, true)
-                Roster.addNearbyToBrawlers(attackerUuid, 30)
-            end
+            -- if isToT() then
+            --     -- Roster.addNearbyToBrawlers(attackerUuid, 30, nil, true)
+            --     Roster.addNearbyToBrawlers(attackerUuid, 30)
+            -- end
         end
         if Osi.IsPlayer(defenderUuid) == 1 then
             if Osi.IsPlayer(attackerUuid) == 0 and damageAmount > 0 then
                 State.Session.IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
-            -- NB: is this needed?
-            if isToT() then
-                -- Roster.addNearbyToBrawlers(defenderUuid, 30, nil, true)
-                Roster.addNearbyToBrawlers(defenderUuid, 30)
-            end
+            -- -- NB: is this needed?
+            -- if isToT() then
+            --     -- Roster.addNearbyToBrawlers(defenderUuid, 30, nil, true)
+            --     Roster.addNearbyToBrawlers(defenderUuid, 30)
+            -- end
         end
         -- print("attacked by fizz")
         -- startBrawlFizzler(Osi.GetRegion(attackerUuid))
@@ -614,7 +618,7 @@ end
 -- end
 
 local function onFlagSet(flag, speaker, dialogInstance)
-    debugPrint("FlagSet", flag, speaker, dialogInstance)
+    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
         Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
         Quests.lakesideRitualCountdown(Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)

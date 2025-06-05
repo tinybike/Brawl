@@ -62,9 +62,22 @@ end
 
 local function allEnterFTB()
     debugPrint("allEnterFTB")
+    if Utils.isToT() then
+        stopToTTimers()
+    end
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         local uuid = Osi.GetUUID(player[1])
         Osi.ForceTurnBasedMode(uuid, 1)
+    end
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, _ in pairs(brawlersInLevel) do
+            if Osi.IsPlayer(brawlerUuid) == 0 then
+                Osi.ForceTurnBasedMode(brawlerUuid, 1)
+                Pause.startTruePause(brawlerUuid)
+            end
+        end
     end
 end
 
@@ -100,6 +113,7 @@ local function cancelQueuedMovement(uuid)
 end
 
 local function midActionLock(entity)
+    debugPrint("midActionLock", entity.Uuid.EntityUuid)
     local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
     if spellCastState.Targets then
         local target = spellCastState.Targets[1]
@@ -149,6 +163,7 @@ local function startTruePause(entityUuid)
     if isAliveAndCanFight(entityUuid) then
         debugPrint("startTruePause", entityUuid, getDisplayName(entityUuid))
         -- if Osi.IsPartyMember(entityUuid, 1) == 1 then
+        Utils.clearOsirisQueue(entityUuid)
         local entity = Ext.Entity.Get(entityUuid)
         if State.Session.TurnBasedListeners[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
@@ -173,7 +188,7 @@ local function startTruePause(entityUuid)
             if State.Session.RemainingMovement[entityUuid] ~= nil and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
                 if entityUuid and isInFTB(movingEntity) then
                     if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                        debugPrint("enqueue movement (raw coords)", entityUuid)
+                        debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
                         debugDump(State.Session.LastClickPosition[entityUuid].position)
                         lock(movingEntity)
                         Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
@@ -197,9 +212,8 @@ local function startTruePause(entityUuid)
             if cast.SpellCastTargetsChangedEvent and cast.SpellCastPreviewEndEvent then
                 local caster = cast.SpellCastState.Caster
                 if caster.Uuid.EntityUuid == entityUuid then
-                    debugPrint("spellcastmovement", entityUuid)
+                    debugPrint("***************SpellCastMovement", entityUuid)
                     if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
-                        debugPrint("midactionlock")
                         midActionLock(caster)
                     end
                 end
