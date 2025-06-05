@@ -96,11 +96,15 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                     startBrawlFizzler(level)
                 end
             else
+                debugPrint("ADDING TO ROSTER DURING FTB...")
+                Utils.clearOsirisQueue(entityUuid)
+                stopPulseAction(brawler)
                 Osi.ForceTurnBasedMode(entityUuid, 1)
                 if not State.Session.Players[entityUuid] then
                     brawler.isPaused = true
                     if State.Settings.TruePause then
                         Pause.startTruePause(entityUuid)
+                        Pause.lock(Ext.Entity.Get(entityUuid))
                     end
                 end
             end

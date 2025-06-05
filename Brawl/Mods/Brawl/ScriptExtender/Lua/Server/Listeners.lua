@@ -101,13 +101,13 @@ local function onEnteredCombat(entityGuid, combatGuid)
 end
 
 local function onEnteredForceTurnBased(entityGuid)
+    debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
     if level and entityUuid then
         local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
         if isPlayer then
             local isHostCharacter = entityUuid == Osi.GetHostCharacter()
-            debugPrint("EnteredForceTurnBased", entityGuid)
             if State.Session.Players[entityUuid].isFreshSummon then
                 State.Session.Players[entityUuid].isFreshSummon = false
                 return Osi.ForceTurnBasedMode(entityUuid, 0)
@@ -128,19 +128,27 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
-        if State.Settings.TruePause then
-            Pause.startTruePause(entityUuid)
+        if Utils.isAliveAndCanFight(entityUuid) then
+            Utils.clearOsirisQueue(entityUuid)
+            if State.Settings.TruePause then
+                Pause.startTruePause(entityUuid)
+            end
         end
         if isPlayer then
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel then
                 for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                    if brawlerUuid ~= entityUuid and not brawlersInLevel[brawlerUuid].isPaused then
+                    if not brawlersInLevel[brawlerUuid].isPaused then
+                        debugPrint("stopping pulse for", brawler.uuid, brawler.displayName)
                         stopPulseAction(brawler, true)
-                        if State.Session.Players[brawlerUuid] then
-                            brawlersInLevel[brawlerUuid].isPaused = true
-                            Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                        end
+                        brawlersInLevel[brawlerUuid].isPaused = true
+                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
+                        -- if brawlerUuid ~= entityUuid then
+                        --     if State.Session.Players[brawlerUuid] then
+                        --         brawlersInLevel[brawlerUuid].isPaused = true
+                        --         Osi.ForceTurnBasedMode(brawlerUuid, 1)
+                        --     end
+                        -- end
                     end
                 end
             end
@@ -169,6 +177,7 @@ local function onLeftForceTurnBased(entityGuid)
         end
         local isHostCharacter = entityUuid == Osi.GetHostCharacter()
         if isHostCharacter then
+            debugPrint("Left FTB startPulseRepo")
             startPulseReposition(level)
         end
         -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)

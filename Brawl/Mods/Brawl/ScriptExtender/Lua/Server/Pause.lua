@@ -221,11 +221,11 @@ local function startTruePause(entityUuid)
         end)
         -- end
         -- Enqueue actions/movements for non-party NPCs
-        if Osi.IsPartyMember(entityUuid, 1) == 0 then
+        if Osi.IsPartyMember(entityUuid, 1) == 0 and not isLocked(Ext.Entity.Get(entityUuid)) then
             local brawler = State.getBrawlerByUuid(entityUuid)
             if brawler and brawler.uuid then
                 -- PulseAction stuff.....
-                debugPrint("*****PULSEACTION STUFF WHILE PAUSED*****")
+                debugPrint("*****PULSEACTION STUFF WHILE PAUSED*****", brawler.uuid, brawler.displayName)
                 local level = Osi.GetRegion(entityUuid)
                 -- Doesn't currently have an attack target, so let's find one
                 if brawler.targetUuid == nil then
@@ -275,6 +275,7 @@ local function checkTruePauseParty()
 end
 
 return {
+    isLocked = isLocked,
     allEnterFTB = allEnterFTB,
     allExitFTB = allExitFTB,
     cancelQueuedMovement = cancelQueuedMovement,

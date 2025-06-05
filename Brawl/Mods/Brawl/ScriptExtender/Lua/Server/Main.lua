@@ -16,6 +16,8 @@ local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
 function stopPulseAction(brawler, remainInBrawl)
+    debugPrint("Stop Pulse Action for brawler")
+    _D(brawler)
     if not remainInBrawl then
         brawler.isInBrawl = false
     end

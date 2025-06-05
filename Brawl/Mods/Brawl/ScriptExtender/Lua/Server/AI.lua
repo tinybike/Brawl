@@ -215,6 +215,7 @@ end
 local function isNpcSpellUsable(spell)
     if spell == "Projectile_Jump" then return false end
     if spell == "Shout_Dash_NPC" then return false end
+    if spell == "Throw_Throw" then return false end
     if spell == "Target_Shove" then return false end
     if spell == "Target_Devour_Ghoul" then return false end
     if spell == "Target_Devour_ShadowMound" then return false end
