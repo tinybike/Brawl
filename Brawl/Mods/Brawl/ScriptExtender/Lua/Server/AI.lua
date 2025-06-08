@@ -683,7 +683,7 @@ local function checkForBrawlToJoin(brawler)
                 end
             end
         end
-        local level = Osi.GetRegion(brawler.uuid)
+        -- local level = Osi.GetRegion(brawler.uuid)
         -- if level and State.Session.BrawlFizzler[level] == nil then
         --     print("check for brawl to join: start fizz")
         --     startBrawlFizzler(level)
@@ -699,6 +699,7 @@ local function pulseAction(brawler)
         local level = Osi.GetRegion(brawler.uuid)
         if level and not brawler.isPaused and isAliveAndCanFight(brawler.uuid) and (not isPlayerControllingDirectly(brawler.uuid) or State.Settings.FullAuto) then
             -- NB: if we allow healing spells etc used by companions, roll this code in, instead of special-casing it here...
+            -- should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
             if isPlayerOrAlly(brawler.uuid) then
                 local players = State.Session.Players
                 for playerUuid, player in pairs(players) do
@@ -747,8 +748,8 @@ end
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
 local function pulseReposition(level)
     State.checkForDownedOrDeadPlayers()
-    if State.Session.Brawlers[level] then
-        local brawlersInLevel = State.Session.Brawlers[level]
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if not Constants.IS_TRAINING_DUMMY[brawlerUuid] then
                 if isAliveAndCanFight(brawlerUuid) then

@@ -21,8 +21,7 @@ local function onCombatStarted(combatGuid)
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
-        -- debugDump(State.Session.Brawlers)
+    if level and not State.Settings.TurnBasedSwarmMode then
         if not isToT() then
             Constants.ENTER_COMBAT_RANGE = 20
             startBrawlFizzler(level)
@@ -30,6 +29,7 @@ local function onCombatStarted(combatGuid)
                 Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
                 Ext.Timer.WaitFor(1500, function ()
                     if Osi.CombatIsActive(combatGuid) then
+                        -- NB: is there a way to do this less aggressively?
                         Osi.EndCombat(combatGuid)
                     end
                 end)
@@ -53,7 +53,11 @@ local function onStarted(level)
     State.setupPartyMembersHitpoints()
     State.uncapPartyMembersMovementDistances()
     Roster.initBrawlers(level)
-    Pause.checkTruePauseParty()
+    if State.Settings.TurnBasedSwarmMode then
+        State.boostPlayerInitiatives()
+    else
+        Pause.checkTruePauseParty()
+    end
     debugDump(State.Session.Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -82,12 +86,19 @@ end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
-    if not isToT() then
-        Constants.ENTER_COMBAT_RANGE = 20
-        onCombatStarted(combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+        Pause.unlockAllPlayers()
+        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+        Roster.allSetCanJoinCombat(1)
     else
-        Constants.ENTER_COMBAT_RANGE = 100
-        startToTTimers()
+        if not isToT() then
+            Constants.ENTER_COMBAT_RANGE = 20
+            onCombatStarted(combatGuid)
+        else
+            Constants.ENTER_COMBAT_RANGE = 100
+            startToTTimers()
+        end
     end
 end
 
@@ -216,6 +227,17 @@ end
 local function onTurnEnded(entityGuid)
     -- NB: how's this work for the "environmental turn"?
     debugPrint("TurnEnded", entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        local entityUuid = Osi.GetUUID(entityGuid)
+        State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+        local allPlayersFinishedTurns = Roster.checkAllPlayersFinishedTurns()
+        debugPrint("All players finished turns?", allPlayersFinishedTurns)
+        if allPlayersFinishedTurns then
+            State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+            Roster.allSetCanJoinCombat(0)
+            Pause.lockAllPlayers()
+        end
+    end
 end
 
 local function onDied(entityGuid)
@@ -744,10 +766,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.TurnEnded = {
-    --     handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    State.Session.Listeners.TurnEnded = {
+        handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     State.Session.Listeners.Died = {
         handle = Ext.Osiris.RegisterListener("Died", 1, "after", onDied),
         stop = Ext.Osiris.UnregisterListener,

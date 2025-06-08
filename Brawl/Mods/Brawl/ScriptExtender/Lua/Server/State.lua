@@ -78,6 +78,7 @@ local Session = {
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
+    TurnBasedSwarmModePlayerTurnEnded = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -844,6 +845,26 @@ local function setIsControllingDirectly()
     end
 end
 
+local function removeBoostPlayerInitiatives()
+    local players = Session.Players
+    if players then
+        for playerUuid, _ in pairs(players) do
+            Osi.RemoveBoosts(playerUuid, "Initiative(1234)", 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+        end
+    end
+end
+
+local function boostPlayerInitiatives()
+    removeBoostPlayerInitiatives()
+    local players = Session.Players
+    -- Players always go first, should this be a setting instead or...?
+    if players then
+        for playerUuid, _ in pairs(players) do
+            Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+        end
+    end
+end
+
 return {
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
@@ -869,6 +890,8 @@ return {
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,
     setIsControllingDirectly = setIsControllingDirectly,
+    removeBoostPlayerInitiatives = removeBoostPlayerInitiatives,
+    boostPlayerInitiatives = boostPlayerInitiatives,
     Settings = Settings,
     Session = Session,
 }

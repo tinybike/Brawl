@@ -46,6 +46,36 @@ end
 --     return nil
 -- end
 
+local function checkAllPlayersFinishedTurns()
+    local players = State.Session.Players
+    if players then
+        debugDump(State.Session.TurnBasedSwarmModePlayerTurnEnded)
+        for playerUuid, _ in pairs(players) do
+            if not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+                return false
+            end
+        end
+        return true
+    end
+    return nil
+end
+
+local function allSetCanJoinCombat(canJoinCombat)
+    debugPrint("allSetCanJoinCombat", canJoinCombat)
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
+                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    AI.pulseAction(brawler)
+                end
+            end
+        end
+    end
+end
+
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
@@ -76,35 +106,45 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
             State.modifyHitpoints(entityUuid)
-            if Osi.IsPlayer(entityUuid) == 0 then
-                -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
-                Osi.SetCanJoinCombat(entityUuid, 0)
-                -- thank u lunisole/ghostboats
-                Osi.PROC_SelfHealing_Disable(entityUuid)
-            elseif State.Session.Players[entityUuid] then
-                -- brawler.originalCanJoinCombat = 1
-                Movement.setPlayerRunToSprint(entityUuid)
-                Osi.SetCanJoinCombat(entityUuid, 0)
-            end
-            State.Session.Brawlers[level][entityUuid] = brawler
-            -- if isInBrawl and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
-            if Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
-                if State.Session.PulseActionTimers[entityUuid] == nil then
-                    startPulseAction(brawler)
+            -- If in turn-based swarm mode, then during the player's turn, SetCanJoinCombat=1 for everyone
+            -- and during the enemy turn SetCanJoinCombat=0 for everyone.
+            -- There are no circumstances where the settings should be different for players vs enemies, BUT
+            -- the trigger to change the setting should be the players' turns start/enemy turns starting.
+            -- Players must be LOCKED during enemy turns to avoid RT combat!
+            -- All players should be set to have identical initiatives for this.
+            -- Pause/True Pause should NOT do anything in this mode.
+            -- Maybe just have players always go first?
+            if not State.Settings.TurnBasedSwarmMode then
+                if Osi.IsPlayer(entityUuid) == 0 then
+                    -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
+                    Osi.SetCanJoinCombat(entityUuid, 0)
+                    -- thank u lunisole/ghostboats
+                    Osi.PROC_SelfHealing_Disable(entityUuid)
+                elseif State.Session.Players[entityUuid] then
+                    -- brawler.originalCanJoinCombat = 1
+                    Movement.setPlayerRunToSprint(entityUuid)
+                    Osi.SetCanJoinCombat(entityUuid, 0)
                 end
-                if State.Session.BrawlFizzler[level] == nil then
-                    startBrawlFizzler(level)
-                end
-            else
-                debugPrint("ADDING TO ROSTER DURING FTB...")
-                Utils.clearOsirisQueue(entityUuid)
-                stopPulseAction(brawler)
-                Osi.ForceTurnBasedMode(entityUuid, 1)
-                if not State.Session.Players[entityUuid] then
-                    brawler.isPaused = true
-                    if State.Settings.TruePause then
-                        Pause.startTruePause(entityUuid)
-                        Pause.lock(Ext.Entity.Get(entityUuid))
+                State.Session.Brawlers[level][entityUuid] = brawler
+                -- if isInBrawl and Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
+                if Osi.IsInForceTurnBasedMode(Osi.GetHostCharacter()) == 0 then
+                    if State.Session.PulseActionTimers[entityUuid] == nil then
+                        startPulseAction(brawler)
+                    end
+                    if State.Session.BrawlFizzler[level] == nil then
+                        startBrawlFizzler(level)
+                    end
+                else
+                    debugPrint("ADDING TO ROSTER DURING FTB...")
+                    Utils.clearOsirisQueue(entityUuid)
+                    stopPulseAction(brawler)
+                    Osi.ForceTurnBasedMode(entityUuid, 1)
+                    if not State.Session.Players[entityUuid] then
+                        brawler.isPaused = true
+                        if State.Settings.TruePause then
+                            Pause.startTruePause(entityUuid)
+                            Pause.lock(Ext.Entity.Get(entityUuid))
+                        end
                     end
                 end
             end
@@ -227,4 +267,6 @@ return {
     disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,
     initBrawlers = initBrawlers,
+    allSetCanJoinCombat = allSetCanJoinCombat,
+    checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
 }

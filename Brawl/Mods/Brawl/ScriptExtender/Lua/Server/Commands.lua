@@ -110,6 +110,9 @@ end
 local function disableMod()
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
+    if State.Settings.TurnBasedSwarmMode then
+        State.removeBoostPlayerInitiatives()
+    end
     modStatusMessage("Brawl Disabled")
 end
 
@@ -541,6 +544,17 @@ local function onMCMMaxPartySize(maxPartySize)
     State.setMaxPartySize()
 end
 
+local function onMCMTurnBasedSwarmMode(value)
+    State.Settings.TurnBasedSwarmMode = value
+    if value == true then
+        State.boostPlayerInitiatives()
+        Roster.allSetCanJoinCombat(1)
+    else
+        State.removeBoostPlayerInitiatives()
+        Roster.allSetCanJoinCombat(0)
+    end
+end
+
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
@@ -579,6 +593,6 @@ return {
         hogwild_mode = function (v) State.Settings.HogwildMode = v end,
         max_party_size = onMCMMaxPartySize,
         murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
-        turn_based_swarm_mode = function (v) State.Settings.TurnBasedSwarmMode = v end,
+        turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
     },
 }
