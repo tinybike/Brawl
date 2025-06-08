@@ -454,25 +454,22 @@ end
 local function onModToggle(data)
     if MCM then
         MCM.Set("mod_enabled", not State.Settings.ModEnabled)
-    else
-        toggleMod()
     end
+    toggleMod()
 end
 
 local function onCompanionAIToggle(data)
     if MCM then
         MCM.Set("companion_ai_enabled", not State.Settings.CompanionAIEnabled)
-    else
-        toggleCompanionAI()
     end
+    toggleCompanionAI()
 end
 
 local function onFullAutoToggle(data)
     if MCM then
         MCM.Set("full_auto", not State.Settings.FullAuto)
-    else
-        toggleFullAuto()
     end
+    toggleFullAuto()
 end
 
 local function onMCMModEnabled(value)
