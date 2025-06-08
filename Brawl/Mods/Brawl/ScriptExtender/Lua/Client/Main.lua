@@ -196,7 +196,7 @@ end
 
 local function getPositionInfo()
     local pickingHelper = Ext.UI.GetPickingHelper(1)
-    if pickingHelper.Inner and pickingHelper.Inner.Position then
+    if pickingHelper and pickingHelper.Inner and pickingHelper.Inner.Position then
         local clickedOn = {}
         if pickingHelper.Inner.Inner and pickingHelper.Inner.Inner[1] and pickingHelper.Inner.Inner[1].GameObject then
             local clickedOnEntity = pickingHelper.Inner.Inner[1].GameObject
