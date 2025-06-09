@@ -117,6 +117,12 @@ local function startNextTurnBasedSwarmRound()
     debugPrint("startNextTurnBasedSwarmRound")
     -- debugDump(State.Session.Brawlers)
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+    if Utils.isToT() then
+        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+            debugPrint("********************Moving ToT forward********************")
+            Mods.ToT.Scenario.ForwardCombat()
+        end
+    end
     Pause.unfreezeAllPlayers()
     checkPlayersRejoinCombat()
     Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
@@ -487,20 +493,22 @@ local function useBonusAttacks(uuid)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-    if not State.Settings.TurnBasedSwarmMode and attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
-        local spellName = State.Session.StoryActionIDSpellName[storyActionID]
-        if spellName ~= nil then
-            debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-            State.Session.StoryActionIDSpellName[storyActionID] = nil
-            local spell = State.getSpellByName(spellName)
-            if spell ~= nil and spell.triggersExtraAttack == true then
-                if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
-                    local brawler = State.getBrawlerByUuid(attackerUuid)
-                    if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                        local numBonusAttacks = useBonusAttacks(attackerUuid)
-                        debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
-                        State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
-                        reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
+        if not State.Settings.TurnBasedSwarmMode or Utils.isPugnacious(attackerUuid) then
+            local spellName = State.Session.StoryActionIDSpellName[storyActionID]
+            if spellName ~= nil then
+                debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+                State.Session.StoryActionIDSpellName[storyActionID] = nil
+                local spell = State.getSpellByName(spellName)
+                if spell ~= nil and spell.triggersExtraAttack == true then
+                    if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
+                        local brawler = State.getBrawlerByUuid(attackerUuid)
+                        if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                            local numBonusAttacks = useBonusAttacks(attackerUuid)
+                            debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
+                            State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
+                            reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                        end
                     end
                 end
             end

@@ -644,8 +644,6 @@ local function findTarget(brawler)
         -- Attacking
         local weightedTargets = getWeightedTargets(brawler, State.Session.Brawlers[level])
         local targetUuid = decideOnTarget(weightedTargets)
-        -- debugDump(weightedTargets)
-        -- debugPrint("got target", targetUuid)
         if targetUuid and State.Session.Brawlers[level][targetUuid] then
             local result
             if isHostileTarget(brawler.uuid, targetUuid) then
@@ -662,6 +660,7 @@ local function findTarget(brawler)
                 return true
             end
         end
+        debugDump(weightedTargets)
         debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
         Movement.holdPosition(brawler.uuid)
         return false
