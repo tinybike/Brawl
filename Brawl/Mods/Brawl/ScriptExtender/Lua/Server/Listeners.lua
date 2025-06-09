@@ -85,10 +85,40 @@ local function onLevelGameplayStarted(level, _)
     onStarted(level)
 end
 
+local function checkPlayerRejoinCombat(playerUuid)
+    if Utils.isAliveAndCanFight(playerUuid) then
+        local playerBrawler = State.getBrawlerByUuid(playerUuid)
+        if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
+            local level = Osi.GetRegion(playerUuid)
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, _ in pairs(brawlersInLevel) do
+                    if Utils.isPugnacious(brawlerUuid, playerUuid) and Utils.isAliveAndCanFight(brawlerUuid) and Osi.GetDistanceTo(brawlerUuid, playerUuid) < 20 then
+                        Osi.EnterCombat(playerUuid, brawlerUuid)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function checkPlayersRejoinCombat()
+    local players = State.Session.Players
+    if players then
+        for playerUuid, _ in pairs(players) do
+            checkPlayerRejoinCombat(playerUuid)
+        end
+    end
+end
+
 local function startNextTurnBasedSwarmRound()
     debugPrint("startNextTurnBasedSwarmRound")
+    -- debugDump(State.Session.Brawlers)
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     Pause.unfreezeAllPlayers()
+    checkPlayersRejoinCombat()
     Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
     Roster.allSetCanJoinCombat(1)
 end
