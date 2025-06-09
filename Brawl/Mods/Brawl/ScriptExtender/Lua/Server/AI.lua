@@ -226,7 +226,7 @@ local function isNpcSpellUsable(spell)
     return true
 end
 
-local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced)
+local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, bonusActionOnly)
     if spellName == nil or spell == nil then
         return false
     end
@@ -237,6 +237,9 @@ local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilen
         return false
     end
     if spell.outOfCombatOnly then
+        return false
+    end
+    if bonusActionOnly and not spell.isBonusAction then
         return false
     end
     if spellName == "Target_KiResonation_Blast" and Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
@@ -289,7 +292,7 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs/debuffs (NYI)
-local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks)
+local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, bonusActionOnly)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
@@ -302,7 +305,7 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTar
                     break
                 end
             end
-            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced) then
+            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced, bonusActionOnly) then
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
             end
         end
@@ -318,8 +321,8 @@ local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells
     return getHighestWeightSpell(weightedSpells)
 end
 
-local function decideActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes)
-    local weightedSpells = getWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks)
+local function decideActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
+    local weightedSpells = getWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, bonusActionOnly)
     return getHighestWeightSpell(weightedSpells)
 end
 
@@ -332,7 +335,7 @@ local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)
 end
 
-local function actOnHostileTarget(brawler, target)
+local function actOnHostileTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
     if brawler and target then
         -- todo: Utility spells
@@ -347,7 +350,7 @@ local function actOnHostileTarget(brawler, target)
             actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes)
+            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
             debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
         end
         if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 then
@@ -380,7 +383,7 @@ local function actOnHostileTarget(brawler, target)
     return false
 end
 
-local function actOnFriendlyTarget(brawler, target)
+local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
     debugDump(brawler)
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
@@ -400,7 +403,7 @@ local function actOnFriendlyTarget(brawler, target)
         if Osi.IsPlayer(brawler.uuid) == 1 then
             actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, 0, true)
         else
-            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes)
+            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
         end
         debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
         if actionToTake then
@@ -616,7 +619,7 @@ local function getBrawlersSortedByDistance(entityUuid)
     return brawlersSortedByDistance
 end
 
-local function findTarget(brawler)
+local function findTarget(brawler, bonusActionOnly)
     local level = Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = getBrawlersSortedByDistance(brawler.uuid)
@@ -692,7 +695,7 @@ local function checkForBrawlToJoin(brawler)
 end
 
 -- Brawlers doing dangerous stuff
-local function pulseAction(brawler)
+local function pulseAction(brawler, bonusActionOnly)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid then
         local level = Osi.GetRegion(brawler.uuid)

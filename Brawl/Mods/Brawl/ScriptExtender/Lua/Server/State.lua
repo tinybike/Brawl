@@ -370,6 +370,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             triggersExtraAttack = extraAttackCheck(spell),
             isDirectHeal = checkForDirectHeal(spell),
             hasApplyStatus = checkForApplyStatus(spell),
+            isBonusAction = costs.BonusActionPoint ~= nil,
         }
         return spellInfo
     end
