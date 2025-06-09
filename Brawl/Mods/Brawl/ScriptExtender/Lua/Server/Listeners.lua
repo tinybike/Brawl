@@ -489,7 +489,11 @@ local function useBonusAttacks(uuid)
             numBonusAttacks = numBonusAttacks + 1
         end
     end
-    return numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint") + useActionPointSurplus(uuid, "BonusActionPoint")
+    numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint")
+    if not State.Settings.TurnBasedSwarmMode then
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "BonusActionPoint")
+    end
+    return numBonusAttacks
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
