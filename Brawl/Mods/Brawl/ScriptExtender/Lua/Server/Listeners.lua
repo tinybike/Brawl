@@ -135,7 +135,7 @@ local function onCombatRoundStarted(combatGuid, round)
         if round == 1 then
             startNextTurnBasedSwarmRound()
         else
-            Ext.Timer.WaitFor(6000, startNextTurnBasedSwarmRound)
+            Ext.Timer.WaitFor(8000, startNextTurnBasedSwarmRound)
         end
     else
         if not isToT() then
@@ -560,11 +560,11 @@ local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, sp
 end
 
 local function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
-    debugPrint("UsingSpell", caster, spell, spellType, spellElement, storyActionID)
+    debugPrint(getDisplayName(Osi.GetUUID(caster)), "UsingSpell", caster, spell, spellType, spellElement, storyActionID)
 end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    debugPrint("CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint(getDisplayName(Osi.GetUUID(casterGuid)), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
     debugDump(State.Session.ActionsInProgress[casterUuid])
     if Resources.removeActionInProgress(casterUuid, spellName) then
