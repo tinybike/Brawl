@@ -732,18 +732,23 @@ local function pulseAction(brawler, bonusActionOnly)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[level]
+            -- debugPrint(brawler.displayName, "has target, target is alive", getDisplayName(brawler.targetUuid), isOnSameLevel(brawler.uuid, brawler.targetUuid), isAliveAndCanFight(brawler.targetUuid), isVisible(brawler.targetUuid))
             if brawlersInLevel and isOnSameLevel(brawler.uuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                 if brawler.lockedOnTarget then
                     debugPrint(brawler.displayName, "Locked-on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
-                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
                 end
                 if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
                     debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
                     return findTarget(brawler, bonusActionOnly)
                 end
-                if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
+                local trackingDistance = 12
+                if State.Settings.TurnBasedSwarmMode then
+                    trackingDistance = 20
+                end
+                if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= trackingDistance then
                     debugPrint(brawler.displayName, "Remaining on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
-                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
                 end
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one

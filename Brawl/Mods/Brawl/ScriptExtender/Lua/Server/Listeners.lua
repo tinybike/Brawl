@@ -501,6 +501,9 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
                 State.Session.StoryActionIDSpellName[storyActionID] = nil
                 local spell = State.getSpellByName(spellName)
                 if spell ~= nil and spell.triggersExtraAttack == true then
+                    if State.Settings.TurnBasedSwarmMode and Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
+                        return nil
+                    end
                     if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
                         local brawler = State.getBrawlerByUuid(attackerUuid)
                         if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
