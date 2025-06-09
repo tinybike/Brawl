@@ -567,7 +567,7 @@ local function getSpellByName(name)
     return nil
 end
 
-local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly)
+local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
     if isSilenced(uuid) then
         return false
     end
@@ -577,6 +577,9 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly)
         local isUsableHeal = (spell ~= nil) and spell.isDirectHeal
         if isUsableHeal and excludeSelfOnly then
             isUsableHeal = isUsableHeal and not spell.isSelfOnly
+        end
+        if bonusActionOnly then
+            isUsableHeal = isUsableHeal and spell.isBonusAction
         end
         if isUsableHeal then
             if Settings.HogwildMode then

@@ -338,8 +338,6 @@ end
 local function actOnHostileTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
     if brawler and target then
-        -- todo: Utility spells
-        local spellTypes = {"Control", "Damage"}
         local actionToTake = nil
         local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
         if Osi.IsPlayer(brawler.uuid) == 1 then
@@ -350,10 +348,14 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
             debugPrint("Companion action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName)
         else
-            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype)
+            actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Control", "Damage"}, bonusActionOnly)
+            debugPrint("Action to take on hostile target", actionToTake, brawler.uuid, brawler.displayName, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
-        if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 then
+        if not actionToTake and bonusActionOnly then
+            debugPrint("No hostile bonus actions available for", brawler.uuid, brawler.displayName)
+            return true
+        end
+        if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 and not State.Settings.TurnBasedSwarmMode then
             local numUsableSpells = 0
             local usableSpells = {}
             for _, preparedSpell in pairs(preparedSpells) do
@@ -389,13 +391,13 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
     if preparedSpells ~= nil then
         -- todo: Utility/Buff spells
-        debugPrint("acting on friendly target", brawler.uuid, brawler.displayName, getDisplayName(target.uuid))
+        debugPrint("acting on friendly target", brawler.uuid, brawler.displayName, getDisplayName(target.uuid), bonusActionOnly)
         local spellTypes = {"Healing"}
-        if brawler.uuid == target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, false) then
+        if brawler.uuid == target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
             debugPrint("No direct heals found (self)")
             return false
         end
-        if brawler.uuid ~= target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, true) then
+        if brawler.uuid ~= target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
             debugPrint("No direct heals found (other)")
             return false
         end
@@ -409,6 +411,9 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         if actionToTake then
             Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+            return true
+        elseif bonusActionOnly then
+            debugPrint("No friendly bonus actions available for", brawler.uuid, brawler.displayName)
             return true
         end
         return false
@@ -520,7 +525,7 @@ end
 
 -- Attacking targets: prioritize close targets with less remaining HP
 -- (Lowest weight = most desireable target)
-local function getWeightedTargets(brawler, potentialTargets)
+local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
     local weightedTargets = {}
     local isHealer = isHealerArchetype(brawler.archetype)
     local anchorCharacterUuid
@@ -544,7 +549,8 @@ local function getWeightedTargets(brawler, potentialTargets)
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
         if brawler.uuid == potentialTargetUuid then
-            if State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, false) then
+            local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+            if State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
                 local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                 local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
                 if State.Settings.CompanionTactics == "Offense" then
@@ -560,7 +566,8 @@ local function getWeightedTargets(brawler, potentialTargets)
             local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
             if (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                 local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
-                if isHostile or State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true) then
+                local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+                if isHostile or State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
                     if not isPlayerOrAlly(brawler.uuid) then
@@ -652,7 +659,7 @@ local function findTarget(brawler, bonusActionOnly)
             if isHostileTarget(brawler.uuid, targetUuid) then
                 result = actOnHostileTarget(brawler, State.Session.Brawlers[level][targetUuid])
                 debugPrint("result (hostile)", result)
-                if result == true then
+                if result == true and not bonusActionOnly then
                     brawler.targetUuid = targetUuid
                 end
             else
