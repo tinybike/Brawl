@@ -51,11 +51,12 @@ local function onStarted(level)
     Movement.setMovementSpeedThresholds()
     Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
-    State.uncapPartyMembersMovementDistances()
     Roster.initBrawlers(level)
     if State.Settings.TurnBasedSwarmMode then
         State.boostPlayerInitiatives()
+        State.recapPartyMembersMovementDistances()
     else
+        State.uncapPartyMembersMovementDistances()
         Pause.checkTruePauseParty()
     end
     debugDump(State.Session.Players)
@@ -456,7 +457,7 @@ local function useBonusAttacks(uuid)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
+    if not State.Settings.TurnBasedSwarmMode and attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         local spellName = State.Session.StoryActionIDSpellName[storyActionID]
         if spellName ~= nil then
             debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)

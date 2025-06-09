@@ -548,9 +548,11 @@ local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
         State.boostPlayerInitiatives()
+        State.recapPartyMembersMovementDistances()
         Roster.allSetCanJoinCombat(1)
     else
         State.removeBoostPlayerInitiatives()
+        State.uncapPartyMembersMovementDistances()
         Roster.allSetCanJoinCombat(0)
     end
 end
