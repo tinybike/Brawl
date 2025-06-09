@@ -46,6 +46,7 @@ end
 --     return nil
 -- end
 
+-- NB: need to account for summons here too! adjust their initiatives etc
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then

@@ -530,24 +530,12 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
                 State.Session.IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
             end
-            -- NB: is this needed?
-            -- if isToT() then
-            --     -- Roster.addNearbyToBrawlers(attackerUuid, 30, nil, true)
-            --     Roster.addNearbyToBrawlers(attackerUuid, 30)
-            -- end
         end
         if Osi.IsPlayer(defenderUuid) == 1 then
             if Osi.IsPlayer(attackerUuid) == 0 and damageAmount > 0 then
                 State.Session.IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
-            -- -- NB: is this needed?
-            -- if isToT() then
-            --     -- Roster.addNearbyToBrawlers(defenderUuid, 30, nil, true)
-            --     Roster.addNearbyToBrawlers(defenderUuid, 30)
-            -- end
         end
-        -- print("attacked by fizz")
-        -- startBrawlFizzler(Osi.GetRegion(attackerUuid))
     end
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)

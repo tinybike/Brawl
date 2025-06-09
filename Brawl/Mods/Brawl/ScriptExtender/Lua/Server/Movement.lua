@@ -34,11 +34,17 @@ local function enemyMovementDistanceToSpeed(movementDistance)
 end
 
 local function getMovementDistanceAmount(entity)
-    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+    if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+    end
+    return 0
 end
 
 local function getMovementDistanceMaxAmount(entity)
-    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+    if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+    end
+    return 0
 end
 
 local function getMovementSpeed(entityUuid)
