@@ -17,7 +17,7 @@ end
 
 local function unlock(entity)
     debugPrint("unlock", entity.Uuid.EntityUuid, isLocked(entity))
-    debugDump(entity.TurnBased)
+    -- debugDump(entity.TurnBased)
     entity.TurnBased.IsActiveCombatTurn = true
     entity:Replicate("TurnBased")
     local uuid = entity.Uuid.EntityUuid

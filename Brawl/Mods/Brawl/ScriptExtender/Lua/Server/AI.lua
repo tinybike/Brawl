@@ -276,7 +276,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, dist
                 end
             end
             if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
-                debugPrint("get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
+                debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
             end
         end
@@ -315,8 +315,8 @@ end
 
 local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
     local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE)
-    debugPrint("companion weighted spells", getDisplayName(brawler.uuid), brawler.archetype, distanceToTarget)
-    debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
+    debugPrint(brawler.displayName, "companion weighted spells", brawler.uuid, brawler.archetype, distanceToTarget)
+    -- debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
@@ -327,7 +327,7 @@ local function decideActionOnTarget(brawler, targetUuid, preparedSpells, distanc
 end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
-    debugPrint("useSpellOnTarget", attackerUuid, targetUuid, spellName)
+    debugPrint(getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
     if State.Settings.HogwildMode then
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
         return true
@@ -387,18 +387,17 @@ end
 
 local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
-    debugDump(brawler)
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
     if preparedSpells ~= nil then
         -- todo: Utility/Buff spells
-        debugPrint("acting on friendly target", brawler.uuid, brawler.displayName, getDisplayName(target.uuid), bonusActionOnly)
+        debugPrint(brawler.displayName, "acting on friendly target", brawler.uuid, target.displayName, bonusActionOnly)
         local spellTypes = {"Healing"}
         if brawler.uuid == target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
-            debugPrint("No direct heals found (self)")
+            debugPrint(brawler.displayName, "No direct heals found (self)")
             return false
         end
         if brawler.uuid ~= target.uuid and not State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
-            debugPrint("No direct heals found (other)")
+            debugPrint(brawler.displayName, "No direct heals found (other)")
             return false
         end
         local actionToTake = nil
@@ -407,13 +406,13 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
         end
-        debugPrint("Action to take on friendly target", actionToTake, brawler.uuid, brawler.displayName)
+        debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid)
         if actionToTake then
             Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
             return true
         elseif bonusActionOnly then
-            debugPrint("No friendly bonus actions available for", brawler.uuid, brawler.displayName)
+            debugPrint(brawler.displayName, "No friendly bonus actions available for", brawler.uuid)
             return true
         end
         return false
@@ -502,7 +501,7 @@ local function isHostileTarget(uuid, targetUuid)
     elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
         isHostile = Osi.IsEnemy(uuid, targetUuid) == 1
     else
-        debugPrint("isHostileTarget: what happened here?", uuid, targetUuid, getDisplayName(uuid), getDisplayName(targetUuid))
+        debugPrint(getDisplayName(uuid), "isHostileTarget: what happened here?", uuid, targetUuid, getDisplayName(targetUuid))
     end
     return isHostile
 end
@@ -642,7 +641,7 @@ local function findTarget(brawler, bonusActionOnly)
             if State.Session.Brawlers[level] then
                 local friendlyTargetUuid = whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and State.Session.Brawlers[level][friendlyTargetUuid] then
-                    debugPrint("actOnFriendlyTarget", brawler.uuid, brawler.displayName, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
+                    debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, getDisplayName(friendlyTargetUuid))
                     if actOnFriendlyTarget(brawler, State.Session.Brawlers[level][friendlyTargetUuid]) then
                         State.Session.HealRequested[userId] = false
                         return true
@@ -658,20 +657,20 @@ local function findTarget(brawler, bonusActionOnly)
             local result
             if isHostileTarget(brawler.uuid, targetUuid) then
                 result = actOnHostileTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                debugPrint("result (hostile)", result)
+                debugPrint(brawler.displayName, "result (hostile)", result)
                 if result == true and not bonusActionOnly then
                     brawler.targetUuid = targetUuid
                 end
             else
                 result = actOnFriendlyTarget(brawler, State.Session.Brawlers[level][targetUuid])
-                debugPrint("result (friendly)", result)
+                debugPrint(brawler.displayName, "result (friendly)", result)
             end
             if result == true then
                 return true
             end
         end
         debugDump(weightedTargets)
-        debugPrint("can't find a target, holding position", brawler.uuid, brawler.displayName)
+        debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid)
         Movement.holdPosition(brawler.uuid)
         return false
     end
@@ -681,7 +680,7 @@ end
 local function checkForBrawlToJoin(brawler)
     local closestPlayerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
     if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < Constants.ENTER_COMBAT_RANGE then
-        debugPrint("Closest alive player to", brawler.uuid, brawler.displayName, "is", closestPlayerUuid, closestDistance)
+        debugPrint(brawler.displayName, "Closest alive player to", brawler.uuid, "is", closestPlayerUuid, closestDistance)
         Roster.addBrawler(closestPlayerUuid)
         local players = State.Session.Players
         for playerUuid, player in pairs(players) do
@@ -715,7 +714,7 @@ local function pulseAction(brawler, bonusActionOnly)
                     if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < Constants.HELP_DOWNED_MAX_RANGE then
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
-                        debugPrint("Helping target", playerUuid, getDisplayName(playerUuid))
+                        debugPrint(brawler.displayName, "Helping target", playerUuid, getDisplayName(playerUuid))
                         Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help")
                         return useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
                     end
@@ -725,27 +724,27 @@ local function pulseAction(brawler, bonusActionOnly)
             end
             -- Doesn't currently have an attack target, so let's find one
             if brawler.targetUuid == nil then
-                debugPrint("Find target (no current target)", brawler.uuid, brawler.displayName)
+                debugPrint(brawler.displayName, "Find target (no current target)", brawler.uuid)
                 return findTarget(brawler)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel and isOnSameLevel(brawler.uuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                 if brawler.lockedOnTarget then
-                    debugPrint("Locked-on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+                    debugPrint(brawler.displayName, "Locked-on target, attacking", brawler.uuid, "->", getDisplayName(brawler.targetUuid))
                     return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
                 if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
-                    debugPrint("Find target (defense tactics)", brawler.uuid, brawler.displayName)
+                    debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid)
                     return findTarget(brawler)
                 end
                 if Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= 12 then
-                    debugPrint("Remaining on target, attacking", brawler.displayName, brawler.uuid, "->", getDisplayName(brawler.targetUuid))
+                    debugPrint(brawler.displayName, "Remaining on target, attacking", brawler.uuid, "->", getDisplayName(brawler.targetUuid))
                     return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
                 end
             end
             -- Has an attack target but it's already dead or unable to fight, so find a new one
-            debugPrint("Find target (current target invalid)", brawler.uuid, brawler.displayName)
+            debugPrint(brawler.displayName, "Find target (current target invalid)", brawler.uuid)
             brawler.targetUuid = nil
             return findTarget(brawler)
         end
@@ -767,29 +766,29 @@ local function pulseReposition(level)
                         if brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid) then
                             local _, closestDistance = Osi.GetClosestAlivePlayer(brawlerUuid)
                             if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
-                                debugPrint("Too far away, removing brawler", brawlerUuid, getDisplayName(brawlerUuid))
+                                debugPrint(brawler.displayName, "Too far away, removing brawler", brawlerUuid)
                                 Roster.removeBrawler(level, brawlerUuid)
                             else
-                                debugPrint("Repositioning", brawler.displayName, brawlerUuid, "->", brawler.targetUuid)
+                                debugPrint(brawler.displayName, "Repositioning", brawlerUuid, "->", brawler.targetUuid)
                                 -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
                             end
                         else
-                            -- debugPrint("Checking for a brawl to join", brawler.displayName, brawlerUuid)
+                            -- debugPrint(brawler.displayName, "Checking for a brawl to join", brawlerUuid)
                             checkForBrawlToJoin(brawler)
                         end
                     -- Player, ally, and neutral units are not actively looking for a fight
                     -- - Companions and allies use the same logic
                     -- - Neutrals just chilling
                     elseif State.areAnyPlayersBrawling() and isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                        -- debugPrint("Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
+                        -- debugPrint(brawler.displayName, "Player or ally", brawlerUuid, Osi.GetHitpoints(brawlerUuid))
                         if State.Session.Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
-                            debugPrint("Player is controlling directly: do not take action!")
-                            debugDump(brawler)
+                            debugPrint(brawler.displayName, "Player is controlling directly: do not take action!")
+                            -- debugDump(brawler)
                             stopPulseAction(brawler, true)
                         else
                             if not brawler.isInBrawl then
                                 if Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
-                                    debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                                    debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then

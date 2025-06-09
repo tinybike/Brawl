@@ -70,9 +70,10 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                 if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    debugPrint("AI.pulseAction once", brawler.uuid, brawler.displayName)
+                    debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                     AI.pulseAction(brawler)
                     Ext.Timer.WaitFor(3000, function ()
+                        debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                         AI.pulseAction(brawler, true)
                     end)
                 end
@@ -106,7 +107,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
-            debugPrint("Adding Brawler", entityUuid, displayName, brawler.actionInterval)
+            debugPrint(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
@@ -145,7 +146,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                         startBrawlFizzler(level)
                     end
                 else
-                    debugPrint("ADDING TO ROSTER DURING FTB...")
+                    -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
                     stopPulseAction(brawler)
                     Osi.ForceTurnBasedMode(entityUuid, 1)
