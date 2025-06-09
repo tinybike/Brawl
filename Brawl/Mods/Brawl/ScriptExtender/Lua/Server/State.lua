@@ -855,11 +855,12 @@ local function removeBoostPlayerInitiatives()
 end
 
 local function boostPlayerInitiatives()
-    removeBoostPlayerInitiatives()
+    -- removeBoostPlayerInitiatives()
     local players = Session.Players
     -- Players always go first, should this be a setting instead or...?
     if players then
         for playerUuid, _ in pairs(players) do
+            debugPrint("Boosting player initiative", playerUuid)
             Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
         end
     end

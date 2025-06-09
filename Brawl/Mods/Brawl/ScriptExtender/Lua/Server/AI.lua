@@ -749,7 +749,7 @@ end
 local function pulseReposition(level)
     State.checkForDownedOrDeadPlayers()
     local brawlersInLevel = State.Session.Brawlers[level]
-    if brawlersInLevel then
+    if brawlersInLevel and not State.Settings.TurnBasedSwarmMode then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if not Constants.IS_TRAINING_DUMMY[brawlerUuid] then
                 if isAliveAndCanFight(brawlerUuid) then
@@ -780,7 +780,7 @@ local function pulseReposition(level)
                         else
                             if not brawler.isInBrawl then
                                 if Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
-                                    -- debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
+                                    debugPrint("Not in brawl, starting pulse action for", brawler.displayName)
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then

@@ -84,13 +84,22 @@ local function onLevelGameplayStarted(level, _)
     onStarted(level)
 end
 
+local function startNextTurnBasedSwarmRound()
+    debugPrint("startNextTurnBasedSwarmRound")
+    State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+    Pause.unfreezeAllPlayers()
+    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+    Roster.allSetCanJoinCombat(1)
+end
+
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
-        State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-        Pause.unlockAllPlayers()
-        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-        Roster.allSetCanJoinCombat(1)
+        if round == 1 then
+            startNextTurnBasedSwarmRound()
+        else
+            Ext.Timer.WaitFor(6000, startNextTurnBasedSwarmRound)
+        end
     else
         if not isToT() then
             Constants.ENTER_COMBAT_RANGE = 20
@@ -107,7 +116,7 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    debugPrint("EnteredCombat", entityGuid, combatGuid)
+    -- debugPrint("EnteredCombat", entityGuid, combatGuid)
     Roster.addBrawler(Osi.GetUUID(entityGuid), true)
 end
 
@@ -226,16 +235,18 @@ end
 
 local function onTurnEnded(entityGuid)
     -- NB: how's this work for the "environmental turn"?
-    debugPrint("TurnEnded", entityGuid)
-    if State.Settings.TurnBasedSwarmMode then
+    if State.Settings.TurnBasedSwarmMode and Osi.IsPlayer(entityGuid) == 1 then
+        debugPrint("TurnEnded", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
-        local allPlayersFinishedTurns = Roster.checkAllPlayersFinishedTurns()
-        debugPrint("All players finished turns?", allPlayersFinishedTurns)
-        if allPlayersFinishedTurns then
-            State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-            Roster.allSetCanJoinCombat(0)
-            Pause.lockAllPlayers()
+        if entityUuid then
+            State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+            local allPlayersFinishedTurns = Roster.checkAllPlayersFinishedTurns()
+            debugPrint("All players finished turns?", allPlayersFinishedTurns)
+            if allPlayersFinishedTurns then
+                State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+                Roster.allSetCanJoinCombat(0, true)
+                Pause.freezeAllPlayers()
+            end
         end
     end
 end
@@ -295,7 +306,7 @@ local function onGainedControl(targetGuid)
             for playerUuid, player in pairs(players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
                     player.isControllingDirectly = false
-                    if level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
+                    if not State.Settings.TurnBasedSwarmMode and level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
                         stopPulseAddNearby(playerUuid)
                         startPulseAction(brawlersInLevel[playerUuid])
                     end

@@ -53,11 +53,13 @@ end
 
 function startBrawlFizzler(level)
     stopBrawlFizzler(level)
-    debugPrint("Starting BrawlFizzler", level)
-    State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
-        debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
-        Roster.endBrawl(level)
-    end)
+    if not State.Settings.TurnBasedSwarmMode then
+        debugPrint("Starting BrawlFizzler", level)
+        State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
+            debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
+            Roster.endBrawl(level)
+        end)
+    end
 end
 
 function stopPulseAddNearby(uuid)

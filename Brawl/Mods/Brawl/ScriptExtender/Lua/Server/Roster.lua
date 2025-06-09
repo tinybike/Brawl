@@ -60,15 +60,16 @@ local function checkAllPlayersFinishedTurns()
     return nil
 end
 
-local function allSetCanJoinCombat(canJoinCombat)
-    debugPrint("allSetCanJoinCombat", canJoinCombat)
+local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
+    debugPrint("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    debugPrint("AI.pulseAction once", brawler.uuid, brawler.displayName)
                     AI.pulseAction(brawler)
                 end
             end
@@ -114,7 +115,12 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- All players should be set to have identical initiatives for this.
             -- Pause/True Pause should NOT do anything in this mode.
             -- Maybe just have players always go first?
-            if not State.Settings.TurnBasedSwarmMode then
+            if State.Settings.TurnBasedSwarmMode then
+                State.Session.Brawlers[level][entityUuid] = brawler
+                if Osi.IsPlayer(entityUuid) == 0 then
+                    Osi.PROC_SelfHealing_Disable(entityUuid)
+                end
+            else
                 if Osi.IsPlayer(entityUuid) == 0 then
                     -- brawler.originalCanJoinCombat = Osi.CanJoinCombat(entityUuid)
                     Osi.SetCanJoinCombat(entityUuid, 0)

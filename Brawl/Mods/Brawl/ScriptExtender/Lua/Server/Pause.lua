@@ -43,20 +43,20 @@ local function lock(entity)
     State.Session.FTBLockedIn[uuid] = true
 end
 
-local function lockAllPlayers()
+local function freezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            lock(Ext.Entity.Get(playerUuid))
+            Osi.Freeze(playerUuid)
         end
     end
 end
 
-local function unlockAllPlayers()
+local function unfreezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            unlock(Ext.Entity.Get(playerUuid))
+            Osi.Unfreeze(playerUuid)
         end
     end
 end
@@ -301,6 +301,6 @@ return {
     midActionLock = midActionLock,
     lock = lock,
     unlock = unlock,
-    lockAllPlayers = lockAllPlayers,
-    unlockAllPlayers = unlockAllPlayers,
+    freezeAllPlayers = freezeAllPlayers,
+    unfreezeAllPlayers = unfreezeAllPlayers,
 }
