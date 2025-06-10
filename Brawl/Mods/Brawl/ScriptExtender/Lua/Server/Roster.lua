@@ -52,7 +52,8 @@ local function checkAllPlayersFinishedTurns()
     if players then
         debugDump(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
-            if not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid))
+            if Utils.isAliveAndCanFight(playerUuid) and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
         end

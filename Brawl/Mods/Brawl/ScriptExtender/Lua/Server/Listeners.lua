@@ -113,37 +113,75 @@ local function checkPlayersRejoinCombat()
     end
 end
 
-local function startNextTurnBasedSwarmRound()
-    debugPrint("startNextTurnBasedSwarmRound")
+function forceRefreshTopbar()
+    local uuid = Osi.GetHostCharacter()
+    if uuid ~= nil then
+        local x, y, z = Osi.GetPosition(uuid)
+        local forceRefresherUuid = Osi.CreateAt("876c66a6-018c-48fe-8406-d90561d3db23", x, y, z, 0, 0, "")
+        debugPrint("Force refresher uuid", forceRefresherUuid)
+        local forceRefresherEntity = Ext.Entity.Get(forceRefresherUuid)
+        forceRefresherEntity.GameObjectVisual.Scale = 0.0
+        forceRefresherEntity:Replicate("GameObjectVisual")
+        Ext.Timer.WaitFor(1000, function ()
+            Osi.EnterCombat(forceRefresherUuid, uuid)
+            Ext.Timer.WaitFor(1000, function ()
+                Osi.RequestDelete(forceRefresherUuid)
+            end)
+        end)
+    end
+end
+
+local function startNextTurnBasedSwarmRound(combatGuid)
+    debugPrint("startNextTurnBasedSwarmRound", combatGuid)
     -- debugDump(State.Session.Brawlers)
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     if Utils.isToT() then
         if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
             debugPrint("********************Moving ToT forward********************")
             Mods.ToT.Scenario.ForwardCombat()
+            Ext.Timer.WaitFor(3000, function ()
+                print("delayed action")
+                Pause.unfreezeAllPlayers()
+                checkPlayersRejoinCombat()
+                Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
+                Roster.allSetCanJoinCombat(1)
+            end)
+        else
+            Pause.unfreezeAllPlayers()
+            checkPlayersRejoinCombat()
+            Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
+            Roster.allSetCanJoinCombat(1)
         end
+    else
+        Pause.unfreezeAllPlayers()
+        checkPlayersRejoinCombat()
+        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+        Roster.allSetCanJoinCombat(1)
     end
-    Pause.unfreezeAllPlayers()
-    checkPlayersRejoinCombat()
-    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-    Roster.allSetCanJoinCombat(1)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
+    if isToT() then
+        Constants.ENTER_COMBAT_RANGE = 100
+    else
+        Constants.ENTER_COMBAT_RANGE = 20
+    end
     if State.Settings.TurnBasedSwarmMode then
         if round == 1 then
-            startNextTurnBasedSwarmRound()
+            debugPrint("First round")
+            startNextTurnBasedSwarmRound(combatGuid)
         else
-            Ext.Timer.WaitFor(8000, startNextTurnBasedSwarmRound)
+            debugPrint("Later round")
+            Ext.Timer.WaitFor(8000, function ()
+                startNextTurnBasedSwarmRound(combatGuid)
+            end)
         end
     else
-        if not isToT() then
-            Constants.ENTER_COMBAT_RANGE = 20
-            onCombatStarted(combatGuid)
-        else
-            Constants.ENTER_COMBAT_RANGE = 100
+        if isToT() then
             startToTTimers()
+        else
+            onCombatStarted(combatGuid)
         end
     end
 end
@@ -365,7 +403,14 @@ local function onCharacterJoinedParty(character)
         if State.Session.Players and not State.Session.Players[uuid] then
             State.setupPlayer(uuid)
             State.setupPartyMembersHitpoints()
-            State.uncapPartyMembersMovementDistances()
+            if State.Settings.TurnBasedSwarmMode then
+                State.boostPlayerInitiative(uuid)
+                State.recapPartyMembersMovementDistances()
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
+            else
+                State.uncapPartyMembersMovementDistances()
+                -- Pause.checkTruePauseParty()
+            end
         end
         if State.areAnyPlayersBrawling() then
             Roster.addBrawler(uuid, true)
@@ -974,4 +1019,5 @@ return {
     onStarted = onStarted,
     stopListeners = stopListeners,
     startListeners = startListeners,
+    startNextTurnBasedSwarmRound = startNextTurnBasedSwarmRound,
 }

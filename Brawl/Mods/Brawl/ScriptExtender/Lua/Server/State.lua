@@ -858,14 +858,18 @@ local function removeBoostPlayerInitiatives()
     end
 end
 
+local function boostPlayerInitiative(playerUuid)
+    debugPrint("Boosting player initiative", playerUuid)
+    Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+end
+
 local function boostPlayerInitiatives()
     -- removeBoostPlayerInitiatives()
     local players = Session.Players
     -- Players always go first, should this be a setting instead or...?
     if players then
         for playerUuid, _ in pairs(players) do
-            debugPrint("Boosting player initiative", playerUuid)
-            Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+            boostPlayerInitiative(playerUuid)
         end
     end
 end
@@ -897,6 +901,7 @@ return {
     setIsControllingDirectly = setIsControllingDirectly,
     removeBoostPlayerInitiatives = removeBoostPlayerInitiatives,
     boostPlayerInitiatives = boostPlayerInitiatives,
+    boostPlayerInitiative = boostPlayerInitiative,
     Settings = Settings,
     Session = Session,
 }

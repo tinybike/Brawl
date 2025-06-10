@@ -682,14 +682,18 @@ end
 -- Enemies are pugnacious jerks and looking for a fight >:(
 local function checkForBrawlToJoin(brawler)
     local closestPlayerUuid, closestDistance = Osi.GetClosestAlivePlayer(brawler.uuid)
-    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < Constants.ENTER_COMBAT_RANGE then
+    local enterCombatRange = Constants.ENTER_COMBAT_RANGE
+    if State.Settings.TurnBasedSwarmMode then
+        enterCombatRange = 30
+    end
+    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < enterCombatRange then
         debugPrint(brawler.displayName, "Closest alive player to", brawler.uuid, "is", closestPlayerUuid, closestDistance)
         Roster.addBrawler(closestPlayerUuid)
         local players = State.Session.Players
         for playerUuid, player in pairs(players) do
             if playerUuid ~= closestPlayerUuid then
                 local distanceTo = Osi.GetDistanceTo(brawler.uuid, playerUuid)
-                if distanceTo < Constants.ENTER_COMBAT_RANGE then
+                if distanceTo < enterCombatRange then
                     Roster.addBrawler(playerUuid)
                 end
             end

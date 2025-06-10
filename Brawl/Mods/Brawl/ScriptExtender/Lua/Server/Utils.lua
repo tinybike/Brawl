@@ -26,7 +26,10 @@ local function dumpEntityToFile(entityUuid)
 end
 
 local function getDisplayName(entityUuid)
-    return Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+    local displayName = Osi.GetDisplayName(entityUuid)
+    if displayName ~= nil then
+        return Osi.ResolveTranslatedString(displayName)
+    end
 end
 
 local function isAliveAndCanFight(entityUuid)

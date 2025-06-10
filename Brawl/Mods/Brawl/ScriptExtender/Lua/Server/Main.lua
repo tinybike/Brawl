@@ -74,9 +74,7 @@ function startPulseAddNearby(uuid)
     debugPrint("startPulseAddNearby", uuid, getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] == nil then
         State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
-            -- if not isToT() then
-                AI.pulseAddNearby(uuid)
-            -- end
+            AI.pulseAddNearby(uuid)
         end, 7500)
     end
 end
