@@ -80,36 +80,41 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                local setCanJoinCombat = false
-                if not Utils.isToT() then
-                    setCanJoinCombat = true
-                elseif brawlerUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper then
-                    setCanJoinCombat = true
+                -- local setCanJoinCombat = false
+                -- if not Utils.isToT() then
+                --     setCanJoinCombat = true
+                -- elseif brawlerUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper then
+                --     setCanJoinCombat = true
+                -- end
+                -- if setCanJoinCombat then
+                Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
+                if canJoinCombat == 0 and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    swarmTurnComplete[brawlerUuid] = false
                 end
-                if setCanJoinCombat then
-                    Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                    if canJoinCombat == 0 and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        swarmTurnComplete[brawlerUuid] = false
-                    end
-                    if canJoinCombat == 0 and shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
-                        AI.pulseAction(brawler)
-                        Ext.Timer.WaitFor(5000, function ()
-                            print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
-                            AI.pulseAction(brawler, true)
-                            Ext.Timer.WaitFor(3000, function ()
-                                print(brawler.displayName, "all timers expired, finishing turn")
-                                swarmTurnComplete[brawlerUuid] = true
-                                _D(swarmTurnComplete)
-                                if isSwarmTurnComplete(swarmTurnComplete) then
-                                    swarmTurnComplete[brawlerUuid] = false
-                                    Listeners.startNextTurnBasedSwarmRound()
-                                end
-                            end)
-                        end)
-                    end
+                if canJoinCombat == 0 and shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
+                    AI.pulseAction(brawler)
+                    Ext.Timer.WaitFor(5000, function ()
+                        print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
+                        AI.pulseAction(brawler, true)
+                        -- Ext.Timer.WaitFor(3000, function ()
+                        --     print(brawler.displayName, "all timers expired, finishing turn")
+                        --     swarmTurnComplete[brawlerUuid] = true
+                        --     _D(swarmTurnComplete)
+                        --     if isSwarmTurnComplete(swarmTurnComplete) then
+                        --         swarmTurnComplete[brawlerUuid] = false
+                        --         -- Listeners.startNextTurnBasedSwarmRound()
+                        --     end
+                        -- end)
+                    end)
                 end
+                -- end
             end
+        end
+        if canJoinCombat == 0 then
+            Ext.Timer.WaitFor(10000, function ()
+                Listeners.startNextTurnBasedSwarmRound()
+            end)
         end
     end
 end
