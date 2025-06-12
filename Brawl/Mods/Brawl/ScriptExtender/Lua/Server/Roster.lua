@@ -75,7 +75,7 @@ end
 local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
     print("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    local swarmTurnComplete = {}
+    -- local swarmTurnComplete = {}
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
@@ -88,9 +88,9 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 -- end
                 -- if setCanJoinCombat then
                 Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                if canJoinCombat == 0 and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    swarmTurnComplete[brawlerUuid] = false
-                end
+                -- if canJoinCombat == 0 and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                --     swarmTurnComplete[brawlerUuid] = false
+                -- end
                 if canJoinCombat == 0 and shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                     AI.pulseAction(brawler)

@@ -20,12 +20,18 @@ local function checkPlayerRejoinCombat(playerUuid)
     if Utils.isAliveAndCanFight(playerUuid) then
         local playerBrawler = State.getBrawlerByUuid(playerUuid)
         if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
+            print("checkPlayerRejoinCombat", playerUuid)
             local level = Osi.GetRegion(playerUuid)
             local brawlersInLevel = State.Session.Brawlers[level]
             if brawlersInLevel then
                 for brawlerUuid, _ in pairs(brawlersInLevel) do
                     if Utils.isPugnacious(brawlerUuid, playerUuid) and Utils.isAliveAndCanFight(brawlerUuid) and Osi.GetDistanceTo(brawlerUuid, playerUuid) < 20 then
-                        Osi.EnterCombat(playerUuid, brawlerUuid)
+                        print("re-entering combat", playerUuid, brawlerUuid, getDisplayName(playerUuid), getDisplayName(brawlerUuid))
+                        -- NB: this doesn't seem to work in the invis-out-of-combat scenario -- why?
+                        -- Osi.EnterCombat(playerUuid, brawlerUuid)
+                        Osi.SetRelationTemporaryHostile(playerUuid, brawlerUuid)
+                        -- local entity = Ext.Entity.Get(playerUuid)
+                        -- entity.CombatParticipant.CombatHandle.CombatState.Participants
                         return true
                     end
                 end
@@ -91,6 +97,10 @@ local function startNextTurnBasedSwarmRound(combatGuid)
                 Ext.Timer.WaitFor(1000, function ()
                     print("ToT delay 2")
                     setEnemiesTurnComplete()
+                    Ext.Timer.WaitFor(1000, function ()
+                        print("ToT delay 3")
+                        setEnemiesTurnComplete()
+                    end)
                 end)
                 -- Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
             --     Roster.allSetCanJoinCombat(0, false)
@@ -106,6 +116,10 @@ local function startNextTurnBasedSwarmRound(combatGuid)
             Ext.Timer.WaitFor(1000, function ()
                 print("ToT delay 2")
                 setEnemiesTurnComplete()
+                Ext.Timer.WaitFor(1000, function ()
+                    print("ToT delay 3")
+                    setEnemiesTurnComplete()
+                end)
             end)
         end
     else

@@ -43,10 +43,36 @@ local function lock(entity)
     State.Session.FTBLockedIn[uuid] = true
 end
 
+local function freezePlayer(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not State.Session.FrozenPlayerResources[uuid] then
+        State.Session.FrozenPlayerResources[uuid] = {}
+        State.Session.FrozenPlayerResources[uuid].ActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount
+        State.Session.FrozenPlayerResources[uuid].BonusActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount
+        State.Session.FrozenPlayerResources[uuid].Movement = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+    end
+    entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 0
+    entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 0
+    entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = 0
+    entity:Replicate("ActionResources")
+end
+
+local function unfreezePlayer(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if State.Session.FrozenPlayerResources[uuid] then
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].ActionPoint
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].BonusActionPoint
+        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = State.Session.FrozenPlayerResources[uuid].Movement
+        State.Session.FrozenPlayerResources[uuid] = nil
+    end
+    entity:Replicate("ActionResources")
+end
+
 local function freezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
+            -- freezePlayer(playerUuid)
             Osi.Freeze(playerUuid)
         end
     end
@@ -56,6 +82,7 @@ local function unfreezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
+            -- unfreezePlayer(playerUuid)
             Osi.Unfreeze(playerUuid)
         end
     end
@@ -301,6 +328,8 @@ return {
     midActionLock = midActionLock,
     lock = lock,
     unlock = unlock,
+    freezePlayer = freezePlayer,
+    unfreezePlayer = unfreezePlayer,
     freezeAllPlayers = freezeAllPlayers,
     unfreezeAllPlayers = unfreezeAllPlayers,
 }
