@@ -120,7 +120,7 @@ local function deductCastedSpell(uuid, spellName)
                         end
                     end
                 end
-            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            elseif costType ~= nil and costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" then
                     if entity.ActionResources and entity.ActionResources.Resources then
                         local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
