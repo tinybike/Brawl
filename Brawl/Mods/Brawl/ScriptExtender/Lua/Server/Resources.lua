@@ -136,8 +136,7 @@ local function deductCastedSpell(uuid, spellName)
                 else
                     if not Constants.ACTION_RESOURCES[costType] then
                         print("unknown costType", costType)
-                    end
-                    if entity.ActionResources and entity.ActionResources.Resources and Constants.ACTION_RESOURCES[costType] then
+                    elseif entity.ActionResources and entity.ActionResources.Resources then
                         local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
                         if resources then
                             local resource = resources[1] -- NB: always index 1?

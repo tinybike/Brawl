@@ -574,7 +574,10 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
                     if not isPlayerOrAlly(brawler.uuid) then
                         weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile)
-                        State.Session.ActiveCombatGroups[brawler.combatGroupId] = true
+                        print(brawler.displayName, "Got offense weighted target", getDisplayName(potentialTargetUuid), weightedTargets[potentialTargetUuid])
+                        if brawler.combatGroupId then
+                            State.Session.ActiveCombatGroups[brawler.combatGroupId] = true
+                        end
                     else
                         if State.Settings.CompanionTactics == "Offense" then
                             weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile)

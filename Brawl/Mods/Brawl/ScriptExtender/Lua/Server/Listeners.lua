@@ -59,13 +59,15 @@ local function setEnemiesTurnComplete()
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 -- print(brawler.displayName, "check for turn")
                 if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    -- print(brawler.displayName, "Setting turn complete")
                     local entity = Ext.Entity.Get(brawlerUuid)
-                    entity.TurnBased.HadTurnInCombat = true
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity.TurnBased.TurnActionsCompleted = true
-                    -- entity.TurnBased.CanActInCombat = false
-                    entity:Replicate("TurnBased")
+                    if not entity.TurnBased.TurnActionsCompleted then
+                        print(brawler.displayName, "Setting turn complete")
+                        entity.TurnBased.HadTurnInCombat = true
+                        entity.TurnBased.RequestedEndTurn = true
+                        entity.TurnBased.TurnActionsCompleted = true
+                        -- entity.TurnBased.CanActInCombat = false
+                        entity:Replicate("TurnBased")
+                    end
                 end
             end
         end
