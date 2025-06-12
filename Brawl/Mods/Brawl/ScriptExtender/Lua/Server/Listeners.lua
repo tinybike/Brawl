@@ -14,16 +14,135 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
+-- TurnBasedSwarmRoundTracker = {}
+
+local function checkPlayerRejoinCombat(playerUuid)
+    if Utils.isAliveAndCanFight(playerUuid) then
+        local playerBrawler = State.getBrawlerByUuid(playerUuid)
+        if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
+            local level = Osi.GetRegion(playerUuid)
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, _ in pairs(brawlersInLevel) do
+                    if Utils.isPugnacious(brawlerUuid, playerUuid) and Utils.isAliveAndCanFight(brawlerUuid) and Osi.GetDistanceTo(brawlerUuid, playerUuid) < 20 then
+                        Osi.EnterCombat(playerUuid, brawlerUuid)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function checkPlayersRejoinCombat()
+    local players = State.Session.Players
+    if players then
+        for playerUuid, _ in pairs(players) do
+            checkPlayerRejoinCombat(playerUuid)
+        end
+    end
+end
+
+local function setEnemiesTurnComplete()
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                -- print(brawler.displayName, "check for turn")
+                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    print(brawler.displayName, "Setting turn complete")
+                    local entity = Ext.Entity.Get(brawlerUuid)
+                    entity.TurnBased.HadTurnInCombat = true
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity.TurnBased.TurnActionsCompleted = true
+                    -- entity.TurnBased.CanActInCombat = false
+                    entity:Replicate("TurnBased")
+                end
+            end
+        end
+    end
+end
+
+local function startNextTurnBasedSwarmRound(combatGuid)
+    print("startNextTurnBasedSwarmRound", combatGuid)
+    -- debugDump(State.Session.Brawlers)
+    -- local hostBrawler = State.getBrawlerByUuid(Osi.GetHostCharacter())
+    -- local tbsCombatGuid = hostBrawler.combatGuid
+    -- if TurnBasedSwarmRoundTracker[tbsCombatGuid] == nil then
+    --     TurnBasedSwarmRoundTracker[tbsCombatGuid] = 1
+    -- else
+    --     TurnBasedSwarmRoundTracker[tbsCombatGuid] = TurnBasedSwarmRoundTracker[tbsCombatGuid] + 1
+    -- end
+    -- print("starting round", TurnBasedSwarmRoundTracker[combatGuid])
+    -- State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+    if isToT() then
+        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+            print("********************Moving ToT forward********************")
+            Pause.unfreezeAllPlayers()
+            Roster.allSetCanJoinCombat(1)
+            checkPlayersRejoinCombat()
+            Mods.ToT.Scenario.ForwardCombat()
+            Ext.Timer.WaitFor(3000, function ()
+                print("ToT delay")
+                Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
+                -- Roster.allSetCanJoinCombat(1)
+                Ext.Timer.WaitFor(1000, function ()
+                    print("ToT delay 2")
+                    setEnemiesTurnComplete()
+                end)
+                -- Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
+            --     Roster.allSetCanJoinCombat(0, false)
+            --     Ext.Timer.WaitFor(3000, function ()
+            --         print("delayed 2")
+            --         Pause.unfreezeAllPlayers()
+            --         checkPlayersRejoinCombat()
+            --         Roster.allSetCanJoinCombat(1)
+            --     end)
+            end)
+        else
+            Pause.unfreezeAllPlayers()
+            Roster.allSetCanJoinCombat(1)
+            checkPlayersRejoinCombat()
+            Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
+            Ext.Timer.WaitFor(1000, function ()
+                print("ToT delay 2")
+                setEnemiesTurnComplete()
+            end)
+        end
+    else
+        Pause.unfreezeAllPlayers()
+        checkPlayersRejoinCombat()
+        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+        Roster.allSetCanJoinCombat(1)
+    end
+end
+
 local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
+    -- NB: clean this up / don't reassign "constant" values
+    if isToT() then
+        Constants.ENTER_COMBAT_RANGE = 100
+    else
+        Constants.ENTER_COMBAT_RANGE = 20
+    end
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if State.Settings.TurnBasedSwarmMode then
+        -- TurnBasedSwarmRoundTracker[combatGuid] = 0
+        if not isToT() then
+            startNextTurnBasedSwarmRound(combatGuid)
+        end
+        -- Ext.Timer.WaitFor(8000, function ()
+        --     startNextTurnBasedSwarmRound(combatGuid)
+        -- end)
+    end
     if level and not State.Settings.TurnBasedSwarmMode then
         if not isToT() then
-            Constants.ENTER_COMBAT_RANGE = 20
             startBrawlFizzler(level)
             Ext.Timer.WaitFor(500, function ()
                 Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
@@ -35,7 +154,6 @@ local function onCombatStarted(combatGuid)
                 end)
             end)
         else
-            Constants.ENTER_COMBAT_RANGE = 100
             startToTTimers()
         end
     end
@@ -85,98 +203,19 @@ local function onLevelGameplayStarted(level, _)
     onStarted(level)
 end
 
-local function checkPlayerRejoinCombat(playerUuid)
-    if Utils.isAliveAndCanFight(playerUuid) then
-        local playerBrawler = State.getBrawlerByUuid(playerUuid)
-        if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
-            local level = Osi.GetRegion(playerUuid)
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if brawlersInLevel then
-                for brawlerUuid, _ in pairs(brawlersInLevel) do
-                    if Utils.isPugnacious(brawlerUuid, playerUuid) and Utils.isAliveAndCanFight(brawlerUuid) and Osi.GetDistanceTo(brawlerUuid, playerUuid) < 20 then
-                        Osi.EnterCombat(playerUuid, brawlerUuid)
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function checkPlayersRejoinCombat()
-    local players = State.Session.Players
-    if players then
-        for playerUuid, _ in pairs(players) do
-            checkPlayerRejoinCombat(playerUuid)
-        end
-    end
-end
-
-function forceRefreshTopbar()
-    local uuid = Osi.GetHostCharacter()
-    if uuid ~= nil then
-        local x, y, z = Osi.GetPosition(uuid)
-        local forceRefresherUuid = Osi.CreateAt("876c66a6-018c-48fe-8406-d90561d3db23", x, y, z, 0, 0, "")
-        debugPrint("Force refresher uuid", forceRefresherUuid)
-        local forceRefresherEntity = Ext.Entity.Get(forceRefresherUuid)
-        forceRefresherEntity.GameObjectVisual.Scale = 0.0
-        forceRefresherEntity:Replicate("GameObjectVisual")
-        Ext.Timer.WaitFor(1000, function ()
-            Osi.EnterCombat(forceRefresherUuid, uuid)
-            Ext.Timer.WaitFor(1000, function ()
-                Osi.RequestDelete(forceRefresherUuid)
-            end)
-        end)
-    end
-end
-
-local function startNextTurnBasedSwarmRound(combatGuid)
-    debugPrint("startNextTurnBasedSwarmRound", combatGuid)
-    -- debugDump(State.Session.Brawlers)
-    State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-    if Utils.isToT() then
-        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-            debugPrint("********************Moving ToT forward********************")
-            Mods.ToT.Scenario.ForwardCombat()
-            Ext.Timer.WaitFor(3000, function ()
-                print("delayed action")
-                Pause.unfreezeAllPlayers()
-                checkPlayersRejoinCombat()
-                Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
-                Roster.allSetCanJoinCombat(1)
-            end)
-        else
-            Pause.unfreezeAllPlayers()
-            checkPlayersRejoinCombat()
-            Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
-            Roster.allSetCanJoinCombat(1)
-        end
-    else
-        Pause.unfreezeAllPlayers()
-        checkPlayersRejoinCombat()
-        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-        Roster.allSetCanJoinCombat(1)
-    end
-end
-
 local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
-    if isToT() then
-        Constants.ENTER_COMBAT_RANGE = 100
-    else
-        Constants.ENTER_COMBAT_RANGE = 20
-    end
+    print("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
-        if round == 1 then
-            debugPrint("First round")
-            startNextTurnBasedSwarmRound(combatGuid)
-        else
-            debugPrint("Later round")
-            Ext.Timer.WaitFor(8000, function ()
-                startNextTurnBasedSwarmRound(combatGuid)
-            end)
-        end
+        checkPlayersRejoinCombat()
+        -- if round == 1 then
+        --     print("First round")
+        --     startNextTurnBasedSwarmRound(combatGuid)
+        -- else
+        --     print("Later round", round)
+        --     Ext.Timer.WaitFor(8000, function ()
+        --         startNextTurnBasedSwarmRound(combatGuid)
+        --     end)
+        -- end
     else
         if isToT() then
             startToTTimers()
@@ -187,7 +226,7 @@ local function onCombatRoundStarted(combatGuid, round)
 end
 
 local function onCombatEnded(combatGuid)
-    debugPrint("CombatEnded", combatGuid)
+    print("CombatEnded", combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
@@ -1020,4 +1059,6 @@ return {
     stopListeners = stopListeners,
     startListeners = startListeners,
     startNextTurnBasedSwarmRound = startNextTurnBasedSwarmRound,
+    checkPlayersRejoinCombat = checkPlayersRejoinCombat,
+    setEnemiesTurnComplete = setEnemiesTurnComplete,
 }
