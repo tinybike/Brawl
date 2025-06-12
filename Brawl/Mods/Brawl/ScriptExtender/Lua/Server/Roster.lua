@@ -94,7 +94,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 if canJoinCombat == 0 and shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                     AI.pulseAction(brawler)
-                    Ext.Timer.WaitFor(5000, function ()
+                    Ext.Timer.WaitFor(8000, function ()
                         print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                         AI.pulseAction(brawler, true)
                         -- Ext.Timer.WaitFor(3000, function ()
@@ -112,7 +112,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
             end
         end
         if canJoinCombat == 0 then
-            Ext.Timer.WaitFor(10000, function ()
+            Ext.Timer.WaitFor(12000, function ()
                 Listeners.startNextTurnBasedSwarmRound()
             end)
         end

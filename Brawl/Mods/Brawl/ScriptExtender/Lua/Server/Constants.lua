@@ -35,6 +35,7 @@ Constants.ACTION_RESOURCES = {
     DeflectMissiles_Charge = "2b8021f4-99ac-42d4-87ce-96a7c5505aee",
     SneakAttack_Charge = "1531b6ec-4ba8-4b0d-8411-422d8f51855f",
     Movement = "d6b2369d-84f0-4ca4-a3a7-62d2d192a185",
+    SuperiorityDie = "f82e9e53-1391-4555-95b3-ad52c3b8e259",
 }
 Constants.AUNTIE_ETHEL_UUID = "c457d064-83fb-4ec6-b74d-1f30dfafd12d"
 Constants.TUT_ZHALK_UUID = "ed103005-fd71-457d-ae6c-39654bbd8f2e"
