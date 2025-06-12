@@ -30,8 +30,9 @@ local function checkPlayerRejoinCombat(playerUuid)
                         -- NB: this doesn't seem to work in the invis-out-of-combat scenario -- why?
                         -- Osi.EnterCombat(playerUuid, brawlerUuid)
                         Osi.SetRelationTemporaryHostile(playerUuid, brawlerUuid)
-                        -- local entity = Ext.Entity.Get(playerUuid)
-                        -- entity.CombatParticipant.CombatHandle.CombatState.Participants
+                        -- NB: alternative method from Focus
+                        -- local combat = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")[1]
+                        -- combat.ServerEnterRequest.EnterRequests[_C()] = true
                         return true
                     end
                 end
@@ -249,7 +250,7 @@ local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid then
+    if level and entityUuid and not State.Settings.TurnBasedSwarmMode then
         local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
         if isPlayer then
             local isHostCharacter = entityUuid == Osi.GetHostCharacter()
@@ -305,7 +306,7 @@ local function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
+    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] and not State.Settings.TurnBasedSwarmMode then
         if State.Session.Players[entityUuid].isFreshSummon then
             State.Session.Players[entityUuid].isFreshSummon = false
         end
@@ -700,7 +701,7 @@ end
 local function onDialogEnded(dialog, dialogInstanceId)
     debugPrint("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
+    if level and not State.Settings.TurnBasedSwarmMode then
         startPulseReposition(level)
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then

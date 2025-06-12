@@ -49,12 +49,13 @@ local function freezePlayer(uuid)
         State.Session.FrozenPlayerResources[uuid] = {}
         State.Session.FrozenPlayerResources[uuid].ActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount
         State.Session.FrozenPlayerResources[uuid].BonusActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount
-        State.Session.FrozenPlayerResources[uuid].Movement = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+        State.Session.FrozenPlayerResources[uuid].CanMoveFlags = entity.CanMove.Flags
     end
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 0
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 0
-    entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = 0
+    entity.CanMove.Flags = {}
     entity:Replicate("ActionResources")
+    entity:Replicate("CanMove")
 end
 
 local function unfreezePlayer(uuid)
@@ -62,18 +63,22 @@ local function unfreezePlayer(uuid)
     if State.Session.FrozenPlayerResources[uuid] then
         entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].ActionPoint
         entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].BonusActionPoint
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = State.Session.FrozenPlayerResources[uuid].Movement
+        entity.CanMove.Flags = State.Session.FrozenPlayerResources[uuid].CanMoveFlags
         State.Session.FrozenPlayerResources[uuid] = nil
     end
     entity:Replicate("ActionResources")
+    entity:Replicate("CanMove")
 end
 
 local function freezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            -- freezePlayer(playerUuid)
-            Osi.Freeze(playerUuid)
+            Osi.SetCanJoinCombat(playerUuid, 0)
+            Ext.Timer.WaitFor(200, function ()
+                freezePlayer(playerUuid)
+            end)
+            -- Osi.Freeze(playerUuid)
         end
     end
 end
@@ -82,8 +87,11 @@ local function unfreezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            -- unfreezePlayer(playerUuid)
-            Osi.Unfreeze(playerUuid)
+            Osi.SetCanJoinCombat(playerUuid, 1)
+            Ext.Timer.WaitFor(200, function ()
+                unfreezePlayer(playerUuid)
+            end)
+            -- Osi.Unfreeze(playerUuid)
         end
     end
 end

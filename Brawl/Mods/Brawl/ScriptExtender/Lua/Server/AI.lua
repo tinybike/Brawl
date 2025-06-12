@@ -703,6 +703,7 @@ local function checkForBrawlToJoin(brawler)
         --     print("check for brawl to join: start fizz")
         --     startBrawlFizzler(level)
         -- end
+        print("check for", brawler.uuid, brawler.displayName)
         startPulseAction(brawler)
     end
 end
@@ -800,7 +801,7 @@ local function pulseReposition(level)
                         else
                             if not brawler.isInBrawl then
                                 if Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
-                                    debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
+                                    print(brawler.displayName, "Not in brawl, starting pulse action for")
                                     startPulseAction(brawler)
                                 end
                             elseif isBrawlingWithValidTarget(brawler) and Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
