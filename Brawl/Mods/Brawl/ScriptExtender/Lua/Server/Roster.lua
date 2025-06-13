@@ -104,19 +104,19 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                         AI.pulseAction(brawler)
                         -- NB: has bonus action available check first?
-                        -- Ext.Timer.WaitFor(9000, function ()
-                        --     print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
-                        --     AI.pulseAction(brawler, true)
-                        --     -- Ext.Timer.WaitFor(3000, function ()
-                        --     --     print(brawler.displayName, "all timers expired, finishing turn")
-                        --     --     swarmTurnComplete[brawlerUuid] = true
-                        --     --     _D(swarmTurnComplete)
-                        --     --     if isSwarmTurnComplete(swarmTurnComplete) then
-                        --     --         swarmTurnComplete[brawlerUuid] = false
-                        --     --         -- Listeners.startNextTurnBasedSwarmRound()
-                        --     --     end
-                        --     -- end)
-                        -- end)
+                        Ext.Timer.WaitFor(8000, function ()
+                            print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
+                            AI.pulseAction(brawler, true)
+                            -- Ext.Timer.WaitFor(3000, function ()
+                            --     print(brawler.displayName, "all timers expired, finishing turn")
+                            --     swarmTurnComplete[brawlerUuid] = true
+                            --     _D(swarmTurnComplete)
+                            --     if isSwarmTurnComplete(swarmTurnComplete) then
+                            --         swarmTurnComplete[brawlerUuid] = false
+                            --         -- Listeners.startNextTurnBasedSwarmRound()
+                            --     end
+                            -- end)
+                        end)
                     end
                 end
                 -- end
@@ -176,9 +176,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if Osi.IsPlayer(entityUuid) == 0 then
                     Osi.PROC_SelfHealing_Disable(entityUuid)
-                    if Utils.isToT() then
-                        State.Session.IsAttackingOrBeingAttackedByPlayer[entityUuid] = true
-                    end
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then

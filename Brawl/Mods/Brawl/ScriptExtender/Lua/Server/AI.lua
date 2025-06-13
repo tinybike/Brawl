@@ -550,6 +550,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
+        print(brawler.displayName, "checking potential target", getDisplayName(potentialTargetUuid), potentialTargetUuid)
         if brawler.uuid == potentialTargetUuid then
             local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
             if State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
@@ -566,9 +567,11 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         elseif isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
-            if (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+            print(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
+            if Utils.isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                 local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
                 local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+                print(brawler.displayName, "isHostile?", isHostile)
                 if isHostile or State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
