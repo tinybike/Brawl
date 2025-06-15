@@ -52,7 +52,7 @@ local function checkAllPlayersFinishedTurns()
         debugDump(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
             local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
-            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
+            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
             if Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
@@ -68,30 +68,28 @@ local function isSwarmTurnComplete(swarmTurnComplete)
             return false
         end
     end
-    print("swarm turn complete!")
+    debugPrint("swarm turn complete!")
     return true
 end
 
 local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
-    print("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
+    debugPrint("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
     local hostCharacterUuid = Osi.GetHostCharacter()
     local level = Osi.GetRegion(hostCharacterUuid)
     -- local swarmTurnComplete = {}
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
-            local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                brawlerIndex = brawlerIndex + 1
                 local setCanJoinCombat = true
                 if canJoinCombat == 0 then
                     if Utils.isToT() and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
-                        print("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
+                        debugPrint("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
                         Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
                         setCanJoinCombat = false
                     end
                     if State.Session.Players[brawlerUuid] then
-                        print("player, staying in combat", brawlerUuid, brawler.displayName, Osi.CanJoinCombat(brawlerUuid))
+                        debugPrint("player, staying in combat", brawlerUuid, brawler.displayName, Osi.CanJoinCombat(brawlerUuid))
                         setCanJoinCombat = false
                     end
                 end
@@ -101,14 +99,14 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                     --     swarmTurnComplete[brawlerUuid] = false
                     -- end
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        print(brawler.displayName, "AI.pulseAction once", brawler.uuid)
+                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                         AI.pulseAction(brawler)
                         -- NB: has bonus action available check first?
                         Ext.Timer.WaitFor(8000, function ()
-                            print(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
+                            debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                             AI.pulseAction(brawler, true)
                             -- Ext.Timer.WaitFor(3000, function ()
-                            --     print(brawler.displayName, "all timers expired, finishing turn")
+                            --     debugPrint(brawler.displayName, "all timers expired, finishing turn")
                             --     swarmTurnComplete[brawlerUuid] = true
                             --     _D(swarmTurnComplete)
                             --     if isSwarmTurnComplete(swarmTurnComplete) then
@@ -124,7 +122,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
         end
         -- if canJoinCombat == 0 then
         --     Ext.Timer.WaitFor(12000, function ()
-        --         print("Time's up!")
+        --         debugPrint("Time's up!")
         --         Listeners.startNextTurnBasedSwarmRound()
         --     end)
         -- end
@@ -159,7 +157,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
-            print(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
+            debugPrint(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)

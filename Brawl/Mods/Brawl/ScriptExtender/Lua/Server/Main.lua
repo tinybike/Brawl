@@ -36,7 +36,7 @@ function startPulseAction(brawler)
     end
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
-        print("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
+        debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAction(brawler)
         end, brawler.actionInterval)
@@ -215,7 +215,7 @@ end
 
 local function startSession()
     if not State or not State.Settings then
-        print("State not loaded, retrying...")
+        debugPrint("State not loaded, retrying...")
         return Ext.Timer.WaitFor(250, startSession)
     end
     if State.Settings.ModEnabled then
