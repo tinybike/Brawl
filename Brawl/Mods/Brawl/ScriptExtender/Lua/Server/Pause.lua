@@ -79,7 +79,6 @@ local function freezeAllPlayers()
             Ext.Timer.WaitFor(200, function ()
                 freezePlayer(playerUuid)
             end)
-            -- Osi.Freeze(playerUuid)
         end
     end
 end
@@ -92,7 +91,6 @@ local function unfreezeAllPlayers()
             Ext.Timer.WaitFor(200, function ()
                 unfreezePlayer(playerUuid)
             end)
-            -- Osi.Unfreeze(playerUuid)
         end
     end
 end
