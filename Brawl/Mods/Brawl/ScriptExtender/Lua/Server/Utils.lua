@@ -181,6 +181,10 @@ local function isVisible(entityUuid)
     return Osi.IsInvisible(entityUuid) == 0 and Osi.HasActiveStatus(entityUuid, "SNEAKING") == 0
 end
 
+local function isMeleeArchetype(archetype)
+    return archetype:find("melee") ~= nil or archetype:find("beast") ~= nil
+end
+
 local function isHealerArchetype(archetype)
     return archetype:find("healer") ~= nil
 end
@@ -264,17 +268,40 @@ local function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
-local function hasLoseControlStatus(uuid)
-    -- NB: not yet in SE release branch! (thanks Focus)
+-- Thanks Focus
+function hasLoseControlStatus(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    -- NB: not yet in SE release branch
     -- if Ext.Entity.Get(uuid).StatusLoseControl ~= nil then
     --     return true
     -- end
-    for _, loseControlStatus in ipairs(Constants.LOSE_CONTROL_STATUSES) do
-        if Osi.HasActiveStatus(uuid, loseControlStatus) == 1 then
-            return true
+    if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+            local stats = Ext.Stats.Get(status.StatusId, nil, false)
+            if stats ~= nil then
+                for _, flag in ipairs(stats.StatusPropertyFlags) do
+                    if flag == "LoseControl" or flag == "LoseControlFriendly" then
+                        return true
+                    end
+                end
+            end
         end
     end
     return false
+end
+
+local function timeIt(fn, ...)
+    local t0 = Ext.Utils.MonotonicTime()
+    fn(...)
+    return Ext.Utils.MonotonicTime() - t0
+end
+
+local function averageTime(fn, n, ...)
+    local sum = 0
+    for i = 1, n do
+        sum = sum + timeIt(fn, ...)
+    end
+    return sum / n
 end
 
 return {
@@ -297,6 +324,7 @@ return {
     isProjectileSpell = isProjectileSpell,
     isVisible = isVisible,
     isHealerArchetype = isHealerArchetype,
+    isMeleeArchetype = isMeleeArchetype,
     isBrawlingWithValidTarget = isBrawlingWithValidTarget,
     getNearby = getNearby,
     isOnSameLevel = isOnSameLevel,
@@ -310,4 +338,5 @@ return {
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
     hasLoseControlStatus = hasLoseControlStatus,
+    averageTime = averageTime,
 }

@@ -65,18 +65,38 @@ local function getRemainingMovement(entity)
     end
 end
 
-local function findPathToPosition(playerUuid, position, callback)
-    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+local function findPathToTargetUuid(uuid, targetUuid)
+    local x, y, z = Osi.GetPosition(targetUuid)
+    local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 2.0, uuid, 1)
+    if validX == nil or validY == nil or validZ == nil then
+        return false
+    end
+    local validPosition = {validX, validY, validZ}
+    local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
+    local goalFound = Ext.Level.FindPath(path)
+    debugPrint("Got valid position near target", uuid, targetUuid, validX, validY, validZ, goalFound, path.GoalFound)
+    return goalFound
+end
+
+local function findPathToPosition(uuid, position, callback)
+    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, uuid, 1)
     if validX == nil or validY == nil or validZ == nil then
         return callback("Can't get there", nil)
     end
     local validPosition = {validX, validY, validZ}
-    Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
-        if not path or not path.GoalFound then
-            return callback("Can't get there", nil)
-        end
-        callback(nil, validPosition)
-    end)
+    debugPrint("Got valid position", uuid, validX, validY, validZ)
+    local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
+    local goalFound = Ext.Level.FindPath(path)
+    if not goalFound then
+        return callback("Can't get there", nil)
+    end
+    callback(nil, validPosition)
+    -- Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), validPosition, function (path)
+    --     if not path or not path.GoalFound then
+    --         return callback("Can't get there", nil)
+    --     end
+    --     callback(nil, validPosition)
+    -- end)
 end
 
 local function moveToTargetUuid(uuid, targetUuid, override)
@@ -221,6 +241,7 @@ return {
     getRemainingMovement = getRemainingMovement,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
+    findPathToTargetUuid = findPathToTargetUuid,
     findPathToPosition = findPathToPosition,
     moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,

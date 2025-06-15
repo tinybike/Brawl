@@ -79,6 +79,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
+            local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 local setCanJoinCombat = true
                 if canJoinCombat == 0 then
@@ -95,13 +96,16 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 if setCanJoinCombat then
                     Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid)
-                        AI.pulseAction(brawler)
-                        -- NB: has bonus action available check first?
-                        Ext.Timer.WaitFor(8000, function ()
-                            debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
-                            AI.pulseAction(brawler, true)
+                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex, brawlerIndex*10)
+                        Ext.Timer.WaitFor(brawlerIndex*10, function ()
+                            AI.pulseAction(brawler)
+                            -- NB: has bonus action available check first?
+                            Ext.Timer.WaitFor(8000, function ()
+                                debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
+                                AI.pulseAction(brawler, true)
+                            end)
                         end)
+                        brawlerIndex = brawlerIndex + 1
                     end
                 end
             end

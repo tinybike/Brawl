@@ -174,15 +174,11 @@ Constants.ARCHETYPE_WEIGHTS.beast = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.goblin_melee = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.goblin_ranged = Constants.ARCHETYPE_WEIGHTS.ranged
 Constants.ARCHETYPE_WEIGHTS.mage = Constants.ARCHETYPE_WEIGHTS.mage
-Constants.ARCHETYPE_WEIGHTS.koboldinventor_drunk = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.ranged_stupid = Constants.ARCHETYPE_WEIGHTS.ranged
 Constants.ARCHETYPE_WEIGHTS.melee_magic_smart = Constants.ARCHETYPE_WEIGHTS.melee_magic
-Constants.ARCHETYPE_WEIGHTS.merregon = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.act3_LOW_ghost_nurse = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.ogre_melee = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.beholder = Constants.ARCHETYPE_WEIGHTS.melee_magic
-Constants.ARCHETYPE_WEIGHTS.minotaur = Constants.ARCHETYPE_WEIGHTS.melee
-Constants.ARCHETYPE_WEIGHTS.steel_watcher_biped = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.DAMAGE_TYPES = {
     Slashing = 2,
     Piercing = 3,
@@ -219,39 +215,5 @@ Constants.SAFE_AOE_SPELLS = {
     "Target_KiResonation_Blast",
 }
 Constants.RAGE_BOOSTS = {"RAGE", "RAGE_FRENZY", "RAGE_GIANT"}
-Constants.LOSE_CONTROL_STATUSES = {
-    "GUARDIAN_OF_FAITH_AURA",
-    "LOW_SORCEROUSSUNDRIES_MINORILLUSION",
-    "MINOR_ILLUSION",
-    "HOUNDOFILLOMEN_TECHNICAL",
-    "CREATEILLUSION_DISPLACERBEAST",
-    "SHA_TRIALS_TELEPORT_TECHNICAL",
-    "DOMINATE_BEAST_PLAYER",
-    "SWARM_BEAR",
-    "SWARM_WAKETHEDEAD_GHOUL",
-    "TAUNTED",
-    "SWARM_RAVEN",
-    "HAG_INSANITYS_KISS",
-    "HAG_MASK_CONTROLLED",
-    "ORI_KARLACH_ENRAGE",
-    "COMPELLED_DUEL",
-    "MADNESS",
-    "TIMMASK_SPORES",
-    "ZOMBIE_DECAY",
-    "LOW_FATHERCARRION_FATHEROFTHEDEAD",
-    "COMMAND_APPROACH",
-    "MAG_DEATH_DO_SHADOW_POSSESION",
-    "DOMINATE_PERSON",
-    "PLANAR_BINDING",
-    "ACCURSED_SPECTER",
-    "CHAMPION_CHALLENGE",
-    "MIND_MASTERY",
-    "DOMINATE_BEAST",
-    "UND_NERE_COERCION",
-    "SCL_SHADOW_CURSE_UNDEAD",
-    "LURING_SONG",
-    "SCL_SHADOW_CURSE_UNDEAD_NEW",
-    "SHA_NECROMANCER_FLESH_BERSERK",
-}
 
 return Constants

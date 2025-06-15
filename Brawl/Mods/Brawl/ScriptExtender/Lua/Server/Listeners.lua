@@ -100,19 +100,12 @@ end
 
 local function startNextTurnBasedSwarmRound(combatGuid)
     debugPrint("startNextTurnBasedSwarmRound", combatGuid)
-    if isToT() then
-        Pause.unfreezeAllPlayers()
-        Roster.allSetCanJoinCombat(1)
-        checkPlayersRejoinCombat()
-        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), 150, combatGuid)
-        checkEnemiesJoinCombat()
-    else
-        Pause.unfreezeAllPlayers()
-        Roster.allSetCanJoinCombat(1)
-        checkPlayersRejoinCombat()
-        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-        checkEnemiesJoinCombat()
-    end
+    local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
+    Pause.unfreezeAllPlayers()
+    Roster.allSetCanJoinCombat(1)
+    checkPlayersRejoinCombat()
+    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), nearbyRadius, combatGuid)
+    checkEnemiesJoinCombat()
 end
 
 local function onCombatStarted(combatGuid)

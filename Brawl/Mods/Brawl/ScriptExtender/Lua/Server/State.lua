@@ -468,7 +468,7 @@ local function getArchetype(uuid)
         archetype = Osi.GetActiveArchetype(uuid)
     end
     if not Constants.ARCHETYPE_WEIGHTS[archetype] then
-        if archetype == "base" then
+        if archetype == nil or archetype == "base" then
             archetype = "melee"
         elseif archetype:find("ranged") ~= nil then
             archetype = "ranged"
@@ -483,7 +483,6 @@ local function getArchetype(uuid)
         elseif archetype:find("monk") ~= nil then
             archetype = "monk"
         else
-            debugPrint("Archetype missing from the list, using melee for now", archetype)
             archetype = "melee"
         end
     end
