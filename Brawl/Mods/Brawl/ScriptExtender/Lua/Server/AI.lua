@@ -36,7 +36,8 @@ local function getSpellTypeWeight(spellType)
     return 0
 end
 
-local function getResistanceWeight(spell, entity)
+local function getResistanceWeight(spell, uuid)
+    local entity = Ext.Entity.Get(uuid)
     if entity and entity.Resistances and entity.Resistances.Resistances then
         local resistances = entity.Resistances.Resistances
         if spell.damageType ~= "None" and resistances[Constants.DAMAGE_TYPES[spell.damageType]] and resistances[Constants.DAMAGE_TYPES[spell.damageType]][1] then
@@ -65,12 +66,12 @@ local function getHighestWeightSpell(weightedSpells)
             selectedSpell = spellName
         end
     end
-    -- print("selected spell", selectedSpell, maxWeight)
+    -- debugPrint("selected spell", selectedSpell, maxWeight)
     return selectedSpell
 end
 
 -- should account for damage range
-local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks)
+local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks, targetUuid)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
@@ -146,15 +147,18 @@ local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spe
     end
     -- If this spell has a damage type, favor vulnerable enemies
     -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
-    -- weight = weight + getResistanceWeight(spell, targetEntity)
+    if State.Settings.TurnBasedSwarmMode and spell.damageType ~= nil and spell.damageType ~= "None" then
+        local resistanceWeight = getResistanceWeight(spell, targetUuid)
+        print("got resistance weight", resistanceWeight, spell.damageType)
+        weight = weight + resistanceWeight
+    end
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
     -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
-    -- if not State.Settings.HogwildMode then
-    --     weight = weight - spell.level
-    -- end
     if State.Settings.HogwildMode then
         weight = weight + spell.level*2
+    else
+        weight = weight - spell.level*0.3
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -277,7 +281,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, dist
             end
             if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
                 debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -306,7 +310,7 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTar
                 end
             end
             if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks)
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -550,7 +554,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        print(brawler.displayName, "checking potential target", getDisplayName(potentialTargetUuid), potentialTargetUuid)
+        debugPrint(brawler.displayName, "checking potential target", getDisplayName(potentialTargetUuid), potentialTargetUuid)
         if brawler.uuid == potentialTargetUuid then
             local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
             if State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
@@ -567,11 +571,11 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         elseif isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
             local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
             local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
-            print(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
+            debugPrint(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
             if Utils.isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                 local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
                 local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
-                print(brawler.displayName, "isHostile?", isHostile)
+                debugPrint(brawler.displayName, "isHostile?", isHostile)
                 if isHostile or State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
@@ -591,10 +595,12 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                         end
                     end
                     -- NB: this is too intense of a request and will crash the game :/
-                    -- local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
-                    -- if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
-                    --     weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid] * AI_TARGET_CONCENTRATION_WEIGHT_MULTIPLIER
-                    -- end
+                    if State.Settings.TurnBasedSwarmMode then
+                        local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
+                        if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                            weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]/Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                        end
+                    end
                 end
             end
         end

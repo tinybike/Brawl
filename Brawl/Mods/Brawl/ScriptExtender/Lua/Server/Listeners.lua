@@ -330,7 +330,6 @@ local function onLeftForceTurnBased(entityGuid)
         end
         local isHostCharacter = entityUuid == Osi.GetHostCharacter()
         if isHostCharacter then
-            debugPrint("Left FTB startPulseRepo")
             startPulseReposition(level)
         end
         -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
@@ -380,8 +379,6 @@ local function onTurnStarted(entityGuid)
     end
 end
 
--- NB: end turns for enemies onTurnStarted instead of everyone?
--- NB: pull just the enemies (except the orb) out of combat but NOT the players -- preserve the round count?
 local function onTurnEnded(entityGuid)
     -- NB: how's this work for the "environmental turn"?
     if State.Settings.TurnBasedSwarmMode and Osi.IsPartyMember(entityGuid, 1) == 1 then
@@ -391,12 +388,10 @@ local function onTurnEnded(entityGuid)
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
             local allPlayersFinishedTurns = Roster.checkAllPlayersFinishedTurns()
             if allPlayersFinishedTurns then
-                debugPrint("All players finished turns")
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
                 Roster.allSetCanJoinCombat(0, true)
                 Pause.freezeAllPlayers()
                 Ext.Timer.WaitFor(10000, function ()
-                    debugPrint("Time's up!")
                     Listeners.startNextTurnBasedSwarmRound()
                 end)
             end

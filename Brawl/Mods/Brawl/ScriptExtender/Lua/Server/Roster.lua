@@ -76,7 +76,6 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
     debugPrint("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
     local hostCharacterUuid = Osi.GetHostCharacter()
     local level = Osi.GetRegion(hostCharacterUuid)
-    -- local swarmTurnComplete = {}
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
@@ -95,9 +94,6 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 end
                 if setCanJoinCombat then
                     Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                    -- if canJoinCombat == 0 and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    --     swarmTurnComplete[brawlerUuid] = false
-                    -- end
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                         debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid)
                         AI.pulseAction(brawler)
@@ -105,27 +101,11 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         Ext.Timer.WaitFor(8000, function ()
                             debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                             AI.pulseAction(brawler, true)
-                            -- Ext.Timer.WaitFor(3000, function ()
-                            --     debugPrint(brawler.displayName, "all timers expired, finishing turn")
-                            --     swarmTurnComplete[brawlerUuid] = true
-                            --     _D(swarmTurnComplete)
-                            --     if isSwarmTurnComplete(swarmTurnComplete) then
-                            --         swarmTurnComplete[brawlerUuid] = false
-                            --         -- Listeners.startNextTurnBasedSwarmRound()
-                            --     end
-                            -- end)
                         end)
                     end
                 end
-                -- end
             end
         end
-        -- if canJoinCombat == 0 then
-        --     Ext.Timer.WaitFor(12000, function ()
-        --         debugPrint("Time's up!")
-        --         Listeners.startNextTurnBasedSwarmRound()
-        --     end)
-        -- end
     end
 end
 
