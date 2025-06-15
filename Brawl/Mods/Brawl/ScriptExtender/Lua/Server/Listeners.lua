@@ -395,7 +395,6 @@ local function onTurnEnded(entityGuid)
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
                 Roster.allSetCanJoinCombat(0, true)
                 Pause.freezeAllPlayers()
-                -- NB: this is causing the round overcounts somehow
                 Ext.Timer.WaitFor(10000, function ()
                     print("Time's up!")
                     Listeners.startNextTurnBasedSwarmRound()

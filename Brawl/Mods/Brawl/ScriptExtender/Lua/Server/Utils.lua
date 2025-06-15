@@ -264,6 +264,19 @@ local function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
+local function hasLoseControlStatus(uuid)
+    -- NB: not yet in SE release branch! (thanks Focus)
+    -- if Ext.Entity.Get(uuid).StatusLoseControl ~= nil then
+    --     return true
+    -- end
+    for _, loseControlStatus in ipairs(Constants.LOSE_CONTROL_STATUSES) do
+        if Osi.HasActiveStatus(uuid, loseControlStatus) == 1 then
+            return true
+        end
+    end
+    return false
+end
+
 return {
     debugPrint = debugPrint,
     debugDump = debugDump,
@@ -296,4 +309,5 @@ return {
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
+    hasLoseControlStatus = hasLoseControlStatus,
 }

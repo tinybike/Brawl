@@ -46,14 +46,14 @@ end
 --     return nil
 -- end
 
--- NB: need to account for summons here too! adjust their initiatives etc
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
         debugDump(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
-            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid))
-            if Utils.isAliveAndCanFight(playerUuid) and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+            local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
+            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
+            if Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
         end
