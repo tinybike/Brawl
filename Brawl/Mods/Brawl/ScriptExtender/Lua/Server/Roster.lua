@@ -149,11 +149,13 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- Players must be LOCKED during enemy turns to avoid RT combat!
             -- All players should be set to have identical initiatives for this.
             -- Pause/True Pause should NOT do anything in this mode.
-            -- Maybe just have players always go first?
             if State.Settings.TurnBasedSwarmMode then
                 State.Session.Brawlers[level][entityUuid] = brawler
-                if Osi.IsPlayer(entityUuid) == 0 then
+                if Osi.IsPartyMember(entityUuid, 1) == 0 then
                     Osi.PROC_SelfHealing_Disable(entityUuid)
+                elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
+                    debugPrint("player brawler added, set turn ended", entityUuid)
+                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then

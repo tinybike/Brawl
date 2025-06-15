@@ -17,6 +17,10 @@ local isToT = Utils.isToT
 local function checkPlayerRejoinCombat(playerUuid)
     if Utils.isAliveAndCanFight(playerUuid) then
         local playerBrawler = State.getBrawlerByUuid(playerUuid)
+        if not playerBrawler and isToT() then
+            Roster.addBrawler(playerUuid, true)
+            playerBrawler = State.getBrawlerByUuid(playerUuid)
+        end
         if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
             debugPrint("checkPlayerRejoinCombat", playerUuid)
             local level = Osi.GetRegion(playerUuid)
@@ -250,7 +254,10 @@ end
 
 local function onEnteredCombat(entityGuid, combatGuid)
     -- debugPrint("EnteredCombat", entityGuid, combatGuid)
-    Roster.addBrawler(Osi.GetUUID(entityGuid), true)
+    local entityUuid = Osi.GetUUID(entityGuid)
+    if entityUuid then
+        Roster.addBrawler(entityUuid, true)
+    end
 end
 
 local function onEnteredForceTurnBased(entityGuid)
