@@ -70,14 +70,18 @@ local function unfreezePlayer(uuid)
     entity:Replicate("CanMove")
 end
 
-local function freezeAllPlayers()
+local function freezeAllPlayers(shouldFreezePlayers)
+    debugPrint("freezeAllPlayers")
+    debugDump(shouldFreezePlayers)
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            debugPrint(Utils.getDisplayName(playerUuid), "freezing player", playerUuid)
             Osi.SetCanJoinCombat(playerUuid, 0)
             Ext.Timer.WaitFor(200, function ()
-                freezePlayer(playerUuid)
+                if shouldFreezePlayers[playerUuid] then
+                    debugPrint(Utils.getDisplayName(playerUuid), "freezing player", playerUuid)
+                    freezePlayer(playerUuid)
+                end
             end)
         end
     end

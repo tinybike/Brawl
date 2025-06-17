@@ -96,7 +96,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 if setCanJoinCombat then
                     Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex, brawlerIndex*10)
+                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex)
                         Ext.Timer.WaitFor(brawlerIndex*10, function ()
                             AI.pulseAction(brawler)
                             -- NB: has bonus action available check first?

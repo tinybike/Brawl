@@ -361,9 +361,13 @@ local function onTurnEnded(entityGuid)
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
             local allPlayersFinishedTurns = Roster.checkAllPlayersFinishedTurns()
             if allPlayersFinishedTurns then
+                local shouldFreezePlayers = {}
+                for uuid, _ in pairs(State.Session.Players) do
+                    shouldFreezePlayers[uuid] = Utils.isToT() or Osi.IsInCombat(uuid) == 1
+                end
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
                 Roster.allSetCanJoinCombat(0, true)
-                Pause.freezeAllPlayers()
+                Pause.freezeAllPlayers(shouldFreezePlayers)
                 Ext.Timer.WaitFor(10000, function ()
                     Listeners.startNextTurnBasedSwarmRound()
                 end)

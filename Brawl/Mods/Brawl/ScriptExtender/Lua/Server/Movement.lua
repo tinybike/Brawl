@@ -74,7 +74,8 @@ local function findPathToTargetUuid(uuid, targetUuid)
     local validPosition = {validX, validY, validZ}
     local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
     local goalFound = Ext.Level.FindPath(path)
-    debugPrint("Got valid position near target", uuid, targetUuid, validX, validY, validZ, goalFound, path.GoalFound)
+    Ext.Level.ReleasePath(path)
+    debugPrint("Got valid position near target", uuid, targetUuid, validX, validY, validZ, goalFound)
     return goalFound
 end
 
@@ -87,6 +88,7 @@ local function findPathToPosition(uuid, position, callback)
     debugPrint("Got valid position", uuid, validX, validY, validZ)
     local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
     local goalFound = Ext.Level.FindPath(path)
+    Ext.Level.ReleasePath(path)
     if not goalFound then
         return callback("Can't get there", nil)
     end
