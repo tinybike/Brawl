@@ -103,6 +103,7 @@ end
 
 local function moveToTargetUuid(uuid, targetUuid, override)
     if override then
+        debugPrint("moveToTargetUuid", uuid, targetUuid, override)
         clearOsirisQueue(uuid)
     end
     Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "")
@@ -110,6 +111,7 @@ end
 
 local function moveToPosition(uuid, position, override)
     if override then
+        debugPrint("moveToPosition", uuid, override)
         clearOsirisQueue(uuid)
     end
     Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
@@ -187,29 +189,24 @@ end
 
 local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
     local range = getSpellRange(spellName)
-    local rangeNumber
+    local rangeNumber = Utils.convertSpellRangeToNumber(range)
     -- clearOsirisQueue(attackerUuid)
     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
-    if range == "MeleeMainWeaponRange" then
-        moveToTargetUuid(attackerUuid, targetUuid, true)
-    elseif range == "RangedMainWeaponRange" or range == "ThrownObjectRange" then
-        rangeNumber = 18
+    if rangeNumber <= 2 then
+        debugPrint("************moving into position for melee attack", Utils.getDisplayName(attackerUuid), Utils.getDisplayName(targetUuid), spellName)
+        return moveToTargetUuid(attackerUuid, targetUuid, true)
     else
-        rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if rangeNumber == nil then
-            print("Couldn't parse range, what is this?", range, rangeNumber, distanceToTarget, attackerUuid, targetUuid)
-        end
         if rangeNumber ~= nil and distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
-            debugPrint("moveIntoPositionForSpell distance > range, moving to...")
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+            debugPrint("******moveIntoPositionForSpell distance > range, moving to...")
+            return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
         end
     end
-    local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
-    if not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
-        debugPrint("moveIntoPositionForSpell can't see target, moving closer")
-        moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2)
-    end
+    -- local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
+    -- if not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
+    --     debugPrint("moveIntoPositionForSpell can't see target, moving closer")
+    --     return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2)
+    -- end
 end
 
 local function setPlayerRunToSprint(entityUuid)

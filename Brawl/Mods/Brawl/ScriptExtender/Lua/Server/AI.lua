@@ -384,9 +384,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             end
             debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
         end
-        if not State.Settings.TurnBasedSwarmMode then
-            Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
-        end
+        Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
         if not actionToTake or actionToTake == "Target_MainHandAttack" then
             Osi.Attack(brawler.uuid, target.uuid, 0)
         else
