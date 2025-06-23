@@ -384,12 +384,14 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             end
             debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
         end
-        Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
-        if not actionToTake or actionToTake == "Target_MainHandAttack" then
-            Osi.Attack(brawler.uuid, target.uuid, 0)
-        else
-            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
-        end
+        Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
+            debugPrint("callback for MoveIntoPosition", brawler.displayName, target.displayName, actionToTake)
+            if not actionToTake or actionToTake == "Target_MainHandAttack" then
+                Osi.Attack(brawler.uuid, target.uuid, 0)
+            else
+                useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+            end
+        end)
         return true
     end
     return false
@@ -418,8 +420,9 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         end
         debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid, bonusActionOnly)
         if actionToTake then
-            Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake)
-            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+            Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
+                useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+            end)
             return true
         elseif bonusActionOnly then
             debugPrint(brawler.displayName, "No friendly bonus actions available for", brawler.uuid, bonusActionOnly)
@@ -760,8 +763,9 @@ local function pulseAction(brawler, bonusActionOnly)
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
                         debugPrint(brawler.displayName, "Helping target", playerUuid, getDisplayName(playerUuid))
-                        Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help")
-                        return useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
+                        return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", function ()
+                            useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
+                        end)
                     end
                 end
             else

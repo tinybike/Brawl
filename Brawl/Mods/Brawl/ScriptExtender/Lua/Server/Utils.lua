@@ -109,9 +109,6 @@ local function isPugnacious(potentialEnemyUuid, uuid)
             return nil
         end
     end
-    -- if State.Settings.MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
-    --     Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
-    -- end
     return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 

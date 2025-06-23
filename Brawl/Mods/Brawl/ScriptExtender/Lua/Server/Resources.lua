@@ -30,6 +30,9 @@ end
 local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
+    if not entity or not entity.SpellBookPrepares or not entity.SpellBookPrepares.PreparedSpells then
+        return false
+    end
     for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
         if preparedSpell.OriginatorPrototype == spellName then
             isSpellPrepared = true

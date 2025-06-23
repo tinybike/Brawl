@@ -22,7 +22,6 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    MurderhoboMode = false,
     TurnBasedSwarmMode = false,
 }
 if MCM then
@@ -39,7 +38,6 @@ if MCM then
     Settings.CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     Settings.HogwildMode = MCM.Get("hogwild_mode")
     Settings.MaxPartySize = MCM.Get("max_party_size")
-    Settings.MurderhoboMode = MCM.Get("murderhobo_mode")
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
 end
 

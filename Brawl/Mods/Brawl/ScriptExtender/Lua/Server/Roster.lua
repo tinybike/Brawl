@@ -83,7 +83,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 local setCanJoinCombat = true
                 if canJoinCombat == 0 then
-                    if Utils.isToT() and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
+                    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
                         debugPrint("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
                         Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
                         setCanJoinCombat = false
@@ -100,7 +100,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         Ext.Timer.WaitFor(brawlerIndex*10, function ()
                             AI.pulseAction(brawler)
                             -- NB: has bonus action available check first?
-                            Ext.Timer.WaitFor(8000, function ()
+                            Ext.Timer.WaitFor(7000, function ()
                                 debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                                 AI.pulseAction(brawler, true)
                             end)

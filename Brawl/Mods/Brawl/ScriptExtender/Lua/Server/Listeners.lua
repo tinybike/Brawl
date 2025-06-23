@@ -83,19 +83,21 @@ local function setEnemiesTurnComplete()
 end
 
 local function checkEnemiesJoinCombat()
-    local hostCharacterUuid = Osi.GetHostCharacter()
-    local level = Osi.GetRegion(hostCharacterUuid)
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                debugPrint(brawler.displayName, "check for join combat")
-                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
-                end
-            end
-        end
-    end
+    -- local hostCharacterUuid = Osi.GetHostCharacter()
+    -- local level = Osi.GetRegion(hostCharacterUuid)
+    -- if level then
+    --     local brawlersInLevel = State.Session.Brawlers[level]
+    --     if brawlersInLevel then
+    --         for brawlerUuid, brawler in pairs(brawlersInLevel) do
+    --             debugPrint(brawler.displayName, "check for join combat")
+    --             -- NB: what about withers? act 3 civilians? etc 0133f2ad-e121-4590-b5f0-a79413919805
+    --             --     do we even need this apart from ToT?
+    --             if Osi.IsPartyMember(brawlerUuid, 1) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
+    --                 Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
+    --             end
+    --         end
+    --     end
+    -- end
 end
 
 local function startNextTurnBasedSwarmRound(combatGuid)
@@ -103,9 +105,16 @@ local function startNextTurnBasedSwarmRound(combatGuid)
     local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
     Pause.unfreezeAllPlayers()
     Roster.allSetCanJoinCombat(1)
-    checkPlayersRejoinCombat()
-    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), nearbyRadius, combatGuid)
-    checkEnemiesJoinCombat()
+    local hostCharacter = Osi.GetHostCharacter()
+    if not isToT() or not Mods.ToT.Player.InCamp() then
+        checkPlayersRejoinCombat()
+        Roster.addNearbyToBrawlers(hostCharacter, nearbyRadius, combatGuid)
+        checkEnemiesJoinCombat()
+    end
+end
+
+local function onCharacterMoveFailedUseJump(character)
+    debugPrint("CharacterMoveFailedUseJump", character)
 end
 
 local function onCombatStarted(combatGuid)
@@ -124,6 +133,7 @@ local function onCombatStarted(combatGuid)
     if State.Settings.TurnBasedSwarmMode then
         -- TurnBasedSwarmRoundTracker[combatGuid] = 0
         if not isToT() then
+            debugPrint("next round, combat started...", combatGuid)
             startNextTurnBasedSwarmRound(combatGuid)
         end
         -- Ext.Timer.WaitFor(8000, function ()
@@ -368,7 +378,8 @@ local function onTurnEnded(entityGuid)
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
                 Roster.allSetCanJoinCombat(0, true)
                 Pause.freezeAllPlayers(shouldFreezePlayers)
-                Ext.Timer.WaitFor(10000, function ()
+                Ext.Timer.WaitFor(9000, function ()
+                    debugPrint("start next round, onTurnEnded delayed")
                     Listeners.startNextTurnBasedSwarmRound()
                 end)
             end
@@ -725,18 +736,32 @@ local function onDifficultyChanged(difficulty)
 end
 
 local function onTeleportedToCamp(character)
+    debugPrint("TeleportedToCamp", character)
     local entityUuid = Osi.GetUUID(character)
-    if entityUuid ~= nil and State.Session.Brawlers ~= nil then
-        for level, brawlersInLevel in pairs(State.Session.Brawlers) do
-            if brawlersInLevel[entityUuid] ~= nil then
+    -- NB: use this for RT too? why remove all?
+    if State.Session.TurnBasedSwarmMode then
+        if entityUuid then
+            local level = Osi.GetRegion(entityUuid)
+            local brawler = State.getBrawlerByUuid(entityUuid)
+            if level and brawler then
                 Roster.removeBrawler(level, entityUuid)
                 Roster.checkForEndOfBrawl(level)
+            end
+        end
+    else
+        if entityUuid ~= nil and State.Session.Brawlers ~= nil then
+            for level, brawlersInLevel in pairs(State.Session.Brawlers) do
+                if brawlersInLevel[entityUuid] ~= nil then
+                    Roster.removeBrawler(level, entityUuid)
+                    Roster.checkForEndOfBrawl(level)
+                end
             end
         end
     end
 end
 
 local function onTeleportedFromCamp(character)
+    debugPrint("TeleportedFromCamp", character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.areAnyPlayersBrawling() then
         Roster.addBrawler(entityUuid, false)
@@ -745,11 +770,13 @@ end
 
 -- thank u focus
 local function onPROC_Subregion_Entered(characterGuid, _)
-    debugPrint("PROC_Subregion_Entered", characterGuid)
-    local uuid = Osi.GetUUID(characterGuid)
-    local level = Osi.GetRegion(uuid)
-    if level and State.Session.Players and State.Session.Players[uuid] then
-        AI.pulseReposition(level)
+    if not State.Settings.TurnBasedSwarmMode then
+        debugPrint("PROC_Subregion_Entered", characterGuid)
+        local uuid = Osi.GetUUID(characterGuid)
+        local level = Osi.GetRegion(uuid)
+        if level and State.Session.Players and State.Session.Players[uuid] then
+            AI.pulseReposition(level)
+        end
     end
 end
 
@@ -880,6 +907,10 @@ local function startListeners()
     }
     State.Session.Listeners.LevelGameplayStarted = {
         handle = Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", onLevelGameplayStarted),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CharacterMoveFailedUseJump = {
+        handle = Ext.Osiris.RegisterListener("CharacterMoveFailedUseJump", 1, "after", onCharacterMoveFailedUseJump),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.CombatStarted = {

@@ -594,7 +594,6 @@ return {
         companion_ai_max_spell_level = function (v) State.Settings.CompanionAIMaxSpellLevel = v end,
         hogwild_mode = function (v) State.Settings.HogwildMode = v end,
         max_party_size = onMCMMaxPartySize,
-        murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
     },
 }
