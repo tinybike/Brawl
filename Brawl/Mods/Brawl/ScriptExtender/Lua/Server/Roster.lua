@@ -122,7 +122,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         else
             okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
         end
-        if State.Settings.TurnBasedSwarmMode and Utils.isToT() and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
+        if State.Settings.TurnBasedSwarmMode and Utils.isToT() and Mods.ToT.PersistentVars.Scenario and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
             okToAdd = true
         end
         if okToAdd then

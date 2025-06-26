@@ -22,7 +22,8 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    TurnBasedSwarmMode = false,
+    -- TurnBasedSwarmMode = false,
+    TurnBasedSwarmMode = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -86,6 +87,7 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "FrozenPlayerResources", {Server = true, Client = false, SyncToClient = false})
 
 local function hasTargetCondition(targetConditionString, condition)
     local parts = {}

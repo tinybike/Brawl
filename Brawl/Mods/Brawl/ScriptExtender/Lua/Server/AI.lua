@@ -618,9 +618,12 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                     end
                     -- NB: this is too intense of a request for real-time mode and will crash the game :/
                     if State.Settings.TurnBasedSwarmMode then
-                        local concentration = Ext.Entity.Get(potentialTargetUuid).Concentration
-                        if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
-                            weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]/Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                        local potentialTargetEntity = Ext.Entity.Get(potentialTargetUuid)
+                        if potentialTargetEntity then
+                            local concentration = potentialTargetEntity.Concentration
+                            if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                                weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]/Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                            end
                         end
                     end
                 end
