@@ -103,6 +103,7 @@ end
 local function startNextTurnBasedSwarmRound(combatGuid)
     debugPrint("startNextTurnBasedSwarmRound", combatGuid)
     local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
+    -- NB: deal with "Combat Started" edge cases for subsequent rounds, e.g. StatusImmunity("SURPRISED")
     Pause.unfreezeAllPlayers()
     Roster.allSetCanJoinCombat(1)
     local hostCharacter = Osi.GetHostCharacter()
@@ -199,6 +200,9 @@ end
 
 local function onLevelGameplayStarted(level, _)
     debugPrint("LevelGameplayStarted", level)
+    -- debugDump(Utils.getPersistentModVars())
+    -- debugDump(Utils.getPersistentModVars("FrozenPlayerResources"))
+    -- debugDump(Utils.getPersistentModVars("ModifiedHitpoints"))
     onStarted(level)
 end
 

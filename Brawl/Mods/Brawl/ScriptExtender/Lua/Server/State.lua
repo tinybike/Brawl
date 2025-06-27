@@ -78,7 +78,6 @@ local Session = {
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     TurnBasedSwarmModePlayerTurnEnded = {},
-    FrozenPlayerResources = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 

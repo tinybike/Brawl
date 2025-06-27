@@ -158,6 +158,14 @@ local function convertSpellRangeToNumber(range)
     end
 end
 
+local function getPersistentModVars(label)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if label ~= nil then
+        return modVars[label]
+    end
+    return modVars
+end
+
 local function getSpellRange(spellName)
     if not spellName then
         return "MeleeMainWeaponRange"
@@ -217,7 +225,7 @@ local function getPointInFrontOf(entityUuid, distance)
 end
 
 local function clearOsirisQueue(uuid)
-    debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
+    -- debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end
@@ -336,4 +344,5 @@ return {
     applyOnMeTargetVfx = applyOnMeTargetVfx,
     hasLoseControlStatus = hasLoseControlStatus,
     averageTime = averageTime,
+    getPersistentModVars = getPersistentModVars,
 }

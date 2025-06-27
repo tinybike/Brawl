@@ -43,14 +43,46 @@ local function lock(entity)
     State.Session.FTBLockedIn[uuid] = true
 end
 
+local function isPlayerFrozen(uuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.FrozenPlayerResources == nil then
+        return false
+    end
+    if not modVars.FrozenPlayerResources[uuid] then
+        return false
+    end
+    return true
+end
+
 local function freezePlayer(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if not State.Session.FrozenPlayerResources[uuid] then
-        State.Session.FrozenPlayerResources[uuid] = {}
-        State.Session.FrozenPlayerResources[uuid].ActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount
-        State.Session.FrozenPlayerResources[uuid].BonusActionPoint = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount
-        State.Session.FrozenPlayerResources[uuid].CanMoveFlags = entity.CanMove.Flags
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.FrozenPlayerResources == nil then
+        modVars.FrozenPlayerResources = {}
     end
+    local frozenPlayerResources = modVars.FrozenPlayerResources
+    if not frozenPlayerResources[uuid] then
+        frozenPlayerResources[uuid] = {}
+        if entity.ActionResources and entity.ActionResources.Resources then
+            local actionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint]
+            if actionPoints and actionPoints[1] and actionPoints[1].Amount ~= nil then
+                frozenPlayerResources[uuid].ActionPoint = actionPoints[1].Amount
+            end
+            local bonusActionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint]
+            if bonusActionPoints and bonusActionPoints[1] and bonusActionPoints[1].Amount ~= nil then
+                frozenPlayerResources[uuid].BonusActionPoint = bonusActionPoints[1].Amount
+            end
+        end
+        if entity.CanMove and entity.CanMove.Flags ~= nil then
+            frozenPlayerResources[uuid].CanMoveFlags = {}
+            for _, flag in ipairs(entity.CanMove.Flags) do
+               table.insert(frozenPlayerResources[uuid].CanMoveFlags, flag)
+            end
+        end
+        modVars.FrozenPlayerResources[uuid] = frozenPlayerResources[uuid]
+    end
+    debugPrint("FREEZE: FROZEN PLAYER RESOURCES")
+    debugDump(frozenPlayerResources)
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 0
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 0
     entity.CanMove.Flags = {}
@@ -60,14 +92,32 @@ end
 
 local function unfreezePlayer(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if State.Session.FrozenPlayerResources[uuid] then
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].ActionPoint
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = State.Session.FrozenPlayerResources[uuid].BonusActionPoint
-        entity.CanMove.Flags = State.Session.FrozenPlayerResources[uuid].CanMoveFlags
-        State.Session.FrozenPlayerResources[uuid] = nil
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.FrozenPlayerResources == nil then
+        modVars.FrozenPlayerResources = {}
+    end
+    local frozenPlayerResources = modVars.FrozenPlayerResources
+    debugPrint("UNFREEZE: FROZEN PLAYER RESOURCES")
+    debugDump(frozenPlayerResources)
+    if frozenPlayerResources[uuid] then
+        if entity.ActionResources and entity.ActionResources.Resources then
+            local actionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint]
+            if actionPoints and actionPoints[1] and frozenPlayerResources[uuid].ActionPoint ~= nil then
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = frozenPlayerResources[uuid].ActionPoint
+            end
+            local bonusActionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint]
+            if bonusActionPoints and bonusActionPoints[1] and frozenPlayerResources[uuid].BonusActionPoint ~= nil then
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = frozenPlayerResources[uuid].BonusActionPoint
+            end
+        end
+        if entity.CanMove and frozenPlayerResources[uuid].CanMoveFlags ~= nil then
+            entity.CanMove.Flags = frozenPlayerResources[uuid].CanMoveFlags
+        end
+        frozenPlayerResources[uuid] = nil
     end
     entity:Replicate("ActionResources")
     entity:Replicate("CanMove")
+    modVars.FrozenPlayerResources = frozenPlayerResources
 end
 
 local function freezeAllPlayers(shouldFreezePlayers)
@@ -343,4 +393,5 @@ return {
     unfreezePlayer = unfreezePlayer,
     freezeAllPlayers = freezeAllPlayers,
     unfreezeAllPlayers = unfreezeAllPlayers,
+    isPlayerFrozen = isPlayerFrozen,
 }
