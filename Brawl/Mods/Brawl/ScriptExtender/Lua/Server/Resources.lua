@@ -189,6 +189,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     Osi.UseSpell(casterUuid, spellName, targetUuid)
+    -- AI.queueSpellRequest(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)

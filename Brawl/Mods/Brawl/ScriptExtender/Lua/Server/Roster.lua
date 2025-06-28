@@ -99,7 +99,6 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex)
                         Ext.Timer.WaitFor(brawlerIndex*10, function ()
                             AI.pulseAction(brawler)
-                            -- NB: has bonus action available check first?
                             Ext.Timer.WaitFor(7000, function ()
                                 debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                                 AI.pulseAction(brawler, true)

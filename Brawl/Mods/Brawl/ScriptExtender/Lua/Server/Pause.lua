@@ -81,8 +81,8 @@ local function freezePlayer(uuid)
         end
         modVars.FrozenPlayerResources[uuid] = frozenPlayerResources[uuid]
     end
-    debugPrint("FREEZE: FROZEN PLAYER RESOURCES")
-    debugDump(frozenPlayerResources)
+    -- debugPrint("FREEZE: FROZEN PLAYER RESOURCES")
+    -- debugDump(frozenPlayerResources)
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 0
     entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 0
     entity.CanMove.Flags = {}
@@ -97,8 +97,8 @@ local function unfreezePlayer(uuid)
         modVars.FrozenPlayerResources = {}
     end
     local frozenPlayerResources = modVars.FrozenPlayerResources
-    debugPrint("UNFREEZE: FROZEN PLAYER RESOURCES")
-    debugDump(frozenPlayerResources)
+    -- debugPrint("UNFREEZE: FROZEN PLAYER RESOURCES")
+    -- debugDump(frozenPlayerResources)
     if frozenPlayerResources[uuid] then
         if entity.ActionResources and entity.ActionResources.Resources then
             local actionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint]

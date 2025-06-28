@@ -36,17 +36,20 @@ local function getCastOptions(flags)
     return castOptionsMask
 end
 
-local function getOriginatorPrototype(spellName)
-    local stats = Ext.Stats.Get(spellName)
+local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
     end
     return stats.RootSpellID
 end
 
-local function queueSpellRequest(casterUuid, spellName, targetUuid)
+-- NB: requires SEv25 (currently devel only)
+-- thank u focus and mazzle
+local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
+    local stats = Ext.Stats.Get(spellName)
     local request = {
-        CastOptions = getCastOptions({"IgnoreHasSpell", "IgnoreTargetChecks", "ShowPrepareAnimation"}),
+        -- include NoMovement?
+        CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "IgnoreCastChecks", "IgnoreTargetChecks", "ShowPrepareAnimation"}),
         Caster = Ext.Entity.Get(casterUuid),
         NetGuid = "",
         Originator = {
@@ -57,18 +60,19 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid)
             Statusid = "",
         },
         Spell = {
-            OriginatorPrototype = getOriginatorPrototype(spellName),
+            OriginatorPrototype = getOriginatorPrototype(spellName, stats),
             ProgressionSource = Constants.NULL_UUID,
             Prototype = spellName,
             Source = Constants.NULL_UUID,
             SourceType = "Osiris",
         },
-        Targets = {{Target = Ext.Entity.Get(targetUuid), TargetingType = "Target"}},
+        Targets = {{Target = Ext.Entity.Get(targetUuid), TargetingType = stats.SpellType}},
         field_88 = 0,
         field_A8 = 1,
         field_B0 = 3359090190287412865,
         field_B8 = -1518500991745074566,
     }
+    _D(request)
     Ext.System.ServerCastRequest.OsirisCastRequests[#Ext.System.ServerCastRequest.OsirisCastRequests + 1] = request
 end
 
@@ -206,8 +210,8 @@ local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spe
     -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
     if State.Settings.HogwildMode then
         weight = weight + spell.level*2
-    else
-        weight = weight - spell.level*0.3
+    -- else
+    --     weight = weight - spell.level*0.3
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -385,6 +389,7 @@ local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     debugPrint(getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
     if State.Settings.HogwildMode then
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
+        -- queueSpellRequest(attackerUuid, spellName, targetUuid)
         return true
     end
     return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)
@@ -619,56 +624,58 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        debugPrint(brawler.displayName, "checking potential target", getDisplayName(potentialTargetUuid), potentialTargetUuid)
-        if brawler.uuid == potentialTargetUuid then
-            local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
-            if State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
-                local targetHp = Osi.GetHitpoints(potentialTargetUuid)
-                local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
-                if State.Settings.CompanionTactics == "Offense" then
-                    weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil)
-                elseif State.Settings.CompanionTactics == "Defense" then
-                    weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
-                else
-                    weightedTargets[potentialTargetUuid] = getBalancedWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
-                end
-            end
-        elseif isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
-            local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
-            local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
-            debugPrint(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
-            if isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
-                local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
-                local hasPathToTarget = nil
-                if isMelee and not isPlayerOrAlly(brawler.uuid) and isHostile then
-                    hasPathToTarget = findPathToTargetUuid(brawler.uuid, potentialTargetUuid)
-                end
+        if not isToT() or (Mods.ToT.PersistentVars.Scenario and potentialTargetUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper) then
+            debugPrint(brawler.displayName, "checking potential target", getDisplayName(potentialTargetUuid), potentialTargetUuid)
+            if brawler.uuid == potentialTargetUuid then
                 local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
-                if isHostile or State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
+                if State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
                     local targetHp = Osi.GetHitpoints(potentialTargetUuid)
                     local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
-                    if not isPlayerOrAlly(brawler.uuid) then
-                        weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
-                        debugPrint(brawler.displayName, "Got offense weighted target", getDisplayName(potentialTargetUuid), weightedTargets[potentialTargetUuid])
-                        if brawler.combatGroupId ~= nil then
-                            State.Session.ActiveCombatGroups[brawler.combatGroupId] = true
-                        end
+                    if State.Settings.CompanionTactics == "Offense" then
+                        weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil)
+                    elseif State.Settings.CompanionTactics == "Defense" then
+                        weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
                     else
-                        if State.Settings.CompanionTactics == "Offense" then
-                            weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
-                        elseif State.Settings.CompanionTactics == "Defense" then
-                            weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
-                        else
-                            weightedTargets[potentialTargetUuid] = getBalancedWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
-                        end
+                        weightedTargets[potentialTargetUuid] = getBalancedWeightedTarget(0, targetHp, targetHpPct, true, isHealer, false, nil, nil, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
                     end
-                    -- NB: this is too intense of a request for real-time mode and will crash the game :/
-                    if State.Settings.TurnBasedSwarmMode then
-                        local potentialTargetEntity = Ext.Entity.Get(potentialTargetUuid)
-                        if potentialTargetEntity then
-                            local concentration = potentialTargetEntity.Concentration
-                            if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
-                                weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]/Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                end
+            elseif isVisible(potentialTargetUuid) and isAliveAndCanFight(potentialTargetUuid) then
+                local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
+                local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
+                debugPrint(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
+                if isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+                    local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
+                    local hasPathToTarget = nil
+                    if isMelee and not isPlayerOrAlly(brawler.uuid) and isHostile then
+                        hasPathToTarget = findPathToTargetUuid(brawler.uuid, potentialTargetUuid)
+                    end
+                    local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+                    if isHostile or State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
+                        local targetHp = Osi.GetHitpoints(potentialTargetUuid)
+                        local targetHpPct = Osi.GetHitpointsPercentage(potentialTargetUuid)
+                        if not isPlayerOrAlly(brawler.uuid) then
+                            weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
+                            debugPrint(brawler.displayName, "Got offense weighted target", getDisplayName(potentialTargetUuid), weightedTargets[potentialTargetUuid])
+                            if brawler.combatGroupId ~= nil then
+                                State.Session.ActiveCombatGroups[brawler.combatGroupId] = true
+                            end
+                        else
+                            if State.Settings.CompanionTactics == "Offense" then
+                                weightedTargets[potentialTargetUuid] = getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
+                            elseif State.Settings.CompanionTactics == "Defense" then
+                                weightedTargets[potentialTargetUuid] = getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
+                            else
+                                weightedTargets[potentialTargetUuid] = getBalancedWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
+                            end
+                        end
+                        -- NB: this is too intense of a request for real-time mode and will crash the game :/
+                        if State.Settings.TurnBasedSwarmMode then
+                            local potentialTargetEntity = Ext.Entity.Get(potentialTargetUuid)
+                            if potentialTargetEntity then
+                                local concentration = potentialTargetEntity.Concentration
+                                if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+                                    weightedTargets[potentialTargetUuid] = weightedTargets[potentialTargetUuid]/Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                                end
                             end
                         end
                     end
@@ -676,6 +683,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
             end
         end
     end
+    debugDump(weightedTargets)
     return weightedTargets
 end
 
