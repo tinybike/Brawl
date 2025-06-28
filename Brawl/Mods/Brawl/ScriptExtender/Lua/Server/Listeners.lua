@@ -83,21 +83,21 @@ local function setEnemiesTurnComplete()
 end
 
 local function checkEnemiesJoinCombat()
-    -- local hostCharacterUuid = Osi.GetHostCharacter()
-    -- local level = Osi.GetRegion(hostCharacterUuid)
-    -- if level then
-    --     local brawlersInLevel = State.Session.Brawlers[level]
-    --     if brawlersInLevel then
-    --         for brawlerUuid, brawler in pairs(brawlersInLevel) do
-    --             debugPrint(brawler.displayName, "check for join combat")
-    --             -- NB: what about withers? act 3 civilians? etc 0133f2ad-e121-4590-b5f0-a79413919805
-    --             --     do we even need this apart from ToT?
-    --             if Osi.IsPartyMember(brawlerUuid, 1) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
-    --                 Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
-    --             end
-    --         end
-    --     end
-    -- end
+    local hostCharacterUuid = Osi.GetHostCharacter()
+    local level = Osi.GetRegion(hostCharacterUuid)
+    if level then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
+                debugPrint(brawler.displayName, "check for join combat")
+                -- NB: what about withers? act 3 civilians? etc 0133f2ad-e121-4590-b5f0-a79413919805
+                --     do we even need this apart from ToT?
+                if Osi.IsPartyMember(brawlerUuid, 1) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
+                    Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
+                end
+            end
+        end
+    end
 end
 
 local function startNextTurnBasedSwarmRound(combatGuid)
@@ -110,7 +110,7 @@ local function startNextTurnBasedSwarmRound(combatGuid)
     if not isToT() or not Mods.ToT.Player.InCamp() then
         checkPlayersRejoinCombat()
         Roster.addNearbyToBrawlers(hostCharacter, nearbyRadius, combatGuid)
-        checkEnemiesJoinCombat()
+        -- checkEnemiesJoinCombat()
     end
 end
 

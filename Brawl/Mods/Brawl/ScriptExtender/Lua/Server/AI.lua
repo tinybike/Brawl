@@ -26,6 +26,52 @@ local clearOsirisQueue = Utils.clearOsirisQueue
 local isToT = Utils.isToT
 local findPathToTargetUuid = Movement.findPathToTargetUuid
 
+local function getCastOptions(flags)
+    local castOptionsMask = 0
+    for _, flag in ipairs(flags) do
+        if Constants.SPELL_REQUEST_FLAGS[flag] then
+            castOptionsMask = castOptionsMask | Constants.SPELL_REQUEST_FLAGS[flag]
+        end
+    end
+    return castOptionsMask
+end
+
+local function getOriginatorPrototype(spellName)
+    local stats = Ext.Stats.Get(spellName)
+    if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
+        return spellName
+    end
+    return stats.RootSpellID
+end
+
+local function queueSpellRequest(casterUuid, spellName, targetUuid)
+    local request = {
+        CastOptions = getCastOptions({"IgnoreHasSpell", "IgnoreTargetChecks", "ShowPrepareAnimation"}),
+        Caster = Ext.Entity.Get(casterUuid),
+        NetGuid = "",
+        Originator = {
+            ActionGuid = Constants.NULL_UUID,
+            CanApplyConcentration = true,
+            InterruptId = "",
+            PassiveId = "",
+            Statusid = "",
+        },
+        Spell = {
+            OriginatorPrototype = getOriginatorPrototype(spellName),
+            ProgressionSource = Constants.NULL_UUID,
+            Prototype = spellName,
+            Source = Constants.NULL_UUID,
+            SourceType = "Osiris",
+        },
+        Targets = {{Target = Ext.Entity.Get(targetUuid), TargetingType = "Target"}},
+        field_88 = 0,
+        field_A8 = 1,
+        field_B0 = 3359090190287412865,
+        field_B8 = -1518500991745074566,
+    }
+    Ext.System.ServerCastRequest.OsirisCastRequests[#Ext.System.ServerCastRequest.OsirisCastRequests + 1] = request
+end
+
 local function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
         return 7
@@ -877,4 +923,5 @@ return {
     pulseAction = pulseAction,
     pulseReposition = pulseReposition,
     pulseAddNearby = pulseAddNearby,
+    queueSpellRequest = queueSpellRequest,
 }

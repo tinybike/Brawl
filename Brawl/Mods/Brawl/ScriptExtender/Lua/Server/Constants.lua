@@ -22,6 +22,7 @@ Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR = 2
 Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS = 15
 Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS = 5
 Constants.UNCAPPED_MOVEMENT_DISTANCE = 1000
+Constants.NULL_UUID = "00000000-0000-0000-0000-000000000000"
 Constants.LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
 Constants.ACTION_RESOURCES = {
     ActionPoint = "734cbcfb-8922-4b6d-8330-b2a7e4c14b6a",
@@ -215,5 +216,28 @@ Constants.SAFE_AOE_SPELLS = {
     "Target_KiResonation_Blast",
 }
 Constants.RAGE_BOOSTS = {"RAGE", "RAGE_FRENZY", "RAGE_GIANT"}
+Constants.SPELL_REQUEST_FLAGS = {
+    IgnoreHasSpell = 0x1,
+    IgnoreCastChecks = 0x2,
+    IgnoreSpellRolls = 0x4,
+    IsReaction = 0x8,
+    NoMovement = 0x10,
+    AvoidAoO = 0x20,
+    DestroySource = 0x40,
+    Immediate = 0x80,
+    Silent = 0x100,
+    IgnoreTargetChecks = 0x200,
+    IsPreview = 0x400,
+    IsHoverPreview = 0x800,
+    ShowPrepareAnimation = 0x1000,
+    Forced = 0x2000,
+    IsRoll = 0x4000,
+    IsInterrupt = 0x8000,
+    FromClient = 0x10000,
+    NoUnsheath = 0x20000,
+    CheckProjectileTargets = 0x40000,
+    AvoidDangerousAuras = 0x80000,
+    Unknown100000 = 0x100000,
+}
 
 return Constants
