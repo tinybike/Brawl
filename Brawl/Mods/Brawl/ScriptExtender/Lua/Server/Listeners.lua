@@ -133,6 +133,7 @@ local function onCombatStarted(combatGuid)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if State.Settings.TurnBasedSwarmMode then
         -- TurnBasedSwarmRoundTracker[combatGuid] = 0
+        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
         if not isToT() then
             debugPrint("next round, combat started...", combatGuid)
             startNextTurnBasedSwarmRound(combatGuid)
@@ -233,7 +234,7 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    -- debugPrint("EnteredCombat", entityGuid, combatGuid)
+    debugPrint("EnteredCombat", entityGuid, combatGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     if entityUuid then
         Roster.addBrawler(entityUuid, true)
@@ -471,7 +472,7 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 State.boostPlayerInitiative(uuid)
                 State.recapPartyMembersMovementDistances()
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
             else
                 State.uncapPartyMembersMovementDistances()
                 -- Pause.checkTruePauseParty()

@@ -273,6 +273,14 @@ local function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
+local function isPlayerTurnEnded(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn == false then
+        return false
+    end
+    return true
+end
+
 -- Thanks Focus
 function hasLoseControlStatus(uuid)
     local entity = Ext.Entity.Get(uuid)
@@ -342,6 +350,7 @@ return {
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
+    isPlayerTurnEnded = isPlayerTurnEnded,
     hasLoseControlStatus = hasLoseControlStatus,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,

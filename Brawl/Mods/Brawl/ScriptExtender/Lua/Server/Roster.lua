@@ -85,7 +85,9 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 if canJoinCombat == 0 then
                     if Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
                         debugPrint("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
-                        Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
+                        if Osi.IsEnemy(brawlerUuid, hostCharacterUuid) == 0 then
+                            Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
+                        end
                         setCanJoinCombat = false
                     end
                     if State.Session.Players[brawlerUuid] then
@@ -93,6 +95,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         setCanJoinCombat = false
                     end
                 end
+                debugPrint(Utils.getDisplayName(brawlerUuid), "set can join combat", setCanJoinCombat, canJoinCombat)
                 if setCanJoinCombat then
                     Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
@@ -103,7 +106,7 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                                 debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
                                 AI.pulseAction(brawler, true)
                             end)
-                        end)
+                        end)e
                         brawlerIndex = brawlerIndex + 1
                     end
                 end
@@ -122,6 +125,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
         end
         if State.Settings.TurnBasedSwarmMode and Utils.isToT() and Mods.ToT.PersistentVars.Scenario and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
+            debugPrint("ADDING COMBAT HELPER TO BRAWLERS")
             okToAdd = true
         end
         if okToAdd then
@@ -157,8 +161,8 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 if Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     Osi.PROC_SelfHealing_Disable(entityUuid)
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
-                    debugPrint("player brawler added, set turn ended", entityUuid)
-                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+                    debugPrint("player brawler added, set turn ended?", entityUuid)
+                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = Utils.isPlayerTurnEnded(entityUuid)
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then
