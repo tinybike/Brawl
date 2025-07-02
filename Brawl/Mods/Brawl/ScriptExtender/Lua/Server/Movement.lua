@@ -56,10 +56,21 @@ local function getMovementSpeed(entityUuid)
     return movementSpeed
 end
 
+local function setMovementToMax(entity)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources
+        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
+            debugPrint("Set movement to max", resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount)
+            resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+            entity:Replicate("ActionResources")
+        end
+    end
+end
+
 local function getRemainingMovement(entity)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
-        if entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
             return getMovementDistanceAmount(entity)
         end
     end
@@ -257,6 +268,7 @@ return {
     getMovementSpeed = getMovementSpeed,
     getMovementDistanceMaxAmount = getMovementDistanceMaxAmount,
     getRemainingMovement = getRemainingMovement,
+    setMovementToMax = setMovementToMax,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
     findPathToTargetUuid = findPathToTargetUuid,

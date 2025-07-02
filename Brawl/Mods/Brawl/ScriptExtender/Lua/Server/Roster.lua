@@ -84,12 +84,12 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
             local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 local setCanJoinCombat = true
+                if Osi.IsEnemy(brawlerUuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
+                    Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
+                end
                 if canJoinCombat == 0 then
                     if Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
                         debugPrint("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
-                        if Osi.IsEnemy(brawlerUuid, hostCharacterUuid) == 0 then
-                            Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
-                        end
                         setCanJoinCombat = false
                     end
                     if State.Session.Players[brawlerUuid] then
@@ -99,15 +99,16 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 end
                 debugPrint(Utils.getDisplayName(brawlerUuid), "set can join combat", setCanJoinCombat, canJoinCombat)
                 if setCanJoinCombat then
-                    Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
+                    -- Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                         debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex)
                         Ext.Timer.WaitFor(brawlerIndex*10, function ()
-                            AI.pulseAction(brawler)
-                            Ext.Timer.WaitFor(7000, function ()
-                                debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
-                                -- AI.pulseAction(brawler)
-                                AI.pulseAction(brawler, true)
+                            Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
+                            AI.pulseAction(brawler, true)
+                            Ext.Timer.WaitFor(4000, function ()
+                                debugPrint(brawler.displayName, "AI.pulseAction 2", brawler.uuid)
+                                Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
+                                AI.pulseAction(brawler)
                             end)
                         end)
                         brawlerIndex = brawlerIndex + 1

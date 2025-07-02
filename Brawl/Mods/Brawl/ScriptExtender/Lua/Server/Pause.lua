@@ -126,7 +126,7 @@ local function freezeAllPlayers(shouldFreezePlayers)
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            Osi.SetCanJoinCombat(playerUuid, 0)
+            -- Osi.SetCanJoinCombat(playerUuid, 0)
             Ext.Timer.WaitFor(200, function ()
                 if shouldFreezePlayers[playerUuid] then
                     debugPrint(Utils.getDisplayName(playerUuid), "freezing player", playerUuid)
@@ -141,7 +141,7 @@ local function unfreezeAllPlayers()
     local players = State.Session.Players
     if players then
         for playerUuid, _ in pairs(players) do
-            Osi.SetCanJoinCombat(playerUuid, 1)
+            -- Osi.SetCanJoinCombat(playerUuid, 1)
             Ext.Timer.WaitFor(200, function ()
                 unfreezePlayer(playerUuid)
             end)
