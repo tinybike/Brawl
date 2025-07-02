@@ -104,7 +104,6 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                         debugPrint(brawler.displayName, "AI.pulseAction once", brawlerUuid, brawlerIndex)
                         if State.Session.TBSMActionResourceListeners[brawlerUuid] == nil then
                             State.Session.TBSMActionResourceListeners[brawlerUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-                                print("fuck you")
                                 Movement.setMovementToMax(entity)
                             end, Ext.Entity.Get(brawlerUuid))
                         end
