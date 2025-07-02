@@ -281,8 +281,33 @@ local function isPlayerTurnEnded(uuid)
     return true
 end
 
+local function canAct(uuid)
+    if not uuid or isDowned(uuid) or not isAliveAndCanFight(uuid) then
+        return false
+    end
+    for _, noActionStatus in ipairs(Constants.NO_ACTION_STATUSES) do
+        if Osi.HasActiveStatus(uuid, noActionStatus) == 1 then
+            debugPrint(getDisplayName(uuid), "has a no action status", noActionStatus)
+            return false
+        end
+    end
+    return true
+end
+
+local function canMove(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.CanMove and entity.CanMove.Flags then
+        for _, flag in ipairs(entity.CanMove.Flags) do
+            if flag == "CanMove" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- Thanks Focus
-function hasLoseControlStatus(uuid)
+local function hasLoseControlStatus(uuid)
     local entity = Ext.Entity.Get(uuid)
     -- NB: not yet in SE release branch
     -- if Ext.Entity.Get(uuid).StatusLoseControl ~= nil then
@@ -351,6 +376,8 @@ return {
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
     isPlayerTurnEnded = isPlayerTurnEnded,
+    canAct = canAct,
+    canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,

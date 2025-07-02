@@ -239,5 +239,17 @@ Constants.SPELL_REQUEST_FLAGS = {
     AvoidDangerousAuras = 0x80000,
     Unknown100000 = 0x100000,
 }
+Constants.NO_ACTION_STATUSES = {
+    "COMMAND_GROVEL",
+    "COMMAND_HALT",
+    "COMMAND_APPROACH",
+    "COMMAND_FLEE",
+    "SLEEP",
+    "SLEEPING",
+    "INCAPACITATED",
+    "STUNNED",
+    "STUNNED_STUNNINGGAZE",
+    "PETRIFIED",
+}
 
 return Constants

@@ -72,6 +72,8 @@ local function isSwarmTurnComplete(swarmTurnComplete)
     return true
 end
 
+-- NB: stay in combat, adjust movement speed as needed
+--     when there's only 3 or 4 enemies auto-disables
 local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
     debugPrint("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
     local hostCharacterUuid = Osi.GetHostCharacter()
@@ -104,9 +106,10 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                             AI.pulseAction(brawler)
                             Ext.Timer.WaitFor(7000, function ()
                                 debugPrint(brawler.displayName, "AI.pulseAction bonusActionOnly", brawler.uuid)
+                                -- AI.pulseAction(brawler)
                                 AI.pulseAction(brawler, true)
                             end)
-                        end)e
+                        end)
                         brawlerIndex = brawlerIndex + 1
                     end
                 end
