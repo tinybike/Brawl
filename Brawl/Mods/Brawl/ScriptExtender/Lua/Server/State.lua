@@ -78,6 +78,7 @@ local Session = {
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     TurnBasedSwarmModePlayerTurnEnded = {},
+    TBSMActionResourceListeners = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 

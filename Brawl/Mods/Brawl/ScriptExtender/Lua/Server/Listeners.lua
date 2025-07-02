@@ -383,7 +383,7 @@ local function onTurnEnded(entityGuid)
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
                 Roster.allSetCanJoinCombat(0, true)
                 Pause.freezeAllPlayers(shouldFreezePlayers)
-                Ext.Timer.WaitFor(9000, function ()
+                Ext.Timer.WaitFor(12000, function ()
                     debugPrint("start next round, onTurnEnded delayed")
                     Listeners.startNextTurnBasedSwarmRound()
                 end)

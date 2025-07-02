@@ -101,13 +101,19 @@ local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
                 if setCanJoinCombat then
                     -- Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
                     if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        debugPrint(brawler.displayName, "AI.pulseAction once", brawler.uuid, brawlerIndex)
+                        debugPrint(brawler.displayName, "AI.pulseAction once", brawlerUuid, brawlerIndex)
+                        if State.Session.TBSMActionResourceListeners[brawlerUuid] == nil then
+                            State.Session.TBSMActionResourceListeners[brawlerUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+                                print("fuck you")
+                                Movement.setMovementToMax(entity)
+                            end, Ext.Entity.Get(brawlerUuid))
+                        end
                         Ext.Timer.WaitFor(brawlerIndex*10, function ()
-                            Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
+                            -- Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
                             AI.pulseAction(brawler, true)
-                            Ext.Timer.WaitFor(4000, function ()
-                                debugPrint(brawler.displayName, "AI.pulseAction 2", brawler.uuid)
-                                Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
+                            Ext.Timer.WaitFor(6000, function ()
+                                debugPrint(brawler.displayName, "AI.pulseAction 2", brawlerUuid)
+                                -- Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
                                 AI.pulseAction(brawler)
                             end)
                         end)
@@ -228,6 +234,10 @@ local function removeBrawler(level, entityUuid)
             State.Session.PlayerCurrentTarget[entityUuid] = nil
             State.Session.PlayerMarkedTarget[entityUuid] = nil
             State.Session.IsAttackingOrBeingAttackedByPlayer[entityUuid] = nil
+        end
+        if State.Session.TBSMActionResourceListeners[entityUuid] then
+            Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[entityUuid])
+            State.Session.TBSMActionResourceListeners[entityUuid] = nil
         end
     end
 end
