@@ -549,11 +549,11 @@ local function onMCMTurnBasedSwarmMode(value)
     if value == true then
         State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
-        Swarm.startEnemyTurn(1)
+        -- Swarm.startEnemyTurn(1)
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
-        Swarm.startEnemyTurn(0)
+        -- Swarm.startEnemyTurn(0)
     end
 end
 

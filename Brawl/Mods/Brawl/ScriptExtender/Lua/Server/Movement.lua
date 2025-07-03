@@ -59,7 +59,7 @@ end
 local function setMovementToMax(entity)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
-        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
+        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] and resources[Constants.ACTION_RESOURCES.Movement][1].Amount == 0.0 then
             resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
             entity:Replicate("ActionResources")
         end
@@ -117,15 +117,18 @@ local function findPathToPosition(uuid, position, callback)
     -- end)
 end
 
+-- NB: restructure this to use EntityEvent notifications for movements
 local function moveToTargetUuid(uuid, targetUuid, override, callback)
     debugPrint("moveToTargetUuid", uuid, targetUuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
+    -- Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "", moveID)
     Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "")
     if callback ~= nil then
         Ext.Timer.WaitFor(State.Settings.TurnBasedSwarmMode and 750 or 100, callback)
     end
+    return true
 end
 
 local function moveToPosition(uuid, position, override, callback)
@@ -137,6 +140,7 @@ local function moveToPosition(uuid, position, override, callback)
     if callback ~= nil then
         Ext.Timer.WaitFor(State.Settings.TurnBasedSwarmMode and 750 or 100, callback)
     end
+    return true
 end
 
 local function moveCompanionsToPlayer(playerUuid)
@@ -171,13 +175,13 @@ end
 local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance, callback)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     if x ~= nil and y ~= nil and z ~= nil then
-        moveToPosition(moverUuid, {x, y, z}, true, callback)
-    else
-        debugPrint(Utils.getDisplayName(moverUuid), "Failed to get en route coordinates", Utils.getDisplayName(targetUuid), x, y, z, goalDistance)
-        if callback ~= nil then
-            callback()
-        end
+        return moveToPosition(moverUuid, {x, y, z}, true, callback)
     end
+    debugPrint(Utils.getDisplayName(moverUuid), "Failed to get en route coordinates", Utils.getDisplayName(targetUuid), x, y, z, goalDistance)
+    if callback ~= nil then
+        callback()
+    end
+    return false
 end
 
 local function holdPosition(entityUuid)
@@ -222,18 +226,19 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, cal
     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
     if rangeNumber <= 2 then
         debugPrint("************moving into position for melee attack", Utils.getDisplayName(attackerUuid), Utils.getDisplayName(targetUuid), spellName)
-        moveToTargetUuid(attackerUuid, targetUuid, true, callback)
+        return moveToTargetUuid(attackerUuid, targetUuid, true, callback)
     else
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
         local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
         if rangeNumber ~= nil and distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
             debugPrint("******moveIntoPositionForSpell distance > range, moving to...", attackerUuid, targetUuid, rangeNumber, callback)
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber, callback)
+            return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber, callback)
         elseif not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
             debugPrint("moveIntoPositionForSpell can't see target, moving closer", attackerUuid, targetUuid, rangeNumber, callback)
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2, callback)
+            return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2, callback)
         elseif callback ~= nil then
             callback()
+            return true
         end
     end
 end

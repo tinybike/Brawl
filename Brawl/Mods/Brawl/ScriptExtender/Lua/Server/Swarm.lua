@@ -88,12 +88,12 @@ local function freezeAllPlayers(shouldFreezePlayers)
     if players then
         for playerUuid, _ in pairs(players) do
             -- Osi.SetCanJoinCombat(playerUuid, 0)
-            Ext.Timer.WaitFor(200, function ()
-                if shouldFreezePlayers[playerUuid] then
-                    debugPrint(getDisplayName(playerUuid), "freezing player", playerUuid)
-                    freezePlayer(playerUuid)
-                end
-            end)
+            -- Ext.Timer.WaitFor(200, function ()
+            if not shouldFreezePlayers or shouldFreezePlayers[playerUuid] then
+                debugPrint(getDisplayName(playerUuid), "freezing player", playerUuid)
+                freezePlayer(playerUuid)
+            end
+            -- end)
         end
     end
 end
@@ -110,50 +110,47 @@ local function unfreezeAllPlayers()
     end
 end
 
+local function singleCharacterTurn(brawler, brawlerIndex)
+    local hostCharacterUuid = Osi.GetHostCharacter()
+    -- is this ok for non-ToT?
+    if Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
+        Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
+    end
+    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) then
+        debugPrint("don't take turn", brawler.uuid, Osi.CanJoinCombat(brawler.uuid))
+        return false
+    end
+    debugPrint(brawler.displayName, "AI.pulseAction (bonus)", brawler.uuid, brawlerIndex)
+    if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
+        State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+            Movement.setMovementToMax(entity)
+        end, Ext.Entity.Get(brawler.uuid))
+    end
+    Ext.Timer.WaitFor(brawlerIndex*10, function ()
+        if not AI.pulseAction(brawler, true) then
+            debugPrint(brawler.displayName, "bonus action not found, immediate AI.pulseAction", brawler.uuid)
+            return AI.pulseAction(brawler)
+        end
+        Ext.Timer.WaitFor(6000, function ()
+            debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
+            AI.pulseAction(brawler)
+        end)
+    end)
+    return true
+end
+
 -- NB: stay in combat, adjust movement speed as needed
 --     when there's only 3 or 4 enemies auto-disables
-local function startEnemyTurn(canJoinCombat, shouldTakeAction)
-    debugPrint("startEnemyTurn", canJoinCombat, shouldTakeAction)
-    local hostCharacterUuid = Osi.GetHostCharacter()
-    local level = Osi.GetRegion(hostCharacterUuid)
+local function startEnemyTurn()
+    debugPrint("startEnemyTurn")
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                local shouldTakeTurn = true
-                if Osi.IsEnemy(brawlerUuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
-                    Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
-                end
-                if canJoinCombat == 0 then
-                    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
-                        debugPrint("combat helper, don't take turn", brawlerUuid)
-                        shouldTakeTurn = false
-                    end
-                    if State.Session.Players[brawlerUuid] then
-                        debugPrint("player, don't take turn", brawlerUuid, brawler.displayName, Osi.CanJoinCombat(brawlerUuid))
-                        shouldTakeTurn = false
-                    end
-                end
-                debugPrint(getDisplayName(brawlerUuid), "startEnemyTurn", shouldTakeTurn, canJoinCombat)
-                if shouldTakeTurn then
-                    -- Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                    if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        debugPrint(brawler.displayName, "AI.pulseAction once", brawlerUuid, brawlerIndex)
-                        if State.Session.TBSMActionResourceListeners[brawlerUuid] == nil then
-                            State.Session.TBSMActionResourceListeners[brawlerUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-                                Movement.setMovementToMax(entity)
-                            end, Ext.Entity.Get(brawlerUuid))
-                        end
-                        Ext.Timer.WaitFor(brawlerIndex*10, function ()
-                            AI.pulseAction(brawler, true)
-                            Ext.Timer.WaitFor(6000, function ()
-                                debugPrint(brawler.displayName, "AI.pulseAction 2", brawlerUuid)
-                                AI.pulseAction(brawler)
-                            end)
-                        end)
-                        brawlerIndex = brawlerIndex + 1
-                    end
+                if singleCharacterTurn(brawler, brawlerIndex) then
+                    brawlerIndex = brawlerIndex + 1
                 end
             end
         end
@@ -234,18 +231,18 @@ end
 --     end
 -- end
 
-local function startNextRound(combatGuid)
-    debugPrint("startNextRound", combatGuid)
-    local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
-    unfreezeAllPlayers()
-    startEnemyTurn(1)
-    local hostCharacter = Osi.GetHostCharacter()
-    if not isToT() or not Mods.ToT.Player.InCamp() then
-        -- checkPlayersRejoinCombat()
-        Roster.addNearbyToBrawlers(hostCharacter, nearbyRadius, combatGuid)
-        -- checkEnemiesJoinCombat()
-    end
-end
+-- local function startNextRound(combatGuid)
+--     debugPrint("startNextRound", combatGuid)
+--     -- local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
+--     unfreezeAllPlayers()
+--     -- startEnemyTurn(1)
+--     -- local hostCharacter = Osi.GetHostCharacter()
+--     -- if not isToT() or not Mods.ToT.Player.InCamp() then
+--     --     -- checkPlayersRejoinCombat()
+--     --     Roster.addNearbyToBrawlers(hostCharacter, nearbyRadius, combatGuid)
+--     --     -- checkEnemiesJoinCombat()
+--     -- end
+-- end
 
 local function setTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
@@ -266,6 +263,6 @@ return {
     -- checkPlayersRejoinCombat = checkPlayersRejoinCombat,
     checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
     startEnemyTurn = startEnemyTurn,
-    startNextRound = startNextRound,
+    -- startNextRound = startNextRound,
     setTurnComplete = setTurnComplete,
 }

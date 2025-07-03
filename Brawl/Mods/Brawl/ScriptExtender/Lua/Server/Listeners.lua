@@ -31,31 +31,28 @@ local function onCombatStarted(combatGuid)
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if State.Settings.TurnBasedSwarmMode then
-        -- TurnBasedSwarmRoundTracker[combatGuid] = 0
-        Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-        if not isToT() then
-            debugPrint("next round, combat started...", combatGuid)
-            Swarm.startNextRound(combatGuid)
-        end
-        -- Ext.Timer.WaitFor(8000, function ()
-        --     Swarm.startNextRound(combatGuid)
-        -- end)
-    end
-    if level and not State.Settings.TurnBasedSwarmMode then
-        if not isToT() then
-            startBrawlFizzler(level)
-            Ext.Timer.WaitFor(500, function ()
-                Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-                Ext.Timer.WaitFor(1500, function ()
-                    if Osi.CombatIsActive(combatGuid) then
-                        -- NB: is there a way to do this less aggressively?
-                        Osi.EndCombat(combatGuid)
-                    end
-                end)
-            end)
+    if level then
+        if State.Settings.TurnBasedSwarmMode then
+            -- Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+            if not isToT() then
+                -- Swarm.startNextRound(combatGuid)
+                Swarm.unfreezeAllPlayers()
+            end
         else
-            startToTTimers()
+            if not isToT() then
+                startBrawlFizzler(level)
+                Ext.Timer.WaitFor(500, function ()
+                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+                    Ext.Timer.WaitFor(1500, function ()
+                        if Osi.CombatIsActive(combatGuid) then
+                            -- NB: is there a way to do this less aggressively?
+                            Osi.EndCombat(combatGuid)
+                        end
+                    end)
+                end)
+            else
+                startToTTimers()
+            end
         end
     end
 end
@@ -281,11 +278,17 @@ local function onTurnEnded(entityGuid)
                     shouldFreezePlayers[uuid] = Utils.isToT() or Osi.IsInCombat(uuid) == 1
                 end
                 State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-                Swarm.startEnemyTurn(0, true)
-                Swarm.freezeAllPlayers(shouldFreezePlayers)
-                Ext.Timer.WaitFor(12000, function ()
-                    debugPrint("start next round, onTurnEnded delayed")
-                    Swarm.startNextRound()
+                Ext.Timer.WaitFor(1500, function () -- delay to allow new enemies to get scooped up
+                    Swarm.startEnemyTurn()
+                    Swarm.freezeAllPlayers(shouldFreezePlayers)
+                    if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and Mods.ToT.PersistentVars.Scenario.Round == 1 then
+                        debugPrint("start next round immediately (first round ToT)")
+                        return Swarm.unfreezeAllPlayers()
+                    end
+                    Ext.Timer.WaitFor(12000, function ()
+                        debugPrint("start next round, onTurnEnded delayed")
+                        Swarm.unfreezeAllPlayers()
+                    end)
                 end)
             end
         end
@@ -786,9 +789,13 @@ end
 
 local function onLeveledUp(character)
     debugPrint("LeveledUp", character)
-    if character ~= nil and Osi.GetUUID(character) == Osi.GetHostCharacter() then
+    if character ~= nil and Osi.IsPartyMember(character, 1) == 1 then
         State.buildSpellTable()
     end
+end
+
+local function onEntityEvent(object, event)
+    debugPrint("EntityEvent", object, event)
 end
 
 local function stopListeners()
@@ -1000,6 +1007,10 @@ local function startListeners()
     -- }
     State.Session.Listeners.LeveledUp = {
         handle = Ext.Osiris.RegisterListener("LeveledUp", 1, "after", onLeveledUp),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.EntityEvent = {
+        handle = Ext.Osiris.RegisterListener("EntityEvent", 2, "after", onEntityEvent),
         stop = Ext.Osiris.UnregisterListener,
     }
 end

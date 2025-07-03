@@ -416,7 +416,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
         end
         if not actionToTake and bonusActionOnly then
             debugPrint("No hostile bonus actions available for", brawler.uuid, brawler.displayName)
-            return true
+            return false
         end
         if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 and not State.Settings.TurnBasedSwarmMode then
             local numUsableSpells = 0
@@ -782,8 +782,10 @@ local function findTarget(brawler, bonusActionOnly)
             end
             debugDump(weightedTargets)
         end
-        debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
-        Movement.holdPosition(brawler.uuid)
+        if not bonusActionOnly then
+            debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
+            Movement.holdPosition(brawler.uuid)
+        end
         return false
     end
 end
@@ -870,7 +872,7 @@ local function pulseAction(brawler, bonusActionOnly)
             return findTarget(brawler, bonusActionOnly)
         end
         -- If this brawler is dead or unable to fight, stop this pulse
-        stopPulseAction(brawler)
+        return stopPulseAction(brawler)
     end
 end
 
