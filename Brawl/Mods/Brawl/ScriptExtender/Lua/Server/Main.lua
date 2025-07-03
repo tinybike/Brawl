@@ -9,6 +9,7 @@ Pause = require("Server/Pause.lua")
 Quests = require("Server/Quests.lua")
 Commands = require("Server/Commands.lua")
 Listeners = require("Server/Listeners.lua")
+Swarm = require("Server/Swarm.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump

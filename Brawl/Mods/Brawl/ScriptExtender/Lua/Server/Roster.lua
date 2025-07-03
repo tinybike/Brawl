@@ -46,84 +46,6 @@ end
 --     return nil
 -- end
 
-local function checkAllPlayersFinishedTurns()
-    local players = State.Session.Players
-    if players then
-        debugDump(State.Session.TurnBasedSwarmModePlayerTurnEnded)
-        for playerUuid, _ in pairs(players) do
-            local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
-            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
-            if Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
-                return false
-            end
-        end
-        return true
-    end
-    return nil
-end
-
-local function isSwarmTurnComplete(swarmTurnComplete)
-    for _, turnComplete in pairs(swarmTurnComplete) do
-        if not turnComplete then
-            return false
-        end
-    end
-    debugPrint("swarm turn complete!")
-    return true
-end
-
--- NB: stay in combat, adjust movement speed as needed
---     when there's only 3 or 4 enemies auto-disables
-local function allSetCanJoinCombat(canJoinCombat, shouldTakeAction)
-    debugPrint("allSetCanJoinCombat", canJoinCombat, shouldTakeAction)
-    local hostCharacterUuid = Osi.GetHostCharacter()
-    local level = Osi.GetRegion(hostCharacterUuid)
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            local brawlerIndex = 0
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                local setCanJoinCombat = true
-                if Osi.IsEnemy(brawlerUuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
-                    Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
-                end
-                if canJoinCombat == 0 then
-                    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawlerUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
-                        debugPrint("combat helper, staying in combat", brawlerUuid, Osi.CanJoinCombat(brawlerUuid))
-                        setCanJoinCombat = false
-                    end
-                    if State.Session.Players[brawlerUuid] then
-                        debugPrint("player, staying in combat", brawlerUuid, brawler.displayName, Osi.CanJoinCombat(brawlerUuid))
-                        setCanJoinCombat = false
-                    end
-                end
-                debugPrint(Utils.getDisplayName(brawlerUuid), "set can join combat", setCanJoinCombat, canJoinCombat)
-                if setCanJoinCombat then
-                    -- Osi.SetCanJoinCombat(brawlerUuid, canJoinCombat)
-                    if shouldTakeAction and Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        debugPrint(brawler.displayName, "AI.pulseAction once", brawlerUuid, brawlerIndex)
-                        if State.Session.TBSMActionResourceListeners[brawlerUuid] == nil then
-                            State.Session.TBSMActionResourceListeners[brawlerUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-                                Movement.setMovementToMax(entity)
-                            end, Ext.Entity.Get(brawlerUuid))
-                        end
-                        Ext.Timer.WaitFor(brawlerIndex*10, function ()
-                            -- Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
-                            AI.pulseAction(brawler, true)
-                            Ext.Timer.WaitFor(6000, function ()
-                                debugPrint(brawler.displayName, "AI.pulseAction 2", brawlerUuid)
-                                -- Movement.setMovementToMax(Ext.Entity.Get(brawlerUuid))
-                                AI.pulseAction(brawler)
-                            end)
-                        end)
-                        brawlerIndex = brawlerIndex + 1
-                    end
-                end
-            end
-        end
-    end
-end
-
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = Osi.GetRegion(entityUuid)
@@ -330,6 +252,4 @@ return {
     disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,
     initBrawlers = initBrawlers,
-    allSetCanJoinCombat = allSetCanJoinCombat,
-    checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
 }
