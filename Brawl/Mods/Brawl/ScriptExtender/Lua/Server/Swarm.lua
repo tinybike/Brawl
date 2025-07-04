@@ -112,12 +112,13 @@ end
 
 local function singleCharacterTurn(brawler, brawlerIndex)
     local hostCharacterUuid = Osi.GetHostCharacter()
+    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
     -- is this ok for non-ToT?
     if Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) then
-        debugPrint("don't take turn", brawler.uuid, Osi.CanJoinCombat(brawler.uuid))
+    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
+        debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
     debugPrint(brawler.displayName, "AI.pulseAction (bonus)", brawler.uuid, brawlerIndex)
@@ -141,7 +142,7 @@ end
 
 -- NB: stay in combat, adjust movement speed as needed
 --     when there's only 3 or 4 enemies auto-disables
-local function startEnemyTurn()
+local function startEnemyTurn(canActBeforeDelay)
     debugPrint("startEnemyTurn")
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
@@ -149,7 +150,7 @@ local function startEnemyTurn()
         if brawlersInLevel then
             local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if singleCharacterTurn(brawler, brawlerIndex) then
+                if canActBeforeDelay[brawlerUuid] ~= false and singleCharacterTurn(brawler, brawlerIndex) then
                     brawlerIndex = brawlerIndex + 1
                 end
             end
