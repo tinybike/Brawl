@@ -79,6 +79,7 @@ local Session = {
     ModStatusMessageTimer = nil,
     TurnBasedSwarmModePlayerTurnEnded = {},
     TBSMActionResourceListeners = {},
+    SwarmTurnComplete = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -87,7 +88,7 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
-Ext.Vars.RegisterModVariable(ModuleUUID, "FrozenPlayerResources", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "FrozenResources", {Server = true, Client = false, SyncToClient = false})
 
 local function hasTargetCondition(targetConditionString, condition)
     local parts = {}
@@ -805,7 +806,7 @@ end
 
 local function setMaxPartySize()
     Osi.SetMaxPartySizeOverride(Settings.MaxPartySize)
-	Osi.PROC_CheckPartyFull()
+    Osi.PROC_CheckPartyFull()
 end
 
 local function setupPlayer(guid)

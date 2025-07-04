@@ -99,7 +99,7 @@ end
 local function onLevelGameplayStarted(level, _)
     debugPrint("LevelGameplayStarted", level)
     -- debugDump(Utils.getPersistentModVars())
-    -- debugDump(Utils.getPersistentModVars("FrozenPlayerResources"))
+    -- debugDump(Utils.getPersistentModVars("FrozenResources"))
     -- debugDump(Utils.getPersistentModVars("ModifiedHitpoints"))
     onStarted(level)
 end
@@ -252,7 +252,7 @@ end
 
 local function onTurnStarted(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        debugPrint("TurnStarted", entityGuid)
+        print("TurnStarted", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
         if entityUuid then
             if Osi.IsPartyMember(entityUuid, 1) == 1 then
@@ -260,58 +260,25 @@ local function onTurnStarted(entityGuid)
             -- elseif not Utils.isToT() then
             --     Swarm.setTurnComplete(entityUuid)
             -- elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
-            else
+            -- else
                 -- start enemy turn here instead...?
                 -- if all players finished turns, then apply freezePlayer to the enemy (to keep the turn open)
                 -- and do the enemy turns, THEN setTurnComplete to finish up?
-                Swarm.setTurnComplete(entityUuid)
+                -- Swarm.setTurnComplete(entityUuid)
             end
         end
     end
-end
-
-local function allBrawlersCanAct()
-    local brawlersCanAct = {}
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                brawlersCanAct[brawlerUuid] = Utils.canAct(brawlerUuid)
-                -- brawlersCanAct[brawlerUuid] = true
-            end
-        end
-    end
-    return brawlersCanAct
 end
 
 local function onTurnEnded(entityGuid)
-    -- NB: how's this work for the "environmental turn"?
     if State.Settings.TurnBasedSwarmMode and Osi.IsPartyMember(entityGuid, 1) == 1 then
         debugPrint("TurnEnded", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
         if entityUuid then
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
-            local allPlayersFinishedTurns = Swarm.checkAllPlayersFinishedTurns()
-            if allPlayersFinishedTurns then
-                local shouldFreezePlayers = {}
-                for uuid, _ in pairs(State.Session.Players) do
-                    shouldFreezePlayers[uuid] = Utils.isToT() or Osi.IsInCombat(uuid) == 1
-                end
-                State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-                local canActBeforeDelay = allBrawlersCanAct()
-                Ext.Timer.WaitFor(1500, function () -- delay to allow new enemies to get scooped up
-                    Swarm.startEnemyTurn(canActBeforeDelay)
-                    Swarm.freezeAllPlayers(shouldFreezePlayers)
-                    if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and Mods.ToT.PersistentVars.Scenario.Round == 1 then
-                        debugPrint("start next round immediately (first round ToT)")
-                        return Swarm.unfreezeAllPlayers()
-                    end
-                    Ext.Timer.WaitFor(12000, function ()
-                        debugPrint("start next round, onTurnEnded delayed")
-                        Swarm.unfreezeAllPlayers()
-                    end)
-                end)
+            if Swarm.checkAllPlayersFinishedTurns() then
+                print("Started Swarm turn!")
+                Swarm.startSwarmTurn()
             end
         end
     end

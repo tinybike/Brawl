@@ -1,9 +1,10 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
+Constants.SWARM_TURN_DURATION = 12000
 Constants.BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 Constants.LIE_ON_GROUND_TIMEOUT = 3500
 Constants.COUNTDOWN_TURN_INTERVAL = 6000
