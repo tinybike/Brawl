@@ -261,6 +261,9 @@ local function onTurnStarted(entityGuid)
             --     Swarm.setTurnComplete(entityUuid)
             -- elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
             else
+                -- start enemy turn here instead...?
+                -- if all players finished turns, then apply freezePlayer to the enemy (to keep the turn open)
+                -- and do the enemy turns, THEN setTurnComplete to finish up?
                 Swarm.setTurnComplete(entityUuid)
             end
         end

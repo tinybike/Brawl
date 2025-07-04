@@ -250,6 +250,9 @@ Constants.NO_ACTION_STATUSES = {
     "STUNNED",
     "STUNNED_STUNNINGGAZE",
     "PETRIFIED",
+    "HOLD_PERSON",
+    "HOLD_PERSON_MONK",
+    "PARALYZED",
 }
 
 return Constants
