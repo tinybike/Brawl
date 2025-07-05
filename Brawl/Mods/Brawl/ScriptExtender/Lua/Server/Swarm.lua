@@ -6,13 +6,57 @@ local isToT = Utils.isToT
 
 local function setTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if not entity.TurnBased.TurnActionsCompleted then
-        debugPrint(getDisplayName(uuid), "Setting turn complete", uuid)
+    if entity.TurnBased and not entity.TurnBased.TurnActionsCompleted then
+        print(getDisplayName(uuid), "Setting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = true
         entity.TurnBased.RequestedEndTurn = true
         entity.TurnBased.TurnActionsCompleted = true
         -- entity.TurnBased.CanActInCombat = false
         entity:Replicate("TurnBased")
+        State.Session.SwarmTurnComplete[uuid] = true
+    end
+end
+
+local function unsetTurnComplete(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity.TurnBased then
+        print(getDisplayName(uuid), "Unsetting turn complete", uuid)
+        entity.TurnBased.HadTurnInCombat = false
+        entity.TurnBased.RequestedEndTurn = false
+        entity.TurnBased.TurnActionsCompleted = false
+        -- entity.TurnBased.CanActInCombat = false
+        entity:Replicate("TurnBased")
+        State.Session.SwarmTurnComplete[uuid] = false
+    end
+end
+
+local function setAllEnemyTurnsComplete()
+    print("setAllEnemyTurnsComplete")
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, _ in pairs(brawlersInLevel) do
+                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    setTurnComplete(brawlerUuid)
+                end
+            end
+        end
+    end
+end
+
+local function unsetAllEnemyTurnsComplete()
+    print("unsetAllEnemyTurnsComplete")
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    if level then
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel then
+            for brawlerUuid, _ in pairs(brawlersInLevel) do
+                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                    unsetTurnComplete(brawlerUuid)
+                end
+            end
+        end
     end
 end
 
@@ -147,8 +191,11 @@ local function resetSwarmTurnComplete()
             for brawlerUuid, _ in pairs(brawlersInLevel) do
                 if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     print("setting turn complete for", brawlerUuid, Utils.getDisplayName(brawlerUuid))
-                    -- change this so the player's turn doesn't start UNTIL this triggers
-                    setTurnComplete(brawlerUuid)
+                    local entity = Ext.Entity.Get(brawlerUuid)
+                    _D(entity.TurnBased)
+                    if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
+                        setTurnComplete(brawlerUuid)
+                    end
                     State.Session.SwarmTurnComplete[brawlerUuid] = false
                 end
             end
@@ -163,8 +210,21 @@ local function completeSwarmTurn(uuid)
         _D(State.Session.SwarmTurnComplete)
         if checkSwarmTurnComplete() then
             resetSwarmTurnComplete()
+            unfreezeAllPlayers()
         end
     end)
+end
+
+local function isControlledByDefaultAI(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    -- do we need to flag an enemy for active status?
+    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
+        print("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
+        State.Session.SwarmTurnComplete[uuid] = true
+        -- completeSwarmTurn(uuid)
+        return true
+    end
+    return false
 end
 
 local function singleCharacterTurn(brawler, brawlerIndex)
@@ -179,25 +239,32 @@ local function singleCharacterTurn(brawler, brawlerIndex)
         -- State.Session.SwarmTurnComplete[brawler.uuid] = true
         return false
     end
+    if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
+        return false
+    end
     debugPrint(brawler.displayName, "AI.pulseAction (bonus)", brawler.uuid, brawlerIndex)
     if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
         State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
             Movement.setMovementToMax(entity)
         end, Ext.Entity.Get(brawler.uuid))
     end
-    Ext.Timer.WaitFor(brawlerIndex*10, function ()
+    -- Ext.Timer.WaitFor(brawlerIndex*10, function ()
+    if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
         if not AI.pulseAction(brawler, true) then
             debugPrint(brawler.displayName, "bonus action not found, immediate AI.pulseAction", brawler.uuid)
             AI.pulseAction(brawler)
             completeSwarmTurn(brawler.uuid)
         else
             Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
-                debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
-                AI.pulseAction(brawler)
-                completeSwarmTurn(brawler.uuid)
+                if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+                    debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
+                    AI.pulseAction(brawler)
+                    completeSwarmTurn(brawler.uuid)
+                end
             end)
         end
-    end)
+    end
+    -- end)
     return true
 end
 
@@ -274,6 +341,9 @@ local function allBrawlersCanAct()
     return brawlersCanAct
 end
 
+-- the FIRST enemy to go uses the built-in AI and takes its turn normally, this keeps the turn open
+-- all other enemies go at the same time, using the Brawl AI
+-- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
 local function startSwarmTurn()
     local shouldFreezePlayers = {}
     for uuid, _ in pairs(State.Session.Players) do
@@ -282,16 +352,27 @@ local function startSwarmTurn()
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     local canActBeforeDelay = allBrawlersCanAct()
     Ext.Timer.WaitFor(1500, function () -- delay to allow new enemies to get scooped up
+        print("startSwarmTurn", Mods.ToT.PersistentVars.Scenario.Round)
+        -- if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil then
+        --     if Mods.ToT.PersistentVars.Scenario.Round <= 1 then
+        --         print("start next round immediately (prep round ToT)")
+        --         return
+        --     end
+        -- end
+        if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
+            State.Session.TBSMToTSkippedPrepRound = true
+            print("SKIPPING PREP ROUND...")
+            return
+        end
         startEnemyTurn(canActBeforeDelay)
         freezeAllPlayers(shouldFreezePlayers)
-        if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and Mods.ToT.PersistentVars.Scenario.Round == 1 then
-            debugPrint("start next round immediately (first round ToT)")
-            return unfreezeAllPlayers()
-        end
-        Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION, function ()
-            debugPrint("start next round, onTurnEnded delayed")
-            unfreezeAllPlayers()
-        end)
+        --     debugPrint("start next round immediately (first round ToT)")
+        --     return unfreezeAllPlayers()
+        -- end
+        -- Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION, function ()
+        --     debugPrint("start next round, onTurnEnded delayed")
+        --     unfreezeAllPlayers()
+        -- end)
     end)
 end
 
@@ -344,6 +425,9 @@ end
 
 return {
     setTurnComplete = setTurnComplete,
+    unsetTurnComplete = unsetTurnComplete,
+    setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,
+    unsetAllEnemyTurnsComplete = unsetAllEnemyTurnsComplete,
     isFrozen = isFrozen,
     freezeCharacter = freezeCharacter,
     unfreezeCharacter = unfreezeCharacter,

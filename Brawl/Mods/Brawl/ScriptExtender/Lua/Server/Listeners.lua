@@ -22,6 +22,7 @@ local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
     -- NB: clean this up / don't reassign "constant" values
     if isToT() then
+        State.Session.TBSMToTSkippedPrepRound = false
         Constants.ENTER_COMBAT_RANGE = 100
     else
         Constants.ENTER_COMBAT_RANGE = 20
@@ -131,10 +132,13 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    debugPrint("EnteredCombat", entityGuid, combatGuid)
+    print("EnteredCombat", entityGuid, combatGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     if entityUuid then
         Roster.addBrawler(entityUuid, true)
+        -- if State.Settings.TurnBasedSwarmMode then
+        --     State.Session.SwarmTurnComplete[entityUuid] = true
+        -- end
     end
 end
 
@@ -257,14 +261,18 @@ local function onTurnStarted(entityGuid)
         if entityUuid then
             if Osi.IsPartyMember(entityUuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
+                Swarm.unsetAllEnemyTurnsComplete()
             -- elseif not Utils.isToT() then
             --     Swarm.setTurnComplete(entityUuid)
-            -- elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
+            elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
             -- else
                 -- start enemy turn here instead...?
                 -- if all players finished turns, then apply freezePlayer to the enemy (to keep the turn open)
                 -- and do the enemy turns, THEN setTurnComplete to finish up?
-                -- Swarm.setTurnComplete(entityUuid)
+                -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
+                --     print("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
+                --     Swarm.setTurnComplete(entityUuid)
+                -- end
             end
         end
     end

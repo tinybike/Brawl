@@ -79,6 +79,7 @@ local Session = {
     ModStatusMessageTimer = nil,
     TurnBasedSwarmModePlayerTurnEnded = {},
     TBSMActionResourceListeners = {},
+    TBSMToTSkippedPrepRound = false,
     SwarmTurnComplete = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
