@@ -352,7 +352,7 @@ local function startSwarmTurn()
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     local canActBeforeDelay = allBrawlersCanAct()
     Ext.Timer.WaitFor(1500, function () -- delay to allow new enemies to get scooped up
-        print("startSwarmTurn", Mods.ToT.PersistentVars.Scenario.Round)
+        -- print("startSwarmTurn", Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round)
         -- if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil then
         --     if Mods.ToT.PersistentVars.Scenario.Round <= 1 then
         --         print("start next round immediately (prep round ToT)")

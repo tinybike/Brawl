@@ -296,6 +296,9 @@ local function onDied(entityGuid)
     debugPrint("Died", entityGuid)
     local level = Osi.GetRegion(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
+    if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
+        State.Session.SwarmTurnComplete[entityUuid] = nil
+    end
     if level ~= nil and entityUuid ~= nil and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] ~= nil then
         -- Sometimes units don't appear dead when killed out-of-combat...
         -- this at least makes them lie prone (and dead-appearing units still appear dead)

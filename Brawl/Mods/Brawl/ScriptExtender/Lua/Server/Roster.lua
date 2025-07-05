@@ -162,6 +162,9 @@ local function removeBrawler(level, entityUuid)
             Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[entityUuid])
             State.Session.TBSMActionResourceListeners[entityUuid] = nil
         end
+        if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
+            State.Session.SwarmTurnComplete[entityUuid] = nil
+        end
     end
 end
 
@@ -177,6 +180,8 @@ local function endBrawl(level)
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
+    State.Session.SwarmTurnComplete = {}
+    State.Session.TBSMActionResourceListeners = {}
     -- stopPulseReposition(level)
     stopBrawlFizzler(level)
 end
