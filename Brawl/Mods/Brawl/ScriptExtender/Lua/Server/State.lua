@@ -81,6 +81,7 @@ local Session = {
     TBSMActionResourceListeners = {},
     TBSMToTSkippedPrepRound = false,
     SwarmTurnComplete = {},
+    ResurrectedPlayer = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 

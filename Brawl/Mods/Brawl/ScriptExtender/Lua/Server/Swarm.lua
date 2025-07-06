@@ -71,101 +71,6 @@ local function isFrozen(uuid)
     return true
 end
 
-local function freezeCharacter(uuid)
-    -- local entity = Ext.Entity.Get(uuid)
-    -- local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-    -- if modVars.FrozenResources == nil then
-    --     modVars.FrozenResources = {}
-    -- end
-    -- local frozenResources = modVars.FrozenResources
-    -- if not frozenResources[uuid] then
-    --     frozenResources[uuid] = {}
-    --     if entity.ActionResources and entity.ActionResources.Resources then
-    --         local actionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint]
-    --         if actionPoints and actionPoints[1] and actionPoints[1].Amount ~= nil then
-    --             frozenResources[uuid].ActionPoint = actionPoints[1].Amount
-    --         end
-    --         local bonusActionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint]
-    --         if bonusActionPoints and bonusActionPoints[1] and bonusActionPoints[1].Amount ~= nil then
-    --             frozenResources[uuid].BonusActionPoint = bonusActionPoints[1].Amount
-    --         end
-    --     end
-    --     if entity.CanMove and entity.CanMove.Flags ~= nil then
-    --         frozenResources[uuid].CanMoveFlags = {}
-    --         for _, flag in ipairs(entity.CanMove.Flags) do
-    --            table.insert(frozenResources[uuid].CanMoveFlags, flag)
-    --         end
-    --     end
-    --     modVars.FrozenResources[uuid] = frozenResources[uuid]
-    -- end
-    -- -- debugPrint("FREEZE: FROZEN PLAYER RESOURCES")
-    -- -- debugDump(frozenResources)
-    -- entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 0
-    -- entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 0
-    -- entity.CanMove.Flags = {}
-    -- entity:Replicate("ActionResources")
-    -- entity:Replicate("CanMove")
-end
-
-local function unfreezeCharacter(uuid)
-    -- local entity = Ext.Entity.Get(uuid)
-    -- local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-    -- if modVars.FrozenResources == nil then
-    --     modVars.FrozenResources = {}
-    -- end
-    -- local frozenResources = modVars.FrozenResources
-    -- -- debugPrint("UNFREEZE: FROZEN PLAYER RESOURCES")
-    -- -- debugDump(frozenResources)
-    -- if frozenResources[uuid] then
-    --     if entity.ActionResources and entity.ActionResources.Resources then
-    --         local actionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint]
-    --         if actionPoints and actionPoints[1] and frozenResources[uuid].ActionPoint ~= nil then
-    --             entity.ActionResources.Resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = frozenResources[uuid].ActionPoint
-    --         end
-    --         local bonusActionPoints = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint]
-    --         if bonusActionPoints and bonusActionPoints[1] and frozenResources[uuid].BonusActionPoint ~= nil then
-    --             entity.ActionResources.Resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = frozenResources[uuid].BonusActionPoint
-    --         end
-    --     end
-    --     if entity.CanMove and frozenResources[uuid].CanMoveFlags ~= nil then
-    --         entity.CanMove.Flags = frozenResources[uuid].CanMoveFlags
-    --     end
-    --     frozenResources[uuid] = nil
-    -- end
-    -- entity:Replicate("ActionResources")
-    -- entity:Replicate("CanMove")
-    -- modVars.FrozenResources = frozenResources
-end
-
-local function freezeAllPlayers(shouldFreezePlayers)
-    -- debugPrint("freezeAllPlayers")
-    -- debugDump(shouldFreezePlayers)
-    local players = State.Session.Players
-    if players then
-        for playerUuid, _ in pairs(players) do
-            -- Osi.SetCanJoinCombat(playerUuid, 0)
-            -- Ext.Timer.WaitFor(200, function ()
-            if not shouldFreezePlayers or shouldFreezePlayers[playerUuid] then
-                debugPrint(getDisplayName(playerUuid), "freezing player", playerUuid)
-                freezeCharacter(playerUuid)
-            end
-            -- end)
-        end
-    end
-end
-
-local function unfreezeAllPlayers()
-    local players = State.Session.Players
-    if players then
-        for playerUuid, _ in pairs(players) do
-            -- Osi.SetCanJoinCombat(playerUuid, 1)
-            Ext.Timer.WaitFor(200, function ()
-                unfreezeCharacter(playerUuid)
-            end)
-        end
-    end
-end
-
 local function checkSwarmTurnComplete()
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
@@ -210,7 +115,6 @@ local function completeSwarmTurn(uuid)
         _D(State.Session.SwarmTurnComplete)
         if checkSwarmTurnComplete() then
             resetSwarmTurnComplete()
-            unfreezeAllPlayers()
         end
     end)
 end
@@ -352,27 +256,12 @@ local function startSwarmTurn()
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     local canActBeforeDelay = allBrawlersCanAct()
     Ext.Timer.WaitFor(2500, function () -- delay to allow new enemies to get scooped up
-        -- print("startSwarmTurn", Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round)
-        -- if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil then
-        --     if Mods.ToT.PersistentVars.Scenario.Round <= 1 then
-        --         print("start next round immediately (prep round ToT)")
-        --         return
-        --     end
-        -- end
         if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
             State.Session.TBSMToTSkippedPrepRound = true
             print("SKIPPING PREP ROUND...")
             return
         end
         startEnemyTurn(canActBeforeDelay)
-        freezeAllPlayers(shouldFreezePlayers)
-        --     debugPrint("start next round immediately (first round ToT)")
-        --     return unfreezeAllPlayers()
-        -- end
-        -- Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION, function ()
-        --     debugPrint("start next round, onTurnEnded delayed")
-        --     unfreezeAllPlayers()
-        -- end)
     end)
 end
 
@@ -392,50 +281,12 @@ local function checkAllPlayersFinishedTurns()
     return nil
 end
 
--- local function checkEnemiesJoinCombat()
---     local hostCharacterUuid = Osi.GetHostCharacter()
---     local level = Osi.GetRegion(hostCharacterUuid)
---     if level then
---         local brawlersInLevel = State.Session.Brawlers[level]
---         if brawlersInLevel then
---             for brawlerUuid, brawler in pairs(brawlersInLevel) do
---                 debugPrint(brawler.displayName, "check for join combat")
---                 -- NB: what about withers? act 3 civilians? etc 0133f2ad-e121-4590-b5f0-a79413919805
---                 --     do we even need this apart from ToT?
---                 if Osi.IsPartyMember(brawlerUuid, 1) == 0 and not Utils.isPlayerOrAlly(brawlerUuid) then
---                     Osi.SetRelationTemporaryHostile(brawlerUuid, hostCharacterUuid)
---                 end
---             end
---         end
---     end
--- end
-
--- local function startNextRound(combatGuid)
---     debugPrint("startNextRound", combatGuid)
---     -- local nearbyRadius = isToT() and 150 or Constants.NEARBY_RADIUS
---     unfreezeAllPlayers()
---     -- startEnemyTurn(1)
---     -- local hostCharacter = Osi.GetHostCharacter()
---     -- if not isToT() or not Mods.ToT.Player.InCamp() then
---     --     -- checkPlayersRejoinCombat()
---     --     Roster.addNearbyToBrawlers(hostCharacter, nearbyRadius, combatGuid)
---     --     -- checkEnemiesJoinCombat()
---     -- end
--- end
-
 return {
     setTurnComplete = setTurnComplete,
     unsetTurnComplete = unsetTurnComplete,
     setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,
     unsetAllEnemyTurnsComplete = unsetAllEnemyTurnsComplete,
-    isFrozen = isFrozen,
-    freezeCharacter = freezeCharacter,
-    unfreezeCharacter = unfreezeCharacter,
-    freezeAllPlayers = freezeAllPlayers,
-    unfreezeAllPlayers = unfreezeAllPlayers,
-    -- checkPlayersRejoinCombat = checkPlayersRejoinCombat,
     startSwarmTurn = startSwarmTurn,
     checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
     startEnemyTurn = startEnemyTurn,
-    -- startNextRound = startNextRound,
 }

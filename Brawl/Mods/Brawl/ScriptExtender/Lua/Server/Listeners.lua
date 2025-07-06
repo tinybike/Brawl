@@ -19,25 +19,34 @@ local function onCharacterMoveFailedUseJump(character)
 end
 
 local function onCombatStarted(combatGuid)
-    debugPrint("CombatStarted", combatGuid)
+    print("CombatStarted", combatGuid)
     -- NB: clean this up / don't reassign "constant" values
     if isToT() then
-        State.Session.TBSMToTSkippedPrepRound = false
+        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
+            State.Session.TBSMToTSkippedPrepRound = false
+        else
+            State.Session.TBSMToTSkippedPrepRound = true
+        end
         Constants.ENTER_COMBAT_RANGE = 100
     else
         Constants.ENTER_COMBAT_RANGE = 20
     end
-    local players = State.Session.Players
-    for playerUuid, _ in pairs(players) do
+    for playerUuid, _ in pairs(State.Session.Players) do
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         if State.Settings.TurnBasedSwarmMode then
-            -- Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-            if not isToT() then
-                -- Swarm.startNextRound(combatGuid)
-                Swarm.unfreezeAllPlayers()
+            local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+            if serverEnterRequestEntities then
+                local combatEntity = serverEnterRequestEntities[1]
+                if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+                    for _, participant in ipairs(combatEntity.CombatState.Participants) do
+                        if not State.Session.Players[participant.Uuid.EntityUuid] then
+                            Roster.addBrawler(participant.Uuid.EntityUuid, true)
+                        end
+                    end
+                end
             end
         else
             if not isToT() then
@@ -98,7 +107,7 @@ local function onUserReservedFor(entity, _, _)
 end
 
 local function onLevelGameplayStarted(level, _)
-    debugPrint("LevelGameplayStarted", level)
+    print("LevelGameplayStarted", level)
     -- debugDump(Utils.getPersistentModVars())
     -- debugDump(Utils.getPersistentModVars("FrozenResources"))
     -- debugDump(Utils.getPersistentModVars("ModifiedHitpoints"))
@@ -108,16 +117,7 @@ end
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
-        -- Swarm.checkPlayersRejoinCombat()
-        -- if round == 1 then
-        --     debugPrint("First round")
-        --     Swarm.startNextRound(combatGuid)
-        -- else
-        --     debugPrint("Later round", round)
-        --     Ext.Timer.WaitFor(8000, function ()
-        --         Swarm.startNextRound(combatGuid)
-        --     end)
-        -- end
+        Swarm.unsetAllEnemyTurnsComplete()
     else
         if isToT() then
             startToTTimers()
@@ -132,13 +132,24 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    print("EnteredCombat", entityGuid, combatGuid)
+    debugPrint("EnteredCombat", entityGuid, combatGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     if entityUuid then
         Roster.addBrawler(entityUuid, true)
-        -- if State.Settings.TurnBasedSwarmMode then
-        --     State.Session.SwarmTurnComplete[entityUuid] = true
-        -- end
+        if State.Settings.TurnBasedSwarmMode and Osi.IsPartyMember(entityUuid, 1) == 1 and State.Session.ResurrectedPlayer[entityUuid] then
+            State.Session.ResurrectedPlayer[entityUuid] = nil
+            local initiativeRoll = Roster.rollForInitiative(entityUuid)
+            local entity = Ext.Entity.Get(entityUuid)
+            if entity and entity.CombatParticipant then
+                entity.CombatParticipant.InitiativeRoll = initiativeRoll
+                if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+                    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = initiativeRolls
+                    entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+                end
+                entity:Replicate("CombatParticipant")
+            end
+            -- State.Session.SwarmTurnComplete[entityUuid] = true
+        end
     end
 end
 
@@ -261,14 +272,7 @@ local function onTurnStarted(entityGuid)
         if entityUuid then
             if Osi.IsPartyMember(entityUuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
-                Swarm.unsetAllEnemyTurnsComplete()
-            -- elseif not Utils.isToT() then
-            --     Swarm.setTurnComplete(entityUuid)
             elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
-            -- else
-                -- start enemy turn here instead...?
-                -- if all players finished turns, then apply freezePlayer to the enemy (to keep the turn open)
-                -- and do the enemy turns, THEN setTurnComplete to finish up?
                 -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
                 --     print("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
                 --     Swarm.setTurnComplete(entityUuid)
@@ -309,6 +313,17 @@ local function onDied(entityGuid)
         end)
         Roster.removeBrawler(level, entityUuid)
         Roster.checkForEndOfBrawl(level)
+    end
+end
+
+local function onResurrected(entityGuid)
+    debugPrint("Resurrected", entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid and Osi.IsPartyMember(entityUuid, 1) == 1 then
+            State.Session.ResurrectedPlayer[entityUuid] = true
+            State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+        end
     end
 end
 
@@ -859,6 +874,10 @@ local function startListeners()
     }
     State.Session.Listeners.Died = {
         handle = Ext.Osiris.RegisterListener("Died", 1, "after", onDied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.Resurrected = {
+        handle = Ext.Osiris.RegisterListener("Resurrected", 1, "after", onResurrected),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.GainedControl = {

@@ -165,6 +165,9 @@ local function removeBrawler(level, entityUuid)
         if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
             State.Session.SwarmTurnComplete[entityUuid] = nil
         end
+        if State.Session.ResurrectedPlayer[entityUuid] ~= nil then
+            State.Session.ResurrectedPlayer[entityUuid] = nil
+        end
     end
 end
 
@@ -238,7 +241,7 @@ local function initBrawlers(level)
     State.Session.Brawlers[level] = {}
     local players = State.Session.Players
     for playerUuid, player in pairs(players) do
-        if player.isControllingDirectly then
+        if not State.Settings.TurnBasedSwarmMode and player.isControllingDirectly then
             startPulseAddNearby(playerUuid)
         end
         if Osi.IsInCombat(playerUuid) == 1 then
@@ -246,10 +249,13 @@ local function initBrawlers(level)
             break
         end
     end
-    startPulseReposition(level)
+    if not State.Settings.TurnBasedSwarmMode then
+        startPulseReposition(level)
+    end
 end
 
 return {
+    rollForInitiative = rollForInitiative,
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
     endBrawl = endBrawl,
