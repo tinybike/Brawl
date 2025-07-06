@@ -256,9 +256,7 @@ Constants.NO_ACTION_STATUSES = {
     "PARALYZED",
     "HOLD_MONSTER",
     "FROZEN",
-    "SG_Frightened",
     "SG_Incapacitated",
-    "SG_Restrained",
     "SG_Stunned",
     "SG_Unconscious",
 }

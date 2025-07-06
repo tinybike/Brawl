@@ -135,7 +135,7 @@ local function singleCharacterTurn(brawler, brawlerIndex)
     local hostCharacterUuid = Osi.GetHostCharacter()
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
     -- is this ok for non-ToT?
-    if Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
+    if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
     if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
