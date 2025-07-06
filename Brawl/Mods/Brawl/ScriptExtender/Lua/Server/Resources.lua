@@ -123,7 +123,7 @@ local function deductCastedSpell(uuid, spellName)
                         end
                     end
                 end
-            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            elseif State.Settings.TurnBasedSwarmMode or (costType ~= "ActionPoint" and costType ~= "BonusActionPoint") then
                 if costType == "SpellSlot" then
                     if entity.ActionResources and entity.ActionResources.Resources then
                         local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
@@ -143,7 +143,13 @@ local function deductCastedSpell(uuid, spellName)
                         local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
                         if resources then
                             local resource = resources[1] -- NB: always index 1?
-                            resource.Amount = resource.Amount - costValue
+                            if resource.Amount ~= nil then
+                                if resource.Amount >= costValue then
+                                    resource.Amount = resource.Amount - costValue
+                                else
+                                    resource.Amount = 0
+                                end
+                            end
                         end
                     end
                 end
