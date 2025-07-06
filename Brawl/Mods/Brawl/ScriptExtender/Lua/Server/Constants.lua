@@ -254,6 +254,13 @@ Constants.NO_ACTION_STATUSES = {
     "HOLD_PERSON",
     "HOLD_PERSON_MONK",
     "PARALYZED",
+    "HOLD_MONSTER",
+    "FROZEN",
+    "SG_Frightened",
+    "SG_Incapacitated",
+    "SG_Restrained",
+    "SG_Stunned",
+    "SG_Unconscious",
 }
 
 return Constants
