@@ -74,7 +74,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
         field_B0 = 3359090190287412865,
         field_B8 = -1518500991745074566,
     }
-    _D(request)
+    -- _D(request)
     Ext.System.ServerCastRequest.OsirisCastRequests[#Ext.System.ServerCastRequest.OsirisCastRequests + 1] = request
 end
 

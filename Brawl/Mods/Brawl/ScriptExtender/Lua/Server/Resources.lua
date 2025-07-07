@@ -181,21 +181,23 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     if targetUuid == nil then
         return false
     end
-    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-        return false
-    end
-    if variant ~= nil then
-        spellName = variant
-    end
-    if upcastLevel ~= nil then
-        spellName = spellName .. "_" .. tostring(upcastLevel)
-    end
     clearOsirisQueue(casterUuid)
-    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
-    Osi.UseSpell(casterUuid, spellName, targetUuid)
-    -- AI.queueSpellRequest(casterUuid, spellName, targetUuid)
+    print(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    AI.queueSpellRequest(casterUuid, spellName, targetUuid)
+    -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
+    --     return false
+    -- end
+    -- if variant ~= nil then
+    --     spellName = variant
+    -- end
+    -- if upcastLevel ~= nil then
+    --     spellName = spellName .. "_" .. tostring(upcastLevel)
+    -- end
+    -- clearOsirisQueue(casterUuid)
+    -- State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    -- debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
