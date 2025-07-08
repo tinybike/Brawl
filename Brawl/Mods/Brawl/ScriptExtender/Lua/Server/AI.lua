@@ -45,13 +45,13 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
--- NB: requires SEv25 (currently devel only)
 -- thank u focus and mazzle
+-- cache values so we don't have to get from stats
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
     local stats = Ext.Stats.Get(spellName)
     local request = {
         -- include NoMovement?
-        CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "IgnoreCastChecks", "IgnoreTargetChecks", "ShowPrepareAnimation"}),
+        CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation"}),
         Caster = Ext.Entity.Get(casterUuid),
         NetGuid = "",
         Originator = {

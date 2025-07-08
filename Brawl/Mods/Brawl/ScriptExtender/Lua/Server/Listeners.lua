@@ -129,6 +129,14 @@ end
 
 local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        State.Session.SwarmTurnComplete = {}
+        if State.Session.SwarmTurnTimer ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+            State.Session.SwarmTurnTimer = nil
+        end
+        State.Session.TBSMActionResourceListeners = {}
+    end
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
@@ -813,6 +821,28 @@ local function onEntityEvent(object, event)
     debugPrint("EntityEvent", object, event)
 end
 
+local function onReactionInterruptActionNeeded(characterGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        print("ReactionInterruptActionNeeded", characterGuid)
+        local uuid = Osi.GetUUID(characterGuid)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
+            print("pausing swarm turn timer")
+            Ext.Timer.Pause(State.Session.SwarmTurnTimer)
+        end
+    end
+end
+
+local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+    if State.Settings.TurnBasedSwarmMode then
+        print("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+        local uuid = Osi.GetUUID(characterGuid)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
+            print("resuming swarm turn timer")
+            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+        end
+    end
+end
+
 local function stopListeners()
     cleanupAll()
     local listeners = State.Session.Listeners
@@ -1030,6 +1060,14 @@ local function startListeners()
     }
     State.Session.Listeners.EntityEvent = {
         handle = Ext.Osiris.RegisterListener("EntityEvent", 2, "after", onEntityEvent),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ReactionInterruptActionNeeded = {
+        handle = Ext.Osiris.RegisterListener("ReactionInterruptActionNeeded", 1, "after", onReactionInterruptActionNeeded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ReactionInterruptUsed = {
+        handle = Ext.Osiris.RegisterListener("ReactionInterruptUsed", 3, "after", onReactionInterruptUsed),
         stop = Ext.Osiris.UnregisterListener,
     }
 end

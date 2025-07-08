@@ -184,6 +184,10 @@ local function endBrawl(level)
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
     State.Session.SwarmTurnComplete = {}
+    if State.Session.SwarmTurnTimer ~= nil then
+        Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+        State.Session.SwarmTurnTimer = nil
+    end
     State.Session.TBSMActionResourceListeners = {}
     -- stopPulseReposition(level)
     stopBrawlFizzler(level)
