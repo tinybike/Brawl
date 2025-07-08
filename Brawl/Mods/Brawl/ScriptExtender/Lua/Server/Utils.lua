@@ -328,6 +328,16 @@ local function hasLoseControlStatus(uuid)
     return false
 end
 
+local function getCurrentCombatRound()
+    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+    if serverEnterRequestEntities then
+        local combatEntity = serverEnterRequestEntities[1]
+        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+            return combatEntity.TurnOrder.field_40
+        end
+    end
+end
+
 local function timeIt(fn, ...)
     local t0 = Ext.Utils.MonotonicTime()
     fn(...)
@@ -379,6 +389,7 @@ return {
     canAct = canAct,
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
+    getCurrentCombatRound = getCurrentCombatRound,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,
 }

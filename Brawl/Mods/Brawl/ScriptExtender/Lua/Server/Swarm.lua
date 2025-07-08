@@ -266,9 +266,13 @@ local function startSwarmTurn()
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
             State.Session.SwarmTurnTimer = nil
         end
+        State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
         State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(15000, function ()
-            print("Swarm turn timer finished - setting all enemy turns complete...")
-            setAllEnemyTurnsComplete()
+            if Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then 
+                print("Swarm turn timer finished - setting all enemy turns complete...")
+                setAllEnemyTurnsComplete()
+                State.Session.SwarmTurnTimerCombatRound = nil
+            end
         end)
     end)
 end
