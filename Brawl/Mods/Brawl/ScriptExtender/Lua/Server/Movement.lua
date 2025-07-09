@@ -65,9 +65,9 @@ local function setMovementToMax(entity)
                 Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[uuid])
                 State.Session.TBSMActionResourceListeners[uuid] = nil
             end
-            -- resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
-            -- entity:Replicate("ActionResources")
-            AI.queueSpellRequest(uuid, "Shout_Dash", uuid, nil, true)
+            resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+            entity:Replicate("ActionResources")
+            -- AI.queueSpellRequest(uuid, "Shout_Dash", uuid, nil, true)
         end
     end
 end

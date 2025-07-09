@@ -60,7 +60,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     local request = {
         -- include NoMovement?
         -- CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}),
-        CastOptions = castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"},
+        CastOptions = castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"},
         CastPosition = nil,
         Item = nil,
         Caster = Ext.Entity.Get(casterUuid),
