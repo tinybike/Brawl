@@ -161,18 +161,11 @@ local function singleCharacterTurn(brawler, brawlerIndex)
     if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
         return false
     end
-    -- local numActionPoints = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0)
-    -- local numBonusActionPoints = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0)
     if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
         State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-            if State.Session.TBSMActionResourceListeners[brawler.uuid] ~= nil then
-                Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[brawler.uuid])
-                State.Session.TBSMActionResourceListeners[brawler.uuid] = nil
-            end
             Movement.setMovementToMax(entity)
         end, Ext.Entity.Get(brawler.uuid))
     end
-    -- debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid, brawlerIndex, numActionPoints, numBonusActionPoints)
     Ext.Timer.WaitFor(brawlerIndex*10, function ()
         swarmAction(brawler)
     end)

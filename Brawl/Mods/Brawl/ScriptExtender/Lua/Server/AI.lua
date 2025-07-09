@@ -55,7 +55,7 @@ end
 
 -- thank u focus and mazzle
 -- cache values so we don't have to get from stats
-local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
+local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     local request = {
         -- include NoMovement?
@@ -97,7 +97,15 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
     }
     -- _D(request)
     print("inserting request", #Ext.System.ServerCastRequest.OsirisCastRequests + 1, spellName, Utils.getDisplayName(casterUuid), request.RequestGuid)
-    Ext.System.ServerCastRequest.OsirisCastRequests[#Ext.System.ServerCastRequest.OsirisCastRequests + 1] = request
+    local requests = Ext.System.ServerCastRequest.OsirisCastRequests
+    if insertAtFront then
+        for i = #requests, 1, -1 do
+            requests[i + 1] = requests[i]
+        end
+        requests[1] = request
+    else
+        requests[#requests + 1] = request
+    end
 end
 
 local function getSpellTypeWeight(spellType)
@@ -856,6 +864,7 @@ local function checkForBrawlToJoin(brawler)
 end
 
 -- Brawlers doing dangerous stuff
+-- NB: if findTarget distance > max movement distance in TBSM then use Dash?
 local function pulseAction(brawler, bonusActionOnly)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and canAct(brawler.uuid) then

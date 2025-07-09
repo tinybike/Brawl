@@ -501,21 +501,10 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
     end)
 end
 
-local function decreaseActionResource(uuid, resourceType, amount)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.ActionResources and entity.ActionResources.Resources then
-        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
-        if resources then
-            resources[1].Amount = resources[1].Amount - amount
-        end
-    end
-    entity:Replicate("ActionResources")
-end
-
 local function useActionPointSurplus(uuid, resourceType)
     local pointSurplus = math.floor(Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
     if pointSurplus > 0 then
-        decreaseActionResource(uuid, resourceType, pointSurplus)
+        Resources.decreaseActionResource(uuid, resourceType, pointSurplus)
     end
     return pointSurplus
 end

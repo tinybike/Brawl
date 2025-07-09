@@ -57,11 +57,17 @@ local function getMovementSpeed(entityUuid)
 end
 
 local function setMovementToMax(entity)
-    if entity and entity.ActionResources and entity.ActionResources.Resources then
+    if entity and entity.Uuid and entity.Uuid.EntityUuid and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] and resources[Constants.ACTION_RESOURCES.Movement][1].Amount == 0.0 then
-            resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
-            entity:Replicate("ActionResources")
+            local uuid = entity.Uuid.EntityUuid
+            if State.Session.TBSMActionResourceListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[uuid])
+                State.Session.TBSMActionResourceListeners[uuid] = nil
+            end
+            -- resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+            -- entity:Replicate("ActionResources")
+            AI.queueSpellRequest(uuid, "Shout_Dash", uuid, nil, true)
         end
     end
 end

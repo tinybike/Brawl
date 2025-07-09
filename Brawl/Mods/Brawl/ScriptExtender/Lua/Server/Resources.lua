@@ -7,6 +7,21 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local clearOsirisQueue = Utils.clearOsirisQueue
 
+local function decreaseActionResource(uuid, resourceType, amount)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
+        if resources and resources[1] then
+            if resources[1].Amount >= amount then
+                resources[1].Amount = resources[1].Amount - amount
+            else
+                resources[1].Amount = 0.0
+            end
+        end
+    end
+    entity:Replicate("ActionResources")
+end
+
 local function checkSpellCharge(casterUuid, spellName)
     -- debugPrint("checking spell charge", casterUuid, spellName)
     if spellName then
@@ -215,6 +230,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
 end
 
 return {
+    decreaseActionResource = decreaseActionResource,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,
