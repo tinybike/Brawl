@@ -115,8 +115,14 @@ local function onLevelGameplayStarted(level, _)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
+    print("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
+        if State.Session.SwarmTurnTimer ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+            State.Session.SwarmTurnTimer = nil
+        end
+        State.Session.SwarmTurnTimerCombatRound = nil
+        -- State.Session.ActionsInProgress = {}
         Swarm.unsetAllEnemyTurnsComplete()
     else
         if isToT() then
@@ -275,12 +281,11 @@ end
 
 local function onTurnStarted(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        print("TurnStarted", entityGuid)
+        debugPrint("TurnStarted", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
         if entityUuid then
             if Osi.IsPartyMember(entityUuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
-                Swarm.unsetAllEnemyTurnsComplete()
             elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
                 -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
                 --     print("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
@@ -292,14 +297,19 @@ local function onTurnStarted(entityGuid)
 end
 
 local function onTurnEnded(entityGuid)
-    if State.Settings.TurnBasedSwarmMode and Osi.IsPartyMember(entityGuid, 1) == 1 then
-        debugPrint("TurnEnded", entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        print("TurnEnded", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        if entityUuid then
-            State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
-            if Swarm.checkAllPlayersFinishedTurns() then
-                print("Started Swarm turn!")
-                Swarm.startSwarmTurn()
+        if entityUuid and State.getBrawlerByUuid(entityUuid) then
+            if Osi.IsPartyMember(entityGuid, 1) == 1 then
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+                if Swarm.checkAllPlayersFinishedTurns() then
+                    print("Started Swarm turn!")
+                    Swarm.unsetAllEnemyTurnsComplete()
+                    Swarm.startSwarmTurn()
+                end
+            else
+                Swarm.completeSwarmTurn(entityUuid)
             end
         end
     end
@@ -527,8 +537,8 @@ local function useBonusAttacks(uuid)
             numBonusAttacks = numBonusAttacks + 1
         end
     end
-    numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint")
     if not State.Settings.TurnBasedSwarmMode then
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint")
         numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "BonusActionPoint")
     end
     return numBonusAttacks
@@ -609,11 +619,19 @@ local function onUsingSpell(caster, spell, spellType, spellElement, storyActionI
 end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    debugPrint(getDisplayName(Osi.GetUUID(casterGuid)), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    debugDump(State.Session.ActionsInProgress[casterUuid])
+    print(getDisplayName(casterUuid), "CastedSpell", casterUuid, spellName, spellType, spellElement, storyActionID)
+    _D(State.Session.ActionsInProgress[casterUuid])
     if Resources.removeActionInProgress(casterUuid, spellName) then
-        Resources.deductCastedSpell(casterUuid, spellName)
+        print("removed action in progress")
+        if State.Settings.TurnBasedSwarmMode then
+            local brawler = State.getBrawlerByUuid(casterUuid)
+            print("got brawler, next swarm action go")
+            if brawler then
+                Swarm.swarmAction(brawler)
+            end
+        end
+        -- Resources.deductCastedSpell(casterUuid, spellName)
     end
 end
 
@@ -818,16 +836,16 @@ local function onLeveledUp(character)
     end
 end
 
-local function onEntityEvent(object, event)
-    debugPrint("EntityEvent", object, event)
+local function onEntityEvent(characterGuid, event)
+    debugPrint("EntityEvent", characterGuid, event)
 end
 
 local function onReactionInterruptActionNeeded(characterGuid)
     if State.Settings.TurnBasedSwarmMode then
-        print("ReactionInterruptActionNeeded", characterGuid)
+        debugPrint("ReactionInterruptActionNeeded", characterGuid)
         local uuid = Osi.GetUUID(characterGuid)
         if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
-            print("pausing swarm turn timer")
+            debugPrint("pausing swarm turn timer")
             Ext.Timer.Pause(State.Session.SwarmTurnTimer)
         end
     end
@@ -835,10 +853,10 @@ end
 
 local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     if State.Settings.TurnBasedSwarmMode then
-        print("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+        debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
         local uuid = Osi.GetUUID(characterGuid)
         if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
-            print("resuming swarm turn timer")
+            debugPrint("resuming swarm turn timer")
             Ext.Timer.Resume(State.Session.SwarmTurnTimer)
         end
     end

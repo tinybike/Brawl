@@ -83,7 +83,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
 end
 
 local function removeActionInProgress(uuid, spellName)
-    debugPrint("removeActionInProgress", uuid, spellName)
+    print("removeActionInProgress", uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -95,9 +95,10 @@ local function removeActionInProgress(uuid, spellName)
                 break
             end
         end
+        print("found action in progress", actionsInProgressIndex)
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, getDisplayName(uuid), actionsInProgress[i])
+                print("remove action in progress", i, getDisplayName(uuid), actionsInProgress[i])
                 table.remove(actionsInProgress, i)
             end
             return true
@@ -182,6 +183,8 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
         return false
     end
     clearOsirisQueue(casterUuid)
+    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     print(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)
     -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
@@ -198,6 +201,13 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     -- debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     -- Osi.UseSpell(casterUuid, spellName, targetUuid)
+    -- print("before", #Ext.System.ServerCastRequest.OsirisCastRequests)
+    -- _D(Ext.System.ServerCastRequest.OsirisCastRequests)
+    -- for _, request in ipairs(Ext.System.ServerCastRequest.OsirisCastRequests) do
+    --     request.CastOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
+    -- end
+    -- print("after")
+    -- _D(Ext.System.ServerCastRequest.OsirisCastRequests)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)

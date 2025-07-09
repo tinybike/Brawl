@@ -6,12 +6,11 @@ local isToT = Utils.isToT
 
 local function setTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if entity.TurnBased and not entity.TurnBased.TurnActionsCompleted then
-        print(getDisplayName(uuid), "Setting turn complete", uuid)
+    if entity.TurnBased then
+        -- print(getDisplayName(uuid), "Setting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = true
         entity.TurnBased.RequestedEndTurn = true
         entity.TurnBased.TurnActionsCompleted = true
-        -- entity.TurnBased.CanActInCombat = false
         entity:Replicate("TurnBased")
         State.Session.SwarmTurnComplete[uuid] = true
     end
@@ -20,11 +19,10 @@ end
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity.TurnBased then
-        print(getDisplayName(uuid), "Unsetting turn complete", uuid)
+        -- print(getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
-        -- entity.TurnBased.CanActInCombat = false
         entity:Replicate("TurnBased")
         State.Session.SwarmTurnComplete[uuid] = false
     end
@@ -110,8 +108,9 @@ end
 
 local function completeSwarmTurn(uuid)
     Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
-        State.Session.SwarmTurnComplete[uuid] = true
-        print("checkSwarmTurnComplete", uuid, Utils.getDisplayName(uuid))
+        -- State.Session.SwarmTurnComplete[uuid] = true
+        setTurnComplete(uuid)
+        print("completeSwarmTurn", uuid, Utils.getDisplayName(uuid))
         _D(State.Session.SwarmTurnComplete)
         if checkSwarmTurnComplete() then
             resetSwarmTurnComplete()
@@ -131,43 +130,69 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
+-- NB: instead of just using a fixed delay, use CastedSpell listener for next action?
+local function swarmAction(brawler)
+    print("swarmAction", brawler.displayName, brawler.uuid)
+    if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
+        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
+        print(brawler.displayName, "swarmAction", brawler.uuid, numActions, numBonusActions)
+        if numActions == 0 and numBonusActions == 0 then
+            return completeSwarmTurn(brawler.uuid)
+        end
+        if numActions > 0 then
+            AI.pulseAction(brawler)
+        elseif numBonusActions > 0 then
+            AI.pulseAction(brawler, true)
+        end
+    end
+end
+
 local function singleCharacterTurn(brawler, brawlerIndex)
-    local hostCharacterUuid = Osi.GetHostCharacter()
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
-    -- is this ok for non-ToT?
+    local hostCharacterUuid = Osi.GetHostCharacter()
     if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
     if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
-        -- State.Session.SwarmTurnComplete[brawler.uuid] = true
         return false
     end
     if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
         return false
     end
-    debugPrint(brawler.displayName, "AI.pulseAction (bonus)", brawler.uuid, brawlerIndex)
+    -- local numActionPoints = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0)
+    -- local numBonusActionPoints = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0)
     if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
         State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+            if State.Session.TBSMActionResourceListeners[brawler.uuid] ~= nil then
+                Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[brawler.uuid])
+                State.Session.TBSMActionResourceListeners[brawler.uuid] = nil
+            end
             Movement.setMovementToMax(entity)
         end, Ext.Entity.Get(brawler.uuid))
     end
+    -- debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid, brawlerIndex, numActionPoints, numBonusActionPoints)
+    Ext.Timer.WaitFor(brawlerIndex*10, function ()
+        swarmAction(brawler)
+    end)
+    -- swarmAction(brawler, numActionPoints, numBonusActionPoints)
     -- Ext.Timer.WaitFor(brawlerIndex*10, function ()
-    if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
-        if not AI.pulseAction(brawler, true) then
-            debugPrint(brawler.displayName, "bonus action not found, immediate AI.pulseAction", brawler.uuid)
-            AI.pulseAction(brawler)
-            completeSwarmTurn(brawler.uuid)
-        else
-            Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
-                if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
-                    debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
-                    AI.pulseAction(brawler)
-                    completeSwarmTurn(brawler.uuid)
-                end
-            end)
-        end
-    end
+    -- if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then        
+        -- if not AI.pulseAction(brawler, true) then
+        --     debugPrint(brawler.displayName, "bonus action not found, immediate AI.pulseAction", brawler.uuid)
+        --     AI.pulseAction(brawler)
+        --     completeSwarmTurn(brawler.uuid)
+        -- else
+        --     Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
+        --         if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+        --             debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
+        --             AI.pulseAction(brawler)
+        --             completeSwarmTurn(brawler.uuid)
+        --         end
+        --     end)
+        -- end
+    -- end
     -- end)
     return true
 end
@@ -190,46 +215,6 @@ local function startEnemyTurn(canActBeforeDelay)
     end
 end
 
--- local function checkPlayerRejoinCombat(playerUuid)
---     if isAliveAndCanFight(playerUuid) then
---         local playerBrawler = State.getBrawlerByUuid(playerUuid)
---         if not playerBrawler and isToT() then
---             Roster.addBrawler(playerUuid, true)
---             playerBrawler = State.getBrawlerByUuid(playerUuid)
---         end
---         if playerBrawler and Osi.IsInCombat(playerUuid) == 0 then
---             debugPrint("checkPlayerRejoinCombat", playerUuid)
---             local level = Osi.GetRegion(playerUuid)
---             local brawlersInLevel = State.Session.Brawlers[level]
---             if brawlersInLevel then
---                 for brawlerUuid, _ in pairs(brawlersInLevel) do
---                     if Utils.isPugnacious(brawlerUuid, playerUuid) and isAliveAndCanFight(brawlerUuid) and Osi.GetDistanceTo(brawlerUuid, playerUuid) < 20 then
---                         debugPrint("re-entering combat", playerUuid, brawlerUuid, getDisplayName(playerUuid), getDisplayName(brawlerUuid))
---                         -- Osi.EnterCombat(playerUuid, brawlerUuid)
---                         Osi.SetRelationTemporaryHostile(playerUuid, brawlerUuid)
---                         -- NB: alternative method from Focus
---                         -- local combat = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")[1]
---                         -- combat.ServerEnterRequest.EnterRequests[_C()] = true
---                         -- NB: alternative from Norb
---                         -- Ext.System.ServerCombat.JoinCombat[_C()] = combatEntity
---                         return true
---                     end
---                 end
---             end
---         end
---     end
---     return false
--- end
-
--- local function checkPlayersRejoinCombat()
---     local players = State.Session.Players
---     if players then
---         for playerUuid, _ in pairs(players) do
---             checkPlayerRejoinCombat(playerUuid)
---         end
---     end
--- end
-
 local function allBrawlersCanAct()
     local brawlersCanAct = {}
     local level = Osi.GetRegion(Osi.GetHostCharacter())
@@ -238,7 +223,6 @@ local function allBrawlersCanAct()
         if brawlersInLevel then
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 brawlersCanAct[brawlerUuid] = Utils.canAct(brawlerUuid)
-                -- brawlersCanAct[brawlerUuid] = true
             end
         end
     end
@@ -267,7 +251,7 @@ local function startSwarmTurn()
             State.Session.SwarmTurnTimer = nil
         end
         State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
-        State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(15000, function ()
+        State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(20000, function ()
             if Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then 
                 print("Swarm turn timer finished - setting all enemy turns complete...")
                 setAllEnemyTurnsComplete()
@@ -298,7 +282,9 @@ return {
     unsetTurnComplete = unsetTurnComplete,
     setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,
     unsetAllEnemyTurnsComplete = unsetAllEnemyTurnsComplete,
+    completeSwarmTurn = completeSwarmTurn,
     startSwarmTurn = startSwarmTurn,
     checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
     startEnemyTurn = startEnemyTurn,
+    swarmAction = swarmAction,
 }

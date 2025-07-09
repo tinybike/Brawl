@@ -45,13 +45,24 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
+-- thank u focus
+---@return Guid
+function createUUID()
+    return string.gsub("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", "[xy]", function (c)
+        return string.format("%x", c == "x" and Ext.Math.Random(0, 0xf) or Ext.Math.Random(8, 0xb))
+    end)
+end
+
 -- thank u focus and mazzle
 -- cache values so we don't have to get from stats
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
     local stats = Ext.Stats.Get(spellName)
     local request = {
         -- include NoMovement?
-        CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation"}),
+        -- CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}),
+        CastOptions = castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"},
+        CastPosition = nil,
+        Item = nil,
         Caster = Ext.Entity.Get(casterUuid),
         NetGuid = "",
         Originator = {
@@ -61,6 +72,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
             PassiveId = "",
             Statusid = "",
         },
+        RequestGuid = createUUID(),
         Spell = {
             OriginatorPrototype = getOriginatorPrototype(spellName, stats),
             ProgressionSource = Constants.NULL_UUID,
@@ -68,13 +80,23 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions)
             Source = Constants.NULL_UUID,
             SourceType = "Osiris",
         },
-        Targets = {{Target = Ext.Entity.Get(targetUuid), TargetingType = stats.SpellType}},
-        field_88 = 0,
+        StoryActionId = 0,
+        Targets = {{
+            Position = nil,
+            Target = Ext.Entity.Get(targetUuid),
+            Target2 = nil,
+            TargetProxy = nil,
+            TargetingType = stats.SpellType,
+        }},
+        field_70 = nil,
         field_A8 = 1,
-        field_B0 = 3359090190287412865,
-        field_B8 = -1518500991745074566,
+        -- field_88 = 0,
+        -- field_A8 = 1,
+        -- field_B0 = 3359090190287412865,
+        -- field_B8 = -1518500991745074566,
     }
     -- _D(request)
+    print("inserting request", #Ext.System.ServerCastRequest.OsirisCastRequests + 1, spellName, Utils.getDisplayName(casterUuid), request.RequestGuid)
     Ext.System.ServerCastRequest.OsirisCastRequests[#Ext.System.ServerCastRequest.OsirisCastRequests + 1] = request
 end
 
