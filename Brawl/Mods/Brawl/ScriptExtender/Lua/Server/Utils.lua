@@ -338,6 +338,21 @@ local function getCurrentCombatRound()
     end
 end
 
+-- thank u focus
+---@return Guid
+local function createUuid()
+    return string.gsub("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", "[xy]", function (c)
+        return string.format("%x", c == "x" and Ext.Math.Random(0, 0xf) or Ext.Math.Random(8, 0xb))
+    end)
+end
+
+local function getOriginatorPrototype(spellName, stats)
+    if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
+        return spellName
+    end
+    return stats.RootSpellID
+end
+
 local function timeIt(fn, ...)
     local t0 = Ext.Utils.MonotonicTime()
     fn(...)
@@ -390,6 +405,8 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     getCurrentCombatRound = getCurrentCombatRound,
+    createUuid = createUuid,
+    getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,
 }

@@ -173,32 +173,14 @@ local function singleCharacterTurn(brawler, brawlerIndex)
     if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
         return false
     end
-    if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
-        State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-            Movement.setMovementToMax(entity)
-        end, Ext.Entity.Get(brawler.uuid))
-    end
+    -- if State.Session.TBSMActionResourceListeners[brawler.uuid] == nil then
+    --     State.Session.TBSMActionResourceListeners[brawler.uuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+    --         Movement.setMovementToMax(entity)
+    --     end, Ext.Entity.Get(brawler.uuid))
+    -- end
     Ext.Timer.WaitFor(brawlerIndex*25, function ()
         swarmAction(brawler)
     end)
-    -- swarmAction(brawler, numActionPoints, numBonusActionPoints)
-    -- Ext.Timer.WaitFor(brawlerIndex*10, function ()
-    -- if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then        
-        -- if not AI.pulseAction(brawler, true) then
-        --     debugPrint(brawler.displayName, "bonus action not found, immediate AI.pulseAction", brawler.uuid)
-        --     AI.pulseAction(brawler)
-        --     completeSwarmTurn(brawler.uuid)
-        -- else
-        --     Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
-        --         if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
-        --             debugPrint(brawler.displayName, "AI.pulseAction", brawler.uuid)
-        --             AI.pulseAction(brawler)
-        --             completeSwarmTurn(brawler.uuid)
-        --         end
-        --     end)
-        -- end
-    -- end
-    -- end)
     return true
 end
 

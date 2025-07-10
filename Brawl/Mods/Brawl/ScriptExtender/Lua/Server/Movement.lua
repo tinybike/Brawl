@@ -115,25 +115,20 @@ local function findPathToPosition(uuid, position, callback)
         return callback("Can't get there", nil)
     end
     callback(nil, validPosition)
-    -- Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), validPosition, function (path)
-    --     if not path or not path.GoalFound then
-    --         return callback("Can't get there", nil)
-    --     end
-    --     callback(nil, validPosition)
-    -- end)
 end
 
--- NB: restructure this to use EntityEvent notifications for movements
+local function registerActiveMovement(moverUuid, onMovementCompleted)
+    local eventUuid = Utils.createUuid()
+    State.Session.ActiveMovements[eventUuid] = {moverUuid = moverUuid, onMovementCompleted = onMovementCompleted}
+    return eventUuid
+end
+
 local function moveToTargetUuid(uuid, targetUuid, override, callback)
     debugPrint("moveToTargetUuid", uuid, targetUuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
-    -- Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "", moveID)
-    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "")
-    if callback ~= nil then
-        Ext.Timer.WaitFor(State.Settings.TurnBasedSwarmMode and 750 or 100, callback)
-    end
+    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
     return true
 end
 
@@ -142,10 +137,7 @@ local function moveToPosition(uuid, position, override, callback)
     if override then
         clearOsirisQueue(uuid)
     end
-    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
-    if callback ~= nil then
-        Ext.Timer.WaitFor(State.Settings.TurnBasedSwarmMode and 750 or 100, callback)
-    end
+    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
     return true
 end
 

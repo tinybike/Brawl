@@ -833,8 +833,18 @@ local function onLeveledUp(character)
     end
 end
 
-local function onEntityEvent(characterGuid, event)
-    -- debugPrint("EntityEvent", characterGuid, event)
+local function onEntityEvent(characterGuid, eventUuid)
+    if State.Session.ActiveMovements[eventUuid] and State.Session.ActiveMovements[eventUuid].moverUuid then
+        print("EntityEvent", characterGuid, eventUuid)
+        local activeMovement = State.Session.ActiveMovements[eventUuid]
+        local characterUuid = Osi.GetUUID(characterGuid)
+        if characterUuid == activeMovement.moverUuid then
+            if activeMovement.onMovementCompleted and type(activeMovement.onMovementCompleted) == "function" then
+                activeMovement.onMovementCompleted()
+            end
+            State.Session.ActiveMovements[eventUuid] = nil
+        end
+    end
 end
 
 local function onReactionInterruptActionNeeded(characterGuid)
@@ -861,14 +871,10 @@ end
 
 -- thank u focus
 local function onServerInterruptDecision()
-    for entity, decision in pairs(Ext.System.ServerInterruptDecision.Decisions) do
-        _P(string.format("Decision found: %s", decision))
-        -- _D(entity.InterruptActionState)
+    for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
         if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
-            debugPrint("resuming swarm turn timer (decision)")
-            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+            return Ext.Timer.Resume(State.Session.SwarmTurnTimer)
         end
-        return
     end
 end
 

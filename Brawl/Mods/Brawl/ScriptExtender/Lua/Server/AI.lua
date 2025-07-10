@@ -28,21 +28,6 @@ local canAct = Utils.canAct
 local canMove = Utils.canMove
 local findPathToTargetUuid = Movement.findPathToTargetUuid
 
-local function getOriginatorPrototype(spellName, stats)
-    if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
-        return spellName
-    end
-    return stats.RootSpellID
-end
-
--- thank u focus
----@return Guid
-function createUUID()
-    return string.gsub("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", "[xy]", function (c)
-        return string.format("%x", c == "x" and Ext.Math.Random(0, 0xf) or Ext.Math.Random(8, 0xb))
-    end)
-end
-
 -- thank u focus and mazzle
 -- cache values so we don't have to get from stats
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
@@ -60,9 +45,9 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
             PassiveId = "",
             Statusid = "",
         },
-        RequestGuid = createUUID(),
+        RequestGuid = Utils.createUuid(),
         Spell = {
-            OriginatorPrototype = getOriginatorPrototype(spellName, stats),
+            OriginatorPrototype = Utils.getOriginatorPrototype(spellName, stats),
             ProgressionSource = Constants.NULL_UUID,
             Prototype = spellName,
             Source = Constants.NULL_UUID,
@@ -80,7 +65,6 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
         field_A8 = 1,
     }
     local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
-    print("Number of queued requests", #queuedRequests)
     if insertAtFront then
         for i = #queuedRequests, 1, -1 do
             queuedRequests[i + 1] = queuedRequests[i]
@@ -90,6 +74,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
         queuedRequests[#queuedRequests + 1] = request
     end
     print("Inserted new cast request", request.RequestGuid, #queuedRequests)
+    return request.RequestGuid
 end
 
 local function getSpellTypeWeight(spellType)
@@ -284,17 +269,12 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     return true
 end
 
-local function isNpcSpellUsable(spell)
-    if spell == "Projectile_Jump" then return false end
-    if spell == "Shout_Dash_NPC" then return false end
-    if spell == "Throw_Throw" then return false end
-    if spell == "Target_Shove" then return false end
-    if spell == "Target_Devour_Ghoul" then return false end
-    if spell == "Target_Devour_ShadowMound" then return false end
-    if spell == "Target_LOW_RamazithsTower_Nightsong_Globe_1" then return false end
-    if spell == "Target_Dip_NPC" then return false end
-    if spell == "Projectile_SneakAttack" then return false end
-    if spell == "Rush_Charger_Push" then return false end
+local function isNpcSpellUsable(spellName)
+    for _, unusableSpell in ipairs(Constants.UNUSABLE_NPC_SPELLS) do
+        if spellName == unusableSpell then
+            return false
+        end
+    end
     return true
 end
 
@@ -402,9 +382,8 @@ end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     debugPrint(getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
-    if State.Settings.HogwildMode then
+    if State.Settings.HogwildMode and not State.Settings.TurnBasedSwarmMode then
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
-        -- queueSpellRequest(attackerUuid, spellName, targetUuid)
         return true
     end
     return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)

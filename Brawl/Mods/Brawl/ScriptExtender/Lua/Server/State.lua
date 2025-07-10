@@ -77,6 +77,7 @@ local Session = {
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
+    ActiveMovements = {},
     TurnBasedSwarmModePlayerTurnEnded = {},
     TBSMActionResourceListeners = {},
     TBSMToTSkippedPrepRound = false,
@@ -326,13 +327,6 @@ local function checkForDirectHeal(spell)
     return false
 end
 
-local function getOriginatorPrototype(spellName, stats)
-    if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
-        return spellName
-    end
-    return stats.RootSpellID
-end
-
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -385,7 +379,6 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isDirectHeal = checkForDirectHeal(spell),
             hasApplyStatus = checkForApplyStatus(spell),
             isBonusAction = costs.BonusActionPoint ~= nil,
-            originatorPrototype = getOriginatorPrototype(spellName, spell),
         }
         return spellInfo
     end

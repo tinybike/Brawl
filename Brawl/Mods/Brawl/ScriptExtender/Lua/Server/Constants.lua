@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -335,6 +335,20 @@ Constants.NO_ACTION_STATUSES = {
     "SG_Incapacitated",
     "SG_Stunned",
     "SG_Unconscious",
+}
+Constants.UNUSABLE_NPC_SPELLS = {
+    "Throw_Throw",
+    "Target_Devour_Ghoul",
+    "Target_Devour_ShadowMound",
+    "Target_LOW_RamazithsTower_Nightsong_Globe_1",
+    "Target_Dip_NPC",
+    "Target_QuiveringPalm",
+    "Target_TAD_ConcentratedBlast",
+    "Projectile_SneakAttack",
+    -- "Target_Shove",
+    -- "Rush_Charger_Push",
+    -- "Projectile_Jump",
+    -- "Shout_Dash_NPC",
 }
 
 return Constants
