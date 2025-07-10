@@ -28,16 +28,6 @@ local canAct = Utils.canAct
 local canMove = Utils.canMove
 local findPathToTargetUuid = Movement.findPathToTargetUuid
 
-local function getCastOptions(flags)
-    local castOptionsMask = 0
-    for _, flag in ipairs(flags) do
-        if Constants.SPELL_REQUEST_FLAGS[flag] then
-            castOptionsMask = castOptionsMask | Constants.SPELL_REQUEST_FLAGS[flag]
-        end
-    end
-    return castOptionsMask
-end
-
 local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
@@ -58,8 +48,6 @@ end
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     local request = {
-        -- include NoMovement?
-        -- CastOptions = getCastOptions(castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}),
         CastOptions = castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"},
         CastPosition = nil,
         Item = nil,
@@ -90,22 +78,18 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
         }},
         field_70 = nil,
         field_A8 = 1,
-        -- field_88 = 0,
-        -- field_A8 = 1,
-        -- field_B0 = 3359090190287412865,
-        -- field_B8 = -1518500991745074566,
     }
-    -- _D(request)
-    print("inserting request", #Ext.System.ServerCastRequest.OsirisCastRequests + 1, spellName, Utils.getDisplayName(casterUuid), request.RequestGuid)
-    local requests = Ext.System.ServerCastRequest.OsirisCastRequests
+    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
+    print("Number of queued requests", #queuedRequests)
     if insertAtFront then
-        for i = #requests, 1, -1 do
-            requests[i + 1] = requests[i]
+        for i = #queuedRequests, 1, -1 do
+            queuedRequests[i + 1] = queuedRequests[i]
         end
-        requests[1] = request
+        queuedRequests[1] = request
     else
-        requests[#requests + 1] = request
+        queuedRequests[#queuedRequests + 1] = request
     end
+    print("Inserted new cast request", request.RequestGuid, #queuedRequests)
 end
 
 local function getSpellTypeWeight(spellType)

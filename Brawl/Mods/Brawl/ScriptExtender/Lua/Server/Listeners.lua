@@ -121,6 +121,7 @@ local function onCombatRoundStarted(combatGuid, round)
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
             State.Session.SwarmTurnTimer = nil
         end
+        State.Session.SwarmTurnActive = false
         State.Session.SwarmTurnTimerCombatRound = nil
         -- State.Session.ActionsInProgress = {}
         Swarm.unsetAllEnemyTurnsComplete()
@@ -609,18 +610,37 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    print(getDisplayName(casterUuid), "CastedSpell", casterUuid, spellName, spellType, spellElement, storyActionID)
-    _D(State.Session.ActionsInProgress[casterUuid])
+    print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- _D(State.Session.ActionsInProgress[casterUuid])
+    if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
+        debugPrint("resuming swarm turn timer (CastedSpell)")
+        Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+    end
     if Resources.removeActionInProgress(casterUuid, spellName) then
-        print("removed action in progress")
         if State.Settings.TurnBasedSwarmMode then
             local brawler = State.getBrawlerByUuid(casterUuid)
-            print("got brawler, next swarm action go")
             if brawler then
                 Swarm.swarmAction(brawler)
             end
         end
         -- Resources.deductCastedSpell(casterUuid, spellName)
+    end
+end
+
+local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = Osi.GetUUID(casterGuid)
+    print(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
+    --     debugPrint("resuming swarm turn timer")
+    --     Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+    -- end
+    if Resources.removeActionInProgress(casterUuid, spellName) then
+        if State.Settings.TurnBasedSwarmMode then
+            local brawler = State.getBrawlerByUuid(casterUuid)
+            if brawler then
+                Swarm.swarmAction(brawler)
+            end
+        end
     end
 end
 
@@ -826,7 +846,7 @@ local function onLeveledUp(character)
 end
 
 local function onEntityEvent(characterGuid, event)
-    debugPrint("EntityEvent", characterGuid, event)
+    -- debugPrint("EntityEvent", characterGuid, event)
 end
 
 local function onReactionInterruptActionNeeded(characterGuid)
@@ -845,9 +865,22 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
         debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
         local uuid = Osi.GetUUID(characterGuid)
         if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
-            debugPrint("resuming swarm turn timer")
+            debugPrint("resuming swarm turn timer (interrupt used)")
             Ext.Timer.Resume(State.Session.SwarmTurnTimer)
         end
+    end
+end
+
+-- thank u focus
+local function onServerInterruptDecision()
+    for entity, decision in pairs(Ext.System.ServerInterruptDecision.Decisions) do
+        _P(string.format("Decision found: %s", decision))
+        -- _D(entity.InterruptActionState)
+        if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
+            debugPrint("resuming swarm turn timer (decision)")
+            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+        end
+        return
     end
 end
 
@@ -960,6 +993,10 @@ local function startListeners()
     }
     State.Session.Listeners.CastedSpell = {
         handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CastSpellFailed = {
+        handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.DialogStarted = {
@@ -1077,6 +1114,10 @@ local function startListeners()
     State.Session.Listeners.ReactionInterruptUsed = {
         handle = Ext.Osiris.RegisterListener("ReactionInterruptUsed", 3, "after", onReactionInterruptUsed),
         stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ServerInterruptDecision = {
+        handle = Ext.Entity.OnSystemUpdate("ServerInterruptDecision", onServerInterruptDecision),
+        stop = Ext.Entity.Unsubscribe,
     }
 end
 

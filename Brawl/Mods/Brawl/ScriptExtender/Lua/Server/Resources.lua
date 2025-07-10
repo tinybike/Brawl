@@ -98,7 +98,6 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
 end
 
 local function removeActionInProgress(uuid, spellName)
-    print("removeActionInProgress", uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -110,7 +109,6 @@ local function removeActionInProgress(uuid, spellName)
                 break
             end
         end
-        print("found action in progress", actionsInProgressIndex)
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
                 print("remove action in progress", i, getDisplayName(uuid), actionsInProgress[i])

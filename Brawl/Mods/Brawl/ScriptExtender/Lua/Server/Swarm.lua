@@ -74,9 +74,12 @@ local function checkSwarmTurnComplete()
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
+            for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 if Osi.IsPartyMember(brawlerUuid, 1) == 0 and not State.Session.SwarmTurnComplete[brawlerUuid] then
                     print("swarm turn not complete for", brawlerUuid, Utils.getDisplayName(brawlerUuid))
+                    local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0)
+                    local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0)
+                    print(brawler.displayName, "swarmAction", brawler.uuid, numActions, numBonusActions)
                     return false
                 end
             end
@@ -120,7 +123,6 @@ end
 
 local function isControlledByDefaultAI(uuid)
     local entity = Ext.Entity.Get(uuid)
-    -- do we need to flag an enemy for active status?
     if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
         print("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
         State.Session.SwarmTurnComplete[uuid] = true
@@ -130,10 +132,8 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
--- NB: instead of just using a fixed delay, use CastedSpell listener for next action?
 local function swarmAction(brawler)
-    print("swarmAction", brawler.displayName, brawler.uuid)
-    if not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
         local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
         local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
         print(brawler.displayName, "swarmAction", brawler.uuid, numActions, numBonusActions)
@@ -141,9 +141,21 @@ local function swarmAction(brawler)
             return completeSwarmTurn(brawler.uuid)
         end
         if numActions > 0 then
-            AI.pulseAction(brawler)
+            local actionResult = AI.pulseAction(brawler)
+            print(brawler.displayName, "action result", actionResult)
+            if not actionResult and numBonusActions > 0 then
+                local bonusActionResult = AI.pulseAction(brawler, true)
+                print(brawler.displayName, "bonus action result (1)", bonusActionResult)
+                if not bonusActionResult then
+                    completeSwarmTurn(brawler.uuid)
+                end
+            end
         elseif numBonusActions > 0 then
-            AI.pulseAction(brawler, true)
+            local bonusActionResult = AI.pulseAction(brawler, true)
+            print(brawler.displayName, "bonus action result (2)", bonusActionResult)
+            if not bonusActionResult then
+                completeSwarmTurn(brawler.uuid)
+            end
         end
     end
 end
@@ -166,7 +178,7 @@ local function singleCharacterTurn(brawler, brawlerIndex)
             Movement.setMovementToMax(entity)
         end, Ext.Entity.Get(brawler.uuid))
     end
-    Ext.Timer.WaitFor(brawlerIndex*10, function ()
+    Ext.Timer.WaitFor(brawlerIndex*25, function ()
         swarmAction(brawler)
     end)
     -- swarmAction(brawler, numActionPoints, numBonusActionPoints)
@@ -200,7 +212,7 @@ local function startEnemyTurn(canActBeforeDelay)
         if brawlersInLevel then
             local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if canActBeforeDelay[brawlerUuid] ~= false and singleCharacterTurn(brawler, brawlerIndex) then
+                if State.Session.SwarmTurnActive and canActBeforeDelay[brawlerUuid] ~= false and singleCharacterTurn(brawler, brawlerIndex) then
                     brawlerIndex = brawlerIndex + 1
                 end
             end
@@ -232,9 +244,11 @@ local function startSwarmTurn()
     end
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     local canActBeforeDelay = allBrawlersCanAct()
+    State.Session.SwarmTurnActive = true
     Ext.Timer.WaitFor(2500, function () -- delay to allow new enemies to get scooped up
         if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
             State.Session.TBSMToTSkippedPrepRound = true
+            State.Session.SwarmTurnActive = false
             print("SKIPPING PREP ROUND...")
             return
         end
@@ -245,10 +259,14 @@ local function startSwarmTurn()
         end
         State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
         State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(20000, function ()
-            if Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then 
-                print("Swarm turn timer finished - setting all enemy turns complete...")
+            print("current combat round", Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound)
+            if Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
+                print("***************************************************************************************")
+                print("************************Swarm turn timer finished - setting all enemy turns complete...")
+                print("***************************************************************************************")
                 setAllEnemyTurnsComplete()
                 State.Session.SwarmTurnTimerCombatRound = nil
+                State.Session.SwarmTurnActive = false
             end
         end)
     end)
