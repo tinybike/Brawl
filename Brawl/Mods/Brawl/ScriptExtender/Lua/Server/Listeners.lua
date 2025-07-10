@@ -629,19 +629,7 @@ end
 
 local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    print(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
-    -- if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
-    --     debugPrint("resuming swarm turn timer")
-    --     Ext.Timer.Resume(State.Session.SwarmTurnTimer)
-    -- end
-    if Resources.removeActionInProgress(casterUuid, spellName) then
-        if State.Settings.TurnBasedSwarmMode then
-            local brawler = State.getBrawlerByUuid(casterUuid)
-            if brawler then
-                Swarm.swarmAction(brawler)
-            end
-        end
-    end
+    debugPrint(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onDialogStarted(dialog, dialogInstanceId)
