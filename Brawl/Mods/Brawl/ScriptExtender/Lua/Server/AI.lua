@@ -406,36 +406,33 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
             debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
-        if not actionToTake and bonusActionOnly then
-            debugPrint("No hostile bonus actions available for", brawler.uuid, brawler.displayName)
-            return false
-        end
-        if not actionToTake and Osi.IsPlayer(brawler.uuid) == 0 and not State.Settings.TurnBasedSwarmMode then
-            local numUsableSpells = 0
-            local usableSpells = {}
-            for _, preparedSpell in pairs(preparedSpells) do
-                local spellName = preparedSpell.OriginatorPrototype
-                if isNpcSpellUsable(spellName) then
-                    if State.Session.SpellTable.Damage[spellName] or State.Session.SpellTable.Control[spellName] then
-                        table.insert(usableSpells, spellName)
-                        numUsableSpells = numUsableSpells + 1
+        if not actionToTake then
+            debugPrint("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
+            if Osi.IsPlayer(brawler.uuid) == 0 and not State.Settings.TurnBasedSwarmMode then
+                local numUsableSpells = 0
+                local usableSpells = {}
+                for _, preparedSpell in pairs(preparedSpells) do
+                    local spellName = preparedSpell.OriginatorPrototype
+                    if isNpcSpellUsable(spellName) then
+                        if State.Session.SpellTable.Damage[spellName] or State.Session.SpellTable.Control[spellName] then
+                            table.insert(usableSpells, spellName)
+                            numUsableSpells = numUsableSpells + 1
+                        end
                     end
                 end
+                if numUsableSpells > 1 then
+                    actionToTake = usableSpells[math.random(1, numUsableSpells)]
+                elseif numUsableSpells == 1 then
+                    actionToTake = usableSpells[1]
+                end
+                debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
+            else
+                return false
             end
-            if numUsableSpells > 1 then
-                actionToTake = usableSpells[math.random(1, numUsableSpells)]
-            elseif numUsableSpells == 1 then
-                actionToTake = usableSpells[1]
-            end
-            debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
-            debugPrint("callback for MoveIntoPosition", brawler.displayName, target.displayName, actionToTake)
-            if not actionToTake or actionToTake == "Target_MainHandAttack" then
-                Osi.Attack(brawler.uuid, target.uuid, 0)
-            else
-                useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
-            end
+            print(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
+            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end)
         return true
     end
