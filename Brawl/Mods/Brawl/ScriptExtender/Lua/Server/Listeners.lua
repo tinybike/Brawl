@@ -535,6 +535,9 @@ local function useBonusAttacks(uuid)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+    if State.Settings.TurnBasedSwarmMode and not State.Session.SwarmTurnActive then
+        return
+    end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         if not State.Settings.TurnBasedSwarmMode or Utils.isPugnacious(attackerUuid) then
             local spellName = State.Session.StoryActionIDSpellName[storyActionID]
