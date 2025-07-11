@@ -17,24 +17,22 @@ end
 
 local function unlock(entity)
     debugPrint("unlock", entity.Uuid.EntityUuid, isLocked(entity))
-    debugDump(entity.TurnBased)
-    -- if isLocked(entity) then
-        entity.TurnBased.IsActiveCombatTurn = true
-        entity:Replicate("TurnBased")
-        local uuid = entity.Uuid.EntityUuid
-        State.Session.FTBLockedIn[uuid] = false
-        if State.Session.MovementQueue[uuid] then
-            debugPrint("unloading movement queue for", uuid)
-            if State.Session.ActionResourcesListeners[uuid] ~= nil then
-                Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
-                State.Session.ActionResourcesListeners[uuid] = nil
-            end
-            local moveTo = State.Session.MovementQueue[uuid]
-            debugDump(moveTo)
-            Movement.moveToPosition(uuid, moveTo, false)
-            State.Session.MovementQueue[uuid] = nil
+    -- debugDump(entity.TurnBased)
+    entity.TurnBased.IsActiveCombatTurn = true
+    entity:Replicate("TurnBased")
+    local uuid = entity.Uuid.EntityUuid
+    State.Session.FTBLockedIn[uuid] = false
+    if State.Session.MovementQueue[uuid] then
+        debugPrint("unloading movement queue for", uuid)
+        if State.Session.ActionResourcesListeners[uuid] ~= nil then
+            Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
+            State.Session.ActionResourcesListeners[uuid] = nil
         end
-    -- end
+        local moveTo = State.Session.MovementQueue[uuid]
+        debugDump(moveTo)
+        Movement.moveToPosition(uuid, moveTo, false)
+        State.Session.MovementQueue[uuid] = nil
+    end
 end
 
 local function lock(entity)

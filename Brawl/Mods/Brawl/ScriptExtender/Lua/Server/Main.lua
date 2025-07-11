@@ -9,6 +9,7 @@ Pause = require("Server/Pause.lua")
 Quests = require("Server/Quests.lua")
 Commands = require("Server/Commands.lua")
 Listeners = require("Server/Listeners.lua")
+Swarm = require("Server/Swarm.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
@@ -16,8 +17,7 @@ local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
 function stopPulseAction(brawler, remainInBrawl)
-    debugPrint("Stop Pulse Action for brawler")
-    _D(brawler)
+    debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
     if not remainInBrawl then
         brawler.isInBrawl = false
     end
@@ -54,11 +54,13 @@ end
 
 function startBrawlFizzler(level)
     stopBrawlFizzler(level)
-    debugPrint("Starting BrawlFizzler", level)
-    State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
-        debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
-        Roster.endBrawl(level)
-    end)
+    if not State.Settings.TurnBasedSwarmMode then
+        debugPrint("Starting BrawlFizzler", level)
+        State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
+            debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
+            Roster.endBrawl(level)
+        end)
+    end
 end
 
 function stopPulseAddNearby(uuid)
@@ -73,9 +75,7 @@ function startPulseAddNearby(uuid)
     debugPrint("startPulseAddNearby", uuid, getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] == nil then
         State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
-            -- if not isToT() then
-                AI.pulseAddNearby(uuid)
-            -- end
+            AI.pulseAddNearby(uuid)
         end, 7500)
     end
 end
@@ -216,7 +216,7 @@ end
 
 local function startSession()
     if not State or not State.Settings then
-        print("State not loaded, retrying...")
+        debugPrint("State not loaded, retrying...")
         return Ext.Timer.WaitFor(250, startSession)
     end
     if State.Settings.ModEnabled then

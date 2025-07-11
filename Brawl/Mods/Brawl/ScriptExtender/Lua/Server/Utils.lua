@@ -3,7 +3,7 @@
 
 local function debugPrint(...)
     if Constants.DEBUG_LOGGING then
-        print(...)
+        _P(...)
     end
 end
 
@@ -17,7 +17,7 @@ local function dumpAllEntityKeys()
     local uuid = GetHostCharacter()
     local entity = Ext.Entity.Get(uuid)
     for k, _ in pairs(entity:GetAllComponents()) do
-        print(k)
+        _P(k)
     end
 end
 
@@ -26,7 +26,10 @@ local function dumpEntityToFile(entityUuid)
 end
 
 local function getDisplayName(entityUuid)
-    return Osi.ResolveTranslatedString(Osi.GetDisplayName(entityUuid))
+    local displayName = Osi.GetDisplayName(entityUuid)
+    if displayName ~= nil then
+        return Osi.ResolveTranslatedString(displayName)
+    end
 end
 
 local function isAliveAndCanFight(entityUuid)
@@ -87,7 +90,7 @@ end
 local function checkNearby()
     local nearby = getNearby(Osi.GetHostCharacter(), 50)
     for _, uuid in ipairs(nearby) do
-        print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
+        _P(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
     end
 end
 
@@ -106,9 +109,6 @@ local function isPugnacious(potentialEnemyUuid, uuid)
             return nil
         end
     end
-    -- if State.Settings.MurderhoboMode and not isAllyOrPlayer(potentialEnemyUuid) then
-    --     Osi.SetRelationTemporaryHostile(uuid, potentialEnemyUuid)
-    -- end
     return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 
@@ -158,6 +158,14 @@ local function convertSpellRangeToNumber(range)
     end
 end
 
+local function getPersistentModVars(label)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if label ~= nil then
+        return modVars[label]
+    end
+    return modVars
+end
+
 local function getSpellRange(spellName)
     if not spellName then
         return "MeleeMainWeaponRange"
@@ -176,6 +184,10 @@ end
 
 local function isVisible(entityUuid)
     return Osi.IsInvisible(entityUuid) == 0 and Osi.HasActiveStatus(entityUuid, "SNEAKING") == 0
+end
+
+local function isMeleeArchetype(archetype)
+    return archetype:find("melee") ~= nil or archetype:find("beast") ~= nil
 end
 
 local function isHealerArchetype(archetype)
@@ -213,7 +225,7 @@ local function getPointInFrontOf(entityUuid, distance)
 end
 
 local function clearOsirisQueue(uuid)
-    debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
+    -- debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end
@@ -261,6 +273,147 @@ local function applyOnMeTargetVfx(targetUuid)
     -- Osi.ApplyStatus(targetUuid, "EPI_SPECTRALVOICEVFX", 1)
 end
 
+local function isPlayerTurnEnded(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn == false then
+        return false
+    end
+    return true
+end
+
+local function canAct(uuid)
+    if not uuid or isDowned(uuid) or not isAliveAndCanFight(uuid) then
+        return false
+    end
+    for _, noActionStatus in ipairs(Constants.NO_ACTION_STATUSES) do
+        if Osi.HasActiveStatus(uuid, noActionStatus) == 1 then
+            debugPrint(getDisplayName(uuid), "has a no action status", noActionStatus)
+            return false
+        end
+    end
+    return true
+end
+
+local function canMove(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.CanMove and entity.CanMove.Flags then
+        for _, flag in ipairs(entity.CanMove.Flags) do
+            if flag == "CanMove" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Thanks Focus
+local function hasLoseControlStatus(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    -- NB: not yet in SE release branch
+    -- if Ext.Entity.Get(uuid).StatusLoseControl ~= nil then
+    --     return true
+    -- end
+    if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+            local stats = Ext.Stats.Get(status.StatusId, nil, false)
+            if stats ~= nil then
+                for _, flag in ipairs(stats.StatusPropertyFlags) do
+                    if flag == "LoseControl" or flag == "LoseControlFriendly" then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function getCurrentCombatRound()
+    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+    if serverEnterRequestEntities then
+        local combatEntity = serverEnterRequestEntities[1]
+        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+            return combatEntity.TurnOrder.field_40
+        end
+    end
+end
+
+-- thank u focus
+---@return Guid
+local function createUuid()
+    return string.gsub("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", "[xy]", function (c)
+        return string.format("%x", c == "x" and Ext.Math.Random(0, 0xf) or Ext.Math.Random(8, 0xb))
+    end)
+end
+
+local function getOriginatorPrototype(spellName, stats)
+    if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
+        return spellName
+    end
+    return stats.RootSpellID
+end
+
+local function timeIt(fn, ...)
+    local t0 = Ext.Utils.MonotonicTime()
+    fn(...)
+    return Ext.Utils.MonotonicTime() - t0
+end
+
+local function averageTime(fn, n, ...)
+    local sum = 0
+    for i = 1, n do
+        sum = sum + timeIt(fn, ...)
+    end
+    return sum / n
+end
+
+local function updateLeaderboard(attackerUuid, defenderUuid, amount)
+    if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(defenderUuid) == 1 then
+        if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
+            amount = -amount
+        end
+        if State.Session.Leaderboard[attackerUuid] == nil then
+            State.Session.Leaderboard[attackerUuid] = amount
+        else
+            State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] + amount
+        end
+    end
+end
+
+local function dumpLeaderboard()
+    local nameColWidth = 0
+    for uuid,_ in pairs(State.Session.Leaderboard) do
+        local n = #getDisplayName(uuid)
+        if n > nameColWidth then
+            nameColWidth = n
+        end
+    end
+    local nameCol = "%-" .. nameColWidth .. "s"
+    local party = {}
+    for uuid, score in pairs(State.Session.Leaderboard) do
+        if Osi.IsPartyMember(uuid, 1) == 1 then
+            party[#party + 1] = {uuid = uuid, score = score}
+        end
+    end
+    table.sort(party, function (a, b) return a.score > b.score end)
+    local enemy = {}
+    for uuid, score in pairs(State.Session.Leaderboard) do
+        if Osi.IsPartyMember(uuid, 1) ~= 1 then
+            enemy[#enemy + 1] = {uuid = uuid, score = score}
+        end
+    end
+    table.sort(enemy, function (a, b) return a.score > b.score end)
+    _P("========================| PARTY DAMAGE TOTALS |========================")
+    for _, e in ipairs(party) do
+        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+    end
+    _P("========================| ENEMY DAMAGE TOTALS |========================")
+    for _, e in ipairs(enemy) do
+        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+    end
+    _P("=======================================================================")
+end
+
 return {
     debugPrint = debugPrint,
     debugDump = debugDump,
@@ -281,6 +434,7 @@ return {
     isProjectileSpell = isProjectileSpell,
     isVisible = isVisible,
     isHealerArchetype = isHealerArchetype,
+    isMeleeArchetype = isMeleeArchetype,
     isBrawlingWithValidTarget = isBrawlingWithValidTarget,
     getNearby = getNearby,
     isOnSameLevel = isOnSameLevel,
@@ -293,4 +447,15 @@ return {
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
+    isPlayerTurnEnded = isPlayerTurnEnded,
+    canAct = canAct,
+    canMove = canMove,
+    hasLoseControlStatus = hasLoseControlStatus,
+    getCurrentCombatRound = getCurrentCombatRound,
+    createUuid = createUuid,
+    getOriginatorPrototype = getOriginatorPrototype,
+    averageTime = averageTime,
+    getPersistentModVars = getPersistentModVars,
+    updateLeaderboard = updateLeaderboard,
+    dumpLeaderboard = dumpLeaderboard,
 }

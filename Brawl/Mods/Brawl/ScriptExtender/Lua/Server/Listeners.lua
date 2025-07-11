@@ -14,29 +14,56 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
+local function onCharacterMoveFailedUseJump(character)
+    debugPrint("CharacterMoveFailedUseJump", character)
+end
+
 local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
-    local players = State.Session.Players
-    for playerUuid, _ in pairs(players) do
+    -- NB: clean this up / don't reassign "constant" values
+    State.Session.Leaderboard = {}
+    if isToT() then
+        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
+            State.Session.TBSMToTSkippedPrepRound = false
+        else
+            State.Session.TBSMToTSkippedPrepRound = true
+        end
+        Constants.ENTER_COMBAT_RANGE = 100
+    else
+        Constants.ENTER_COMBAT_RANGE = 20
+    end
+    for playerUuid, _ in pairs(State.Session.Players) do
         Roster.addBrawler(playerUuid, true)
     end
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
-        -- debugDump(State.Session.Brawlers)
-        if not isToT() then
-            Constants.ENTER_COMBAT_RANGE = 20
-            startBrawlFizzler(level)
-            Ext.Timer.WaitFor(500, function ()
-                Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-                Ext.Timer.WaitFor(1500, function ()
-                    if Osi.CombatIsActive(combatGuid) then
-                        Osi.EndCombat(combatGuid)
+        if State.Settings.TurnBasedSwarmMode then
+            local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+            if serverEnterRequestEntities then
+                local combatEntity = serverEnterRequestEntities[1]
+                if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+                    for _, participant in ipairs(combatEntity.CombatState.Participants) do
+                        if not State.Session.Players[participant.Uuid.EntityUuid] then
+                            Roster.addBrawler(participant.Uuid.EntityUuid, true)
+                        end
                     end
-                end)
-            end)
+                end
+            end
         else
-            Constants.ENTER_COMBAT_RANGE = 100
-            startToTTimers()
+            if not isToT() then
+                startBrawlFizzler(level)
+                Ext.Timer.WaitFor(500, function ()
+                    Roster.addNearbyToBrawlers(Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
+                    Ext.Timer.WaitFor(1500, function ()
+                        if Osi.CombatIsActive(combatGuid) then
+                            -- NB: is there a way to do this less aggressively?
+                            Osi.EndCombat(combatGuid)
+                        end
+                    end)
+                end)
+            else
+                startToTTimers()
+            end
         end
     end
 end
@@ -51,9 +78,14 @@ local function onStarted(level)
     Movement.setMovementSpeedThresholds()
     Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
-    State.uncapPartyMembersMovementDistances()
     Roster.initBrawlers(level)
-    Pause.checkTruePauseParty()
+    if State.Settings.TurnBasedSwarmMode then
+        State.boostPlayerInitiatives()
+        State.recapPartyMembersMovementDistances()
+    else
+        State.uncapPartyMembersMovementDistances()
+        Pause.checkTruePauseParty()
+    end
     debugDump(State.Session.Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -82,29 +114,64 @@ end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
-    if not isToT() then
-        Constants.ENTER_COMBAT_RANGE = 20
-        onCombatStarted(combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        if State.Session.SwarmTurnTimer ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+            State.Session.SwarmTurnTimer = nil
+        end
+        State.Session.SwarmTurnActive = false
+        State.Session.SwarmTurnTimerCombatRound = nil
+        -- State.Session.ActionsInProgress = {}
+        Swarm.unsetAllEnemyTurnsComplete()
     else
-        Constants.ENTER_COMBAT_RANGE = 100
-        startToTTimers()
+        if isToT() then
+            startToTTimers()
+        else
+            onCombatStarted(combatGuid)
+        end
     end
 end
 
 local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        State.Session.SwarmTurnComplete = {}
+        if State.Session.SwarmTurnTimer ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+            State.Session.SwarmTurnTimer = nil
+        end
+        State.Session.TBSMActionResourceListeners = {}
+        Utils.dumpLeaderboard()
+    end
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
-    Roster.addBrawler(Osi.GetUUID(entityGuid), true)
+    local entityUuid = Osi.GetUUID(entityGuid)
+    if entityUuid then
+        Roster.addBrawler(entityUuid, true)
+        if State.Settings.TurnBasedSwarmMode and Osi.IsPartyMember(entityUuid, 1) == 1 and State.Session.ResurrectedPlayer[entityUuid] then
+            State.Session.ResurrectedPlayer[entityUuid] = nil
+            local initiativeRoll = Roster.rollForInitiative(entityUuid)
+            local entity = Ext.Entity.Get(entityUuid)
+            if entity and entity.CombatParticipant then
+                entity.CombatParticipant.InitiativeRoll = initiativeRoll
+                if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+                    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = initiativeRolls
+                    entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+                end
+                entity:Replicate("CombatParticipant")
+            end
+            -- State.Session.SwarmTurnComplete[entityUuid] = true
+        end
+    end
 end
 
 local function onEnteredForceTurnBased(entityGuid)
     debugPrint("EnteredForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid then
+    if level and entityUuid and not State.Settings.TurnBasedSwarmMode then
         local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
         if isPlayer then
             local isHostCharacter = entityUuid == Osi.GetHostCharacter()
@@ -160,7 +227,7 @@ local function onLeftForceTurnBased(entityGuid)
     debugPrint("LeftForceTurnBased", entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
     local level = Osi.GetRegion(entityGuid)
-    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] then
+    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] and not State.Settings.TurnBasedSwarmMode then
         if State.Session.Players[entityUuid].isFreshSummon then
             State.Session.Players[entityUuid].isFreshSummon = false
         end
@@ -177,7 +244,6 @@ local function onLeftForceTurnBased(entityGuid)
         end
         local isHostCharacter = entityUuid == Osi.GetHostCharacter()
         if isHostCharacter then
-            debugPrint("Left FTB startPulseRepo")
             startPulseReposition(level)
         end
         -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
@@ -213,15 +279,49 @@ local function onLeftForceTurnBased(entityGuid)
     end
 end
 
+local function onTurnStarted(entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        debugPrint("TurnStarted", entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid then
+            if Osi.IsPartyMember(entityUuid, 1) == 1 then
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
+            elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
+                -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
+                --     debugPrint("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
+                --     Swarm.setTurnComplete(entityUuid)
+                -- end
+            end
+        end
+    end
+end
+
 local function onTurnEnded(entityGuid)
-    -- NB: how's this work for the "environmental turn"?
-    debugPrint("TurnEnded", entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        debugPrint("TurnEnded", entityGuid)
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid and State.getBrawlerByUuid(entityUuid) then
+            if Osi.IsPartyMember(entityGuid, 1) == 1 then
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+                if Swarm.checkAllPlayersFinishedTurns() then
+                    debugPrint("Started Swarm turn!")
+                    Swarm.unsetAllEnemyTurnsComplete()
+                    Swarm.startSwarmTurn()
+                end
+            else
+                Swarm.completeSwarmTurn(entityUuid)
+            end
+        end
+    end
 end
 
 local function onDied(entityGuid)
     debugPrint("Died", entityGuid)
     local level = Osi.GetRegion(entityGuid)
     local entityUuid = Osi.GetUUID(entityGuid)
+    if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
+        State.Session.SwarmTurnComplete[entityUuid] = nil
+    end
     if level ~= nil and entityUuid ~= nil and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] ~= nil then
         -- Sometimes units don't appear dead when killed out-of-combat...
         -- this at least makes them lie prone (and dead-appearing units still appear dead)
@@ -232,6 +332,17 @@ local function onDied(entityGuid)
         end)
         Roster.removeBrawler(level, entityUuid)
         Roster.checkForEndOfBrawl(level)
+    end
+end
+
+local function onResurrected(entityGuid)
+    debugPrint("Resurrected", entityGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        local entityUuid = Osi.GetUUID(entityGuid)
+        if entityUuid and Osi.IsPartyMember(entityUuid, 1) == 1 then
+            State.Session.ResurrectedPlayer[entityUuid] = true
+            State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+        end
     end
 end
 
@@ -273,7 +384,7 @@ local function onGainedControl(targetGuid)
             for playerUuid, player in pairs(players) do
                 if player.userId == targetUserId and playerUuid ~= targetUuid then
                     player.isControllingDirectly = false
-                    if level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
+                    if not State.Settings.TurnBasedSwarmMode and level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
                         stopPulseAddNearby(playerUuid)
                         startPulseAction(brawlersInLevel[playerUuid])
                     end
@@ -295,7 +406,14 @@ local function onCharacterJoinedParty(character)
         if State.Session.Players and not State.Session.Players[uuid] then
             State.setupPlayer(uuid)
             State.setupPartyMembersHitpoints()
-            State.uncapPartyMembersMovementDistances()
+            if State.Settings.TurnBasedSwarmMode then
+                State.boostPlayerInitiative(uuid)
+                State.recapPartyMembersMovementDistances()
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
+            else
+                State.uncapPartyMembersMovementDistances()
+                -- Pause.checkTruePauseParty()
+            end
         end
         if State.areAnyPlayersBrawling() then
             Roster.addBrawler(uuid, true)
@@ -372,6 +490,7 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
                     debugPrint("Applying damage", defenderUuid, damageAmount, damageType)
                     Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
                     Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
+                    Utils.updateLeaderboard(attackerUuid, defenderUuid, damageAmount)
                     reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                 else
                     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
@@ -383,21 +502,10 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
     end)
 end
 
-local function decreaseActionResource(uuid, resourceType, amount)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.ActionResources and entity.ActionResources.Resources then
-        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
-        if resources then
-            resources[1].Amount = resources[1].Amount - amount
-        end
-    end
-    entity:Replicate("ActionResources")
-end
-
 local function useActionPointSurplus(uuid, resourceType)
     local pointSurplus = math.floor(Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
     if pointSurplus > 0 then
-        decreaseActionResource(uuid, resourceType, pointSurplus)
+        Resources.decreaseActionResource(uuid, resourceType, pointSurplus)
     end
     return pointSurplus
 end
@@ -419,24 +527,36 @@ local function useBonusAttacks(uuid)
             numBonusAttacks = numBonusAttacks + 1
         end
     end
-    return numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint") + useActionPointSurplus(uuid, "BonusActionPoint")
+    if not State.Settings.TurnBasedSwarmMode then
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint")
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "BonusActionPoint")
+    end
+    return numBonusAttacks
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+    if State.Settings.TurnBasedSwarmMode and not State.Session.SwarmTurnActive then
+        return
+    end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
-        local spellName = State.Session.StoryActionIDSpellName[storyActionID]
-        if spellName ~= nil then
-            debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-            State.Session.StoryActionIDSpellName[storyActionID] = nil
-            local spell = State.getSpellByName(spellName)
-            if spell ~= nil and spell.triggersExtraAttack == true then
-                if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
-                    local brawler = State.getBrawlerByUuid(attackerUuid)
-                    if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
-                        local numBonusAttacks = useBonusAttacks(attackerUuid)
-                        debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
-                        State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
-                        reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+        if not State.Settings.TurnBasedSwarmMode or Utils.isPugnacious(attackerUuid) then
+            local spellName = State.Session.StoryActionIDSpellName[storyActionID]
+            if spellName ~= nil then
+                debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+                State.Session.StoryActionIDSpellName[storyActionID] = nil
+                local spell = State.getSpellByName(spellName)
+                if spell ~= nil and spell.triggersExtraAttack == true then
+                    if State.Settings.TurnBasedSwarmMode and Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
+                        return nil
+                    end
+                    if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
+                        local brawler = State.getBrawlerByUuid(attackerUuid)
+                        if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                            local numBonusAttacks = useBonusAttacks(attackerUuid)
+                            debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
+                            State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
+                            reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                        end
                     end
                 end
             end
@@ -458,24 +578,13 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
             if Osi.IsPlayer(defenderUuid) == 0 and damageAmount > 0 then
                 State.Session.IsAttackingOrBeingAttackedByPlayer[defenderUuid] = attackerUuid
             end
-            -- NB: is this needed?
-            -- if isToT() then
-            --     -- Roster.addNearbyToBrawlers(attackerUuid, 30, nil, true)
-            --     Roster.addNearbyToBrawlers(attackerUuid, 30)
-            -- end
         end
         if Osi.IsPlayer(defenderUuid) == 1 then
             if Osi.IsPlayer(attackerUuid) == 0 and damageAmount > 0 then
                 State.Session.IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
-            -- -- NB: is this needed?
-            -- if isToT() then
-            --     -- Roster.addNearbyToBrawlers(defenderUuid, 30, nil, true)
-            --     Roster.addNearbyToBrawlers(defenderUuid, 30)
-            -- end
         end
-        -- print("attacked by fizz")
-        -- startBrawlFizzler(Osi.GetRegion(attackerUuid))
+        Utils.updateLeaderboard(attackerUuid, defenderUuid, damageAmount)
     end
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
@@ -500,16 +609,31 @@ local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, sp
 end
 
 local function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
-    debugPrint("UsingSpell", caster, spell, spellType, spellElement, storyActionID)
+    debugPrint(getDisplayName(Osi.GetUUID(caster)), "UsingSpell", caster, spell, spellType, spellElement, storyActionID)
 end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    debugPrint("CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    debugDump(State.Session.ActionsInProgress[casterUuid])
-    if Resources.removeActionInProgress(casterUuid, spellName) then
-        Resources.deductCastedSpell(casterUuid, spellName)
+    debugPrint(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- _D(State.Session.ActionsInProgress[casterUuid])
+    if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
+        debugPrint("resuming swarm turn timer (CastedSpell)")
+        Ext.Timer.Resume(State.Session.SwarmTurnTimer)
     end
+    if Resources.removeActionInProgress(casterUuid, spellName) then
+        if State.Settings.TurnBasedSwarmMode then
+            local brawler = State.getBrawlerByUuid(casterUuid)
+            if brawler then
+                Swarm.swarmAction(brawler)
+            end
+        end
+        -- Resources.deductCastedSpell(casterUuid, spellName)
+    end
+end
+
+local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = Osi.GetUUID(casterGuid)
+    debugPrint(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onDialogStarted(dialog, dialogInstanceId)
@@ -538,7 +662,7 @@ end
 local function onDialogEnded(dialog, dialogInstanceId)
     debugPrint("DialogEnded", dialog, dialogInstanceId)
     local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
+    if level and not State.Settings.TurnBasedSwarmMode then
         startPulseReposition(level)
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
@@ -563,18 +687,32 @@ local function onDifficultyChanged(difficulty)
 end
 
 local function onTeleportedToCamp(character)
+    debugPrint("TeleportedToCamp", character)
     local entityUuid = Osi.GetUUID(character)
-    if entityUuid ~= nil and State.Session.Brawlers ~= nil then
-        for level, brawlersInLevel in pairs(State.Session.Brawlers) do
-            if brawlersInLevel[entityUuid] ~= nil then
+    -- NB: use this for RT too? why remove all?
+    if State.Session.TurnBasedSwarmMode then
+        if entityUuid then
+            local level = Osi.GetRegion(entityUuid)
+            local brawler = State.getBrawlerByUuid(entityUuid)
+            if level and brawler then
                 Roster.removeBrawler(level, entityUuid)
                 Roster.checkForEndOfBrawl(level)
+            end
+        end
+    else
+        if entityUuid ~= nil and State.Session.Brawlers ~= nil then
+            for level, brawlersInLevel in pairs(State.Session.Brawlers) do
+                if brawlersInLevel[entityUuid] ~= nil then
+                    Roster.removeBrawler(level, entityUuid)
+                    Roster.checkForEndOfBrawl(level)
+                end
             end
         end
     end
 end
 
 local function onTeleportedFromCamp(character)
+    debugPrint("TeleportedFromCamp", character)
     local entityUuid = Osi.GetUUID(character)
     if entityUuid ~= nil and State.areAnyPlayersBrawling() then
         Roster.addBrawler(entityUuid, false)
@@ -583,11 +721,13 @@ end
 
 -- thank u focus
 local function onPROC_Subregion_Entered(characterGuid, _)
-    debugPrint("PROC_Subregion_Entered", characterGuid)
-    local uuid = Osi.GetUUID(characterGuid)
-    local level = Osi.GetRegion(uuid)
-    if level and State.Session.Players and State.Session.Players[uuid] then
-        AI.pulseReposition(level)
+    if not State.Settings.TurnBasedSwarmMode then
+        debugPrint("PROC_Subregion_Entered", characterGuid)
+        local uuid = Osi.GetUUID(characterGuid)
+        local level = Osi.GetRegion(uuid)
+        if level and State.Session.Players and State.Session.Players[uuid] then
+            AI.pulseReposition(level)
+        end
     end
 end
 
@@ -692,8 +832,53 @@ end
 
 local function onLeveledUp(character)
     debugPrint("LeveledUp", character)
-    if character ~= nil and Osi.GetUUID(character) == Osi.GetHostCharacter() then
+    if character ~= nil and Osi.IsPartyMember(character, 1) == 1 then
         State.buildSpellTable()
+    end
+end
+
+local function onEntityEvent(characterGuid, eventUuid)
+    if State.Session.ActiveMovements[eventUuid] and State.Session.ActiveMovements[eventUuid].moverUuid then
+        debugPrint("EntityEvent", characterGuid, eventUuid)
+        local activeMovement = State.Session.ActiveMovements[eventUuid]
+        local characterUuid = Osi.GetUUID(characterGuid)
+        if characterUuid == activeMovement.moverUuid then
+            if activeMovement.onMovementCompleted and type(activeMovement.onMovementCompleted) == "function" then
+                activeMovement.onMovementCompleted()
+            end
+            State.Session.ActiveMovements[eventUuid] = nil
+        end
+    end
+end
+
+local function onReactionInterruptActionNeeded(characterGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        debugPrint("ReactionInterruptActionNeeded", characterGuid)
+        local uuid = Osi.GetUUID(characterGuid)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
+            debugPrint("pausing swarm turn timer")
+            Ext.Timer.Pause(State.Session.SwarmTurnTimer)
+        end
+    end
+end
+
+local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+    if State.Settings.TurnBasedSwarmMode then
+        debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+        local uuid = Osi.GetUUID(characterGuid)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
+            debugPrint("resuming swarm turn timer (interrupt used)")
+            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+        end
+    end
+end
+
+-- thank u focus
+local function onServerInterruptDecision()
+    for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
+        if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
+            return Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+        end
     end
 end
 
@@ -720,6 +905,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", onLevelGameplayStarted),
         stop = Ext.Osiris.UnregisterListener,
     }
+    State.Session.Listeners.CharacterMoveFailedUseJump = {
+        handle = Ext.Osiris.RegisterListener("CharacterMoveFailedUseJump", 1, "after", onCharacterMoveFailedUseJump),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     State.Session.Listeners.CombatStarted = {
         handle = Ext.Osiris.RegisterListener("CombatStarted", 1, "after", onCombatStarted),
         stop = Ext.Osiris.UnregisterListener,
@@ -744,12 +933,20 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.TurnEnded = {
-    --     handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    State.Session.Listeners.TurnStarted = {
+        handle = Ext.Osiris.RegisterListener("TurnStarted", 1, "after", onTurnStarted),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.TurnEnded = {
+        handle = Ext.Osiris.RegisterListener("TurnEnded", 1, "after", onTurnEnded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     State.Session.Listeners.Died = {
         handle = Ext.Osiris.RegisterListener("Died", 1, "after", onDied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.Resurrected = {
+        handle = Ext.Osiris.RegisterListener("Resurrected", 1, "after", onResurrected),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.GainedControl = {
@@ -794,6 +991,10 @@ local function startListeners()
     }
     State.Session.Listeners.CastedSpell = {
         handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.CastSpellFailed = {
+        handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.DialogStarted = {
@@ -899,6 +1100,22 @@ local function startListeners()
     State.Session.Listeners.LeveledUp = {
         handle = Ext.Osiris.RegisterListener("LeveledUp", 1, "after", onLeveledUp),
         stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.EntityEvent = {
+        handle = Ext.Osiris.RegisterListener("EntityEvent", 2, "after", onEntityEvent),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ReactionInterruptActionNeeded = {
+        handle = Ext.Osiris.RegisterListener("ReactionInterruptActionNeeded", 1, "after", onReactionInterruptActionNeeded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ReactionInterruptUsed = {
+        handle = Ext.Osiris.RegisterListener("ReactionInterruptUsed", 3, "after", onReactionInterruptUsed),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.ServerInterruptDecision = {
+        handle = Ext.Entity.OnSystemUpdate("ServerInterruptDecision", onServerInterruptDecision),
+        stop = Ext.Entity.Unsubscribe,
     }
 end
 

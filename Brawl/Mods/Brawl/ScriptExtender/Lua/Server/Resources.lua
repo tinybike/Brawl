@@ -7,6 +7,21 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local clearOsirisQueue = Utils.clearOsirisQueue
 
+local function decreaseActionResource(uuid, resourceType, amount)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
+        if resources and resources[1] then
+            if resources[1].Amount >= amount then
+                resources[1].Amount = resources[1].Amount - amount
+            else
+                resources[1].Amount = 0.0
+            end
+        end
+    end
+    entity:Replicate("ActionResources")
+end
+
 local function checkSpellCharge(casterUuid, spellName)
     -- debugPrint("checking spell charge", casterUuid, spellName)
     if spellName then
@@ -30,6 +45,9 @@ end
 local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     local entity = Ext.Entity.Get(casterUuid)
     local isSpellPrepared = false
+    if not entity or not entity.SpellBookPrepares or not entity.SpellBookPrepares.PreparedSpells then
+        return false
+    end
     for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
         if preparedSpell.OriginatorPrototype == spellName then
             isSpellPrepared = true
@@ -80,7 +98,6 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
 end
 
 local function removeActionInProgress(uuid, spellName)
-    debugPrint("removeActionInProgress", uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -120,7 +137,7 @@ local function deductCastedSpell(uuid, spellName)
                         end
                     end
                 end
-            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+            elseif State.Settings.TurnBasedSwarmMode or (costType ~= "ActionPoint" and costType ~= "BonusActionPoint") then
                 if costType == "SpellSlot" then
                     if entity.ActionResources and entity.ActionResources.Resources then
                         local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
@@ -134,11 +151,19 @@ local function deductCastedSpell(uuid, spellName)
                         end
                     end
                 else
-                    if entity.ActionResources and entity.ActionResources.Resources then
+                    if not Constants.ACTION_RESOURCES[costType] then
+                        debugPrint("unknown costType", costType)
+                    elseif entity.ActionResources and entity.ActionResources.Resources then
                         local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
                         if resources then
                             local resource = resources[1] -- NB: always index 1?
-                            resource.Amount = resource.Amount - costValue
+                            if resource.Amount ~= nil then
+                                if resource.Amount >= costValue then
+                                    resource.Amount = resource.Amount - costValue
+                                else
+                                    resource.Amount = 0
+                                end
+                            end
                         end
                     end
                 end
@@ -170,20 +195,32 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     if targetUuid == nil then
         return false
     end
-    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-        return false
-    end
-    if variant ~= nil then
-        spellName = variant
-    end
-    if upcastLevel ~= nil then
-        spellName = spellName .. "_" .. tostring(upcastLevel)
-    end
-    debugPrint("casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     clearOsirisQueue(casterUuid)
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    Osi.UseSpell(casterUuid, spellName, targetUuid)
+    debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    AI.queueSpellRequest(casterUuid, spellName, targetUuid)
+    -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
+    --     return false
+    -- end
+    -- if variant ~= nil then
+    --     spellName = variant
+    -- end
+    -- if upcastLevel ~= nil then
+    --     spellName = spellName .. "_" .. tostring(upcastLevel)
+    -- end
+    -- clearOsirisQueue(casterUuid)
+    -- State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    -- debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
+    -- debugPrint("before", #Ext.System.ServerCastRequest.OsirisCastRequests)
+    -- _D(Ext.System.ServerCastRequest.OsirisCastRequests)
+    -- for _, request in ipairs(Ext.System.ServerCastRequest.OsirisCastRequests) do
+    --     request.CastOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
+    -- end
+    -- debugPrint("after")
+    -- _D(Ext.System.ServerCastRequest.OsirisCastRequests)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
@@ -191,6 +228,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
 end
 
 return {
+    decreaseActionResource = decreaseActionResource,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,

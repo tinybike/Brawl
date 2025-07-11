@@ -22,7 +22,6 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    MurderhoboMode = false,
     TurnBasedSwarmMode = false,
 }
 if MCM then
@@ -39,7 +38,6 @@ if MCM then
     Settings.CompanionAIMaxSpellLevel = MCM.Get("companion_ai_max_spell_level")
     Settings.HogwildMode = MCM.Get("hogwild_mode")
     Settings.MaxPartySize = MCM.Get("max_party_size")
-    Settings.MurderhoboMode = MCM.Get("murderhobo_mode")
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
 end
 
@@ -78,6 +76,16 @@ local Session = {
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
+    ActiveMovements = {},
+    TurnBasedSwarmModePlayerTurnEnded = {},
+    TBSMActionResourceListeners = {},
+    TBSMToTSkippedPrepRound = false,
+    SwarmTurnComplete = {},
+    ResurrectedPlayer = {},
+    SwarmTurnTimer = nil,
+    SwarmTurnTimerCombatRound = nil,
+    SwarmTurnActive = nil,
+    Leaderboard = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -353,7 +361,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isSelfOnly = hasTargetCondition(spell.TargetConditions, "Self()"),
             isCharacterOnly = hasTargetCondition(spell.TargetConditions, "Character()"),
             outOfCombatOnly = outOfCombatOnly,
-            -- damageType = spell.DamageType,
+            damageType = spell.DamageType,
             isGapCloser = spell.SpellType == "Rush",
             isSpell = spell.SpellSchool ~= "None",
             isEvocation = spell.SpellSchool == "Evocation",
@@ -369,6 +377,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             triggersExtraAttack = extraAttackCheck(spell),
             isDirectHeal = checkForDirectHeal(spell),
             hasApplyStatus = checkForApplyStatus(spell),
+            isBonusAction = costs.BonusActionPoint ~= nil,
         }
         return spellInfo
     end
@@ -465,7 +474,7 @@ local function getArchetype(uuid)
         archetype = Osi.GetActiveArchetype(uuid)
     end
     if not Constants.ARCHETYPE_WEIGHTS[archetype] then
-        if archetype == "base" then
+        if archetype == nil or archetype == "base" then
             archetype = "melee"
         elseif archetype:find("ranged") ~= nil then
             archetype = "ranged"
@@ -480,7 +489,6 @@ local function getArchetype(uuid)
         elseif archetype:find("monk") ~= nil then
             archetype = "monk"
         else
-            debugPrint("Archetype missing from the list, using melee for now", archetype)
             archetype = "melee"
         end
     end
@@ -565,7 +573,7 @@ local function getSpellByName(name)
     return nil
 end
 
-local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly)
+local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
     if isSilenced(uuid) then
         return false
     end
@@ -575,6 +583,9 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly)
         local isUsableHeal = (spell ~= nil) and spell.isDirectHeal
         if isUsableHeal and excludeSelfOnly then
             isUsableHeal = isUsableHeal and not spell.isSelfOnly
+        end
+        if bonusActionOnly then
+            isUsableHeal = isUsableHeal and spell.isBonusAction
         end
         if isUsableHeal then
             if Settings.HogwildMode then
@@ -634,7 +645,7 @@ local function uncapMovementDistance(entityUuid)
         movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
         movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
         modVars.MovementDistances = movementDistances
-        _D(movementDistances)
+        -- _D(movementDistances)
     end
 end
 
@@ -800,7 +811,7 @@ end
 
 local function setMaxPartySize()
     Osi.SetMaxPartySizeOverride(Settings.MaxPartySize)
-	Osi.PROC_CheckPartyFull()
+    Osi.PROC_CheckPartyFull()
 end
 
 local function setupPlayer(guid)
@@ -844,6 +855,31 @@ local function setIsControllingDirectly()
     end
 end
 
+local function removeBoostPlayerInitiatives()
+    local players = Session.Players
+    if players then
+        for playerUuid, _ in pairs(players) do
+            Osi.RemoveBoosts(playerUuid, "Initiative(1234)", 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+        end
+    end
+end
+
+local function boostPlayerInitiative(playerUuid)
+    debugPrint("Boosting player initiative", playerUuid)
+    Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+end
+
+local function boostPlayerInitiatives()
+    -- removeBoostPlayerInitiatives()
+    local players = Session.Players
+    -- Players always go first, should this be a setting instead or...?
+    if players then
+        for playerUuid, _ in pairs(players) do
+            boostPlayerInitiative(playerUuid)
+        end
+    end
+end
+
 return {
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
@@ -869,6 +905,9 @@ return {
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,
     setIsControllingDirectly = setIsControllingDirectly,
+    removeBoostPlayerInitiatives = removeBoostPlayerInitiatives,
+    boostPlayerInitiatives = boostPlayerInitiatives,
+    boostPlayerInitiative = boostPlayerInitiative,
     Settings = Settings,
     Session = Session,
 }

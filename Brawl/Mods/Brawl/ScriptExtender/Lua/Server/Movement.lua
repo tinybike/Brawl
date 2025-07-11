@@ -34,11 +34,17 @@ local function enemyMovementDistanceToSpeed(movementDistance)
 end
 
 local function getMovementDistanceAmount(entity)
-    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+    if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount
+    end
+    return 0
 end
 
 local function getMovementDistanceMaxAmount(entity)
-    return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+    if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        return entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+    end
+    return 0
 end
 
 local function getMovementSpeed(entityUuid)
@@ -50,41 +56,89 @@ local function getMovementSpeed(entityUuid)
     return movementSpeed
 end
 
+local function setMovementToMax(entity)
+    if entity and entity.Uuid and entity.Uuid.EntityUuid and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources
+        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] and resources[Constants.ACTION_RESOURCES.Movement][1].Amount == 0.0 then
+            local uuid = entity.Uuid.EntityUuid
+            if State.Session.TBSMActionResourceListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[uuid])
+                State.Session.TBSMActionResourceListeners[uuid] = nil
+            end
+            resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+            entity:Replicate("ActionResources")
+            -- AI.queueSpellRequest(uuid, "Shout_Dash", uuid, nil, true)
+        end
+    end
+end
+
 local function getRemainingMovement(entity)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
-        if entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1] then
+        if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
             return getMovementDistanceAmount(entity)
         end
     end
 end
 
-local function findPathToPosition(playerUuid, position, callback)
-    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, playerUuid, 1)
+local function findPathToTargetUuid(uuid, targetUuid)
+    local x, y, z = Osi.GetPosition(targetUuid)
+    local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 2.0, uuid, 1)
+    if validX == nil or validY == nil or validZ == nil then
+        return false
+    end
+    local validPosition = {validX, validY, validZ}
+    local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
+    path.CanUseLadders = true
+    -- path.CanUseCombatPortals = true
+    -- path.CanUsePortals = true
+    -- path.Climbing = true
+    -- _D(path)
+    local goalFound = Ext.Level.FindPath(path)
+    Ext.Level.ReleasePath(path)
+    debugPrint("Got valid path to target", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), validX, validY, validZ, goalFound)
+    -- return true
+    return goalFound
+end
+
+local function findPathToPosition(uuid, position, callback)
+    local validX, validY, validZ = Osi.FindValidPosition(position[1], position[2], position[3], 0, uuid, 1)
     if validX == nil or validY == nil or validZ == nil then
         return callback("Can't get there", nil)
     end
     local validPosition = {validX, validY, validZ}
-    Ext.Level.BeginPathfinding(Ext.Entity.Get(playerUuid), validPosition, function (path)
-        if not path or not path.GoalFound then
-            return callback("Can't get there", nil)
-        end
-        callback(nil, validPosition)
-    end)
+    debugPrint("Got valid position", uuid, validX, validY, validZ)
+    local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
+    local goalFound = Ext.Level.FindPath(path)
+    Ext.Level.ReleasePath(path)
+    if not goalFound then
+        return callback("Can't get there", nil)
+    end
+    callback(nil, validPosition)
 end
 
-local function moveToTargetUuid(uuid, targetUuid, override)
+local function registerActiveMovement(moverUuid, onMovementCompleted)
+    local eventUuid = Utils.createUuid()
+    State.Session.ActiveMovements[eventUuid] = {moverUuid = moverUuid, onMovementCompleted = onMovementCompleted}
+    return eventUuid
+end
+
+local function moveToTargetUuid(uuid, targetUuid, override, callback)
+    debugPrint("moveToTargetUuid", uuid, targetUuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
-    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), "")
+    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
+    return true
 end
 
-local function moveToPosition(uuid, position, override)
+local function moveToPosition(uuid, position, override, callback)
+    debugPrint("moveToPosition", uuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
-    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), "")
+    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
+    return true
 end
 
 local function moveCompanionsToPlayer(playerUuid)
@@ -112,14 +166,20 @@ local function calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     local dy = yMover - yTarget
     local dz = zMover - zTarget
     local fracDistance = goalDistance / math.sqrt(dx*dx + dy*dy + dz*dz)
-    return Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 0, moverUuid, 1)
+    -- return Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 0, moverUuid, 1)
+    return Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 2.0, moverUuid, 1)
 end
 
-local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance)
+local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance, callback)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     if x ~= nil and y ~= nil and z ~= nil then
-        moveToPosition(moverUuid, {x, y, z}, true)
+        return moveToPosition(moverUuid, {x, y, z}, not State.Settings.TurnBasedSwarmMode, callback)
     end
+    debugPrint(Utils.getDisplayName(moverUuid), "Failed to get en route coordinates", Utils.getDisplayName(targetUuid), x, y, z, goalDistance)
+    if callback ~= nil then
+        callback()
+    end
+    return false
 end
 
 local function holdPosition(entityUuid)
@@ -157,30 +217,27 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
     end
 end
 
-local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName)
+local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, callback)
     local range = getSpellRange(spellName)
-    local rangeNumber
+    local rangeNumber = Utils.convertSpellRangeToNumber(range)
     -- clearOsirisQueue(attackerUuid)
     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
-    if range == "MeleeMainWeaponRange" then
-        moveToTargetUuid(attackerUuid, targetUuid, true)
-    elseif range == "RangedMainWeaponRange" or range == "ThrownObjectRange" then
-        rangeNumber = 18
+    if rangeNumber <= 2 then
+        debugPrint("************moving into position for melee attack", Utils.getDisplayName(attackerUuid), Utils.getDisplayName(targetUuid), spellName)
+        return moveToTargetUuid(attackerUuid, targetUuid, not State.Settings.TurnBasedSwarmMode, callback)
     else
-        rangeNumber = tonumber(range)
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        if rangeNumber == nil then
-            print("Couldn't parse range, what is this?", range, rangeNumber, distanceToTarget, attackerUuid, targetUuid)
-        end
+        local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
         if rangeNumber ~= nil and distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
-            debugPrint("moveIntoPositionForSpell distance > range, moving to...")
-            moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber)
+            debugPrint("******moveIntoPositionForSpell distance > range, moving to...", attackerUuid, targetUuid, rangeNumber, callback)
+            return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber, callback)
+        elseif not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
+            debugPrint("moveIntoPositionForSpell can't see target, moving closer", attackerUuid, targetUuid, rangeNumber, callback)
+            return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2, callback)
+        elseif callback ~= nil then
+            callback()
+            return true
         end
-    end
-    local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
-    if not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
-        debugPrint("moveIntoPositionForSpell can't see target, moving closer")
-        moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2)
     end
 end
 
@@ -213,8 +270,10 @@ return {
     getMovementSpeed = getMovementSpeed,
     getMovementDistanceMaxAmount = getMovementDistanceMaxAmount,
     getRemainingMovement = getRemainingMovement,
+    setMovementToMax = setMovementToMax,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
+    findPathToTargetUuid = findPathToTargetUuid,
     findPathToPosition = findPathToPosition,
     moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,

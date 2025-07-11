@@ -110,6 +110,9 @@ end
 local function disableMod()
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
+    if State.Settings.TurnBasedSwarmMode then
+        State.removeBoostPlayerInitiatives()
+    end
     modStatusMessage("Brawl Disabled")
 end
 
@@ -541,6 +544,30 @@ local function onMCMMaxPartySize(maxPartySize)
     State.setMaxPartySize()
 end
 
+local function onMCMTurnBasedSwarmMode(value)
+    State.Settings.TurnBasedSwarmMode = value
+    if value == true then
+        stopAllPulseAddNearbyTimers()
+        stopAllPulseRepositionTimers()
+        stopAllPulseActionTimers()
+        stopAllBrawlFizzlers()
+        local hostCharacter = Osi.GetHostCharacter()
+        if hostCharacter then
+            local level = Osi.GetRegion(hostCharacter)
+            if level then
+                Roster.endBrawl(level)
+            end
+        end
+        State.boostPlayerInitiatives()
+        State.recapPartyMembersMovementDistances()
+    else
+        State.removeBoostPlayerInitiatives()
+        State.uncapPartyMembersMovementDistances()
+        disableMod()
+        enableMod()
+    end
+end
+
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
@@ -578,7 +605,6 @@ return {
         companion_ai_max_spell_level = function (v) State.Settings.CompanionAIMaxSpellLevel = v end,
         hogwild_mode = function (v) State.Settings.HogwildMode = v end,
         max_party_size = onMCMMaxPartySize,
-        murderhobo_mode = function (v) State.Settings.MurderhoboMode = v end,
-        turn_based_swarm_mode = function (v) State.Settings.TurnBasedSwarmMode = v end,
+        turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
     },
 }
