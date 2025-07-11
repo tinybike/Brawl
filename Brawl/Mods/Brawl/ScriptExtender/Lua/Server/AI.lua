@@ -32,8 +32,14 @@ local findPathToTargetUuid = Movement.findPathToTargetUuid
 -- cache values so we don't have to get from stats
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
+    if not castOptions then
+        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        if State.Settings.TurnBasedSwarmMode then
+            table.insert(castOptions, "NoMovement")
+        end
+    end
     local request = {
-        CastOptions = castOptions or {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"},
+        CastOptions = castOptions,
         CastPosition = nil,
         Item = nil,
         Caster = Ext.Entity.Get(casterUuid),
@@ -73,7 +79,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    print("Inserted new cast request", request.RequestGuid, #queuedRequests)
+    _P("Inserted new cast request", request.RequestGuid, #queuedRequests)
     return request.RequestGuid
 end
 
@@ -404,7 +410,15 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-            debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
+            if State.Settings.TurnBasedSwarmMode and not bonusActionOnly and Osi.HasActiveStatus(brawler.uuid, "DASH") == 0 then
+                local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(actionToTake))
+                local remainingMovement = Osi.GetActionResourceValuePersonal(brawler.uuid, "Movement", 0)
+                if remainingMovement < (distanceToTarget - spellRange) then
+                    _P("DASHING...", remainingMovement, distanceToTarget, spellRange)
+                    useSpellOnTarget(brawler.uuid, brawler.uuid, "Shout_Dash_NPC")
+                end
+            end
+            _P(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
         if not actionToTake then
             debugPrint("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
@@ -431,7 +445,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             end
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
-            print(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
+            _P(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end)
         return true
@@ -650,8 +664,12 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, potentialTargetUuid)
                     local canSeeTarget = Osi.CanSee(brawler.uuid, potentialTargetUuid) == 1
                     debugPrint(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
-                    if isToT() or (distanceToTarget < 30 and canSeeTarget) or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
-                        local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
+                    local ableToTarget = true
+                    local isHostile = isHostileTarget(brawler.uuid, potentialTargetUuid)
+                    if not State.Settings.TurnBasedSwarmMode and (distanceToTarget > 30 or (isHostile and not canSeeTarget)) then
+                        ableToTarget = false
+                    end
+                    if isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                         local hasPathToTarget = nil
                         -- if isMelee and not isPlayerOrAlly(brawler.uuid) and isHostile then
                         if isHostile and isValidHostileTarget(potentialTargetUuid) then
@@ -678,7 +696,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                                         weightedTarget = getBalancedWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget, brawler.uuid, potentialTargetUuid, anchorCharacterUuid)
                                     end
                                 end
-                                debugPrint(brawler.displayName, "weighted target", potentialTargetUuid, weightedTarget)
+                                debugPrint(brawler.displayName, "weighted target", getDisplayName(potentialTargetUuid), weightedTarget)
                                 -- NB: this is too intense of a request for real-time mode and will crash the game :/
                                 if State.Settings.TurnBasedSwarmMode and weightedTarget ~= nil then
                                     local potentialTargetEntity = Ext.Entity.Get(potentialTargetUuid)
@@ -843,7 +861,7 @@ local function pulseAction(brawler, bonusActionOnly)
                         end)
                     end
                 end
-            else
+            elseif not State.Settings.TurnBasedSwarmMode then
                 Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
             end
             -- Doesn't currently have an attack target, so let's find one
@@ -853,8 +871,7 @@ local function pulseAction(brawler, bonusActionOnly)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[Osi.GetRegion(brawler.uuid)]
-            -- debugPrint(brawler.displayName, "has target, target is alive", getDisplayName(brawler.targetUuid), isOnSameLevel(brawler.uuid, brawler.targetUuid), isAliveAndCanFight(brawler.targetUuid), isVisible(brawler.targetUuid))
-            if brawlersInLevel and isOnSameLevel(brawler.uuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
+            if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                 if not State.Settings.TurnBasedSwarmMode or findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
                     if brawler.lockedOnTarget and isValidHostileTarget(brawler.targetUuid) then
                         debugPrint(brawler.displayName, "Locked-on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)

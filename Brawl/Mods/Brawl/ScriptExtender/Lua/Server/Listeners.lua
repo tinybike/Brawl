@@ -19,7 +19,7 @@ local function onCharacterMoveFailedUseJump(character)
 end
 
 local function onCombatStarted(combatGuid)
-    print("CombatStarted", combatGuid)
+    _P("CombatStarted", combatGuid)
     -- NB: clean this up / don't reassign "constant" values
     if isToT() then
         if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
@@ -107,12 +107,12 @@ local function onUserReservedFor(entity, _, _)
 end
 
 local function onLevelGameplayStarted(level, _)
-    print("LevelGameplayStarted", level)
+    _P("LevelGameplayStarted", level)
     onStarted(level)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    print("CombatRoundStarted", combatGuid, round)
+    _P("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
         if State.Session.SwarmTurnTimer ~= nil then
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
@@ -286,7 +286,7 @@ local function onTurnStarted(entityGuid)
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
             elseif Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
                 -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
-                --     print("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
+                --     _P("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
                 --     Swarm.setTurnComplete(entityUuid)
                 -- end
             end
@@ -296,13 +296,13 @@ end
 
 local function onTurnEnded(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        print("TurnEnded", entityGuid)
+        _P("TurnEnded", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
         if entityUuid and State.getBrawlerByUuid(entityUuid) then
             if Osi.IsPartyMember(entityGuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
                 if Swarm.checkAllPlayersFinishedTurns() then
-                    print("Started Swarm turn!")
+                    _P("Started Swarm turn!")
                     Swarm.unsetAllEnemyTurnsComplete()
                     Swarm.startSwarmTurn()
                 end
@@ -610,7 +610,7 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    _P(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
     if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
         debugPrint("resuming swarm turn timer (CastedSpell)")
@@ -835,7 +835,7 @@ end
 
 local function onEntityEvent(characterGuid, eventUuid)
     if State.Session.ActiveMovements[eventUuid] and State.Session.ActiveMovements[eventUuid].moverUuid then
-        print("EntityEvent", characterGuid, eventUuid)
+        _P("EntityEvent", characterGuid, eventUuid)
         local activeMovement = State.Session.ActiveMovements[eventUuid]
         local characterUuid = Osi.GetUUID(characterGuid)
         if characterUuid == activeMovement.moverUuid then

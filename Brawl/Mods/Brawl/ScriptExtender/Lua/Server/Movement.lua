@@ -96,7 +96,7 @@ local function findPathToTargetUuid(uuid, targetUuid)
     -- _D(path)
     local goalFound = Ext.Level.FindPath(path)
     Ext.Level.ReleasePath(path)
-    debugPrint("Got valid position near target", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), validX, validY, validZ, goalFound)
+    _P("Got valid path to target", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), validX, validY, validZ, goalFound)
     -- return true
     return goalFound
 end
@@ -173,7 +173,7 @@ end
 local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance, callback)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     if x ~= nil and y ~= nil and z ~= nil then
-        return moveToPosition(moverUuid, {x, y, z}, true, callback)
+        return moveToPosition(moverUuid, {x, y, z}, not State.Settings.TurnBasedSwarmMode, callback)
     end
     debugPrint(Utils.getDisplayName(moverUuid), "Failed to get en route coordinates", Utils.getDisplayName(targetUuid), x, y, z, goalDistance)
     if callback ~= nil then
@@ -224,7 +224,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, cal
     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
     if rangeNumber <= 2 then
         debugPrint("************moving into position for melee attack", Utils.getDisplayName(attackerUuid), Utils.getDisplayName(targetUuid), spellName)
-        return moveToTargetUuid(attackerUuid, targetUuid, true, callback)
+        return moveToTargetUuid(attackerUuid, targetUuid, not State.Settings.TurnBasedSwarmMode, callback)
     else
         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
         local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1

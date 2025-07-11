@@ -3,7 +3,7 @@
 
 local function debugPrint(...)
     if Constants.DEBUG_LOGGING then
-        print(...)
+        _P(...)
     end
 end
 
@@ -17,7 +17,7 @@ local function dumpAllEntityKeys()
     local uuid = GetHostCharacter()
     local entity = Ext.Entity.Get(uuid)
     for k, _ in pairs(entity:GetAllComponents()) do
-        print(k)
+        _P(k)
     end
 end
 
@@ -90,7 +90,7 @@ end
 local function checkNearby()
     local nearby = getNearby(Osi.GetHostCharacter(), 50)
     for _, uuid in ipairs(nearby) do
-        print(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
+        _P(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
     end
 end
 
