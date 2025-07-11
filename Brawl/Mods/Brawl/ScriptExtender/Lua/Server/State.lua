@@ -22,8 +22,7 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    -- TurnBasedSwarmMode = false,
-    TurnBasedSwarmMode = true,
+    TurnBasedSwarmMode = false,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")

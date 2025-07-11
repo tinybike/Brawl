@@ -22,7 +22,7 @@
                             "Id": "turn_based_swarm_mode",
                             "Name": "Turn-Based Swarm Mode",
                             "Type": "checkbox",
-                            "Default": true,
+                            "Default": false,
                             "Description": "If checked, your party will take their turns together in turn-based mode, and then all enemies will act simultaneously as a single 'swarm', using Brawl's real-time combat engine.",
                             "Handles": {"DescriptionHandle": "h69f81fcfgaa46g44c0g9ccag8d8749fedb2c", "NameHandle": "h934a9d9cg4d60g4d75gb628g7187b622cb14"}
                         }
