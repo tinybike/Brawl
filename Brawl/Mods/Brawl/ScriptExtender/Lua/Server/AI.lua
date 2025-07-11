@@ -79,7 +79,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    _P("Inserted new cast request", request.RequestGuid, #queuedRequests)
+    debugPrint("Inserted new cast request", request.RequestGuid, #queuedRequests)
     return request.RequestGuid
 end
 
@@ -213,11 +213,9 @@ local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spe
     end
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
-    -- Adjust by spell level (higher level spells are disfavored, unless we're in hogwild mode)
-    if State.Settings.HogwildMode then
+    -- Adjust by spell level, if we're in hogwild mode
+    if not State.Settings.TurnBasedSwarmMode and State.Settings.HogwildMode then
         weight = weight + spell.level*2
-    -- else
-    --     weight = weight - spell.level*0.3
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -250,7 +248,7 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     if spell.isSelfOnly and distanceToTarget ~= 0.0 then
         return false
     end
-    if not State.Settings.HogwildMode then
+    if State.Settings.TurnBasedSwarmMode or not State.Settings.HogwildMode then
         -- Make sure we're not exceeding the user's specified AI max spell level
         if spell.level > State.Settings.CompanionAIMaxSpellLevel then
             return false
@@ -303,7 +301,7 @@ local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilen
     if spellName == "Target_KiResonation_Blast" and Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
         return false
     end
-    if not State.Settings.HogwildMode then
+    if State.Settings.TurnBasedSwarmMode or not State.Settings.HogwildMode then
         if not Resources.hasEnoughToCastSpell(uuid, spellName) then
             return false
         end
@@ -414,11 +412,11 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
                 local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(actionToTake))
                 local remainingMovement = Osi.GetActionResourceValuePersonal(brawler.uuid, "Movement", 0)
                 if remainingMovement < (distanceToTarget - spellRange) then
-                    _P("DASHING...", remainingMovement, distanceToTarget, spellRange)
+                    debugPrint("DASHING...", remainingMovement, distanceToTarget, spellRange)
                     useSpellOnTarget(brawler.uuid, brawler.uuid, "Shout_Dash_NPC")
                 end
             end
-            _P(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
+            debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
         if not actionToTake then
             debugPrint("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
@@ -445,7 +443,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             end
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
-            _P(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
+            debugPrint(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end)
         return true

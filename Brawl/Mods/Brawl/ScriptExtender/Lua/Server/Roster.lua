@@ -88,16 +88,12 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- All players should be set to have identical initiatives for this.
             -- Pause/True Pause should NOT do anything in this mode.
             if State.Settings.TurnBasedSwarmMode then
+                Osi.SetCanJoinCombat(entityUuid, 1)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if Osi.IsPartyMember(entityUuid, 1) ~= 1 then
-                    -- if Utils.canAct(entityUuid) then
-                        State.Session.SwarmTurnComplete[entityUuid] = false
-                    -- else
-                    --     Swarm.setTurnComplete(entityUuid)
-                    -- end
+                    State.Session.SwarmTurnComplete[entityUuid] = false
                     Osi.PROC_SelfHealing_Disable(entityUuid)
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
-                    debugPrint("player brawler added, set turn ended?", entityUuid)
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = Utils.isPlayerTurnEnded(entityUuid)
                 end
             else

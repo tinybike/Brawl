@@ -547,13 +547,24 @@ end
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
+        stopAllPulseAddNearbyTimers()
+        stopAllPulseRepositionTimers()
+        stopAllPulseActionTimers()
+        stopAllBrawlFizzlers()
+        local hostCharacter = Osi.GetHostCharacter()
+        if hostCharacter then
+            local level = Osi.GetRegion(hostCharacter)
+            if level then
+                Roster.endBrawl(level)
+            end
+        end
         State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
-        -- Swarm.startEnemyTurn(1)
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
-        -- Swarm.startEnemyTurn(0)
+        disableMod()
+        enableMod()
     end
 end
 
