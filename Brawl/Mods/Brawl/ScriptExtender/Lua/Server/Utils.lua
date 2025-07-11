@@ -367,6 +367,53 @@ local function averageTime(fn, n, ...)
     return sum / n
 end
 
+local function updateLeaderboard(attackerUuid, defenderUuid, amount)
+    if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(defenderUuid) == 1 then
+        if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
+            amount = -amount
+        end
+        if State.Session.Leaderboard[attackerUuid] == nil then
+            State.Session.Leaderboard[attackerUuid] = amount
+        else
+            State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] + amount
+        end
+    end
+end
+
+local function dumpLeaderboard()
+    local nameColWidth = 0
+    for uuid,_ in pairs(State.Session.Leaderboard) do
+        local n = #getDisplayName(uuid)
+        if n > nameColWidth then
+            nameColWidth = n
+        end
+    end
+    local nameCol = "%-" .. nameColWidth .. "s"
+    local party = {}
+    for uuid, score in pairs(State.Session.Leaderboard) do
+        if Osi.IsPartyMember(uuid, 1) == 1 then
+            party[#party + 1] = {uuid = uuid, score = score}
+        end
+    end
+    table.sort(party, function (a, b) return a.score > b.score end)
+    local enemy = {}
+    for uuid, score in pairs(State.Session.Leaderboard) do
+        if Osi.IsPartyMember(uuid, 1) ~= 1 then
+            enemy[#enemy + 1] = {uuid = uuid, score = score}
+        end
+    end
+    table.sort(enemy, function (a, b) return a.score > b.score end)
+    _P("========================| PARTY DAMAGE TOTALS |========================")
+    for _, e in ipairs(party) do
+        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+    end
+    _P("========================| ENEMY DAMAGE TOTALS |========================")
+    for _, e in ipairs(enemy) do
+        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+    end
+    _P("=======================================================================")
+end
+
 return {
     debugPrint = debugPrint,
     debugDump = debugDump,
@@ -409,4 +456,6 @@ return {
     getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,
+    updateLeaderboard = updateLeaderboard,
+    dumpLeaderboard = dumpLeaderboard,
 }

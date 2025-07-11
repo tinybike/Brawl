@@ -86,6 +86,7 @@ local Session = {
     SwarmTurnTimer = nil,
     SwarmTurnTimerCombatRound = nil,
     SwarmTurnActive = nil,
+    Leaderboard = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -645,7 +646,7 @@ local function uncapMovementDistance(entityUuid)
         movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
         movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
         modVars.MovementDistances = movementDistances
-        _D(movementDistances)
+        -- _D(movementDistances)
     end
 end
 

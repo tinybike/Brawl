@@ -1,4 +1,4 @@
-local print = Utils.print
+local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isAliveAndCanFight = Utils.isAliveAndCanFight
@@ -99,7 +99,7 @@ end
 local function completeSwarmTurn(uuid)
     setTurnComplete(uuid)
     debugPrint(Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
-    _D(State.Session.SwarmTurnComplete)
+    -- _D(State.Session.SwarmTurnComplete)
     if checkSwarmTurnComplete() then
         resetSwarmTurnComplete()
     end
@@ -238,7 +238,7 @@ end
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
-        _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
+        -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
             local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
             debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], isAliveAndCanFight(playerUuid), isUncontrolled)
