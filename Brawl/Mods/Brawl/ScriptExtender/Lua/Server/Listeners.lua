@@ -108,9 +108,6 @@ end
 
 local function onLevelGameplayStarted(level, _)
     print("LevelGameplayStarted", level)
-    -- debugDump(Utils.getPersistentModVars())
-    -- debugDump(Utils.getPersistentModVars("FrozenResources"))
-    -- debugDump(Utils.getPersistentModVars("ModifiedHitpoints"))
     onStarted(level)
 end
 

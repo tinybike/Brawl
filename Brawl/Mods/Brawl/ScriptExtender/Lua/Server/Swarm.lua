@@ -58,17 +58,6 @@ local function unsetAllEnemyTurnsComplete()
     end
 end
 
-local function isFrozen(uuid)
-    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-    if modVars.FrozenResources == nil then
-        return false
-    end
-    if not modVars.FrozenResources[uuid] then
-        return false
-    end
-    return true
-end
-
 local function checkSwarmTurnComplete()
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
@@ -98,7 +87,7 @@ local function resetSwarmTurnComplete()
                 if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     print("setting turn complete for", brawlerUuid, Utils.getDisplayName(brawlerUuid))
                     local entity = Ext.Entity.Get(brawlerUuid)
-                    _D(entity.TurnBased)
+                    -- _D(entity.TurnBased)
                     if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
                         setTurnComplete(brawlerUuid)
                     end
@@ -111,7 +100,6 @@ end
 
 local function completeSwarmTurn(uuid)
     Ext.Timer.WaitFor(Constants.SWARM_TURN_DURATION/2, function ()
-        -- State.Session.SwarmTurnComplete[uuid] = true
         setTurnComplete(uuid)
         print("completeSwarmTurn", uuid, Utils.getDisplayName(uuid))
         _D(State.Session.SwarmTurnComplete)
@@ -126,7 +114,6 @@ local function isControlledByDefaultAI(uuid)
     if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
         print("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
         State.Session.SwarmTurnComplete[uuid] = true
-        -- completeSwarmTurn(uuid)
         return true
     end
     return false
