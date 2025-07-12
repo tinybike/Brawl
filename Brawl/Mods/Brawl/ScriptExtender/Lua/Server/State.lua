@@ -661,9 +661,11 @@ local function capMovementDistance(entityUuid)
         end
         movementDistances[entityUuid].updating = true
         modVars.MovementDistances = movementDistances
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
-        entity:Replicate("ActionResources")
+        if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
+            entity:Replicate("ActionResources")
+        end
         movementDistances[entityUuid] = nil
         modVars.MovementDistances = movementDistances
         -- debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
