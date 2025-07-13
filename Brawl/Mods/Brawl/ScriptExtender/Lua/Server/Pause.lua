@@ -221,7 +221,7 @@ local function startTruePause(entityUuid)
         -- Enqueue actions/movements for non-party NPCs
         if Osi.IsPartyMember(entityUuid, 1) == 0 and not isLocked(Ext.Entity.Get(entityUuid)) then
             local brawler = State.getBrawlerByUuid(entityUuid)
-            if brawler and brawler.uuid then
+            if brawler and brawler.uuid and Utils.canAct(entityUuid) then
                 -- PulseAction stuff.....
                 debugPrint("*****PULSEACTION STUFF WHILE PAUSED*****", brawler.uuid, brawler.displayName)
                 local level = Osi.GetRegion(entityUuid)
@@ -232,7 +232,7 @@ local function startTruePause(entityUuid)
                 end
                 -- We have a target and the target is alive
                 local brawlersInLevel = State.Session.Brawlers[level]
-                if brawlersInLevel and isOnSameLevel(entityUuid, brawler.targetUuid) and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
+                if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
                     if brawler.lockedOnTarget then
                         debugPrint("Locked-on target, attacking", brawler.displayName, entityUuid, "->", getDisplayName(brawler.targetUuid))
                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])

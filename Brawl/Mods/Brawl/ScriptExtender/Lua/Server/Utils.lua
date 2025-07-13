@@ -367,6 +367,10 @@ local function averageTime(fn, n, ...)
     return sum / n
 end
 
+local function syncLeaderboard()
+    Ext.ServerNet.BroadcastMessage("Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
+end
+
 local function updateLeaderboardKills(uuid)
     if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(uuid) == 1 then
         State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
@@ -403,7 +407,7 @@ local function dumpLeaderboard()
     local kFmt = "%" .. kW  .. "d"
     local colSep = "  "
     local fmt = table.concat({ nameFmt, ddFmt, dtFmt, kFmt }, colSep)
-    local hdrFmt = table.concat({ nameFmt, "%-"..ddW.."s", "%-"..dtW.."s", "%-"..kW.."s" }, colSep)
+    local hdrFmt = table.concat({ nameFmt, "%-" .. ddW .. "s", "%-" .. dtW .. "s", "%-" .. kW .. "s" }, colSep)
     local totalWidth = nameColWidth + #colSep + ddW + #colSep + dtW + #colSep + kW
     local function makeSep(title)
         local txt = "| " .. title .. " |"
@@ -416,7 +420,7 @@ local function dumpLeaderboard()
     for uuid, stats in pairs(State.Session.Leaderboard) do
         local row = {
             uuid = uuid,
-            damageDone = stats.damageDone  or 0,
+            damageDone = stats.damageDone or 0,
             damageTaken = stats.damageTaken or 0,
             kills = stats.kills or 0,
         }
@@ -426,8 +430,8 @@ local function dumpLeaderboard()
             enemy[#enemy + 1] = row
         end
     end
-    table.sort(party, function(a,b) return a.damageDone > b.damageDone end)
-    table.sort(enemy, function(a,b) return a.damageDone > b.damageDone end)
+    table.sort(party, function (a, b) return a.damageDone > b.damageDone end)
+    table.sort(enemy, function (a, b) return a.damageDone > b.damageDone end)
     _P(makeSep("PARTY TOTALS"))
     _P(string.format(hdrFmt, "Name", "Damage", "Taken", "Kills"))
     for _, e in ipairs(party) do
@@ -486,4 +490,6 @@ return {
     updateLeaderboardKills = updateLeaderboardKills,
     updateLeaderboardDamage = updateLeaderboardDamage,
     dumpLeaderboard = dumpLeaderboard,
+    showLeaderboard = showLeaderboard,
+    syncLeaderboard = syncLeaderboard,
 }

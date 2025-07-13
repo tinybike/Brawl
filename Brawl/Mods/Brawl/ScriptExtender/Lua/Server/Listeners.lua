@@ -142,6 +142,7 @@ local function onCombatEnded(combatGuid)
         end
         State.Session.TBSMActionResourceListeners = {}
         Utils.dumpLeaderboard()
+        Utils.syncLeaderboard()
     end
 end
 
@@ -565,7 +566,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
 end
 
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
-    debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
+    print("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
