@@ -367,51 +367,78 @@ local function averageTime(fn, n, ...)
     return sum / n
 end
 
-local function updateLeaderboard(attackerUuid, defenderUuid, amount)
+local function updateLeaderboardKills(uuid)
+    if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(uuid) == 1 then
+        State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
+        State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
+        State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
+    end
+end
+
+local function updateLeaderboardDamage(attackerUuid, defenderUuid, amount)
     if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(defenderUuid) == 1 then
+        State.Session.Leaderboard[defenderUuid] = State.Session.Leaderboard[defenderUuid] or {}
+        State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken or 0
+        State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken + amount
+        State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] or {}
+        State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone or 0
         if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
             amount = -amount
         end
-        if State.Session.Leaderboard[attackerUuid] == nil then
-            State.Session.Leaderboard[attackerUuid] = amount
-        else
-            State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] + amount
-        end
+        State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone + amount
     end
 end
 
 local function dumpLeaderboard()
-    local nameColWidth = 0
-    for uuid,_ in pairs(State.Session.Leaderboard) do
-        local n = #getDisplayName(uuid)
-        if n > nameColWidth then
-            nameColWidth = n
-        end
+    local nameColWidth, ddW, dtW, kW = 0, #("Damage"), #("Taken"), #("Kills")
+    for uuid, stats in pairs(State.Session.Leaderboard) do
+        nameColWidth = math.max(nameColWidth, #getDisplayName(uuid))
+        ddW = math.max(ddW, #tostring(stats.damageDone or 0))
+        dtW = math.max(dtW, #tostring(stats.damageTaken or 0))
+        kW = math.max(kW, #tostring(stats.kills or 0))
     end
-    local nameCol = "%-" .. nameColWidth .. "s"
-    local party = {}
-    for uuid, score in pairs(State.Session.Leaderboard) do
+    local nameFmt = "%-" .. nameColWidth .. "s"
+    local ddFmt = "%" .. ddW  .. "d"
+    local dtFmt = "%" .. dtW  .. "d"
+    local kFmt = "%" .. kW  .. "d"
+    local colSep = "  "
+    local fmt = table.concat({ nameFmt, ddFmt, dtFmt, kFmt }, colSep)
+    local hdrFmt = table.concat({ nameFmt, "%-"..ddW.."s", "%-"..dtW.."s", "%-"..kW.."s" }, colSep)
+    local totalWidth = nameColWidth + #colSep + ddW + #colSep + dtW + #colSep + kW
+    local function makeSep(title)
+        local txt = "| " .. title .. " |"
+        local pad = totalWidth - #txt
+        local left = math.floor(pad/2)
+        local right = pad - left
+        return string.rep("=", left) .. txt .. string.rep("=", right)
+    end
+    local party, enemy = {}, {}
+    for uuid, stats in pairs(State.Session.Leaderboard) do
+        local row = {
+            uuid = uuid,
+            damageDone = stats.damageDone  or 0,
+            damageTaken = stats.damageTaken or 0,
+            kills = stats.kills or 0,
+        }
         if Osi.IsPartyMember(uuid, 1) == 1 then
-            party[#party + 1] = {uuid = uuid, score = score}
+            party[#party + 1] = row
+        else
+            enemy[#enemy + 1] = row
         end
     end
-    table.sort(party, function (a, b) return a.score > b.score end)
-    local enemy = {}
-    for uuid, score in pairs(State.Session.Leaderboard) do
-        if Osi.IsPartyMember(uuid, 1) ~= 1 then
-            enemy[#enemy + 1] = {uuid = uuid, score = score}
-        end
-    end
-    table.sort(enemy, function (a, b) return a.score > b.score end)
-    _P("========================| PARTY DAMAGE TOTALS |========================")
+    table.sort(party, function(a,b) return a.damageDone > b.damageDone end)
+    table.sort(enemy, function(a,b) return a.damageDone > b.damageDone end)
+    _P(makeSep("PARTY TOTALS"))
+    _P(string.format(hdrFmt, "Name", "Damage", "Taken", "Kills"))
     for _, e in ipairs(party) do
-        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+        _P(string.format(fmt, getDisplayName(e.uuid), e.damageDone, e.damageTaken, e.kills))
     end
-    _P("========================| ENEMY DAMAGE TOTALS |========================")
+    _P(makeSep("ENEMY TOTALS"))
+    _P(string.format(hdrFmt, "Name", "Damage", "Taken", "Kills"))
     for _, e in ipairs(enemy) do
-        _P(e.uuid, string.format(nameCol, getDisplayName(e.uuid)), e.score)
+        _P(string.format(fmt, getDisplayName(e.uuid), e.damageDone, e.damageTaken, e.kills))
     end
-    _P("=======================================================================")
+    _P(string.rep("=", totalWidth))
 end
 
 return {
@@ -456,6 +483,7 @@ return {
     getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,
-    updateLeaderboard = updateLeaderboard,
+    updateLeaderboardKills = updateLeaderboardKills,
+    updateLeaderboardDamage = updateLeaderboardDamage,
     dumpLeaderboard = dumpLeaderboard,
 }

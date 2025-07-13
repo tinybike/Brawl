@@ -490,7 +490,7 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
                     debugPrint("Applying damage", defenderUuid, damageAmount, damageType)
                     Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
                     Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
-                    Utils.updateLeaderboard(attackerUuid, defenderUuid, damageAmount)
+                    Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, damageAmount)
                     reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                 else
                     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
@@ -584,7 +584,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
                 State.Session.IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
         end
-        Utils.updateLeaderboard(attackerUuid, defenderUuid, damageAmount)
+        Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, damageAmount)
     end
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
@@ -600,8 +600,12 @@ end
 
 local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID)
     debugPrint("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
-    State.Session.ExtraAttacksRemaining[Osi.GetUUID(attackerGuid)] = nil
-    State.Session.ExtraAttacksRemaining[Osi.GetUUID(defenderGuid)] = nil
+    -- NB: attackOwner for summons?
+    local attackerUuid = Osi.GetUUID(attackerGuid)
+    local defenderUuid = Osi.GetUUID(defenderGuid)
+    Utils.updateLeaderboardKills(attackerUuid)
+    State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+    State.Session.ExtraAttacksRemaining[defenderUuid] = nil
 end
 
 local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
