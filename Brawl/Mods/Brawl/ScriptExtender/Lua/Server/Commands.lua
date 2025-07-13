@@ -606,5 +606,6 @@ return {
         hogwild_mode = function (v) State.Settings.HogwildMode = v end,
         max_party_size = onMCMMaxPartySize,
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
+        leaderboard_enabled = function (v) State.Settings.LeaderboardEnabled = v end,
     },
 }

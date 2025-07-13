@@ -50,6 +50,19 @@
                         }
                     ]
                 }, {
+                    "SectionId": "feature_swarm",
+                    "SectionName": "Swarm Mode Features (Host)",
+                    "Settings": [
+                        {
+                            "Id": "leaderboard_enabled",
+                            "Name": "Enable Leaderboard",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If enabled, will display a pop-up leaderboard after each combat, containing some stats for the fight",
+                            "Handles": {"DescriptionHandle": "h596542ebg6439g4409gbda9gec8bd00a3cec", "NameHandle": "h03c50509g3720g4948g815ag0c331e6220cc"}
+                        }
+                    ]
+                }, {
                     "SectionId": "features_rt",
                     "SectionName": "Real-Time Combat Features (Host)",
                     "Settings": [

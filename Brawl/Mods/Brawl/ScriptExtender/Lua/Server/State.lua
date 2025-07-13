@@ -23,6 +23,7 @@ local Settings = {
     HogwildMode = false,
     MaxPartySize = 4,
     TurnBasedSwarmMode = true,
+    LeaderboardEnabled = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -39,6 +40,7 @@ if MCM then
     Settings.HogwildMode = MCM.Get("hogwild_mode")
     Settings.MaxPartySize = MCM.Get("max_party_size")
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
+    Settings.LeaderboardEnabled = MCM.Get("leaderboard_enabled")
 end
 
 -- Session state

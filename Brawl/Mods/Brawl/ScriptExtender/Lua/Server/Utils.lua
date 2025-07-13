@@ -368,11 +368,13 @@ local function averageTime(fn, n, ...)
 end
 
 local function syncLeaderboard()
-    Ext.ServerNet.BroadcastMessage("Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
+    if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled then
+        Ext.ServerNet.BroadcastMessage("Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
+    end
 end
 
 local function updateLeaderboardKills(uuid)
-    if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(uuid) == 1 then
+    if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled and Osi.IsCharacter(uuid) == 1 then
         State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
@@ -380,7 +382,7 @@ local function updateLeaderboardKills(uuid)
 end
 
 local function updateLeaderboardDamage(attackerUuid, defenderUuid, amount)
-    if State.Settings.TurnBasedSwarmMode and Osi.IsCharacter(defenderUuid) == 1 then
+    if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled and Osi.IsCharacter(defenderUuid) == 1 then
         State.Session.Leaderboard[defenderUuid] = State.Session.Leaderboard[defenderUuid] or {}
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken or 0
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken + amount

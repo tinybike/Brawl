@@ -80,4 +80,6 @@
     <content contentuid="hca026ae7g2883g4754gad94gc5aa89feb0d2" version="1">Max Party Size</content>
     <content contentuid="h69f81fcfgaa46g44c0g9ccag8d8749fedb2c" version="1">If checked, your party will take their turns together in turn-based mode, and then all enemies will act simultaneously as a single 'swarm', using Brawl's real-time combat engine.</content>
     <content contentuid="h934a9d9cg4d60g4d75gb628g7187b622cb14" version="1">Turn-Based Swarm Mode</content>
+    <content contentuid="h596542ebg6439g4409gbda9gec8bd00a3cec" version="1">If enabled, will display a pop-up leaderboard after each combat, containing some stats for the fight</content>
+    <content contentuid="h03c50509g3720g4948g815ag0c331e6220cc" version="1">Enable Leaderboard</content>
 </contentList>
