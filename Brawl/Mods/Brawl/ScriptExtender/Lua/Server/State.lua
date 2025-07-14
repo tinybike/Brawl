@@ -22,7 +22,7 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    TurnBasedSwarmMode = true,
+    TurnBasedSwarmMode = false,
     LeaderboardEnabled = true,
 }
 if MCM then

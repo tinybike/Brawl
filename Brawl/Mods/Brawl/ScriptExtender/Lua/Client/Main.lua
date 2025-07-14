@@ -452,8 +452,14 @@ end
 
 local function getDisplayName(uuid)
     local entity = Ext.Entity.Get(uuid)
+    if not entity then
+        return ""
+    end
     if entity.CustomName and entity.CustomName.Name then
         return entity.CustomName.Name
+    end
+    if not entity.DisplayName or not entity.DisplayName.NameKey or not entity.DisplayName.NameKey.Handle or not entity.DisplayName.NameKey.Handle.Handle then
+        return ""
     end
     return Ext.Loca.GetTranslatedString(entity.DisplayName.NameKey.Handle.Handle)
 end
@@ -475,7 +481,7 @@ local function showLeaderboard(data)
     local damageWidth, takenWidth, killsWidth = #"Damage", #"Taken", #"Kills"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
-        nameWidth = math.max(nameWidth, #getDisplayName(uuid))
+        nameWidth = math.max(nameWidth, #stats.name)
         damageWidth = math.max(damageWidth, #tostring(stats.damageDone or 0))
         takenWidth = math.max(takenWidth, #tostring(stats.damageTaken or 0))
         killsWidth = math.max(killsWidth, #tostring(stats.kills or 0))
@@ -515,7 +521,7 @@ local function showLeaderboard(data)
     table.sort(party, function (a, b) return (a.stats.damageDone or 0) > (b.stats.damageDone or 0) end)
     for _, e in ipairs(party) do
         local row = partyTable:AddRow()
-        row:AddCell():AddText(getDisplayName(e.uuid)):SetColor("Text", lightBlue)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", lightBlue)
         row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         row:AddCell():AddText(tostring(e.stats.kills or 0))
@@ -531,14 +537,14 @@ local function showLeaderboard(data)
     end
     local enemy = {}
     for uuid, stats in pairs(data) do
-        if not Ext.Entity.Get(uuid).PartyMember then
+        if not isPartyMember(uuid) then
             enemy[#enemy + 1] = {uuid = uuid, stats = stats}
         end
     end
     table.sort(enemy, function (a, b) return (a.stats.damageDone or 0) > (b.stats.damageDone or 0) end)
     for _, e in ipairs(enemy) do
         local row = enemyTable:AddRow()
-        row:AddCell():AddText(getDisplayName(e.uuid)):SetColor("Text", lightRed)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", lightRed)
         row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         row:AddCell():AddText(tostring(e.stats.kills or 0))

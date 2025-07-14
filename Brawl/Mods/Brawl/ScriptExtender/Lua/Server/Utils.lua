@@ -376,6 +376,7 @@ end
 local function updateLeaderboardKills(uuid)
     if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled and Osi.IsCharacter(uuid) == 1 then
         State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
+        State.Session.Leaderboard[uuid].name = State.Session.Leaderboard[uuid].name or (getDisplayName(uuid) or "")
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
     end
@@ -384,9 +385,11 @@ end
 local function updateLeaderboardDamage(attackerUuid, defenderUuid, amount)
     if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled and Osi.IsCharacter(defenderUuid) == 1 then
         State.Session.Leaderboard[defenderUuid] = State.Session.Leaderboard[defenderUuid] or {}
+        State.Session.Leaderboard[defenderUuid].name = State.Session.Leaderboard[defenderUuid].name or (getDisplayName(defenderUuid) or "")
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken or 0
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken + amount
         State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] or {}
+        State.Session.Leaderboard[attackerUuid].name = State.Session.Leaderboard[attackerUuid].name or (getDisplayName(attackerUuid) or "")
         State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone or 0
         if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
             amount = -amount
@@ -395,10 +398,18 @@ local function updateLeaderboardDamage(attackerUuid, defenderUuid, amount)
     end
 end
 
+local function addNamesToLeaderboard()
+    if State.Session.Leaderboard then
+        for uuid, stats in pairs(State.Session.Leaderboard) do
+            State.Session.Leaderboard[uuid].name = getDisplayName(uuid) or ""
+        end
+    end
+end
+
 local function dumpLeaderboard()
     local nameColWidth, ddW, dtW, kW = 0, #("Damage"), #("Taken"), #("Kills")
     for uuid, stats in pairs(State.Session.Leaderboard) do
-        nameColWidth = math.max(nameColWidth, #getDisplayName(uuid))
+        nameColWidth = math.max(nameColWidth, #stats.name)
         ddW = math.max(ddW, #tostring(stats.damageDone or 0))
         dtW = math.max(dtW, #tostring(stats.damageTaken or 0))
         kW = math.max(kW, #tostring(stats.kills or 0))
@@ -422,6 +433,7 @@ local function dumpLeaderboard()
     for uuid, stats in pairs(State.Session.Leaderboard) do
         local row = {
             uuid = uuid,
+            name = stats.name,
             damageDone = stats.damageDone or 0,
             damageTaken = stats.damageTaken or 0,
             kills = stats.kills or 0,
@@ -437,12 +449,12 @@ local function dumpLeaderboard()
     _P(makeSep("PARTY TOTALS"))
     _P(string.format(hdrFmt, "Name", "Damage", "Taken", "Kills"))
     for _, e in ipairs(party) do
-        _P(string.format(fmt, getDisplayName(e.uuid), e.damageDone, e.damageTaken, e.kills))
+        _P(string.format(fmt, e.name, e.damageDone, e.damageTaken, e.kills))
     end
     _P(makeSep("ENEMY TOTALS"))
     _P(string.format(hdrFmt, "Name", "Damage", "Taken", "Kills"))
     for _, e in ipairs(enemy) do
-        _P(string.format(fmt, getDisplayName(e.uuid), e.damageDone, e.damageTaken, e.kills))
+        _P(string.format(fmt, e.name, e.damageDone, e.damageTaken, e.kills))
     end
     _P(string.rep("=", totalWidth))
 end
@@ -494,4 +506,5 @@ return {
     dumpLeaderboard = dumpLeaderboard,
     showLeaderboard = showLeaderboard,
     syncLeaderboard = syncLeaderboard,
+    addNamesToLeaderboard = addNamesToLeaderboard,
 }
