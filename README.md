@@ -1,16 +1,10 @@
 # Brawl
 
-Brawl is a real time combat with pause mod for Baldur's Gate 3.  [Download from Nexus.](https://www.nexusmods.com/baldursgate3/mods/12614/)
+Brawl is a combat mod for Baldur's Gate 3.  It includes a Real Time with Pause combat system and a Swarm Mode combat system.  [Download from Nexus.](https://www.nexusmods.com/baldursgate3/mods/12614/)
 
 Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and advice and [Hippo0o](https://github.com/Hippo0o) for the excellent library.
 
 ## Videos
-
-### Swarm Mode
-
-[![The climb to level 20 - Trials of Tav Reloaded - Brawl/Swarm Mode](https://img.youtube.com/vi/ogKuQur15qM/0.jpg)](https://www.youtube.com/watch?v=ogKuQur15qM)
-
-[![Turn-Based Swarm Mode combat test](https://img.youtube.com/vi/JBvppVRuujA/0.jpg)](https://www.youtube.com/watch?v=JBvppVRuujA)
 
 ### Real-Time with Pause
 
@@ -33,3 +27,11 @@ Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and 
 [![Real time combat test 10](https://img.youtube.com/vi/ceyBFM_o2Bo/0.jpg)](https://www.youtube.com/watch?v=ceyBFM_o2Bo)
 
 [![Real time combat test 9](https://img.youtube.com/vi/0nTcq8mUPYY/0.jpg)](https://www.youtube.com/watch?v=0nTcq8mUPYY)
+
+### Swarm Mode
+
+[![Level 20/RogueScore 1000 - Trials of Tav Reloaded - Brawl/Swarm Mode](https://img.youtube.com/vi/dIUznAEjIiA/0.jpg)](https://www.youtube.com/watch?v=dIUznAEjIiA)
+
+[![The climb to level 20 - Trials of Tav Reloaded - Brawl/Swarm Mode](https://img.youtube.com/vi/gWgakH8_yCg/0.jpg)](https://www.youtube.com/watch?v=gWgakH8_yCg)
+
+[![Turn-Based Swarm Mode combat test](https://img.youtube.com/vi/JBvppVRuujA/0.jpg)](https://www.youtube.com/watch?v=JBvppVRuujA)
