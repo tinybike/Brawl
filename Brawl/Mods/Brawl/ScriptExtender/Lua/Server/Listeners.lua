@@ -773,21 +773,23 @@ end
 
 local function onFlagSet(flag, speaker, dialogInstance)
     -- debugPrint("FlagSet", flag, speaker, dialogInstance)
-    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-        Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-        Quests.lakesideRitualCountdown(Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-    elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
-        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-        Quests.stopCountdownTimer(Osi.GetHostCharacter())
-    elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
-        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-        Quests.stopCountdownTimer(Osi.GetHostCharacter())
-    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
-        Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-        Quests.nautiloidTransponderCountdown(Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
-        Quests.questTimerCancel("TUT_Helm_Timer")
-        Quests.stopCountdownTimer(Osi.GetHostCharacter())
+    if not State.Settings.TurnBasedSwarmMode then
+        if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+            Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+            Quests.lakesideRitualCountdown(Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+        elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
+            Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+            Quests.stopCountdownTimer(Osi.GetHostCharacter())
+        elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
+            Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+            Quests.stopCountdownTimer(Osi.GetHostCharacter())
+        elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+            Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+            Quests.nautiloidTransponderCountdown(Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+        elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+            Quests.questTimerCancel("TUT_Helm_Timer")
+            Quests.stopCountdownTimer(Osi.GetHostCharacter())
+        end
     end
 end
 

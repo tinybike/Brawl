@@ -13,10 +13,14 @@ local function debugDump(...)
     end
 end
 
-local function dumpAllEntityKeys()
-    local uuid = GetHostCharacter()
-    local entity = Ext.Entity.Get(uuid)
-    for k, _ in pairs(entity:GetAllComponents()) do
+local function dumpAllEntityKeys(entity)
+    local components = entity:GetAllComponents()
+    local keys = {}
+    for k, _ in pairs(components) do
+        keys[#keys + 1] = k
+    end
+    table.sort(keys, function (a, b) return a < b end)
+    for _, k in ipairs(keys) do
         _P(k)
     end
 end

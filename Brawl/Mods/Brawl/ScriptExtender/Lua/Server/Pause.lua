@@ -16,31 +16,35 @@ local function isLocked(entity)
 end
 
 local function unlock(entity)
-    debugPrint("unlock", entity.Uuid.EntityUuid, isLocked(entity))
-    -- debugDump(entity.TurnBased)
-    entity.TurnBased.IsActiveCombatTurn = true
-    entity:Replicate("TurnBased")
-    local uuid = entity.Uuid.EntityUuid
-    State.Session.FTBLockedIn[uuid] = false
-    if State.Session.MovementQueue[uuid] then
-        debugPrint("unloading movement queue for", uuid)
-        if State.Session.ActionResourcesListeners[uuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
-            State.Session.ActionResourcesListeners[uuid] = nil
+    if entity and entity.Uuid then
+        debugPrint("unlock", entity.Uuid.EntityUuid, isLocked(entity))
+        -- debugDump(entity.TurnBased)
+        entity.TurnBased.IsActiveCombatTurn = true
+        entity:Replicate("TurnBased")
+        local uuid = entity.Uuid.EntityUuid
+        State.Session.FTBLockedIn[uuid] = false
+        if State.Session.MovementQueue[uuid] then
+            debugPrint("unloading movement queue for", uuid)
+            if State.Session.ActionResourcesListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
+                State.Session.ActionResourcesListeners[uuid] = nil
+            end
+            local moveTo = State.Session.MovementQueue[uuid]
+            debugDump(moveTo)
+            Movement.moveToPosition(uuid, moveTo, false)
+            State.Session.MovementQueue[uuid] = nil
         end
-        local moveTo = State.Session.MovementQueue[uuid]
-        debugDump(moveTo)
-        Movement.moveToPosition(uuid, moveTo, false)
-        State.Session.MovementQueue[uuid] = nil
     end
 end
 
 local function lock(entity)
-    local uuid = entity.Uuid.EntityUuid
-    debugPrint("locking", uuid)
-    Roster.disableLockedOnTarget(uuid)
-    entity.TurnBased.IsActiveCombatTurn = false
-    State.Session.FTBLockedIn[uuid] = true
+    if entity and entity.Uuid then
+        local uuid = entity.Uuid.EntityUuid
+        debugPrint("locking", uuid)
+        Roster.disableLockedOnTarget(uuid)
+        entity.TurnBased.IsActiveCombatTurn = false
+        State.Session.FTBLockedIn[uuid] = true
+    end
 end
 
 local function stopTruePause(entityUuid)
