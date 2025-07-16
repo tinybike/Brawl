@@ -475,6 +475,14 @@ local function onFullAutoToggle(data)
     toggleFullAuto()
 end
 
+local function onLeaderboardToggle(data)
+    if MCM then
+        MCM.Set("leaderboard_enabled", not State.Settings.LeaderboardEnabled)
+    end
+    Utils.dumpLeaderboard()
+    Utils.syncLeaderboard()
+end
+
 local function onMCMModEnabled(value)
     State.Settings.ModEnabled = value
     if State.Settings.ModEnabled then
@@ -576,6 +584,7 @@ return {
         ModToggle = onModToggle,
         CompanionAIToggle = onCompanionAIToggle,
         FullAutoToggle = onFullAutoToggle,
+        LeaderboardToggle = onLeaderboardToggle,
         ExitFTB = function (_) Pause.allExitFTB() end,
         EnterFTB = function (_) Pause.allEnterFTB() end,
         ClickPosition = onClickPosition,

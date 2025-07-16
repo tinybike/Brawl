@@ -371,9 +371,14 @@ local function averageTime(fn, n, ...)
     return sum / n
 end
 
-local function syncLeaderboard()
+local function syncLeaderboard(uuid)
     if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled then
-        Ext.ServerNet.BroadcastMessage("Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
+        local leaderboardData = Ext.Json.Stringify(State.Session.Leaderboard or {})
+        if not uuid then
+            Ext.ServerNet.BroadcastMessage("Leaderboard", leaderboardData)
+        else
+            Ext.ServerNet.PostMessageToClient(uuid, "Leaderboard", leaderboardData)
+        end
     end
 end
 

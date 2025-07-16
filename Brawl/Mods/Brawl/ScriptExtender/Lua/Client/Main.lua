@@ -20,6 +20,7 @@ local ActionButtonHotkeys = {
     {ScanCode = "NUM_8", Modifier = "LShift"},
     {ScanCode = "NUM_9", Modifier = "LShift"},
 }
+local LeaderboardToggleHotkey = {ScanCode = "V", Modifier = "LCtrl"}
 local ControllerModToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
 local ControllerFullAutoToggleHotkey = {"", ""}
@@ -32,6 +33,19 @@ local ControllerAttackMoveHotkey = {"", ""}
 local ControllerRequestHealHotkey = {"", ""}
 local ControllerChangeTacticsHotkey = {"", ""}
 local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
+local ControllerLeaderboardToggleHotkey = {"", ""}
+local ControllerCompanionAIToggleHotkeyOverride = false
+local ControllerFullAutoToggleHotkeyOverride = false
+local ControllerPauseToggleHotkeyOverride = false
+local ControllerTargetCloserEnemyHotkeyOverride = false
+local ControllerTargetFartherEnemyHotkeyOverride = false
+local ControllerOnMeHotkeyOverride = false
+local ControllerAttackMyTargetHotkeyOverride = false
+local ControllerAttackMoveHotkeyOverride = false
+local ControllerRequestHealHotkeyOverride = false
+local ControllerChangeTacticsHotkeyOverride = false
+local ControllerActionButtonHotkeysOverride = false
+local ControllerLeaderboardToggleHotkeyOverride = false
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
@@ -77,6 +91,30 @@ if MCM then
         {MCM.Get("controller_action_8_hotkey"), MCM.Get("controller_action_8_hotkey_2")},
         {MCM.Get("controller_action_9_hotkey"), MCM.Get("controller_action_9_hotkey_2")},
     }
+    ControllerLeaderboardToggleHotkey = {MCM.Get("controller_leaderboard_toggle_hotkey"), MCM.Get("controller_leaderboard_toggle_hotkey_2")}
+    ControllerModToggleHotkeyOverride = MCM.Get("controller_mod_toggle_hotkey_override")
+    ControllerCompanionAIToggleHotkeyOverride = MCM.Get("controller_companion_ai_toggle_hotkey_override")
+    ControllerFullAutoToggleHotkeyOverride = MCM.Get("controller_full_auto_toggle_hotkey_override")
+    ControllerPauseToggleHotkeyOverride = MCM.Get("controller_pause_toggle_hotkey_override")
+    ControllerTargetCloserEnemyHotkeyOverride = MCM.Get("controller_target_closer_enemy_hotkey_override")
+    ControllerTargetFartherEnemyHotkeyOverride = MCM.Get("controller_target_farther_enemy_hotkey_override")
+    ControllerOnMeHotkeyOverride = MCM.Get("controller_on_me_hotkey_override")
+    ControllerAttackMyTargetHotkeyOverride = MCM.Get("controller_attack_my_target_hotkey_override")
+    ControllerAttackMoveHotkeyOverride = MCM.Get("controller_attack_move_hotkey_override")
+    ControllerRequestHealHotkeyOverride = MCM.Get("controller_request_heal_hotkey_override")
+    ControllerChangeTacticsHotkeyOverride = MCM.Get("controller_change_tactics_hotkey_override")
+    ControllerActionButtonHotkeysOverride = {
+        MCM.Get("controller_action_1_hotkey_override"),
+        MCM.Get("controller_action_2_hotkey_override"),
+        MCM.Get("controller_action_3_hotkey_override"),
+        MCM.Get("controller_action_4_hotkey_override"),
+        MCM.Get("controller_action_5_hotkey_override"),
+        MCM.Get("controller_action_6_hotkey_override"),
+        MCM.Get("controller_action_7_hotkey_override"),
+        MCM.Get("controller_action_8_hotkey_override"),
+        MCM.Get("controller_action_9_hotkey_override"),
+    }
+    ControllerLeaderboardToggleHotkeyOverride = MCM.Get("controller_leaderboard_toggle_hotkey_override")
 end
 local DirectlyControlledCharacter = nil
 local AwaitingTarget = false
@@ -260,6 +298,10 @@ local function postChangeTactics()
     Ext.ClientNet.PostMessageToServer("ChangeTactics", "")
 end
 
+local function postLeaderboardToggle()
+    Ext.ClientNet.PostMessageToServer("LeaderboardToggle", "")
+end
+
 local function postControllerActionButton(actionButtonLabel)
     Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
 end
@@ -324,6 +366,10 @@ local function onKeyInput(e)
             postChangeTactics()
             keybindingPressed = true
         end
+        if isKeybindingPressed(e, LeaderboardToggleHotkey) then
+            postLeaderboardToggle()
+            keybindingPressed = true
+        end
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do
             if isKeybindingPressed(e, actionButtonHotkey) then
                 postActionButton(actionButtonLabel)
@@ -337,52 +383,97 @@ local function onKeyInput(e)
 end
 
 local function onControllerButtonPressed(button)
+    local override = false
     Ext.ClientNet.PostMessageToServer("ControllerButtonPressed", button)
     if button == "A" then
         postClickPosition()
     end
     if isControllerKeybindingPressed(ControllerModToggleHotkey) then
         postModToggle()
+        if ControllerModToggleHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerCompanionAIToggleHotkey) then
         postCompanionAIToggle()
+        if ControllerCompanionAIToggleHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerFullAutoToggleHotkey) then
         postFullAutoToggle()
+        if ControllerFullAutoToggleHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
         postPauseToggle()
+        if ControllerPauseToggleHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerTargetCloserEnemyHotkey) then
         postTargetCloserEnemy()
+        if ControllerTargetCloserEnemyHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerTargetFartherEnemyHotkey) then
         postTargetFartherEnemy()
+        if ControllerTargetFartherEnemyHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerOnMeHotkey) then
         postOnMe()
+        if ControllerOnMeHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerAttackMyTargetHotkey) then
         postAttackMyTarget()
+        if ControllerAttackMyTargetHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerAttackMoveHotkey) then
         postAttackMove()
+        if ControllerAttackMoveHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerRequestHealHotkey) then
         postRequestHeal()
+        if ControllerRequestHealHotkeyOverride then
+            override = true
+        end
     end
     if isControllerKeybindingPressed(ControllerChangeTacticsHotkey) then
         postChangeTactics()
+        if ControllerChangeTacticsHotkeyOverride then
+            override = true
+        end
+    end
+    if isControllerKeybindingPressed(ControllerLeaderboardToggleHotkey) then
+        postLeaderboardToggle()
+        if ControllerLeaderboardToggleHotkeyOverride then
+            override = true
+        end
     end
     for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
         if isControllerKeybindingPressed(controllerActionButtonHotkey) then
             postControllerActionButton(actionButtonLabel)
+            if ControllerLeaderboardToggleHotkeysOverride[actionButtonLabel] then
+                override = true
+            end
         end
     end
+    return override
 end
 
 local function onControllerAxisInput(e)
     local axis = tostring(e.Axis)
+    local override = false
     if axis == "TriggerLeft" or axis == "TriggerRight" then
         if IsControllerButtonPressed[axis] then
             if e.Value == 0.0 then
@@ -390,16 +481,23 @@ local function onControllerAxisInput(e)
             end
         else
             IsControllerButtonPressed[axis] = true
-            onControllerButtonPressed(axis)
+            override = onControllerButtonPressed(axis)
+            if override then
+                e:PreventAction()
+            end
         end
     end
 end
 
 local function onControllerButtonInput(e)
     local button = tostring(e.Button)
+    local override = false
     IsControllerButtonPressed[button] = e.Pressed
     if e.Pressed then
-        onControllerButtonPressed(button)
+        override = onControllerButtonPressed(button)
+        if override then
+            e:PreventAction()
+        end
     end
 end
 
@@ -474,80 +572,132 @@ local function isPartyMember(uuid)
     return false
 end
 
+
+local LeaderboardWindow = nil
+local cellRefs = { party = {}, enemy = {} }
+
 local function showLeaderboard(data)
+    --------------------------------------------------
+    -- 1) destroy previous window (to avoid stacking)
+    --------------------------------------------------
     if LeaderboardWindow then
         LeaderboardWindow:Destroy()
+        cellRefs.party = {}
+        cellRefs.enemy = {}
     end
+
+    --------------------------------------------------
+    -- 2) compute column widths & counts
+    --------------------------------------------------
     local damageWidth, takenWidth, killsWidth = #"Damage", #"Taken", #"Kills"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
-        nameWidth = math.max(nameWidth, #stats.name)
-        damageWidth = math.max(damageWidth, #tostring(stats.damageDone or 0))
-        takenWidth = math.max(takenWidth, #tostring(stats.damageTaken or 0))
-        killsWidth = math.max(killsWidth, #tostring(stats.kills or 0))
+        nameWidth    = math.max(nameWidth, #stats.name)
+        damageWidth  = math.max(damageWidth, #tostring(stats.damageDone  or 0))
+        takenWidth   = math.max(takenWidth,  #tostring(stats.damageTaken or 0))
+        killsWidth   = math.max(killsWidth,  #tostring(stats.kills      or 0))
         if isPartyMember(uuid) then
             partyCount = partyCount + 1
         else
             enemyCount = enemyCount + 1
         end
     end
-    local numColumns = 4
-    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth)*8 + (numColumns - 1)*16 + 40
-    local rowCount = 3 + partyCount + enemyCount
+
+    --------------------------------------------------
+    -- 3) estimate window size
+    --------------------------------------------------
+    local numColumns   = 4
+    local windowWidth  = (nameWidth + damageWidth + takenWidth + killsWidth)*8
+                         + (numColumns - 1)*16 + 40
+    local rowCount     = 3 + partyCount + enemyCount
     local windowHeight = rowCount*18 + 40
+
+    --------------------------------------------------
+    -- 4) create & size window
+    --------------------------------------------------
     LeaderboardWindow = Ext.IMGUI.NewWindow("Leaderboard")
     LeaderboardWindow:SetSize({windowWidth, windowHeight})
-    LeaderboardWindow.Closeable = true
+    LeaderboardWindow.Closeable          = true
     LeaderboardWindow.NoFocusOnAppearing = true
-    local lightYellow = {1, 1, 0.8, 1}
+
+    local lightYellow  = {1, 1, 0.8, 1}
     local mediumYellow = {0.9, 0.9, 0.6, 0.9}
-    local lightBlue = {0.6, 0.8, 1, 1}
-    local lightRed = {1, 0.8, 0.8, 1}
+    local lightBlue    = {0.6, 0.8, 1, 1}
+    local lightRed     = {1, 0.8, 0.8, 1}
+
+    --------------------------------------------------
+    -- 5) PARTY TOTALS
+    --------------------------------------------------
     LeaderboardWindow:AddSeparatorText("Party Totals"):SetColor("Text", lightYellow)
     local partyTable = LeaderboardWindow:AddTable("PartyTotals", numColumns)
     do
         local hdr = partyTable:AddRow()
         hdr:AddCell():AddText("")
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Taken") :SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Kills") :SetColor("Text", mediumYellow)
     end
+
     local party = {}
     for uuid, stats in pairs(data) do
         if isPartyMember(uuid) then
             party[#party + 1] = {uuid = uuid, stats = stats}
         end
     end
-    table.sort(party, function (a, b) return (a.stats.damageDone or 0) > (b.stats.damageDone or 0) end)
+    table.sort(party, function(a, b)
+        return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
+    end)
+
     for _, e in ipairs(party) do
-        local row = partyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightBlue)
-        row:AddCell():AddText(tostring(e.stats.damageDone or 0))
-        row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
-        row:AddCell():AddText(tostring(e.stats.kills or 0))
+        local row    = partyTable:AddRow()
+        row:AddCell():AddText(e.stats.name) :SetColor("Text", lightBlue)
+        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone  or 0))
+        local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
+        local killsCell = row:AddCell():AddText(tostring(e.stats.kills      or 0))
+        cellRefs.party[e.uuid] = { damage = dmgCell, taken = takenCell, kills = killsCell }
     end
+
+    --------------------------------------------------
+    -- 6) ENEMY TOTALS
+    --------------------------------------------------
     LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
     local enemyTable = LeaderboardWindow:AddTable("EnemyTotals", numColumns)
     do
         local hdr = enemyTable:AddRow()
         hdr:AddCell():AddText("")
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Taken") :SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Kills") :SetColor("Text", mediumYellow)
     end
+
     local enemy = {}
     for uuid, stats in pairs(data) do
         if not isPartyMember(uuid) then
             enemy[#enemy + 1] = {uuid = uuid, stats = stats}
         end
     end
-    table.sort(enemy, function (a, b) return (a.stats.damageDone or 0) > (b.stats.damageDone or 0) end)
+    table.sort(enemy, function(a, b)
+        return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
+    end)
+
     for _, e in ipairs(enemy) do
-        local row = enemyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightRed)
-        row:AddCell():AddText(tostring(e.stats.damageDone or 0))
-        row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
-        row:AddCell():AddText(tostring(e.stats.kills or 0))
+        local row    = enemyTable:AddRow()
+        row:AddCell():AddText(e.stats.name) :SetColor("Text", lightRed)
+        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone  or 0))
+        local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
+        local killsCell = row:AddCell():AddText(tostring(e.stats.kills      or 0))
+        cellRefs.enemy[e.uuid] = { damage = dmgCell, taken = takenCell, kills = killsCell }
+    end
+end
+
+local function updateLeaderboard(data)
+    for uuid, stats in pairs(data) do
+        local refs = cellRefs.party[uuid] or cellRefs.enemy[uuid]
+        if refs then
+            refs.damage:SetText(tostring(stats.damageDone  or 0))
+            refs.taken:SetText(tostring(stats.damageTaken or 0))
+            refs.kills:SetText(tostring(stats.kills      or 0))
+        end
     end
 end
 
@@ -560,6 +710,8 @@ local function onNetMessage(data)
         showNotification(Ext.Json.Parse(data.Payload))
     elseif data.Channel == "Leaderboard" then
         showLeaderboard(Ext.Json.Parse(data.Payload))
+    elseif data.Channel == "UpdateLeaderboard" then
+        updateLeaderboard(Ext.Json.Parse(data.Payload))
     end
 end
 

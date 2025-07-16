@@ -82,4 +82,9 @@
     <content contentuid="h934a9d9cg4d60g4d75gb628g7187b622cb14" version="1">Turn-Based Swarm Mode</content>
     <content contentuid="h596542ebg6439g4409gbda9gec8bd00a3cec" version="1">If enabled, will display a pop-up leaderboard after each combat, containing some stats for the fight</content>
     <content contentuid="h03c50509g3720g4948g815ag0c331e6220cc" version="1">Enable Leaderboard</content>
+    <content contentuid="h625f4a0cg8452g47b3gac8cgf07170b7bb85" version="1">Hotkey to display the leaderboard</content>
+    <content contentuid="h7b02fafcg3c30g4a10ga4efgba555a6694bd" version="1">Leaderboard Toggle Hotkey</content>
+    <content contentuid="h2275bb32gda39g4c15gbf85g6b201d24f197" version="1">Leaderboard Toggle Hotkey 2 (Optional)</content>
+    <content contentuid="hd2ff1055g739fg4113g97eeg96c84b8d23e2" version="1">Override</content>
+    <content contentuid="h40bfe888g839bg49e8ga9bdge9a9bc209c92" version="1">If checked, override this button's default functionality.</content>
 </contentList>

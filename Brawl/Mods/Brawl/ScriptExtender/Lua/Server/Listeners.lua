@@ -773,7 +773,7 @@ end
 
 local function onFlagSet(flag, speaker, dialogInstance)
     -- debugPrint("FlagSet", flag, speaker, dialogInstance)
-    if not State.Settings.TurnBasedSwarmMode then
+    -- if not State.Settings.TurnBasedSwarmMode then
         if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
             Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
             Quests.lakesideRitualCountdown(Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
@@ -790,7 +790,7 @@ local function onFlagSet(flag, speaker, dialogInstance)
             Quests.questTimerCancel("TUT_Helm_Timer")
             Quests.stopCountdownTimer(Osi.GetHostCharacter())
         end
-    end
+    -- end
 end
 
 -- local function onStatusApplied(object, status, causee, storyActionID)
