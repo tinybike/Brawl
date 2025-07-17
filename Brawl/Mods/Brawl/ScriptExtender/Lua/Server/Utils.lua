@@ -121,6 +121,10 @@ local function peerToUserId(peerId)
     return (peerId & 0xffff0000) | 0x0001
 end
 
+local function userToPeerId(userId)
+    return (userId & 0xffff0000) | ((userId & 0x0000ffff) - 1)
+end
+
 -- thank u focus
 ---@return "EASY"|"MEDIUM"|"HARD"|"HONOUR"
 local function getDifficulty()
@@ -371,13 +375,19 @@ local function averageTime(fn, n, ...)
     return sum / n
 end
 
-local function syncLeaderboard(uuid)
+local function showLeaderboardForUser(userId)
+    if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled then
+        Ext.ServerNet.PostMessageToUser(userId, "Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard or {}))
+    end
+end
+
+local function syncLeaderboard(updateOnly)
     if State.Settings.TurnBasedSwarmMode and State.Settings.LeaderboardEnabled then
         local leaderboardData = Ext.Json.Stringify(State.Session.Leaderboard or {})
-        if not uuid then
-            Ext.ServerNet.BroadcastMessage("Leaderboard", leaderboardData)
+        if updateOnly then
+            Ext.ServerNet.BroadcastMessage("UpdateLeaderboard", leaderboardData)
         else
-            Ext.ServerNet.PostMessageToClient(uuid, "Leaderboard", leaderboardData)
+            Ext.ServerNet.BroadcastMessage("Leaderboard", leaderboardData)
         end
     end
 end
@@ -388,6 +398,7 @@ local function updateLeaderboardKills(uuid)
         State.Session.Leaderboard[uuid].name = State.Session.Leaderboard[uuid].name or (getDisplayName(uuid) or "")
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
+        syncLeaderboard(true)
     end
 end
 
@@ -404,6 +415,7 @@ local function updateLeaderboardDamage(attackerUuid, defenderUuid, amount)
             amount = -amount
         end
         State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone + amount
+        syncLeaderboard(true)
     end
 end
 
@@ -480,6 +492,7 @@ return {
     isPlayerOrAlly = isPlayerOrAlly,
     isPugnacious = isPugnacious,
     peerToUserId = peerToUserId,
+    userToPeerId = userToPeerId,
     getDifficulty = getDifficulty,
     split = split,
     convertSpellRangeToNumber = convertSpellRangeToNumber,
@@ -513,7 +526,7 @@ return {
     updateLeaderboardKills = updateLeaderboardKills,
     updateLeaderboardDamage = updateLeaderboardDamage,
     dumpLeaderboard = dumpLeaderboard,
-    showLeaderboard = showLeaderboard,
+    showLeaderboardForUser = showLeaderboardForUser,
     syncLeaderboard = syncLeaderboard,
     addNamesToLeaderboard = addNamesToLeaderboard,
 }

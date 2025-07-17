@@ -476,11 +476,8 @@ local function onFullAutoToggle(data)
 end
 
 local function onLeaderboardToggle(data)
-    if MCM then
-        MCM.Set("leaderboard_enabled", not State.Settings.LeaderboardEnabled)
-    end
     Utils.dumpLeaderboard()
-    Utils.syncLeaderboard()
+    Utils.showLeaderboardForUser(data.UserID)
 end
 
 local function onMCMModEnabled(value)

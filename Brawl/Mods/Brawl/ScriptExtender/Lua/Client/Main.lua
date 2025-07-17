@@ -136,6 +136,11 @@ local IsControllerButtonPressed = {
     TriggerRight = false,
 }
 local LeaderboardWindow = nil
+local cellRefs = {party = {}, enemy = {}}
+local lightYellow = {1, 1, 0.8, 1}
+local mediumYellow = {0.9, 0.9, 0.6, 0.9}
+local lightBlue = {0.6, 0.8, 1, 1}
+local lightRed = {1, 0.8, 0.8, 1}
 
 -- Keybinding stuff from https://github.com/AtilioA/BG3-MCM & modified/re-used with permission
 
@@ -572,64 +577,36 @@ local function isPartyMember(uuid)
     return false
 end
 
-
-local LeaderboardWindow = nil
-local cellRefs = { party = {}, enemy = {} }
-
 local function showLeaderboard(data)
-    --------------------------------------------------
-    -- 1) destroy previous window (to avoid stacking)
-    --------------------------------------------------
     if LeaderboardWindow then
         LeaderboardWindow:Destroy()
         cellRefs.party = {}
         cellRefs.enemy = {}
     end
-
-    --------------------------------------------------
-    -- 2) compute column widths & counts
-    --------------------------------------------------
     local damageWidth, takenWidth, killsWidth = #"Damage", #"Taken", #"Kills"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
-        nameWidth    = math.max(nameWidth, #stats.name)
-        damageWidth  = math.max(damageWidth, #tostring(stats.damageDone  or 0))
-        takenWidth   = math.max(takenWidth,  #tostring(stats.damageTaken or 0))
-        killsWidth   = math.max(killsWidth,  #tostring(stats.kills      or 0))
+        nameWidth = math.max(nameWidth, #stats.name)
+        damageWidth = math.max(damageWidth, #tostring(stats.damageDone or 0))
+        takenWidth = math.max(takenWidth, #tostring(stats.damageTaken or 0))
+        killsWidth = math.max(killsWidth, #tostring(stats.kills or 0))
         if isPartyMember(uuid) then
             partyCount = partyCount + 1
         else
             enemyCount = enemyCount + 1
         end
     end
-
-    --------------------------------------------------
-    -- 3) estimate window size
-    --------------------------------------------------
-    local numColumns   = 4
-    local windowWidth  = (nameWidth + damageWidth + takenWidth + killsWidth)*8
-                         + (numColumns - 1)*16 + 40
-    local rowCount     = 3 + partyCount + enemyCount
+    local numColumns = 4
+    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth)*8 + (numColumns - 1)*16 + 40
+    local rowCount = 3 + partyCount + enemyCount
     local windowHeight = rowCount*18 + 40
-
-    --------------------------------------------------
-    -- 4) create & size window
-    --------------------------------------------------
     LeaderboardWindow = Ext.IMGUI.NewWindow("Leaderboard")
     LeaderboardWindow:SetSize({windowWidth, windowHeight})
-    LeaderboardWindow.Closeable          = true
+    LeaderboardWindow.Closeable = true
     LeaderboardWindow.NoFocusOnAppearing = true
-
-    local lightYellow  = {1, 1, 0.8, 1}
-    local mediumYellow = {0.9, 0.9, 0.6, 0.9}
-    local lightBlue    = {0.6, 0.8, 1, 1}
-    local lightRed     = {1, 0.8, 0.8, 1}
-
-    --------------------------------------------------
-    -- 5) PARTY TOTALS
-    --------------------------------------------------
     LeaderboardWindow:AddSeparatorText("Party Totals"):SetColor("Text", lightYellow)
     local partyTable = LeaderboardWindow:AddTable("PartyTotals", numColumns)
+    cellRefs.partyTable = partyTable
     do
         local hdr = partyTable:AddRow()
         hdr:AddCell():AddText("")
@@ -637,56 +614,49 @@ local function showLeaderboard(data)
         hdr:AddCell():AddText("Taken") :SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Kills") :SetColor("Text", mediumYellow)
     end
-
     local party = {}
     for uuid, stats in pairs(data) do
         if isPartyMember(uuid) then
             party[#party + 1] = {uuid = uuid, stats = stats}
         end
     end
-    table.sort(party, function(a, b)
+    table.sort(party, function (a, b)
         return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
     end)
-
     for _, e in ipairs(party) do
-        local row    = partyTable:AddRow()
+        local row = partyTable:AddRow()
         row:AddCell():AddText(e.stats.name) :SetColor("Text", lightBlue)
-        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone  or 0))
+        local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
-        local killsCell = row:AddCell():AddText(tostring(e.stats.kills      or 0))
-        cellRefs.party[e.uuid] = { damage = dmgCell, taken = takenCell, kills = killsCell }
+        local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
+        cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
     end
-
-    --------------------------------------------------
-    -- 6) ENEMY TOTALS
-    --------------------------------------------------
     LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
     local enemyTable = LeaderboardWindow:AddTable("EnemyTotals", numColumns)
+    cellRefs.enemyTable = enemyTable
     do
         local hdr = enemyTable:AddRow()
         hdr:AddCell():AddText("")
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Taken") :SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Kills") :SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
     end
-
     local enemy = {}
     for uuid, stats in pairs(data) do
         if not isPartyMember(uuid) then
             enemy[#enemy + 1] = {uuid = uuid, stats = stats}
         end
     end
-    table.sort(enemy, function(a, b)
+    table.sort(enemy, function (a, b)
         return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
     end)
-
     for _, e in ipairs(enemy) do
         local row    = enemyTable:AddRow()
         row:AddCell():AddText(e.stats.name) :SetColor("Text", lightRed)
-        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone  or 0))
+        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
-        local killsCell = row:AddCell():AddText(tostring(e.stats.kills      or 0))
-        cellRefs.enemy[e.uuid] = { damage = dmgCell, taken = takenCell, kills = killsCell }
+        local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
+        cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
     end
 end
 
@@ -694,9 +664,25 @@ local function updateLeaderboard(data)
     for uuid, stats in pairs(data) do
         local refs = cellRefs.party[uuid] or cellRefs.enemy[uuid]
         if refs then
-            refs.damage:SetText(tostring(stats.damageDone  or 0))
-            refs.taken:SetText(tostring(stats.damageTaken or 0))
-            refs.kills:SetText(tostring(stats.kills      or 0))
+            refs.damage.Label = tostring(stats.damageDone or 0)
+            refs.taken.Label = tostring(stats.damageTaken or 0)
+            refs.kills.Label = tostring(stats.kills or 0)
+        else
+            if isPartyMember(uuid) then
+                local row = cellRefs.partyTable:AddRow()
+                row:AddCell():AddText(stats.name):SetColor("Text", lightBlue)
+                local dmgCell = row:AddCell():AddText(tostring(stats.damageDone or 0))
+                local takenCell = row:AddCell():AddText(tostring(stats.damageTaken or 0))
+                local killsCell = row:AddCell():AddText(tostring(stats.kills or 0))
+                cellRefs.party[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+            else
+                local row = cellRefs.enemyTable:AddRow()
+                row:AddCell():AddText(stats.name):SetColor("Text", lightRed)
+                local dmgCell = row:AddCell():AddText(tostring(stats.damageDone or 0))
+                local takenCell = row:AddCell():AddText(tostring(stats.damageTaken or 0))
+                local killsCell = row:AddCell():AddText(tostring(stats.kills or 0))
+                cellRefs.enemy[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+            end
         end
     end
 end
@@ -711,7 +697,9 @@ local function onNetMessage(data)
     elseif data.Channel == "Leaderboard" then
         showLeaderboard(Ext.Json.Parse(data.Payload))
     elseif data.Channel == "UpdateLeaderboard" then
-        updateLeaderboard(Ext.Json.Parse(data.Payload))
+        if LeaderboardWindow then
+            updateLeaderboard(Ext.Json.Parse(data.Payload))
+        end
     end
 end
 
