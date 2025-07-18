@@ -83,7 +83,7 @@ end
 
 local function findPathToTargetUuid(uuid, targetUuid)
     local x, y, z = Osi.GetPosition(targetUuid)
-    local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 2.0, uuid, 1)
+    local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 3.0, uuid, 1)
     if validX == nil or validY == nil or validZ == nil then
         return false
     end

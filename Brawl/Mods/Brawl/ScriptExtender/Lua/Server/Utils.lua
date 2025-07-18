@@ -190,8 +190,15 @@ local function getSpellRange(spellName)
     end
 end
 
-local function isVisible(entityUuid)
-    return Osi.IsInvisible(entityUuid) == 0 and Osi.HasActiveStatus(entityUuid, "SNEAKING") == 0
+local function isVisible(uuid, targetUuid)
+    if Osi.HasActiveStatus(uuid, "TRUESIGHT") == 1 or Osi.HasActiveStatus(uuid, "MOD_Generic_Truesight") == 1 then
+        return true
+    end
+    local hasSeeInvisibility = Osi.HasActiveStatus(uuid, "SEE_INVISIBILITY") == 1 or Osi.HasActiveStatus(uuid, "MAG_SEE_INVISIBILITY_HIDDEN_IGNORE_RESTING") == 1
+    if hasSeeInvisibility and Osi.GetDistanceTo(uuid, targetUuid) <= 9 then
+        return true
+    end
+    return Osi.IsInvisible(targetUuid) == 0 and Osi.HasActiveStatus(targetUuid, "SNEAKING") == 0
 end
 
 local function isMeleeArchetype(archetype)

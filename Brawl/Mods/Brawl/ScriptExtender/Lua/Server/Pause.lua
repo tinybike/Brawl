@@ -236,7 +236,7 @@ local function startTruePause(entityUuid)
                 end
                 -- We have a target and the target is alive
                 local brawlersInLevel = State.Session.Brawlers[level]
-                if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
+                if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.uuid, brawler.targetUuid) then
                     if brawler.lockedOnTarget then
                         debugPrint("Locked-on target, attacking", brawler.displayName, entityUuid, "->", getDisplayName(brawler.targetUuid))
                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])

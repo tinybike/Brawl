@@ -599,14 +599,14 @@ local function whoNeedsHealing(uuid, level)
     return friendlyTargetUuid
 end
 
-function isValidHostileTarget(uuid)
-    if not isVisible(uuid) then
+function isValidHostileTarget(uuid, targetUuid)
+    if not isVisible(uuid, targetUuid) then
         return false
-    elseif not isAliveAndCanFight(uuid) and not isDowned(uuid) then
+    elseif not isAliveAndCanFight(targetUuid) and not isDowned(targetUuid) then
         return false
-    elseif Osi.HasActiveStatus(uuid, "SANCTUARY") == 1 then
+    elseif Osi.HasActiveStatus(targetUuid, "SANCTUARY") == 1 then
         return false
-    elseif Osi.HasActiveStatus(uuid, "INVULNERABLE") == 1 then
+    elseif Osi.HasActiveStatus(targetUuid, "INVULNERABLE") == 1 then
         return false
     end
     return true
@@ -670,7 +670,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                     if isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                         local hasPathToTarget = nil
                         -- if isMelee and not isPlayerOrAlly(brawler.uuid) and isHostile then
-                        if isHostile and isValidHostileTarget(potentialTargetUuid) then
+                        if isHostile and isValidHostileTarget(brawler.uuid, potentialTargetUuid) then
                             if isMelee and isHostile then
                                 hasPathToTarget = findPathToTargetUuid(brawler.uuid, potentialTargetUuid)
                             end
@@ -869,9 +869,9 @@ local function pulseAction(brawler, bonusActionOnly)
             end
             -- We have a target and the target is alive
             local brawlersInLevel = State.Session.Brawlers[Osi.GetRegion(brawler.uuid)]
-            if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.targetUuid) then
+            if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.uuid, brawler.targetUuid) then
                 if not State.Settings.TurnBasedSwarmMode or findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
-                    if brawler.lockedOnTarget and isValidHostileTarget(brawler.targetUuid) then
+                    if brawler.lockedOnTarget and isValidHostileTarget(brawler.uuid, brawler.targetUuid) then
                         debugPrint(brawler.displayName, "Locked-on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
                         return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
                     end
@@ -880,7 +880,7 @@ local function pulseAction(brawler, bonusActionOnly)
                         return findTarget(brawler, bonusActionOnly)
                     end
                     local trackingDistance = State.Settings.TurnBasedSwarmMode and 20 or 12
-                    if isValidHostileTarget(brawler.targetUuid) and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= trackingDistance then
+                    if isValidHostileTarget(brawler.uuid, brawler.targetUuid) and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= trackingDistance then
                         debugPrint(brawler.displayName, "Remaining on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
                         return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
                     end

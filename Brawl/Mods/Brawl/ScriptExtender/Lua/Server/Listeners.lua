@@ -608,9 +608,14 @@ Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
                     local targetInitialHp = component.Target.Health.Hp
                     if casterUuid and targetUuid and targetInitialHp then
                         Utils.updateLeaderboardDamage(casterUuid, targetUuid, targetInitialHp)
-                        if State.Session.Players and not State.Session.Players[targetUuid] then
-                            Utils.updateLeaderboardKills(casterUuid)
-                        end
+                        Ext.Timer.WaitFor(1000, function ()
+                            if Osi.IsDead(targetUuid) == 1 then
+                                Utils.updateLeaderboardKills(casterUuid)
+                            end
+                        end)
+                        -- if State.Session.Players and not State.Session.Players[targetUuid] then
+                        --     Utils.updateLeaderboardKills(casterUuid)
+                        -- end
                     end
                     break
                 end
