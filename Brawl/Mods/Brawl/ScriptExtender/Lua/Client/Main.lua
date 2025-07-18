@@ -583,21 +583,23 @@ local function showLeaderboard(data)
         cellRefs.party = {}
         cellRefs.enemy = {}
     end
-    local damageWidth, takenWidth, killsWidth = #"Damage", #"Taken", #"Kills"
+    local damageWidth, takenWidth, killsWidth, healingWidth, receivedWidth = #"Damage", #"Taken", #"Kills", #"Healing", #"Healed"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
         nameWidth = math.max(nameWidth, #stats.name)
         damageWidth = math.max(damageWidth, #tostring(stats.damageDone or 0))
         takenWidth = math.max(takenWidth, #tostring(stats.damageTaken or 0))
         killsWidth = math.max(killsWidth, #tostring(stats.kills or 0))
+        healingWidth = math.max(healingWidth, #tostring(stats.healingDone or 0))
+        receivedWidth = math.max(receivedWidth, #tostring(stats.healingTaken or 0))
         if isPartyMember(uuid) then
             partyCount = partyCount + 1
         else
             enemyCount = enemyCount + 1
         end
     end
-    local numColumns = 4
-    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth)*8 + (numColumns - 1)*16 + 40
+    local numColumns = 6
+    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth + healingWidth + receivedWidth)*8 + (numColumns - 1)*16 + 40
     local rowCount = 3 + partyCount + enemyCount
     local windowHeight = rowCount*18 + 40
     LeaderboardWindow = Ext.IMGUI.NewWindow("Leaderboard")
@@ -611,8 +613,10 @@ local function showLeaderboard(data)
         local hdr = partyTable:AddRow()
         hdr:AddCell():AddText("")
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Taken") :SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Kills") :SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
     end
     local party = {}
     for uuid, stats in pairs(data) do
@@ -625,11 +629,13 @@ local function showLeaderboard(data)
     end)
     for _, e in ipairs(party) do
         local row = partyTable:AddRow()
-        row:AddCell():AddText(e.stats.name) :SetColor("Text", lightBlue)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", lightBlue)
         local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
-        cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+        local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
+        local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
     LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
     local enemyTable = LeaderboardWindow:AddTable("EnemyTotals", numColumns)
@@ -640,6 +646,8 @@ local function showLeaderboard(data)
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
+        hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
     end
     local enemy = {}
     for uuid, stats in pairs(data) do
@@ -651,12 +659,14 @@ local function showLeaderboard(data)
         return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
     end)
     for _, e in ipairs(enemy) do
-        local row    = enemyTable:AddRow()
-        row:AddCell():AddText(e.stats.name) :SetColor("Text", lightRed)
-        local dmgCell   = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
+        local row = enemyTable:AddRow()
+        row:AddCell():AddText(e.stats.name):SetColor("Text", lightRed)
+        local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
-        cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+        local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
+        local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
 end
 
@@ -667,6 +677,8 @@ local function updateLeaderboard(data)
             refs.damage.Label = tostring(stats.damageDone or 0)
             refs.taken.Label = tostring(stats.damageTaken or 0)
             refs.kills.Label = tostring(stats.kills or 0)
+            refs.healing.Label = tostring(stats.healingDone or 0)
+            refs.received.Label = tostring(stats.healingTaken or 0)
         else
             if isPartyMember(uuid) then
                 local row = cellRefs.partyTable:AddRow()
@@ -674,14 +686,18 @@ local function updateLeaderboard(data)
                 local dmgCell = row:AddCell():AddText(tostring(stats.damageDone or 0))
                 local takenCell = row:AddCell():AddText(tostring(stats.damageTaken or 0))
                 local killsCell = row:AddCell():AddText(tostring(stats.kills or 0))
-                cellRefs.party[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+                local healCell = row:AddCell():AddText(tostring(stats.healingDone or 0))
+                local recvCell = row:AddCell():AddText(tostring(stats.healingTaken or 0))
+                cellRefs.party[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
             else
                 local row = cellRefs.enemyTable:AddRow()
                 row:AddCell():AddText(stats.name):SetColor("Text", lightRed)
                 local dmgCell = row:AddCell():AddText(tostring(stats.damageDone or 0))
                 local takenCell = row:AddCell():AddText(tostring(stats.damageTaken or 0))
                 local killsCell = row:AddCell():AddText(tostring(stats.kills or 0))
-                cellRefs.enemy[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell}
+                local healCell = row:AddCell():AddText(tostring(stats.healingDone or 0))
+                local recvCell = row:AddCell():AddText(tostring(stats.healingTaken or 0))
+                cellRefs.enemy[uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
             end
         end
     end

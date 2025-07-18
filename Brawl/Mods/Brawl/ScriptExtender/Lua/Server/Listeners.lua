@@ -565,6 +565,107 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
     end
 end
 
+-- Ext.Events.ExecuteFunctor:Subscribe(function (e)
+--     if e and e.Params then
+--         local ok, source = pcall(function() return e.Params.Source end)
+--         if ok and source and source.Uuid then
+--             local uuid = source.Uuid.EntityUuid
+--                 -- local ok2, statusId = pcall(function() return e.Params.StatusId end)
+--                 -- local ok3, hit = pcall(function() return e.Params.Hit end)
+--                     _D(e.Params)
+--                     -- print(getDisplayName(uuid), Osi.GetHitpoints(uuid))
+--                 -- end
+--             end
+--         end
+--     end
+-- end)
+
+-- thank u laughingleader
+---@param component EsvStatusApplyEventOneFrameComponent
+Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
+    if component.StatusId == "HEAL" or component.Status.ServerStatus.Type == "HEAL" then
+        if component.Target and component.Target.ServerCharacter then
+            local statusHandle = component.Status.ServerStatus.StatusHandle
+            for _, status in pairs(component.Target.ServerCharacter.StatusManager.Statuses) do
+                if status.StatusHandle == statusHandle and status.CauseGUID and status.HealAmount then
+                    local healerUuid = status.CauseGUID
+                    local targetUuid = component.Target.Uuid.EntityUuid
+                    local targetMaxHp = component.Target.Health.MaxHp
+                    local healAmount = (component.Target.Health.Hp == targetMaxHp) and status.HealAmount or math.min(status.HealAmount, targetMaxHp)
+                    debugPrint("healed for", getDisplayName(healerUuid), getDisplayName(targetUuid), status.HealAmount, component.Target.Health.Hp, healAmount)
+                    Utils.updateLeaderboardHealing(healerUuid, targetUuid, healAmount)
+                    break
+                end
+            end
+        end
+    elseif component.StatusId == "QUIVERING_PALM_HP" then
+        if component.Target and component.Target.ServerCharacter then
+            local statusHandle = component.Status.ServerStatus.StatusHandle
+            for _, status in pairs(component.Target.ServerCharacter.StatusManager.Statuses) do
+                if status.StatusHandle == statusHandle then
+                    local casterUuid = status.CauseGUID
+                    local targetUuid = component.Target.Uuid.EntityUuid
+                    local targetInitialHp = component.Target.Health.Hp
+                    if casterUuid and targetUuid and targetInitialHp then
+                        Utils.updateLeaderboardDamage(casterUuid, targetUuid, targetInitialHp)
+                        if State.Session.Players and not State.Session.Players[targetUuid] then
+                            Utils.updateLeaderboardKills(casterUuid)
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end
+end)
+
+local function onHitpointsChanged(guid, percentage)
+    -- print("hp changed", guid, percentage)
+end
+
+-- Ext.Events.BeforeDealDamage:Subscribe(function (e)
+--     if e and e.Attack and e.Hit.Inflicter ~= nil and e.Hit.Inflicter.Uuid.EntityUuid then
+--         local attackerUuid = e.Hit.Inflicter.Uuid.EntityUuid
+--         if Osi.IsCharacter(attackerUuid) == 1 then
+--             local initialHpPercentage = e.Attack.InitialHPPercentage
+--             local totalDamageDone = e.Attack.TotalDamageDone
+--             print("BeforeDealDamage", getDisplayName(attackerUuid), "|", initialHpPercentage, totalDamageDone)
+--         end
+--         -- _D(e)
+--     end
+-- end)
+
+-- Ext.Events.DealDamage:Subscribe(function (e)
+--     if e and e.Attack and e.Target and e.Target.Uuid and e.Target.Uuid.EntityUuid and e.Caster and e.Caster.Uuid and e.Caster.Uuid.EntityUuid then
+--         local attackerUuid = e.Caster.Uuid.EntityUuid
+--         local defenderUuid = e.Target.Uuid.EntityUuid
+--         if Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
+--             local initialHpPercentage = e.Attack.InitialHPPercentage
+--             local maxHp = e.Target.Health.MaxHp
+--             local initialHp = maxHp*initialHpPercentage/100
+--             local currentHp = e.Target.Health.Hp
+--             print("DealDamage", getDisplayName(attackerUuid), "->", getDisplayName(defenderUuid), "|", initialHpPercentage, initialHp, "->", currentHp)
+--         end
+--     end
+-- end)
+
+-- Ext.Events.DealtDamage:Subscribe(function (e)
+--     if e and e.Result and e.Result.Attack and e.Target and e.Target.Uuid and e.Target.Uuid.EntityUuid and e.Caster and e.Caster.Uuid and e.Caster.Uuid.EntityUuid then
+--         local attackerUuid = e.Caster.Uuid.EntityUuid
+--         local defenderUuid = e.Target.Uuid.EntityUuid
+--         if Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
+--             -- _D(e)
+--             local initialHpPercentage = e.Result.Attack.InitialHPPercentage
+--             local maxHp = e.Target.Health.MaxHp
+--             local initialHp = maxHp*initialHpPercentage/100
+--             local currentHp = e.Target.Health.Hp
+--             local totalDamageDone = e.Result.Attack.TotalDamageDone
+--             print("DealtDamage", getDisplayName(attackerUuid), "->", getDisplayName(defenderUuid), "|", initialHpPercentage, initialHp, "->", currentHp, totalDamageDone)
+--             Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, totalDamageDone)
+--         end
+--     end
+-- end)
+
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = Osi.GetUUID(attackerGuid)
@@ -593,9 +694,15 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
 end
 
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
-    debugPrint("UsingSpellOnTarget", casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
-    if spellName ~= nil then
+    local casterUuid = Osi.GetUUID(casterGuid)
+    local targetUuid = Osi.GetUUID(targetGuid)
+    if casterUuid and targetUuid and spellName then
+        debugPrint(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
         State.Session.StoryActionIDSpellName[storyActionID] = spellName
+        if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
+            -- NB: seems like PWK can't be counterspelled...?
+            Utils.updateLeaderboardDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
+        end
     end
 end
 
@@ -613,8 +720,8 @@ local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, sp
     debugPrint("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
 end
 
-local function onUsingSpell(caster, spell, spellType, spellElement, storyActionID)
-    debugPrint(getDisplayName(Osi.GetUUID(caster)), "UsingSpell", caster, spell, spellType, spellElement, storyActionID)
+local function onUsingSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint(getDisplayName(Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
@@ -793,9 +900,9 @@ local function onFlagSet(flag, speaker, dialogInstance)
     -- end
 end
 
--- local function onStatusApplied(object, status, causee, storyActionID)
---     debugPrint("StatusApplied", object, status, causee, storyActionID)
--- end
+local function onStatusApplied(object, status, causee, storyActionID)
+    -- print("StatusApplied", object, status, causee, storyActionID)
+end
 
 local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
     debugPrint("onCharacterOnCrimeSensibleActionNotification", character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
@@ -1036,6 +1143,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
         stop = Ext.Osiris.UnregisterListener,
     }
+    State.Session.Listeners.HitpointsChanged = {
+        handle = Ext.Osiris.RegisterListener("HitpointsChanged", 2, "after", onHitpointsChanged),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     -- State.Session.Listeners.SubQuestUpdateUnlocked = {
     --     handle = Ext.Osiris.RegisterListener("SubQuestUpdateUnlocked", 3, "after", onSubQuestUpdateUnlocked),
     --     stop = Ext.Osiris.UnregisterListener,
@@ -1060,10 +1171,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.StatusApplied = {
-    --     handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    State.Session.Listeners.StatusApplied = {
+        handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     -- State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
     --     handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
     --     stop = Ext.Osiris.UnregisterListener,
