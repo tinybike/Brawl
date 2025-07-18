@@ -33,9 +33,11 @@ local findPathToTargetUuid = Movement.findPathToTargetUuid
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
-        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
         if State.Settings.TurnBasedSwarmMode then
             table.insert(castOptions, "NoMovement")
+        else
+            table.insert(castOptions, "IgnoreTargetChecks")
         end
     end
     local request = {
