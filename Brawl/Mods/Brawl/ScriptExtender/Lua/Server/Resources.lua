@@ -192,13 +192,19 @@ local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, v
 end
 
 local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+    print(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     if targetUuid == nil then
+        return false
+    end
+    local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
+    local distanceTo = math.floor(Osi.GetDistanceTo(casterUuid, targetUuid))
+    if distanceTo > spellRange then
+        print("cast failed, out of range", distanceTo, spellRange)
         return false
     end
     clearOsirisQueue(casterUuid)
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)
     -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
     --     return false

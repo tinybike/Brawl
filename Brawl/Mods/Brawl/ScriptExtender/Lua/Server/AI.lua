@@ -33,11 +33,9 @@ local findPathToTargetUuid = Movement.findPathToTargetUuid
 local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
-        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
+        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
         if State.Settings.TurnBasedSwarmMode then
             table.insert(castOptions, "NoMovement")
-        else
-            table.insert(castOptions, "IgnoreTargetChecks")
         end
     end
     local request = {
@@ -397,6 +395,7 @@ end
 
 local function actOnHostileTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
+    -- local distanceToTarget, bestNode, bestNodeDash = Movement.getPathLengthTo(brawler.uuid, target.uuid)
     if brawler and target then
         local actionToTake = nil
         local spellTypes = {"Control", "Damage"}
@@ -410,14 +409,14 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-            if State.Settings.TurnBasedSwarmMode and not bonusActionOnly and Osi.HasActiveStatus(brawler.uuid, "DASH") == 0 then
-                local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(actionToTake))
-                local remainingMovement = Osi.GetActionResourceValuePersonal(brawler.uuid, "Movement", 0)
-                if remainingMovement < (distanceToTarget - spellRange) then
-                    debugPrint("DASHING...", remainingMovement, distanceToTarget, spellRange)
-                    useSpellOnTarget(brawler.uuid, brawler.uuid, "Shout_Dash_NPC")
-                end
-            end
+            -- if State.Settings.TurnBasedSwarmMode and not bonusActionOnly and Osi.HasActiveStatus(brawler.uuid, "DASH") == 0 then
+            --     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(actionToTake))
+            --     local remainingMovement = Osi.GetActionResourceValuePersonal(brawler.uuid, "Movement", 0)
+            --     if remainingMovement < (distanceToTarget - spellRange) then
+            --         debugPrint("DASHING...", remainingMovement, distanceToTarget, spellRange)
+            --         useSpellOnTarget(brawler.uuid, brawler.uuid, "Shout_Dash_NPC")
+            --     end
+            -- end
             debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
         if not actionToTake then
@@ -444,7 +443,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
                 return false
             end
         end
-        Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
+        Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
             debugPrint(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end)
@@ -476,7 +475,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         end
         debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid, bonusActionOnly)
         if actionToTake then
-            Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, function ()
+            Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
                 useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
             end)
             return true
@@ -842,7 +841,6 @@ local function checkForBrawlToJoin(brawler)
 end
 
 -- Brawlers doing dangerous stuff
--- NB: if findTarget distance > max movement distance in TBSM then use Dash?
 local function pulseAction(brawler, bonusActionOnly)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and canAct(brawler.uuid) then
@@ -856,7 +854,7 @@ local function pulseAction(brawler, bonusActionOnly)
                         player.isBeingHelped = true
                         brawler.targetUuid = nil
                         debugPrint(brawler.displayName, "Helping target", playerUuid, getDisplayName(playerUuid))
-                        return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", function ()
+                        return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
                             useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
                         end)
                     end
@@ -960,6 +958,7 @@ return {
     getSpellWeight = getSpellWeight,
     actOnHostileTarget = actOnHostileTarget,
     actOnFriendlyTarget = actOnFriendlyTarget,
+    useSpellOnTarget = useSpellOnTarget,
     findTarget = findTarget,
     pulseAction = pulseAction,
     pulseReposition = pulseReposition,
