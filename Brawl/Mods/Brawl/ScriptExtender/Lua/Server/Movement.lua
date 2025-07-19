@@ -266,101 +266,201 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
     local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
     local dashed = false
     local override = not State.Settings.TurnBasedSwarmMode
+    local dashAvailable = State.Settings.TurnBasedSwarmMode
     -- if unit can’t move or has zero movement, just callback and exit
     if baseMove <= 0 or not Utils.canMove(attackerUuid) then
         if callback then callback() end
         return true
     end
     local function tryMove(allowedDistance)
-        print("tryMove", allowedDistance)
-        local tx, ty, tz = Osi.GetPosition(targetUuid)
+        -- print("tryMove", allowedDistance)
+        local tx, ty, tz   = Osi.GetPosition(targetUuid)
         local distToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        local need = distToTarget - spellRange
+        local need         = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
-            print("in range already")
             if callback then callback() end
             return true
         end
         -- dash if we need more than base move
-        if need > allowedDistance and not bonusActionOnly and not dashed and Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
+        if dashAvailable and need > allowedDistance and not bonusActionOnly and not dashed and Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
             AI.useSpellOnTarget(attackerUuid, attackerUuid, "Shout_Dash_NPC")
             dashed = true
             return tryMove(baseMove*2)
         end
-        -- build path attacker -> just outside target
+        -- find a valid point just outside the target
         local gx, gy, gz = Osi.FindValidPosition(tx, ty, tz, 3.0, attackerUuid, 1)
         if not gx then
             return false
         end
-        local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(attackerUuid), {gx, gy, gz})
-        path.CanUseLadders = true
-        if not Ext.Level.FindPath(path) or #path.Nodes == 0 then
-            return false
-        end
-        -- scan for best in‑range node and fallback
+        -- queue pathfinding
+        local goalPos = {gx, gy, gz}
         local dashAllow = baseMove*2
-        local bestPos, bestDist = nil, -1
-        local farPos, farDist = nil, -1
-        local nextPos, nextDist = nil, nil
-        for _, n in ipairs(path.Nodes) do
-            local d = n.Distance
-            -- furthest reachable without dash
-            if d <= allowedDistance and d > farDist then
-                farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
+        local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(attackerUuid), goalPos, function(path)
+            if not path or not path.GoalFound or #path.Nodes == 0 then
+                return
             end
-            -- first node beyond base move (for interpolation)
-            if not nextPos and d > allowedDistance then
-                nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
-            end
-            -- is this node actually in spell‑range (using dash max)?
-            if d <= dashAllow then
-                local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
-                local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
-                if eu <= spellRange and d > bestDist then
-                    bestPos, bestDist = {px, py, pz}, d
+            -- scan for best in‑range node and fallback
+            local bestPos, bestDist = nil, -1
+            local farPos,  farDist  = nil, -1
+            local nextPos, nextDist = nil, nil
+            for _, n in ipairs(path.Nodes) do
+                local d = n.Distance
+                -- furthest reachable without dash
+                if d <= allowedDistance and d > farDist then
+                    farPos, farDist = { n.Position[1], n.Position[2], n.Position[3] }, d
+                end
+                -- first node beyond base move (for interpolation)
+                if not nextPos and d > allowedDistance then
+                    nextPos, nextDist = { n.Position[1], n.Position[2], n.Position[3] }, d
+                end
+                -- is this node in spell range (using dash max)?
+                if d <= dashAllow then
+                    local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
+                    local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
+                    if eu <= spellRange and d > bestDist then
+                        bestPos, bestDist = { px, py, pz }, d
+                    end
                 end
             end
-        end
-        -- 1) if bestPos is within baseMove, move there
-        if bestPos and bestDist <= allowedDistance then
-            moveToPosition(attackerUuid, bestPos, override, callback)
-            return true
-        end
-        -- 2) interpolation fallback if farDist < baseMove
-        if farPos and nextPos and farDist < allowedDistance then
-            local origFrac = (allowedDistance - farDist)/(nextDist - farDist)
-            local frac = origFrac
-            local valid = false
-            for attempt = 1, 10 do
-                local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
-                local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
-                local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
-                print("interp try", attempt, "frac", frac, "pos", ix, iy, iz)
-                local vx, vy, vz = Osi.FindValidPosition(ix, iy, iz, 0, attackerUuid, 1)
-                if vx then
-                    farPos = {vx, vy, vz}
-                    print("interp valid pos", vx, vy, vz)
-                    valid = true
-                    break
+            -- 1) if bestPos is within baseMove, move there
+            if bestPos and bestDist <= allowedDistance then
+                moveToPosition(attackerUuid, bestPos, override, callback)
+                return
+            end
+            -- 2) interpolation fallback if farDist < baseMove
+            if farPos and nextPos and farDist < allowedDistance then
+                local origFrac = (allowedDistance - farDist)/(nextDist - farDist)
+                local frac = origFrac
+                local valid = false
+                for attempt = 1, 10 do
+                    local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
+                    local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
+                    local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
+                    local vx, vy, vz = Osi.FindValidPosition(ix, iy, iz, 0, attackerUuid, 1)
+                    if vx then
+                        farPos = {vx, vy, vz}
+                        valid = true
+                        break
+                    end
+                    frac = origFrac*((10 - attempt)/10)
                 end
-                frac = origFrac*((10 - attempt)/10)
+                if not valid then
+                    return
+                end
             end
-            if not valid then
-                print("interp failed, abort")
-                return false
+            -- 3) final fallback move
+            if farPos then
+                moveToPosition(attackerUuid, farPos, override, callback)
             end
-        end
-        -- 3) final fallback move
-        if farPos then
-            print("farpos, moving", attackerUuid, farPos[1], farPos[2], farPos[3])
-            moveToPosition(attackerUuid, farPos, override, callback)
-            return true
-        end
-        return false
+        end)
+        path.CanUseLadders = true
+        return true
     end
     return tryMove(baseMove)
 end
+
+-- local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
+--     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
+--     local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
+--     local dashed = false
+--     local override = not State.Settings.TurnBasedSwarmMode
+--     local dashAvailable = not State.Settings.TurnBasedSwarmMode
+--     -- if unit can’t move or has zero movement, just callback and exit
+--     if baseMove <= 0 or not Utils.canMove(attackerUuid) then
+--         if callback then callback() end
+--         return true
+--     end
+--     local function tryMove(allowedDistance)
+--         print("tryMove", allowedDistance)
+--         local tx, ty, tz = Osi.GetPosition(targetUuid)
+--         local distToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+--         local need = distToTarget - spellRange
+--         -- already in range?
+--         if need <= 0 then
+--             print("in range already")
+--             if callback then callback() end
+--             return true
+--         end
+--         -- dash if we need more than base move
+--         if dashAvailable and need > allowedDistance and not bonusActionOnly and not dashed and Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
+--             AI.useSpellOnTarget(attackerUuid, attackerUuid, "Shout_Dash_NPC")
+--             dashed = true
+--             return tryMove(baseMove*2)
+--         end
+--         -- build path attacker -> just outside target
+--         local gx, gy, gz = Osi.FindValidPosition(tx, ty, tz, 3.0, attackerUuid, 1)
+--         if not gx then
+--             return false
+--         end
+--         local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(attackerUuid), {gx, gy, gz})
+--         path.CanUseLadders = true
+--         if not Ext.Level.FindPath(path) or #path.Nodes == 0 then
+--             return false
+--         end
+--         -- scan for best in‑range node and fallback
+--         local dashAllow = baseMove*2
+--         local bestPos, bestDist = nil, -1
+--         local farPos, farDist = nil, -1
+--         local nextPos, nextDist = nil, nil
+--         for _, n in ipairs(path.Nodes) do
+--             local d = n.Distance
+--             -- furthest reachable without dash
+--             if d <= allowedDistance and d > farDist then
+--                 farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
+--             end
+--             -- first node beyond base move (for interpolation)
+--             if not nextPos and d > allowedDistance then
+--                 nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
+--             end
+--             -- is this node actually in spell‑range (using dash max)?
+--             if d <= dashAllow then
+--                 local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
+--                 local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
+--                 if eu <= spellRange and d > bestDist then
+--                     bestPos, bestDist = {px, py, pz}, d
+--                 end
+--             end
+--         end
+--         -- 1) if bestPos is within baseMove, move there
+--         if bestPos and bestDist <= allowedDistance then
+--             moveToPosition(attackerUuid, bestPos, override, callback)
+--             return true
+--         end
+--         -- 2) interpolation fallback if farDist < baseMove
+--         if farPos and nextPos and farDist < allowedDistance then
+--             local origFrac = (allowedDistance - farDist)/(nextDist - farDist)
+--             local frac = origFrac
+--             local valid = false
+--             for attempt = 1, 10 do
+--                 local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
+--                 local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
+--                 local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
+--                 print("interp try", attempt, "frac", frac, "pos", ix, iy, iz)
+--                 local vx, vy, vz = Osi.FindValidPosition(ix, iy, iz, 0, attackerUuid, 1)
+--                 if vx then
+--                     farPos = {vx, vy, vz}
+--                     print("interp valid pos", vx, vy, vz)
+--                     valid = true
+--                     break
+--                 end
+--                 frac = origFrac*((10 - attempt)/10)
+--             end
+--             if not valid then
+--                 print("interp failed, abort")
+--                 return false
+--             end
+--         end
+--         -- 3) final fallback move
+--         if farPos then
+--             print("farpos, moving", attackerUuid, farPos[1], farPos[2], farPos[3])
+--             moveToPosition(attackerUuid, farPos, override, callback)
+--             return true
+--         end
+--         return false
+--     end
+--     return tryMove(baseMove)
+-- end
 
 -- local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
 --     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
