@@ -350,5 +350,9 @@ Constants.UNUSABLE_NPC_SPELLS = {
     -- "Projectile_Jump",
     -- "Shout_Dash_NPC",
 }
+Constants.LEADERBOARD_EXCLUDED_HEALS = {
+    "ShortResting",
+    "TimelessBody",
+}
 
 return Constants

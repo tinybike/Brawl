@@ -599,14 +599,14 @@ local function showLeaderboard(data)
         end
     end
     local numColumns = 6
-    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth + healingWidth + receivedWidth)*8 + (numColumns - 1)*16 + 40
+    local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth + healingWidth + receivedWidth)*8 + (numColumns - 1)*16 + 100
     local rowCount = 3 + partyCount + enemyCount
-    local windowHeight = rowCount*18 + 40
+    local windowHeight = rowCount*18 + 20
     LeaderboardWindow = Ext.IMGUI.NewWindow("Leaderboard")
     LeaderboardWindow:SetSize({windowWidth, windowHeight})
     LeaderboardWindow.Closeable = true
     LeaderboardWindow.NoFocusOnAppearing = true
-    LeaderboardWindow:AddSeparatorText("Party Totals"):SetColor("Text", lightYellow)
+    -- LeaderboardWindow:AddSeparatorText("Party Totals"):SetColor("Text", lightYellow)
     local partyTable = LeaderboardWindow:AddTable("PartyTotals", numColumns)
     cellRefs.partyTable = partyTable
     do
@@ -637,18 +637,19 @@ local function showLeaderboard(data)
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
         cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
-    LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
+    -- LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
+    LeaderboardWindow:AddSeparator()
     local enemyTable = LeaderboardWindow:AddTable("EnemyTotals", numColumns)
     cellRefs.enemyTable = enemyTable
-    do
-        local hdr = enemyTable:AddRow()
-        hdr:AddCell():AddText("")
-        hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
-        hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
-    end
+    -- do
+    --     local hdr = enemyTable:AddRow()
+    --     hdr:AddCell():AddText("")
+    --     hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
+    --     hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
+    --     hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
+    --     hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
+    --     hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
+    -- end
     local enemy = {}
     for uuid, stats in pairs(data) do
         if not isPartyMember(uuid) then

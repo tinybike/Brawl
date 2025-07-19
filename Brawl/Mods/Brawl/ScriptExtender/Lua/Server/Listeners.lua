@@ -88,6 +88,7 @@ local function onStarted(level)
         State.uncapPartyMembersMovementDistances()
         Pause.checkTruePauseParty()
     end
+    Leaderboard.initialize()
     debugDump(State.Session.Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
 end
@@ -588,7 +589,7 @@ Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
         if component.Target and component.Target.ServerCharacter then
             local statusHandle = component.Status.ServerStatus.StatusHandle
             for _, status in pairs(component.Target.ServerCharacter.StatusManager.Statuses) do
-                if status.StatusHandle == statusHandle and status.CauseGUID and status.HealAmount then
+                if status.StatusHandle == statusHandle and status.CauseGUID and status.HealAmount and not Leaderboard.isExcludedHeal(status) then
                     local healerUuid = status.CauseGUID
                     local targetUuid = component.Target.Uuid.EntityUuid
                     local targetMaxHp = component.Target.Health.MaxHp

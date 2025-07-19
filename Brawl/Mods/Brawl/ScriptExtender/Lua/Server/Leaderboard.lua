@@ -34,6 +34,17 @@ local function postDataToClients(updateOnly)
     end
 end
 
+local function isExcludedHeal(status)
+    if status.Originator and status.Originator.PassiveId then
+        for _, excludedHeal in ipairs(Constants.LEADERBOARD_EXCLUDED_HEALS) do
+            if status.Originator.PassiveId == excludedHeal then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function updateKills(uuid)
     if State.Settings.LeaderboardEnabled and Osi.IsCharacter(uuid) == 1 then
         State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
@@ -139,10 +150,11 @@ end
 
 return {
     initialize = initialize,
+    showForUser = showForUser,
+    postDataToClients = postDataToClients,
+    isExcludedHeal = isExcludedHeal,
     updateKills = updateKills,
     updateDamage = updateDamage,
     updateHealing = updateHealing,
     dumpToConsole = dumpToConsole,
-    showForUser = showForUser,
-    postDataToClients = postDataToClients,
 }
