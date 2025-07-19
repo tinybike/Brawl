@@ -476,8 +476,8 @@ local function onFullAutoToggle(data)
 end
 
 local function onLeaderboardToggle(data)
-    Utils.dumpLeaderboard()
-    Utils.showLeaderboardForUser(data.UserID)
+    Leaderboard.dumpToConsole()
+    Leaderboard.showForUser(data.UserID)
 end
 
 local function onMCMModEnabled(value)

@@ -20,8 +20,10 @@ end
 
 local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        Leaderboard.initialize()
+    end
     -- NB: clean this up / don't reassign "constant" values
-    State.Session.Leaderboard = {}
     if isToT() then
         if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
             State.Session.TBSMToTSkippedPrepRound = false
@@ -141,8 +143,8 @@ local function onCombatEnded(combatGuid)
             State.Session.SwarmTurnTimer = nil
         end
         State.Session.TBSMActionResourceListeners = {}
-        Utils.dumpLeaderboard()
-        Utils.syncLeaderboard()
+        Leaderboard.dumpToConsole()
+        Leaderboard.postDataToClients()
     end
 end
 
@@ -163,7 +165,6 @@ local function onEnteredCombat(entityGuid, combatGuid)
                 end
                 entity:Replicate("CombatParticipant")
             end
-            -- State.Session.SwarmTurnComplete[entityUuid] = true
         end
     end
 end
@@ -491,7 +492,7 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
                     debugPrint("Applying damage", defenderUuid, damageAmount, damageType)
                     Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
                     Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
-                    Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, damageAmount)
+                    Leaderboard.updateDamage(attackerUuid, defenderUuid, damageAmount)
                     reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
                 else
                     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
@@ -593,7 +594,7 @@ Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
                     local targetMaxHp = component.Target.Health.MaxHp
                     local healAmount = (component.Target.Health.Hp == targetMaxHp) and status.HealAmount or math.min(status.HealAmount, targetMaxHp)
                     debugPrint("healed for", getDisplayName(healerUuid), getDisplayName(targetUuid), status.HealAmount, component.Target.Health.Hp, healAmount)
-                    Utils.updateLeaderboardHealing(healerUuid, targetUuid, healAmount)
+                    Leaderboard.updateHealing(healerUuid, targetUuid, healAmount)
                     break
                 end
             end
@@ -607,15 +608,12 @@ Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
                     local targetUuid = component.Target.Uuid.EntityUuid
                     local targetInitialHp = component.Target.Health.Hp
                     if casterUuid and targetUuid and targetInitialHp then
-                        Utils.updateLeaderboardDamage(casterUuid, targetUuid, targetInitialHp)
+                        Leaderboard.updateDamage(casterUuid, targetUuid, targetInitialHp)
                         Ext.Timer.WaitFor(1000, function ()
                             if Osi.IsDead(targetUuid) == 1 then
-                                Utils.updateLeaderboardKills(casterUuid)
+                                Leaderboard.updateKills(casterUuid)
                             end
                         end)
-                        -- if State.Session.Players and not State.Session.Players[targetUuid] then
-                        --     Utils.updateLeaderboardKills(casterUuid)
-                        -- end
                     end
                     break
                 end
@@ -627,49 +625,6 @@ end)
 local function onHitpointsChanged(guid, percentage)
     -- print("hp changed", guid, percentage)
 end
-
--- Ext.Events.BeforeDealDamage:Subscribe(function (e)
---     if e and e.Attack and e.Hit.Inflicter ~= nil and e.Hit.Inflicter.Uuid.EntityUuid then
---         local attackerUuid = e.Hit.Inflicter.Uuid.EntityUuid
---         if Osi.IsCharacter(attackerUuid) == 1 then
---             local initialHpPercentage = e.Attack.InitialHPPercentage
---             local totalDamageDone = e.Attack.TotalDamageDone
---             print("BeforeDealDamage", getDisplayName(attackerUuid), "|", initialHpPercentage, totalDamageDone)
---         end
---         -- _D(e)
---     end
--- end)
-
--- Ext.Events.DealDamage:Subscribe(function (e)
---     if e and e.Attack and e.Target and e.Target.Uuid and e.Target.Uuid.EntityUuid and e.Caster and e.Caster.Uuid and e.Caster.Uuid.EntityUuid then
---         local attackerUuid = e.Caster.Uuid.EntityUuid
---         local defenderUuid = e.Target.Uuid.EntityUuid
---         if Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
---             local initialHpPercentage = e.Attack.InitialHPPercentage
---             local maxHp = e.Target.Health.MaxHp
---             local initialHp = maxHp*initialHpPercentage/100
---             local currentHp = e.Target.Health.Hp
---             print("DealDamage", getDisplayName(attackerUuid), "->", getDisplayName(defenderUuid), "|", initialHpPercentage, initialHp, "->", currentHp)
---         end
---     end
--- end)
-
--- Ext.Events.DealtDamage:Subscribe(function (e)
---     if e and e.Result and e.Result.Attack and e.Target and e.Target.Uuid and e.Target.Uuid.EntityUuid and e.Caster and e.Caster.Uuid and e.Caster.Uuid.EntityUuid then
---         local attackerUuid = e.Caster.Uuid.EntityUuid
---         local defenderUuid = e.Target.Uuid.EntityUuid
---         if Osi.IsCharacter(attackerUuid) == 1 and Osi.IsCharacter(defenderUuid) == 1 then
---             -- _D(e)
---             local initialHpPercentage = e.Result.Attack.InitialHPPercentage
---             local maxHp = e.Target.Health.MaxHp
---             local initialHp = maxHp*initialHpPercentage/100
---             local currentHp = e.Target.Health.Hp
---             local totalDamageDone = e.Result.Attack.TotalDamageDone
---             print("DealtDamage", getDisplayName(attackerUuid), "->", getDisplayName(defenderUuid), "|", initialHpPercentage, initialHp, "->", currentHp, totalDamageDone)
---             Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, totalDamageDone)
---         end
---     end
--- end)
 
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
@@ -691,7 +646,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
                 State.Session.IsAttackingOrBeingAttackedByPlayer[attackerUuid] = defenderUuid
             end
         end
-        Utils.updateLeaderboardDamage(attackerUuid, defenderUuid, damageAmount)
+        Leaderboard.updateDamage(attackerUuid, defenderUuid, damageAmount)
     end
     if attackerUuid ~= nil then
         handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
@@ -704,10 +659,9 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
     if casterUuid and targetUuid and spellName then
         debugPrint(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
         State.Session.StoryActionIDSpellName[storyActionID] = spellName
-        if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
-            -- NB: seems like PWK can't be counterspelled...?
-            Utils.updateLeaderboardDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
-        end
+        -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
+        --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
+        -- end
     end
 end
 
@@ -716,7 +670,11 @@ local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID
     -- NB: attackOwner for summons?
     local attackerUuid = Osi.GetUUID(attackerGuid)
     local defenderUuid = Osi.GetUUID(defenderGuid)
-    Utils.updateLeaderboardKills(attackerUuid)
+    Leaderboard.updateKills(attackerUuid)
+    local spellName = State.Session.StoryActionIDSpellName[storyActionID]
+    if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
+        Leaderboard.updateDamage(attackerUuid, defenderUuid, 100)
+    end
     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
     State.Session.ExtraAttacksRemaining[defenderUuid] = nil
 end
