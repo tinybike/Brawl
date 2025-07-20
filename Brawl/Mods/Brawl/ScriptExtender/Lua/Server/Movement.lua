@@ -134,7 +134,7 @@ local function moveToTargetUuid(uuid, targetUuid, override, callback)
 end
 
 local function moveToPosition(uuid, position, override, callback)
-    print("moveToPosition", uuid, override, position[1], position[2], position[3])
+    debugPrint("moveToPosition", uuid, override, position[1], position[2], position[3])
     if override then
         clearOsirisQueue(uuid)
     end
