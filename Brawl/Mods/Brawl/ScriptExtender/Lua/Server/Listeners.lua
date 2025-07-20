@@ -286,15 +286,8 @@ local function onTurnStarted(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         debugPrint("TurnStarted", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        if entityUuid then
-            if Osi.IsPartyMember(entityUuid, 1) == 1 then
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
-            elseif Utils.isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.CombatHelper ~= entityUuid then
-                -- if not Swarm.checkAllPlayersFinishedTurns() then -- if players not done yet, then just skip it
-                --     debugPrint("players not done, skip turn for", entityUuid, Utils.getDisplayName(entityUuid))
-                --     Swarm.setTurnComplete(entityUuid)
-                -- end
-            end
+        if entityUuid and Osi.IsPartyMember(entityUuid, 1) == 1 then
+            State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
         end
     end
 end
