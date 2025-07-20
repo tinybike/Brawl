@@ -196,6 +196,12 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     if targetUuid == nil then
         return false
     end
+    if variant ~= nil then
+        spellName = variant
+    end
+    if upcastLevel ~= nil then
+        spellName = spellName .. "_" .. tostring(upcastLevel)
+    end
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
     local distanceTo = math.floor(Osi.GetDistanceTo(casterUuid, targetUuid))
     if distanceTo > spellRange then
