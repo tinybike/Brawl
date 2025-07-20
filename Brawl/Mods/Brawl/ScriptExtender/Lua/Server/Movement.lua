@@ -82,49 +82,6 @@ local function getRemainingMovement(entity)
     end
 end
 
-local function getPathLengthTo(uuid, targetUuid)
-    local pathLength = Osi.GetDistanceTo(uuid, targetUuid)
-    local remainingMovement = Osi.GetActionResourceValuePersonal(uuid, "Movement", 0)
-    local x, y, z = Osi.GetPosition(targetUuid)
-    local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 3.0, uuid, 1)
-    if validX == nil or validY == nil or validZ == nil then
-        return false
-    end
-    local validPosition = {validX, validY, validZ}
-    local path = Ext.Level.BeginPathfindingImmediate(Ext.Entity.Get(uuid), validPosition)
-    path.CanUseLadders = true
-    local goalFound = Ext.Level.FindPath(path)
-    local bestNode, bestDashNode = nil, nil
-    if path and path.Nodes then
-        local numNodes = #path.Nodes
-        if numNodes > 0 then
-            pathLength = math.max(path.Nodes.Distance, pathLength)
-            if pathLength > remainingMovement then
-                for i = numNodes, 1, -1 do
-                    local distance = path.Nodes[i].Distance
-                    if distance < remainingMovement then
-                        print("got bestNode", remainingMovement, i)
-                        _D(path.Nodes[i])
-                        local position = path.Nodes[i].Position
-                        bestNode = {position[1], position[2], position[3]}
-                    elseif distance < 2*remainingMovement then
-                        print("got bestNodeDash", remainingMovement, i)
-                        _D(path.Nodes[i])
-                        local position = path.Nodes[i].Position
-                        bestNodeDash = {position[1], position[2], position[3]}
-                    end
-                    if bestNode and bestNodeDash then
-                        break
-                    end
-                end
-            end
-        end
-    end
-    Ext.Level.ReleasePath(path)
-    print("Got actual distance", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), goalFound, Osi.GetDistanceTo(uuid, targetUuid), pathLength)
-    return pathLength
-end
-
 local function findPathToTargetUuid(uuid, targetUuid)
     local x, y, z = Osi.GetPosition(targetUuid)
     local validX, validY, validZ = Osi.FindValidPosition(x, y, z, 3.0, uuid, 1)
@@ -518,7 +475,6 @@ return {
     setMovementToMax = setMovementToMax,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
-    getPathLengthTo = getPathLengthTo,
     findPathToTargetUuid = findPathToTargetUuid,
     findPathToPosition = findPathToPosition,
     moveCompanionsToPlayer = moveCompanionsToPlayer,

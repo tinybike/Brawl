@@ -395,7 +395,6 @@ end
 
 local function actOnHostileTarget(brawler, target, bonusActionOnly)
     local distanceToTarget = Osi.GetDistanceTo(brawler.uuid, target.uuid)
-    -- local distanceToTarget, bestNode, bestNodeDash = Movement.getPathLengthTo(brawler.uuid, target.uuid)
     if brawler and target then
         local actionToTake = nil
         local spellTypes = {"Control", "Damage"}
