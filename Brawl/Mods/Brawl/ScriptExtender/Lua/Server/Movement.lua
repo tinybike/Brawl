@@ -140,7 +140,7 @@ local function findPathToTargetUuid(uuid, targetUuid)
     local goalFound = Ext.Level.FindPath(path)
     -- _D(path)
     Ext.Level.ReleasePath(path)
-    print("Got valid path to target", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), validX, validY, validZ, goalFound)
+    debugPrint("Got valid path to target", Utils.getDisplayName(uuid), Utils.getDisplayName(targetUuid), validX, validY, validZ, goalFound)
     -- return true
     return goalFound
 end

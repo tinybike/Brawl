@@ -192,14 +192,14 @@ local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, v
 end
 
 local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
-    print(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
     if targetUuid == nil then
         return false
     end
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
     local distanceTo = math.floor(Osi.GetDistanceTo(casterUuid, targetUuid))
     if distanceTo > spellRange then
-        print("cast failed, out of range", distanceTo, spellRange)
+        debugPrint("cast failed, out of range", distanceTo, spellRange)
         return false
     end
     clearOsirisQueue(casterUuid)
