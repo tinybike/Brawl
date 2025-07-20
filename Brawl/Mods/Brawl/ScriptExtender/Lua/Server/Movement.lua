@@ -274,9 +274,9 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
     end
     local function tryMove(allowedDistance)
         -- print("tryMove", allowedDistance)
-        local tx, ty, tz   = Osi.GetPosition(targetUuid)
+        local tx, ty, tz = Osi.GetPosition(targetUuid)
         local distToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
-        local need         = distToTarget - spellRange
+        local need = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
             if callback then callback() end
@@ -302,24 +302,24 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
             end
             -- scan for best in‑range node and fallback
             local bestPos, bestDist = nil, -1
-            local farPos,  farDist  = nil, -1
+            local farPos, farDist = nil, -1
             local nextPos, nextDist = nil, nil
             for _, n in ipairs(path.Nodes) do
                 local d = n.Distance
                 -- furthest reachable without dash
                 if d <= allowedDistance and d > farDist then
-                    farPos, farDist = { n.Position[1], n.Position[2], n.Position[3] }, d
+                    farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
                 end
                 -- first node beyond base move (for interpolation)
                 if not nextPos and d > allowedDistance then
-                    nextPos, nextDist = { n.Position[1], n.Position[2], n.Position[3] }, d
+                    nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
                 end
                 -- is this node in spell range (using dash max)?
                 if d <= dashAllow then
                     local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
                     local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
                     if eu <= spellRange and d > bestDist then
-                        bestPos, bestDist = { px, py, pz }, d
+                        bestPos, bestDist = {px, py, pz}, d
                     end
                 end
             end

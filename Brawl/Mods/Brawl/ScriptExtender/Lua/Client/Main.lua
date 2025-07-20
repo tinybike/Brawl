@@ -44,7 +44,7 @@ local ControllerAttackMyTargetHotkeyOverride = false
 local ControllerAttackMoveHotkeyOverride = false
 local ControllerRequestHealHotkeyOverride = false
 local ControllerChangeTacticsHotkeyOverride = false
-local ControllerActionButtonHotkeysOverride = false
+local ControllerActionButtonHotkeysOverride = {false, false, false, false, false, false, false, false, false}
 local ControllerLeaderboardToggleHotkeyOverride = false
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
@@ -468,7 +468,7 @@ local function onControllerButtonPressed(button)
     for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
         if isControllerKeybindingPressed(controllerActionButtonHotkey) then
             postControllerActionButton(actionButtonLabel)
-            if ControllerLeaderboardToggleHotkeysOverride[actionButtonLabel] then
+            if ControllerActionButtonHotkeysOverride[actionButtonLabel] then
                 override = true
             end
         end
