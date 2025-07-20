@@ -20,7 +20,7 @@
                         },
                         {
                             "Id": "turn_based_swarm_mode",
-                            "Name": "Turn-Based Swarm Mode",
+                            "Name": "Swarm Mode",
                             "Type": "checkbox",
                             "Default": true,
                             "Description": "If checked, your party will take their turns together in turn-based mode, and then all enemies will act simultaneously as a single 'swarm', using Brawl's real-time combat engine.",
@@ -32,6 +32,13 @@
                     "SectionName": "Features (Host)",
                     "Settings": [
                         {
+                            "Id": "leaderboard_enabled",
+                            "Name": "Enable Leaderboard",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If enabled, you can display a pop-up window containing some statistics for the current fight (in Swarm Mode) or for the session (Real-Time). Press LCtrl+V (default keybinding) to show the window.",
+                            "Handles": {"DescriptionHandle": "h596542ebg6439g4409gbda9gec8bd00a3cec", "NameHandle": "h03c50509g3720g4948g815ag0c331e6220cc"}
+                        }, {
                             "Id": "hitpoints_multiplier",
                             "Name": "Hitpoints Multiplier",
                             "Type": "slider_float",
@@ -47,19 +54,6 @@
                             "Options": {"Min": 4, "Max": 50},
                             "Description": "The maximum number of characters allowed in your party.",
                             "Handles": {"DescriptionHandle": "hee8ad4cdgb401g4ff2gb947gf4269aaed29b", "NameHandle": "hca026ae7g2883g4754gad94gc5aa89feb0d2"}
-                        }
-                    ]
-                }, {
-                    "SectionId": "feature_swarm",
-                    "SectionName": "Swarm Mode Features (Host)",
-                    "Settings": [
-                        {
-                            "Id": "leaderboard_enabled",
-                            "Name": "Enable Leaderboard",
-                            "Type": "checkbox",
-                            "Default": true,
-                            "Description": "If enabled, will display a pop-up leaderboard after each combat, containing some stats for the fight",
-                            "Handles": {"DescriptionHandle": "h596542ebg6439g4409gbda9gec8bd00a3cec", "NameHandle": "h03c50509g3720g4948g815ag0c331e6220cc"}
                         }
                     ]
                 }, {

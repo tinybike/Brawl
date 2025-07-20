@@ -463,20 +463,22 @@ end
 -- end
 
 -- local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
---     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
---     local remainingMovement = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
---     if spellRange <= 2 and attackerCanMove then
+--     local range = getSpellRange(spellName)
+--     local rangeNumber = Utils.convertSpellRangeToNumber(range)
+--     -- clearOsirisQueue(attackerUuid)
+--     local attackerCanMove = Osi.CanMove(attackerUuid) == 1
+--     if rangeNumber <= 2 then
 --         debugPrint("************moving into position for melee attack", Utils.getDisplayName(attackerUuid), Utils.getDisplayName(targetUuid), spellName)
 --         return moveToTargetUuid(attackerUuid, targetUuid, not State.Settings.TurnBasedSwarmMode, callback)
 --     else
 --         local distanceToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
 --         local canSeeTarget = Osi.CanSee(attackerUuid, targetUuid) == 1
---         if spellRange ~= nil and distanceToTarget ~= nil and distanceToTarget > spellRange and attackerCanMove then
---             debugPrint("******moveIntoPositionForSpell distance > range, moving to...", attackerUuid, targetUuid, spellRange, callback)
---             return moveToDistanceFromTarget(attackerUuid, targetUuid, spellRange, callback)
+--         if rangeNumber ~= nil and distanceToTarget ~= nil and distanceToTarget > rangeNumber and attackerCanMove then
+--             debugPrint("******moveIntoPositionForSpell distance > range, moving to...", attackerUuid, targetUuid, rangeNumber, callback)
+--             return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber, callback)
 --         elseif not canSeeTarget and spellName and not string.match(spellName, "^Projectile_MagicMissile") and attackerCanMove then
---             debugPrint("moveIntoPositionForSpell can't see target, moving closer", attackerUuid, targetUuid, spellRange, callback)
---             return moveToDistanceFromTarget(attackerUuid, targetUuid, spellRange or 2, callback)
+--             debugPrint("moveIntoPositionForSpell can't see target, moving closer", attackerUuid, targetUuid, rangeNumber, callback)
+--             return moveToDistanceFromTarget(attackerUuid, targetUuid, rangeNumber or 2, callback)
 --         elseif callback ~= nil then
 --             callback()
 --             return true
