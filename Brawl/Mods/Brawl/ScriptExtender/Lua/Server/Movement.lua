@@ -219,6 +219,7 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
 end
 
 local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
+    print(Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
     local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
     local dashed = false

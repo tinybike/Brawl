@@ -38,11 +38,12 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
             table.insert(castOptions, "NoMovement")
         end
     end
+    local casterEntity = Ext.Entity.Get(casterUuid)
     local request = {
         CastOptions = castOptions,
         CastPosition = nil,
         Item = nil,
-        Caster = Ext.Entity.Get(casterUuid),
+        Caster = casterEntity,
         NetGuid = "",
         Originator = {
             ActionGuid = Constants.NULL_UUID,
@@ -71,7 +72,8 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
         field_A8 = 1,
     }
     local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
-    if insertAtFront then
+    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(casterEntity)
+    if insertAtFront or isPausedRequest then
         for i = #queuedRequests, 1, -1 do
             queuedRequests[i + 1] = queuedRequests[i]
         end
@@ -79,7 +81,11 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    debugPrint("Inserted new cast request", request.RequestGuid, #queuedRequests)
+    print(getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
+    -- if isPausedRequest then
+    --     Pause.midActionLock(casterEntity)
+    --     -- Pause.lock(casterEntity)
+    -- end
     return request.RequestGuid
 end
 

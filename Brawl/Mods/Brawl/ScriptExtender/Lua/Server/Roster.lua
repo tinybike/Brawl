@@ -194,8 +194,8 @@ end
 
 local function getBrawlerByUuid(uuid)
     local level = Osi.GetRegion(uuid)
-    if level and Session.Brawlers[level] then
-        return Session.Brawlers[level][uuid]
+    if level and State.Session.Brawlers[level] then
+        return State.Session.Brawlers[level][uuid]
     end
     return nil
 end
