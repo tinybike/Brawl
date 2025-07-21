@@ -296,7 +296,7 @@ local function onTurnEnded(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         debugPrint("TurnEnded", entityGuid)
         local entityUuid = Osi.GetUUID(entityGuid)
-        if entityUuid and State.getBrawlerByUuid(entityUuid) then
+        if entityUuid and Roster.getBrawlerByUuid(entityUuid) then
             if Osi.IsPartyMember(entityGuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
                 if Swarm.checkAllPlayersFinishedTurns() then
@@ -546,7 +546,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
                         return nil
                     end
                     if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
-                        local brawler = State.getBrawlerByUuid(attackerUuid)
+                        local brawler = Roster.getBrawlerByUuid(attackerUuid)
                         if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
                             local numBonusAttacks = useBonusAttacks(attackerUuid)
                             debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
@@ -604,7 +604,7 @@ local function onServerStatusApplyEvent(_, _, component)
 end
 
 local function onHitpointsChanged(guid, percentage)
-    -- print("hp changed", guid, percentage)
+    -- debugPrint("hp changed", guid, percentage)
 end
 
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
@@ -640,6 +640,7 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
     if casterUuid and targetUuid and spellName then
         debugPrint(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
         State.Session.StoryActionIDSpellName[storyActionID] = spellName
+        -- NB: what other instakill effects are there? Word of Bhaal, chasms...?
         -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
         --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
         -- end
@@ -678,7 +679,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     end
     if Resources.removeActionInProgress(casterUuid, spellName) then
         if State.Settings.TurnBasedSwarmMode then
-            local brawler = State.getBrawlerByUuid(casterUuid)
+            local brawler = Roster.getBrawlerByUuid(casterUuid)
             if brawler then
                 Swarm.swarmAction(brawler)
             end
@@ -749,7 +750,7 @@ local function onTeleportedToCamp(character)
     if State.Session.TurnBasedSwarmMode then
         if entityUuid then
             local level = Osi.GetRegion(entityUuid)
-            local brawler = State.getBrawlerByUuid(entityUuid)
+            local brawler = Roster.getBrawlerByUuid(entityUuid)
             if level and brawler then
                 Roster.removeBrawler(level, entityUuid)
                 Roster.checkForEndOfBrawl(level)
@@ -1056,10 +1057,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.CastSpellFailed = {
-        handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- State.Session.Listeners.CastSpellFailed = {
+    --     handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     State.Session.Listeners.DialogStarted = {
         handle = Ext.Osiris.RegisterListener("DialogStarted", 2, "before", onDialogStarted),
         stop = Ext.Osiris.UnregisterListener,

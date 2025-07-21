@@ -296,6 +296,10 @@ local function isPlayerTurnEnded(uuid)
     return true
 end
 
+local function getTrackingDistance()
+    return State.Settings.TurnBasedSwarmMode and Constants.TRACKING_DISTANCE_TBSM or Constants.TRACKING_DISTANCE_RT
+end
+
 local function canAct(uuid)
     if not uuid or isDowned(uuid) or not isAliveAndCanFight(uuid) then
         return false
@@ -417,6 +421,7 @@ return {
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
     isPlayerTurnEnded = isPlayerTurnEnded,
+    getTrackingDistance = getTrackingDistance,
     canAct = canAct,
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,

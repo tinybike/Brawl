@@ -839,56 +839,62 @@ local function checkForBrawlToJoin(brawler)
     end
 end
 
+local function act(brawler, bonusActionOnly)
+    if brawler and brawler.uuid then
+        -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
+        --     should this generally be handled by the healing logic, instead of special-casing it here?
+        if isPlayerOrAlly(brawler.uuid) and not bonusActionOnly then
+            local players = State.Session.Players
+            for playerUuid, player in pairs(players) do
+                if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < Constants.HELP_DOWNED_MAX_RANGE then
+                    player.isBeingHelped = true
+                    brawler.targetUuid = nil
+                    debugPrint(brawler.displayName, "Helping target", playerUuid, getDisplayName(playerUuid))
+                    return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
+                        useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
+                    end)
+                end
+            end
+        end
+        -- Doesn't currently have an attack target, so let's find one
+        if brawler.targetUuid == nil then
+            debugPrint(brawler.displayName, "Find target (no current target)", brawler.uuid, bonusActionOnly)
+            return findTarget(brawler, bonusActionOnly)
+        end
+        -- We have a target and the target is alive
+        local brawlersInLevel = State.Session.Brawlers[Osi.GetRegion(brawler.uuid)]
+        if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.uuid, brawler.targetUuid) then
+            if not State.Settings.TurnBasedSwarmMode or findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
+                if brawler.lockedOnTarget and isValidHostileTarget(brawler.uuid, brawler.targetUuid) then
+                    debugPrint(brawler.displayName, "Locked-on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
+                end
+                if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
+                    debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
+                    return findTarget(brawler, bonusActionOnly)
+                end
+                if isValidHostileTarget(brawler.uuid, brawler.targetUuid) and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= Utils.getTrackingDistance() then
+                    debugPrint(brawler.displayName, "Remaining on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
+                end
+            end
+        end
+        -- Has an attack target but it's already dead or unable to fight, so find a new one
+        debugPrint(brawler.displayName, "Find target (current target invalid)", brawler.uuid, bonusActionOnly)
+        brawler.targetUuid = nil
+        return findTarget(brawler, bonusActionOnly)
+    end
+end
+
 -- Brawlers doing dangerous stuff
 local function pulseAction(brawler, bonusActionOnly)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and canAct(brawler.uuid) then
         if not brawler.isPaused and (not isPlayerControllingDirectly(brawler.uuid) or State.Settings.FullAuto) then
-            -- NB: if we allow healing spells etc used by companions, roll this code in, instead of special-casing it here...
-            -- should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
-            if isPlayerOrAlly(brawler.uuid) and not bonusActionOnly then
-                local players = State.Session.Players
-                for playerUuid, player in pairs(players) do
-                    if not player.isBeingHelped and brawler.uuid ~= playerUuid and isDowned(playerUuid) and Osi.GetDistanceTo(playerUuid, brawler.uuid) < Constants.HELP_DOWNED_MAX_RANGE then
-                        player.isBeingHelped = true
-                        brawler.targetUuid = nil
-                        debugPrint(brawler.displayName, "Helping target", playerUuid, getDisplayName(playerUuid))
-                        return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
-                            useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
-                        end)
-                    end
-                end
-            elseif not State.Settings.TurnBasedSwarmMode then
+            if not State.Settings.TurnBasedSwarmMode then
                 Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
             end
-            -- Doesn't currently have an attack target, so let's find one
-            if brawler.targetUuid == nil then
-                debugPrint(brawler.displayName, "Find target (no current target)", brawler.uuid, bonusActionOnly)
-                return findTarget(brawler, bonusActionOnly)
-            end
-            -- We have a target and the target is alive
-            local brawlersInLevel = State.Session.Brawlers[Osi.GetRegion(brawler.uuid)]
-            if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and isAliveAndCanFight(brawler.targetUuid) and isVisible(brawler.uuid, brawler.targetUuid) then
-                if not State.Settings.TurnBasedSwarmMode or findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
-                    if brawler.lockedOnTarget and isValidHostileTarget(brawler.uuid, brawler.targetUuid) then
-                        debugPrint(brawler.displayName, "Locked-on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
-                        return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
-                    end
-                    if isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
-                        debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
-                        return findTarget(brawler, bonusActionOnly)
-                    end
-                    local trackingDistance = State.Settings.TurnBasedSwarmMode and 20 or 12
-                    if isValidHostileTarget(brawler.uuid, brawler.targetUuid) and Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= trackingDistance then
-                        debugPrint(brawler.displayName, "Remaining on target, attacking", getDisplayName(brawler.targetUuid), bonusActionOnly)
-                        return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
-                    end
-                end
-            end
-            -- Has an attack target but it's already dead or unable to fight, so find a new one
-            debugPrint(brawler.displayName, "Find target (current target invalid)", brawler.uuid, bonusActionOnly)
-            brawler.targetUuid = nil
-            return findTarget(brawler, bonusActionOnly)
+            return act(brawler, bonusActionOnly)
         end
         -- If this brawler is dead or unable to fight, stop this pulse
         return stopPulseAction(brawler)
@@ -959,6 +965,7 @@ return {
     actOnFriendlyTarget = actOnFriendlyTarget,
     useSpellOnTarget = useSpellOnTarget,
     findTarget = findTarget,
+    act = act,
     pulseAction = pulseAction,
     pulseReposition = pulseReposition,
     pulseAddNearby = pulseAddNearby,

@@ -1,5 +1,6 @@
 local ModToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
 local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "LShift"}
+local QueueCompanionAIActionsHotkey = {ScanCode = "C", Modifier = "LCtrl"}
 local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
 local PauseToggleHotkey = {ScanCode = "SPACE", Modifier = "LShift"}
 local TargetCloserEnemyHotkey = {ScanCode = "COMMA", Modifier = "NONE"}
@@ -9,6 +10,7 @@ local AttackMyTargetHotkey = {ScanCode = "NUM_2", Modifier = "LAlt"}
 local AttackMoveHotkey = {ScanCode = "A", Modifier = "LAlt"}
 local RequestHealHotkey = {ScanCode = "E", Modifier = "LAlt"}
 local ChangeTacticsHotkey = {ScanCode = "C", Modifier = "LAlt"}
+local LeaderboardToggleHotkey = {ScanCode = "V", Modifier = "LCtrl"}
 local ActionButtonHotkeys = {
     {ScanCode = "NUM_1", Modifier = "LShift"},
     {ScanCode = "NUM_2", Modifier = "LShift"},
@@ -20,9 +22,9 @@ local ActionButtonHotkeys = {
     {ScanCode = "NUM_8", Modifier = "LShift"},
     {ScanCode = "NUM_9", Modifier = "LShift"},
 }
-local LeaderboardToggleHotkey = {ScanCode = "V", Modifier = "LCtrl"}
 local ControllerModToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
+local ControllerQueueCompanionAIActionsHotkey = {"", ""}
 local ControllerFullAutoToggleHotkey = {"", ""}
 local ControllerPauseToggleHotkey = {"RightStick", ""}
 local ControllerTargetCloserEnemyHotkey = {"DPadLeft", ""}
@@ -32,8 +34,8 @@ local ControllerAttackMyTargetHotkey = {"", ""}
 local ControllerAttackMoveHotkey = {"", ""}
 local ControllerRequestHealHotkey = {"", ""}
 local ControllerChangeTacticsHotkey = {"", ""}
-local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 local ControllerLeaderboardToggleHotkey = {"", ""}
+local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
 local ControllerCompanionAIToggleHotkeyOverride = false
 local ControllerFullAutoToggleHotkeyOverride = false
 local ControllerPauseToggleHotkeyOverride = false
@@ -49,6 +51,7 @@ local ControllerLeaderboardToggleHotkeyOverride = false
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
+    -- QueueCompanionAIActionsHotkey = MCM.Get("queue_companion_ai_actions_hotkey")
     FullAutoToggleHotkey = MCM.Get("full_auto_toggle_hotkey")
     PauseToggleHotkey = MCM.Get("pause_toggle_hotkey")
     TargetCloserEnemyHotkey = MCM.Get("target_closer_enemy_hotkey")
@@ -58,6 +61,7 @@ if MCM then
     AttackMoveHotkey = MCM.Get("attack_move_hotkey")
     RequestHealHotkey = MCM.Get("request_heal_hotkey")
     ChangeTacticsHotkey = MCM.Get("change_tactics_hotkey")
+    LeaderboardToggleHotkey = MCM.Get("leaderboard_toggle_hotkey")
     ActionButtonHotkeys = {
         MCM.Get("action_1_hotkey"),
         MCM.Get("action_2_hotkey"),
@@ -71,6 +75,7 @@ if MCM then
     }
     ControllerModToggleHotkey = {MCM.Get("controller_mod_toggle_hotkey"), MCM.Get("controller_mod_toggle_hotkey_2")}
     ControllerCompanionAIToggleHotkey = {MCM.Get("controller_companion_ai_toggle_hotkey"), MCM.Get("controller_companion_ai_toggle_hotkey_2")}
+    -- ControllerQueueCompanionAIActionsHotkey = {MCM.Get("controller_queue_companion_ai_actions_hotkey"), MCM.Get("controller_queue_companion_ai_actions_hotkey_2")}
     ControllerFullAutoToggleHotkey = {MCM.Get("controller_full_auto_toggle_hotkey"), MCM.Get("controller_full_auto_toggle_hotkey_2")}
     ControllerPauseToggleHotkey = {MCM.Get("controller_pause_toggle_hotkey"), MCM.Get("controller_pause_toggle_hotkey_2")}
     ControllerTargetCloserEnemyHotkey = {MCM.Get("controller_target_closer_enemy_hotkey"), MCM.Get("controller_target_closer_enemy_hotkey_2")}
@@ -80,6 +85,7 @@ if MCM then
     ControllerAttackMoveHotkey = {MCM.Get("controller_attack_move_hotkey"), MCM.Get("controller_attack_move_hotkey_2")}
     ControllerRequestHealHotkey = {MCM.Get("controller_request_heal_hotkey"), MCM.Get("controller_request_heal_hotkey_2")}
     ControllerChangeTacticsHotkey = {MCM.Get("controller_change_tactics_hotkey"), MCM.Get("controller_change_tactics_hotkey_2")}
+    ControllerLeaderboardToggleHotkey = {MCM.Get("controller_leaderboard_toggle_hotkey"), MCM.Get("controller_leaderboard_toggle_hotkey_2")}
     ControllerActionButtonHotkeys = {
         {MCM.Get("controller_action_1_hotkey"), MCM.Get("controller_action_1_hotkey_2")},
         {MCM.Get("controller_action_2_hotkey"), MCM.Get("controller_action_2_hotkey_2")},
@@ -91,9 +97,9 @@ if MCM then
         {MCM.Get("controller_action_8_hotkey"), MCM.Get("controller_action_8_hotkey_2")},
         {MCM.Get("controller_action_9_hotkey"), MCM.Get("controller_action_9_hotkey_2")},
     }
-    ControllerLeaderboardToggleHotkey = {MCM.Get("controller_leaderboard_toggle_hotkey"), MCM.Get("controller_leaderboard_toggle_hotkey_2")}
     ControllerModToggleHotkeyOverride = MCM.Get("controller_mod_toggle_hotkey_override")
     ControllerCompanionAIToggleHotkeyOverride = MCM.Get("controller_companion_ai_toggle_hotkey_override")
+    -- ControllerQueueCompanionAIActionsHotkeyOverride = MCM.Get("controller_queue_companion_ai_actions_hotkey_override")
     ControllerFullAutoToggleHotkeyOverride = MCM.Get("controller_full_auto_toggle_hotkey_override")
     ControllerPauseToggleHotkeyOverride = MCM.Get("controller_pause_toggle_hotkey_override")
     ControllerTargetCloserEnemyHotkeyOverride = MCM.Get("controller_target_closer_enemy_hotkey_override")
@@ -103,6 +109,7 @@ if MCM then
     ControllerAttackMoveHotkeyOverride = MCM.Get("controller_attack_move_hotkey_override")
     ControllerRequestHealHotkeyOverride = MCM.Get("controller_request_heal_hotkey_override")
     ControllerChangeTacticsHotkeyOverride = MCM.Get("controller_change_tactics_hotkey_override")
+    ControllerLeaderboardToggleHotkeyOverride = MCM.Get("controller_leaderboard_toggle_hotkey_override")
     ControllerActionButtonHotkeysOverride = {
         MCM.Get("controller_action_1_hotkey_override"),
         MCM.Get("controller_action_2_hotkey_override"),
@@ -114,7 +121,6 @@ if MCM then
         MCM.Get("controller_action_8_hotkey_override"),
         MCM.Get("controller_action_9_hotkey_override"),
     }
-    ControllerLeaderboardToggleHotkeyOverride = MCM.Get("controller_leaderboard_toggle_hotkey_override")
 end
 local DirectlyControlledCharacter = nil
 local AwaitingTarget = false
@@ -271,6 +277,10 @@ local function postCompanionAIToggle()
     Ext.ClientNet.PostMessageToServer("CompanionAIToggle", "")
 end
 
+local function postQueueCompanionAIActions()
+    Ext.ClientNet.PostMessageToServer("QueueCompanionAIActions", "")
+end
+
 local function postFullAutoToggle()
     Ext.ClientNet.PostMessageToServer("FullAutoToggle", "")
 end
@@ -333,6 +343,10 @@ local function onKeyInput(e)
         end
         if isKeybindingPressed(e, CompanionAIToggleHotkey) then
             postCompanionAIToggle()
+            keybindingPressed = true
+        end
+        if isKeybindingPressed(e, QueueCompanionAIActionsHotkey) then
+            postQueueCompanionAIActions()
             keybindingPressed = true
         end
         if isKeybindingPressed(e, FullAutoToggleHotkey) then
@@ -402,6 +416,12 @@ local function onControllerButtonPressed(button)
     if isControllerKeybindingPressed(ControllerCompanionAIToggleHotkey) then
         postCompanionAIToggle()
         if ControllerCompanionAIToggleHotkeyOverride then
+            override = true
+        end
+    end
+    if isControllerKeybindingPressed(ControllerQueueCompanionAIActionsHotkey) then
+        postQueueCompanionAIActions()
+        if ControllerQueueCompanionAIActionsHotkeyOverride then
             override = true
         end
     end

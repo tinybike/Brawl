@@ -252,7 +252,7 @@ end
 local function targetCloserOrFartherEnemy(data, targetFartherEnemy)
     local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player then
-        local brawler = State.getBrawlerByUuid(player.uuid)
+        local brawler = Roster.getBrawlerByUuid(player.uuid)
         if brawler and not brawler.isPaused then
             buildClosestEnemyBrawlers(player.uuid)
             if State.Session.ClosestEnemyBrawlers[player.uuid] ~= nil and next(State.Session.ClosestEnemyBrawlers[player.uuid]) ~= nil then
@@ -327,7 +327,7 @@ local function onActionButton(data, isController)
     if player then
         -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
         if isController then
-            local brawler = State.getBrawlerByUuid(player.uuid)
+            local brawler = Roster.getBrawlerByUuid(player.uuid)
             if not brawler or brawler.isPaused then
                 return
             end
@@ -468,6 +468,10 @@ local function onCompanionAIToggle(data)
     toggleCompanionAI()
 end
 
+local function onQueueCompanionAIActions(data)
+    Pause.queueCompanionAIActions()
+end
+
 local function onFullAutoToggle(data)
     if MCM then
         MCM.Set("full_auto", not State.Settings.FullAuto)
@@ -476,7 +480,6 @@ local function onFullAutoToggle(data)
 end
 
 local function onLeaderboardToggle(data)
-    Leaderboard.dumpToConsole()
     Leaderboard.showForUser(data.UserID)
 end
 
@@ -537,7 +540,7 @@ local function onMCMActiveCharacterArchetype(archetype)
         local partyArchetypes = modVars.PartyArchetypes
         partyArchetypes[uuid] = archetype
         modVars.PartyArchetypes = partyArchetypes
-        local brawler = State.getBrawlerByUuid(uuid)
+        local brawler = Roster.getBrawlerByUuid(uuid)
         if brawler ~= nil then
             brawler.archetype = archetype
         end
@@ -580,6 +583,7 @@ return {
     NetMessage = {
         ModToggle = onModToggle,
         CompanionAIToggle = onCompanionAIToggle,
+        QueueCompanionAIActions = onQueueCompanionAIActions,
         FullAutoToggle = onFullAutoToggle,
         LeaderboardToggle = onLeaderboardToggle,
         ExitFTB = function (_) Pause.allExitFTB() end,

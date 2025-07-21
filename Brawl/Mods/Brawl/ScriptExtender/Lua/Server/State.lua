@@ -546,14 +546,6 @@ local function getPlayerByUserId(userId)
     return nil
 end
 
-local function getBrawlerByUuid(uuid)
-    local level = Osi.GetRegion(uuid)
-    if level and Session.Brawlers[level] then
-        return Session.Brawlers[level][uuid]
-    end
-    return nil
-end
-
 local function isPartyInRealTime()
     if Session.Players then
         for uuid, _ in pairs(Session.Players) do
@@ -891,7 +883,6 @@ return {
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
-    getBrawlerByUuid = getBrawlerByUuid,
     isPartyInRealTime = isPartyInRealTime,
     getSpellByName = getSpellByName,
     hasDirectHeal = hasDirectHeal,

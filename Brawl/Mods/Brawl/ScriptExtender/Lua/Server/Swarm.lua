@@ -115,31 +115,37 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
-local function swarmAction(brawler)
-    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+local function useRemainingActions(brawler)
+    if brawler and brawler.uuid then
         local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
         local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
-        debugPrint(brawler.displayName, "swarmAction", brawler.uuid, numActions, numBonusActions)
+        print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
         if numActions == 0 and numBonusActions == 0 then
             return completeSwarmTurn(brawler.uuid)
         end
         if numActions > 0 then
             local actionResult = AI.pulseAction(brawler)
-            debugPrint(brawler.displayName, "action result", actionResult)
+            print(brawler.displayName, "action result", actionResult)
             if not actionResult and numBonusActions > 0 then
                 local bonusActionResult = AI.pulseAction(brawler, true)
-                debugPrint(brawler.displayName, "bonus action result (1)", bonusActionResult)
+                print(brawler.displayName, "bonus action result (1)", bonusActionResult)
                 if not bonusActionResult then
                     completeSwarmTurn(brawler.uuid)
                 end
             end
         elseif numBonusActions > 0 then
             local bonusActionResult = AI.pulseAction(brawler, true)
-            debugPrint(brawler.displayName, "bonus action result (2)", bonusActionResult)
+            print(brawler.displayName, "bonus action result (2)", bonusActionResult)
             if not bonusActionResult then
                 completeSwarmTurn(brawler.uuid)
             end
         end
+    end
+end
+
+local function swarmAction(brawler)
+    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+        useRemainingActions(brawler)
     end
 end
 
@@ -270,5 +276,6 @@ return {
     startSwarmTurn = startSwarmTurn,
     checkAllPlayersFinishedTurns = checkAllPlayersFinishedTurns,
     startEnemyTurn = startEnemyTurn,
+    useRemainingActions = useRemainingActions,
     swarmAction = swarmAction,
 }

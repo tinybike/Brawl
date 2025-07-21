@@ -192,6 +192,31 @@ local function endBrawl(level)
     stopBrawlFizzler(level)
 end
 
+local function getBrawlerByUuid(uuid)
+    local level = Osi.GetRegion(uuid)
+    if level and Session.Brawlers[level] then
+        return Session.Brawlers[level][uuid]
+    end
+    return nil
+end
+
+local function getBrawlerByName(name)
+    local hostCharacter = Osi.GetHostCharacter()
+    if hostCharacter then
+        local level = Osi.GetRegion(hostCharacter)
+        if level and State.Session.Brawlers then
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for uuid, brawler in pairs(brawlersInLevel) do
+                    if brawler.displayName == name then
+                        return brawler
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
     local nearby = Utils.getNearby(entityUuid, nearbyRadius)
     for _, uuid in ipairs(nearby) do
@@ -258,6 +283,8 @@ local function initBrawlers(level)
 end
 
 return {
+    getBrawlerByUuid = getBrawlerByUuid,
+    getBrawlerByName = getBrawlerByName,
     rollForInitiative = rollForInitiative,
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
