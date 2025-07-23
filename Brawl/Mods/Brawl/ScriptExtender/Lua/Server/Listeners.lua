@@ -536,10 +536,9 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
     end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         if not State.Settings.TurnBasedSwarmMode or Utils.isPugnacious(attackerUuid) then
-            local spellName = State.Session.StoryActionIDSpellName[storyActionID]
-            if spellName ~= nil then
+            if State.Session.StoryActionIDs[storyActionID] and State.Session.StoryActionIDs[storyActionID].spellName then
                 debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-                State.Session.StoryActionIDSpellName[storyActionID] = nil
+                State.Session.StoryActionIDs[storyActionID] = nil
                 local spell = State.getSpellByName(spellName)
                 if spell ~= nil and spell.triggersExtraAttack == true then
                     if State.Settings.TurnBasedSwarmMode and Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
@@ -634,12 +633,33 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
     end
 end
 
+local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID)
+    debugPrint("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
+    -- NB: attackOwner for summons?
+    local attackerUuid = Osi.GetUUID(attackerGuid)
+    local defenderUuid = Osi.GetUUID(defenderGuid)
+    Leaderboard.updateKills(attackerUuid)
+    if State.Session.StoryActionIDs[storyActionID] then
+        local spellName = State.Session.StoryActionIDs[storyActionID].spellName
+        if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
+            Leaderboard.updateDamage(attackerUuid, defenderUuid, 100)
+        end
+    end
+    State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+    State.Session.ExtraAttacksRemaining[defenderUuid] = nil
+end
+
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if casterUuid and targetUuid and spellName then
-        debugPrint(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
-        State.Session.StoryActionIDSpellName[storyActionID] = spellName
+        print(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
+        if not State.Session.StoryActionIDs[storyActionID] then
+            State.Session.StoryActionIDs[storyActionID] = {}
+        end
+        State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
+        State.Session.StoryActionIDs[storyActionID].spellName = spellName
+        State.Session.StoryActionIDs[storyActionID].targetUuid = targetUuid
         -- NB: what other instakill effects are there? Word of Bhaal, chasms...?
         -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
         --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
@@ -647,37 +667,47 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
     end
 end
 
-local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID)
-    debugPrint("KilledBy", defenderGuid, attackOwner, attackerGuid, storyActionID)
-    -- NB: attackOwner for summons?
-    local attackerUuid = Osi.GetUUID(attackerGuid)
-    local defenderUuid = Osi.GetUUID(defenderGuid)
-    Leaderboard.updateKills(attackerUuid)
-    local spellName = State.Session.StoryActionIDSpellName[storyActionID]
-    if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
-        Leaderboard.updateDamage(attackerUuid, defenderUuid, 100)
+local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = Osi.GetUUID(casterGuid)
+    local targetUuid = Osi.GetUUID(targetGuid)
+    if casterUuid and targetUuid and spellName then
+        print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        if not State.Session.StoryActionIDs[storyActionID] then
+            State.Session.StoryActionIDs[storyActionID] = {}
+        end
+        State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
+        State.Session.StoryActionIDs[storyActionID].spellName = spellName
+        State.Session.StoryActionIDs[storyActionID].targetUuid = targetUuid
+        -- NB: what other instakill effects are there? Word of Bhaal, chasms...?
+        -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
+        --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
+        -- end
     end
-    State.Session.ExtraAttacksRemaining[attackerUuid] = nil
-    State.Session.ExtraAttacksRemaining[defenderUuid] = nil
-end
-
-local function onUsingSpellOnZoneWithTarget(caster, target, spell, spellType, spellElement, storyActionID)
-    debugPrint("UsingSpellOnZoneWithTarget", caster, target, spell, spellType, spellElement, storyActionID)
 end
 
 local function onUsingSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    debugPrint(getDisplayName(Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    print(getDisplayName(Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = Osi.GetUUID(casterGuid)
+    if casterUuid and spellName then
+        print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        if not State.Session.StoryActionIDs[storyActionID] then
+            State.Session.StoryActionIDs[storyActionID] = {}
+        end
+        State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
+        State.Session.StoryActionIDs[storyActionID].spellName = spellName
+    end
 end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    debugPrint(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
     if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
         debugPrint("resuming swarm turn timer (CastedSpell)")
         Ext.Timer.Resume(State.Session.SwarmTurnTimer)
     end
     if Resources.removeActionInProgress(casterUuid, spellName) then
+        print("Removed action in progress for", Utils.getDisplayName(casterUuid), spellName)
         if State.Settings.TurnBasedSwarmMode then
             local brawler = Roster.getBrawlerByUuid(casterUuid)
             if brawler then
@@ -686,11 +716,25 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         end
         -- Resources.deductCastedSpell(casterUuid, spellName)
     end
+    if Utils.isCounterspell(spellName) then
+        local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
+        print("got counterspelled", spellName, originalCastInfo.spellName, Utils.getDisplayName(originalCastInfo.targetUuid), Utils.getDisplayName(originalCastInfo.casterUuid))
+        if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
+            print("removed counterspelled spell from acitons in progress")
+            State.Session.StoryActionIDs[storyActionID] = {}
+            if State.Settings.TurnBasedSwarmMode then
+                local brawler = Roster.getBrawlerByUuid(casterUuid)
+                if brawler then
+                    Swarm.swarmAction(brawler)
+                end
+            end
+        end
+    end
 end
 
 local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    debugPrint(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+    print(getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onDialogStarted(dialog, dialogInstanceId)

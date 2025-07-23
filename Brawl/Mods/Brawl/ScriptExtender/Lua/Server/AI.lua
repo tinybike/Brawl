@@ -229,7 +229,7 @@ local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spe
 end
 
 -- NB need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE)
+local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
     -- This should never happen but...
     if spellName == nil or spell == nil then
         return false
@@ -249,6 +249,9 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     end
     -- If it's a healing spell, make sure it's a direct heal
     if spell.type == "Healing" and not spell.isDirectHeal then
+        return false
+    end
+    if bonusActionOnly and not spell.isBonusAction then
         return false
     end
     if spell.isSelfOnly and distanceToTarget ~= 0.0 then
@@ -324,7 +327,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE)
+local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
     for _, preparedSpell in pairs(preparedSpells) do
@@ -337,7 +340,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, dist
                     break
                 end
             end
-            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE) then
+            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
                 debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks, targetUuid)
             end
@@ -375,9 +378,9 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTar
     return weightedSpells
 end
 
-local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE)
-    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE)
-    debugPrint(brawler.displayName, "companion weighted spells", brawler.uuid, brawler.archetype, distanceToTarget)
+local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE, bonusActionOnly)
+    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
+    debugPrint(brawler.displayName, "companion weighted spells", brawler.uuid, brawler.archetype, distanceToTarget, bonusActionOnly)
     -- debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
@@ -410,18 +413,10 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             local playerClosestToTarget = Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
             local targetDistanceToParty = Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
             -- debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
-            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE)
+            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE, bonusActionOnly)
             debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-            -- if State.Settings.TurnBasedSwarmMode and not bonusActionOnly and Osi.HasActiveStatus(brawler.uuid, "DASH") == 0 then
-            --     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(actionToTake))
-            --     local remainingMovement = Osi.GetActionResourceValuePersonal(brawler.uuid, "Movement", 0)
-            --     if remainingMovement < (distanceToTarget - spellRange) then
-            --         debugPrint("DASHING...", remainingMovement, distanceToTarget, spellRange)
-            --         useSpellOnTarget(brawler.uuid, brawler.uuid, "Shout_Dash_NPC")
-            --     end
-            -- end
             debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
         if not actionToTake then
@@ -474,7 +469,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         end
         local actionToTake = nil
         if Osi.IsPlayer(brawler.uuid) == 1 then
-            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, 0, true)
+            actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, 0, true, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
         end

@@ -134,7 +134,7 @@ local function moveToTargetUuid(uuid, targetUuid, override, callback)
 end
 
 local function moveToPosition(uuid, position, override, callback)
-    debugPrint("moveToPosition", uuid, override, position[1], position[2], position[3])
+    print("moveToPosition", uuid, override, position[1], position[2], position[3])
     if override then
         clearOsirisQueue(uuid)
     end
@@ -226,6 +226,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
     local override = not State.Settings.TurnBasedSwarmMode
     local dashAvailable = State.Settings.TurnBasedSwarmMode
     -- if unit can’t move or has zero movement, just callback and exit
+    -- NB: check for movement skills like burrow, misty step, jump, charge, force tunnel, etc?
     if baseMove <= 0 or not Utils.canMove(attackerUuid) then
         if callback then callback() end
         return true
@@ -254,7 +255,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
         -- queue pathfinding
         local goalPos = {gx, gy, gz}
         local dashAllow = baseMove*2
-        local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(attackerUuid), goalPos, function(path)
+        local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(attackerUuid), goalPos, function (path)
             if not path or not path.GoalFound or #path.Nodes == 0 then
                 return
             end

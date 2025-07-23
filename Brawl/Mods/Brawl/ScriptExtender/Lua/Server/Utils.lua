@@ -239,8 +239,17 @@ local function getPointInFrontOf(entityUuid, distance)
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance
 end
 
+local function isCounterspell(spellName)
+    for _, counterspell in ipairs(Constants.COUNTERSPELLS) do
+        if spellName == counterspell then
+            return true
+        end
+    end
+    return false
+end
+
 local function clearOsirisQueue(uuid)
-    -- debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
+    print("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end
@@ -427,6 +436,7 @@ return {
     hasLoseControlStatus = hasLoseControlStatus,
     getCurrentCombatRound = getCurrentCombatRound,
     createUuid = createUuid,
+    isCounterspell = isCounterspell,
     getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,

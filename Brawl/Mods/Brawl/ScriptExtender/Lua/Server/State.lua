@@ -63,7 +63,7 @@ local Session = {
     PartyMembersHitpointsListeners = {},
     ActionResourcesListeners = {},
     TurnBasedListeners = {},
-    SpellCastMovementListeners = {},
+    SpellCastPrepareEndEvent = {},
     FTBLockedIn = {},
     LastClickPosition = {},
     ActiveCombatGroups = {},
@@ -73,7 +73,7 @@ local Session = {
     HealRequestedTimer = {},
     CountdownTimer = {},
     ExtraAttacksRemaining = {},
-    StoryActionIDSpellName = {},
+    StoryActionIDs = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
@@ -88,6 +88,7 @@ local Session = {
     SwarmTurnTimerCombatRound = nil,
     SwarmTurnActive = nil,
     Leaderboard = {},
+    QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 

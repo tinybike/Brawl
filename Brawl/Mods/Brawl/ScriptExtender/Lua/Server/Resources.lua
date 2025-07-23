@@ -208,7 +208,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
         debugPrint("cast failed, out of range", distanceTo, spellRange)
         return false
     end
-    clearOsirisQueue(casterUuid)
+    -- clearOsirisQueue(casterUuid)
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)

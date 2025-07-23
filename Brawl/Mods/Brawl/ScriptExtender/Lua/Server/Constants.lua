@@ -355,5 +355,15 @@ Constants.LEADERBOARD_EXCLUDED_HEALS = {
     "ShortResting",
     "TimelessBody",
 }
+Constants.COUNTERSPELLS = {
+    "Target_Counterspell",
+    "Target_MAG_CounterSpell",
+    "Target_Counterspell_Success",
+    "Target_CounterSpell_Mindflayer",
+    "Target_Counterspell_4",
+    "Target_Counterspell_5",
+    "Target_Counterspell_6",
+    "Target_MOD_Dread_Counterspell",
+}
 
 return Constants
