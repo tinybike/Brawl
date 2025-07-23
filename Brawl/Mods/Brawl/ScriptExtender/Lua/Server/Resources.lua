@@ -203,8 +203,8 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
         spellName = spellName .. "_" .. tostring(upcastLevel)
     end
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
-    local distanceTo = math.floor(Osi.GetDistanceTo(casterUuid, targetUuid))
-    if distanceTo > spellRange then
+    local distanceTo = Osi.GetDistanceTo(casterUuid, targetUuid)
+    if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", distanceTo, spellRange)
         return false
     end

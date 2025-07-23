@@ -187,14 +187,22 @@ local function singleCharacterTurn(brawler, brawlerIndex)
     return true
 end
 
--- NB: stay in combat, adjust movement speed as needed
---     when there's only 3 or 4 enemies auto-disables
 local function startEnemyTurn(canActBeforeDelay)
     debugPrint("startEnemyTurn")
     local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
+            -- select half the enemies for the first 10 sec, then the others for the second 10 sec
+            -- local numEnemies = State.getNumEnemiesRemaining(level)
+            -- local chunkBrawlers = {}
+            -- local enemyIndex = 1
+            -- for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            --     if Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
+            --         chunkBrawlers[brawlerUuid] = brawler
+            --         enemyIndex = enemyIndex + 1
+            --     end
+            -- end
             local brawlerIndex = 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
                 if State.Session.SwarmTurnActive and canActBeforeDelay[brawlerUuid] ~= false and singleCharacterTurn(brawler, brawlerIndex) then
