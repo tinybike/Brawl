@@ -846,6 +846,9 @@ end
 
 local function onStatusApplied(object, status, causee, storyActionID)
     -- print("StatusApplied", object, status, causee, storyActionID)
+    if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
+        Osi.RemoveStatus(Osi.GetUUID(object), "ATT_FEEBLEMIND", "")
+    end
 end
 
 local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
@@ -1120,10 +1123,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.StatusApplied = {
-    --     handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    State.Session.Listeners.StatusApplied = {
+        handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     -- State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
     --     handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
     --     stop = Ext.Osiris.UnregisterListener,
