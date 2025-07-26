@@ -8,7 +8,7 @@ local function setTurnComplete(uuid)
     if State.Session.SwarmTurnActive then
         local entity = Ext.Entity.Get(uuid)
         if entity.TurnBased then
-            -- debugPrint(getDisplayName(uuid), "Setting turn complete", uuid)
+            print(getDisplayName(uuid), "Setting turn complete", uuid)
             entity.TurnBased.HadTurnInCombat = true
             entity.TurnBased.RequestedEndTurn = true
             entity.TurnBased.TurnActionsCompleted = true
@@ -21,7 +21,7 @@ end
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity.TurnBased then
-        -- debugPrint(getDisplayName(uuid), "Unsetting turn complete", uuid)
+        print(getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
@@ -121,6 +121,9 @@ local function useRemainingActions(brawler, callback)
         local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
         print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
         if numActions == 0 and numBonusActions == 0 then
+            if State.Session.QueuedCompanionAIAction[brawler.uuid] then
+                State.Session.QueuedCompanionAIAction[brawler.uuid] = false
+            end
             if callback then callback(brawler.uuid) end
         else
             if numActions > 0 then
@@ -157,6 +160,7 @@ local function singleCharacterTurn(brawler, brawlerIndex)
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
     local hostCharacterUuid = Osi.GetHostCharacter()
     if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
+        print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
     if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
