@@ -139,6 +139,7 @@ end
 local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
     if State.Settings.TurnBasedSwarmMode then
+        State.Session.StoryActionIDs = {}
         State.Session.SwarmTurnComplete = {}
         if State.Session.SwarmTurnTimer ~= nil then
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
@@ -707,6 +708,17 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         debugPrint("resuming swarm turn timer (CastedSpell)")
         Ext.Timer.Resume(State.Session.SwarmTurnTimer)
     end
+    if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
+        if State.Session.Players then
+            local areaRadius = Ext.Stats.Get(spellName).AreaRadius
+            for uuid, _ in pairs(State.Session.Players) do
+                if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
+                    print("removing negative statuses from", getDisplayName(uuid), uuid)
+                    Utils.removeNegativeStatuses(uuid)
+                end
+            end
+        end
+    end
     if Resources.removeActionInProgress(casterUuid, spellName) then
         print("Removed action in progress for", Utils.getDisplayName(casterUuid), spellName)
         if State.Settings.TurnBasedSwarmMode then
@@ -721,14 +733,14 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
         print("got counterspelled", spellName, originalCastInfo.spellName, Utils.getDisplayName(originalCastInfo.targetUuid), Utils.getDisplayName(originalCastInfo.casterUuid))
         if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
-            print("removed counterspelled spell from acitons in progress")
             State.Session.StoryActionIDs[storyActionID] = {}
-            if State.Settings.TurnBasedSwarmMode then
-                local brawler = Roster.getBrawlerByUuid(casterUuid)
-                if brawler then
-                    Swarm.swarmAction(brawler)
-                end
-            end
+            print("removed counterspelled spell from actions in progress and storyactionIDs")
+            -- if State.Settings.TurnBasedSwarmMode then
+            --     local brawler = Roster.getBrawlerByUuid(casterUuid)
+            --     if brawler then
+            --         Swarm.swarmAction(brawler)
+            --     end
+            -- end
         end
     end
 end
@@ -894,7 +906,7 @@ local function onStatusApplied(object, status, causee, storyActionID)
     -- print("StatusApplied", object, status, causee, storyActionID)
     -- Shout_DivineIntervention_Healing Shout_DivineIntervention_Healing_Improvement
     if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
-        Osi.RemoveStatus(Osi.GetUUID(object), "ATT_FEEBLEMIND", "")
+        Utils.removeNegativeStatuses(Osi.GetUUID(object))
     end
 end
 
@@ -970,13 +982,37 @@ local function onReactionInterruptActionNeeded(characterGuid)
     end
 end
 
+local function onServerInterruptUsed(entity, label, component)
+    if State.Settings.TurnBasedSwarmMode and component and component.Interrupts then
+        for _, interrupt in pairs(component.Interrupts) do
+            for interruptEvent, interruptInfo in pairs(interrupt) do
+                if interruptEvent.Target and interruptEvent.Target.Uuid and interruptEvent.Target.Uuid.EntityUuid then
+                    local targetUuid = interruptEvent.Target.Uuid.EntityUuid
+                    print("interrupted:", getDisplayName(targetUuid), targetUuid)
+                    print("interruptor:", getDisplayName(interruptEvent.Source.Uuid.EntityUuid))
+                    if State.Session.ActionsInProgress[targetUuid] then
+                        print("Actions In Progress")
+                        _D(State.Session.ActionsInProgress[targetUuid])
+                        local brawler = Roster.getBrawlerByUuid(targetUuid)
+                        if brawler then
+                            Swarm.swarmAction(brawler)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     if State.Settings.TurnBasedSwarmMode then
-        debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+        print("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
         local uuid = Osi.GetUUID(characterGuid)
-        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
-            debugPrint("resuming swarm turn timer (interrupt used)")
-            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 then
+            if State.Session.SwarmTurnTimer ~= nil and isAutoTriggered == 0 then
+                debugPrint("resuming swarm turn timer (interrupt used)")
+                Ext.Timer.Resume(State.Session.SwarmTurnTimer)
+            end
         end
     end
 end
@@ -1005,9 +1041,12 @@ local function startListeners()
     State.Session.Listeners.ResetCompleted.stop = function ()
         Ext.Events.ResetCompleted:Unsubscribe(State.Session.Listeners.ResetCompleted.handle)
     end
-    -- Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", function (_, _, component)
     State.Session.Listeners.ServerStatusApplyEvent = {
         handle = Ext.Entity.OnCreateDeferred("ServerStatusApplyEvent", onServerStatusApplyEvent),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ServerInterruptUsed = {
+        handle = Ext.Entity.OnCreateDeferred("ServerInterruptUsed", onServerInterruptUsed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UserReservedFor = {

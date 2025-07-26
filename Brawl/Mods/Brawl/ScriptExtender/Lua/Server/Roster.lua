@@ -182,6 +182,7 @@ local function endBrawl(level)
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
+    State.Session.StoryActionIDs = {}
     State.Session.SwarmTurnComplete = {}
     if State.Session.SwarmTurnTimer ~= nil then
         Ext.Timer.Cancel(State.Session.SwarmTurnTimer)

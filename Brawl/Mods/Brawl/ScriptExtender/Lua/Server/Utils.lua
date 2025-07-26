@@ -248,6 +248,14 @@ local function isCounterspell(spellName)
     return false
 end
 
+local function removeNegativeStatuses(uuid)
+    Osi.RemoveStatusesWithGroup(uuid, "SG_Charmed")
+    Osi.RemoveStatusesWithGroup(uuid, "SG_Petrified")
+    Osi.RemoveStatusesWithGroup(uuid, "SG_Cursed")
+    Osi.RemoveStatusesWithGroup(uuid, "SG_Stunned")
+    Osi.RemoveStatus(uuid, "ATT_FEEBLEMIND", "")
+end
+
 local function clearOsirisQueue(uuid)
     print("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
@@ -437,6 +445,7 @@ return {
     getCurrentCombatRound = getCurrentCombatRound,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
+    removeNegativeStatuses = removeNegativeStatuses,
     getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
     getPersistentModVars = getPersistentModVars,
