@@ -576,6 +576,12 @@ local function onServerStatusApplyEvent(_, _, component)
                         local healAmount = (component.Target.Health.Hp == targetMaxHp) and status.HealAmount or math.min(status.HealAmount, targetMaxHp)
                         debugPrint("healed for", getDisplayName(healerUuid), getDisplayName(targetUuid), status.HealAmount, component.Target.Health.Hp, healAmount)
                         Leaderboard.updateHealing(healerUuid, targetUuid, healAmount)
+                        if status.StoryActionID and State.Session.StoryActionIDs[status.StoryActionID] then
+                            local spellName = State.Session.StoryActionIDs[status.StoryActionID].spellName
+                            if spellName == "Target_TAD_TransfuseHealth" then
+                                Leaderboard.updateDamage(healerUuid, healerUuid, healAmount)
+                            end
+                        end
                         break
                     end
                 end
@@ -989,7 +995,7 @@ local function onServerInterruptUsed(entity, label, component)
                 if interruptEvent.Target and interruptEvent.Target.Uuid and interruptEvent.Target.Uuid.EntityUuid then
                     local targetUuid = interruptEvent.Target.Uuid.EntityUuid
                     print("interrupted:", getDisplayName(targetUuid), targetUuid)
-                    print("interruptor:", getDisplayName(interruptEvent.Source.Uuid.EntityUuid))
+                    -- print("interruptor:", getDisplayName(interruptEvent.Source.Uuid.EntityUuid))
                     if State.Session.ActionsInProgress[targetUuid] then
                         print("Actions In Progress")
                         _D(State.Session.ActionsInProgress[targetUuid])

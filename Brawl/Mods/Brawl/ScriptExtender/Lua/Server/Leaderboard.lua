@@ -78,13 +78,15 @@ local function updateDamage(attackerUuid, defenderUuid, amount)
         State.Session.Leaderboard[defenderUuid].name = State.Session.Leaderboard[defenderUuid].name or (getDisplayName(defenderUuid) or "")
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken or 0
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken + amount
-        State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] or {}
-        State.Session.Leaderboard[attackerUuid].name = State.Session.Leaderboard[attackerUuid].name or (getDisplayName(attackerUuid) or "")
-        State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone or 0
-        if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
-            amount = -amount
+        if attackerUuid ~= defenderUuid then
+            State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] or {}
+            State.Session.Leaderboard[attackerUuid].name = State.Session.Leaderboard[attackerUuid].name or (getDisplayName(attackerUuid) or "")
+            State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone or 0
+            if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
+                amount = -amount
+            end
+            State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone + amount
         end
-        State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone + amount
         postDataToClients(true)
     end
 end
