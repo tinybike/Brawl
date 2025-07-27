@@ -137,11 +137,27 @@ local function getHighestWeightSpell(weightedSpells)
 end
 
 -- should account for damage range
-local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spellType, numExtraAttacks, targetUuid)
+local function getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spellType, numExtraAttacks, targetUuid)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
     local weight = 0
+    -- Favor using spells or non-spells?
+    if spell.isSpell then
+        weight = weight + archetypeWeights.isSpell
+    end
+    -- If this spell has a damage type, favor vulnerable enemies
+    -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
+    if State.Settings.TurnBasedSwarmMode and spell.damageType ~= nil and spell.damageType ~= "None" then
+        local resistanceWeight = getResistanceWeight(spell, targetUuid)
+        weight = weight + resistanceWeight
+    end
+    -- Adjust by spell type (damage and healing spells are somewhat favored in general)
+    weight = weight + getSpellTypeWeight(spellType)
+    -- Adjust by spell level, if we're in hogwild mode
+    if not State.Settings.TurnBasedSwarmMode and State.Settings.HogwildMode then
+        weight = weight + spell.level*2
+    end
     -- NB: factor in amount of healing for healing spells also?
     if spellType == "Damage" then
         if spell.triggersExtraAttack and numExtraAttacks > 0 then
@@ -169,59 +185,49 @@ local function getSpellWeight(spellName, spell, distanceToTarget, archetype, spe
             weight = weight - archetypeWeights.gapCloser
         end
     end
-    if spell.targetRadius == "RangedMainWeaponRange" then
-        weight = weight + archetypeWeights.rangedWeapon
-        if distanceToTarget > Constants.RANGED_RANGE_MIN and distanceToTarget < Constants.RANGED_RANGE_MAX then
-            weight = weight + archetypeWeights.rangedWeaponInRange
-        else
-            weight = weight + archetypeWeights.rangedWeaponOutOfRange
-        end
-    elseif spell.targetRadius == "MeleeMainWeaponRange" then
+    if spell.targetRadius == "MeleeMainWeaponRange" then
         weight = weight + archetypeWeights.meleeWeapon
         if distanceToTarget <= Constants.MELEE_RANGE then
             weight = weight + archetypeWeights.meleeWeaponInRange
         end
-    -- NB: should the weights be different from ranged and thrown (e.g. tavern brawler spec)?
-    elseif spell.targetRadius == "ThrownObjectRange" then
-        weight = weight + archetypeWeights.rangedWeapon
-        if distanceToTarget > Constants.THROWN_RANGE_MIN and distanceToTarget < Constants.THROWN_RANGE_MAX then
-            weight = weight + archetypeWeights.rangedWeaponInRange
-        else
-            weight = weight + archetypeWeights.rangedWeaponOutOfRange
-        end
     else
-        local targetRadius = tonumber(spell.targetRadius)
-        if targetRadius then
-            if distanceToTarget <= targetRadius then
-                weight = weight + archetypeWeights.spellInRange
+        if spell.targetRadius == "RangedMainWeaponRange" then
+            weight = weight + archetypeWeights.rangedWeapon
+            if distanceToTarget > Constants.RANGED_RANGE_MIN and distanceToTarget < Constants.RANGED_RANGE_MAX then
+                weight = weight + archetypeWeights.rangedWeaponInRange
+            else
+                weight = weight + archetypeWeights.rangedWeaponOutOfRange
+            end
+        -- NB: should the weights be different from ranged and thrown (e.g. tavern brawler spec)?
+        elseif spell.targetRadius == "ThrownObjectRange" then
+            weight = weight + archetypeWeights.rangedWeapon
+            if distanceToTarget > Constants.THROWN_RANGE_MIN and distanceToTarget < Constants.THROWN_RANGE_MAX then
+                weight = weight + archetypeWeights.rangedWeaponInRange
+            else
+                weight = weight + archetypeWeights.rangedWeaponOutOfRange
             end
         else
-            local range = tonumber(spell.range)
-            if range then
-                if distanceToTarget <= range then
+            local targetRadius = tonumber(spell.targetRadius)
+            if targetRadius then
+                if distanceToTarget <= targetRadius then
                     weight = weight + archetypeWeights.spellInRange
                 end
             else
-                debugPrint("Target radius and range didn't convert to number, what is this?")
-                debugDump(spell)
+                local range = tonumber(spell.range)
+                if range then
+                    if distanceToTarget <= range then
+                        weight = weight + archetypeWeights.spellInRange
+                    end
+                else
+                    print("Target radius and range didn't convert to number, what is this?")
+                    _D(spell)
+                end
             end
         end
-    end
-    -- Favor using spells or non-spells?
-    if spell.isSpell then
-        weight = weight + archetypeWeights.isSpell
-    end
-    -- If this spell has a damage type, favor vulnerable enemies
-    -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
-    if State.Settings.TurnBasedSwarmMode and spell.damageType ~= nil and spell.damageType ~= "None" then
-        local resistanceWeight = getResistanceWeight(spell, targetUuid)
-        weight = weight + resistanceWeight
-    end
-    -- Adjust by spell type (damage and healing spells are somewhat favored in general)
-    weight = weight + getSpellTypeWeight(spellType)
-    -- Adjust by spell level, if we're in hogwild mode
-    if not State.Settings.TurnBasedSwarmMode and State.Settings.HogwildMode then
-        weight = weight + spell.level*2
+        -- Disfavor non-seeking ranged abilities unless we have line-of-sight
+        if not spell.isAutoPathfinding and not hasLineOfSight then
+            weight = weight/2
+        end
     end
     -- Randomize weight by +/- 30% to keep it interesting
     weight = math.floor(weight*(0.7 + math.random()*0.6) + 0.5)
@@ -330,6 +336,7 @@ end
 local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
+    local hasLineOfSight = Osi.HasLineOfSight(uuid, targetUuid) == 1
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         if isNpcSpellUsable(spellName) then
@@ -342,7 +349,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, dist
             end
             if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
                 debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -360,6 +367,7 @@ end
 local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, bonusActionOnly)
     local weightedSpells = {}
     local silenced = isSilenced(uuid)
+    local hasLineOfSight = Osi.HasLineOfSight(uuid, targetUuid) == 1
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
         if isNpcSpellUsable(spellName) then
@@ -371,7 +379,7 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, distanceToTar
                 end
             end
             if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end

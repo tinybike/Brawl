@@ -46,6 +46,7 @@ end
 -- Session state
 local Session = {
     SpellTable = {},
+    SpellTableByName = {},
     Listeners = {},
     Brawlers = {},
     Players = {},
@@ -329,6 +330,18 @@ local function checkForDirectHeal(spell)
     return false
 end
 
+local function isAutoPathfinding(spell)
+    if spell and spell.Trajectories then
+        local trajectories = Utils.split(spell.Trajectories, ",")
+        for _, trajectory in ipairs(trajectories) do
+            if trajectory == Constants.MAGIC_MISSILE_PATHFIND_UUID then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -381,6 +394,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isDirectHeal = checkForDirectHeal(spell),
             hasApplyStatus = checkForApplyStatus(spell),
             isBonusAction = costs.BonusActionPoint ~= nil,
+            isAutoPathfinding = isAutoPathfinding(spell),
         }
         return spellInfo
     end
@@ -560,12 +574,8 @@ end
 
 local function getSpellByName(name)
     if name then
-        local spellType = getSpellTypeByName(name)
-        if spellType and Session.SpellTable[spellType] then
-            return Session.SpellTable[spellType][name]
-        end
+        return Session.SpellTableByName[name]
     end
-    return nil
 end
 
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
@@ -596,10 +606,15 @@ end
 local function buildSpellTable()
     local hostLevel = Osi.GetLevel(Osi.GetHostCharacter())
     local spellTable = {}
+    local spellTableByName = {}
     for _, spellType in ipairs(Constants.ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType, hostLevel)
+        for spellName, spell in pairs(spellTable[spellType]) do
+            spellTableByName[spellName] = spell
+        end
     end
     Session.SpellTable = spellTable
+    Session.SpellTableByName = spellTableByName
 end
 
 local function resetSpellData()

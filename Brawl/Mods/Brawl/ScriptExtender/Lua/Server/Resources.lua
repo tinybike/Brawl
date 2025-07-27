@@ -205,10 +205,17 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
     local distanceTo = Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
-        debugPrint("cast failed, out of range", distanceTo, spellRange)
+        print("cast failed, out of range", getDisplayName(casterUuid), getDisplayName(targetUuid), distanceTo, spellRange, spellName)
         return false
     end
-    -- clearOsirisQueue(casterUuid)
+    if spellRange > 2 and Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
+        local spell = not State.getSpellByName(spellName)
+        if spell and not spell.isAutoPathfinding then
+            print("cast failed, no line of sight", getDisplayName(casterUuid), getDisplayName(targetUuid), spellName)
+            return false
+        end
+    end
+    -- 
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)

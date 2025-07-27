@@ -365,5 +365,6 @@ Constants.COUNTERSPELLS = {
     "Target_Counterspell_6",
     "Target_MOD_Dread_Counterspell",
 }
+Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 
 return Constants
