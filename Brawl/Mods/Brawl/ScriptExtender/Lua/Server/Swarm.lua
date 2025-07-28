@@ -123,6 +123,11 @@ local function useRemainingActions(brawler, callback)
         if numActions == 0 and numBonusActions == 0 then
             if State.Session.QueuedCompanionAIAction[brawler.uuid] then
                 State.Session.QueuedCompanionAIAction[brawler.uuid] = false
+                local entity = Ext.Entity.Get(brawler.uuid)
+                if entity and entity.TurnBased then
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity:Replicate("TurnBased")
+                end
             end
             if callback then callback(brawler.uuid) end
         else
