@@ -24,13 +24,16 @@ local function showForUser(userId)
 end
 
 local function postDataToClients(updateOnly)
-    if State.Settings.LeaderboardEnabled then
+    if State.Settings.LeaderboardEnabled and not State.Session.LeaderboardUpdateTimer then
         local leaderboardData = Ext.Json.Stringify(State.Session.Leaderboard)
         if updateOnly then
             Ext.ServerNet.BroadcastMessage("UpdateLeaderboard", leaderboardData)
         else
             Ext.ServerNet.BroadcastMessage("Leaderboard", leaderboardData)
         end
+        State.Session.LeaderboardUpdateTimer = Ext.Timer.WaitFor(Constants.LEADERBOARD_UPDATE_TIMEOUT, function ()
+            State.Session.LeaderboardUpdateTimer = nil
+        end)
     end
 end
 

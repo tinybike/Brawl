@@ -89,6 +89,7 @@ local Session = {
     SwarmTurnTimerCombatRound = nil,
     SwarmTurnActive = nil,
     Leaderboard = {},
+    LeaderboardUpdateTimer = nil,
     QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
