@@ -257,7 +257,7 @@ local function removeNegativeStatuses(uuid)
 end
 
 local function clearOsirisQueue(uuid)
-    print("clearOsirisQueue", uuid, getDisplayName(uuid))
+    -- print("clearOsirisQueue", uuid, getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end

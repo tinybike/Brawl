@@ -145,7 +145,6 @@ local function onCombatEnded(combatGuid)
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
             State.Session.SwarmTurnTimer = nil
         end
-        State.Session.TBSMActionResourceListeners = {}
         Leaderboard.dumpToConsole()
         Leaderboard.postDataToClients()
     end
@@ -661,7 +660,7 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
     local casterUuid = Osi.GetUUID(casterGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if casterUuid and targetUuid and spellName then
-        print(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
+        -- print(getDisplayName(casterUuid), "UsingSpellOnTarget", getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -679,7 +678,7 @@ local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, s
     local casterUuid = Osi.GetUUID(casterGuid)
     local targetUuid = Osi.GetUUID(targetGuid)
     if casterUuid and targetUuid and spellName then
-        print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        -- print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -694,10 +693,10 @@ local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, s
 end
 
 local function onUsingSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    print(getDisplayName(Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- print(getDisplayName(Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
     if casterUuid and spellName then
-        print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        -- print("UsingSpell", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -708,7 +707,7 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = Osi.GetUUID(casterGuid)
-    print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
     if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
         debugPrint("resuming swarm turn timer (CastedSpell)")
@@ -719,14 +718,14 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             local areaRadius = Ext.Stats.Get(spellName).AreaRadius
             for uuid, _ in pairs(State.Session.Players) do
                 if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
-                    print("removing negative statuses from", getDisplayName(uuid), uuid)
+                    -- print("removing negative statuses from", getDisplayName(uuid), uuid)
                     Utils.removeNegativeStatuses(uuid)
                 end
             end
         end
     end
     if Resources.removeActionInProgress(casterUuid, spellName) then
-        print("Removed action in progress for", Utils.getDisplayName(casterUuid), spellName)
+        -- print("Removed action in progress for", Utils.getDisplayName(casterUuid), spellName)
         if State.Settings.TurnBasedSwarmMode then
             local brawler = Roster.getBrawlerByUuid(casterUuid)
             if brawler then

@@ -3,12 +3,14 @@ local debugDump = Utils.debugDump
 local getDisplayName = Utils.getDisplayName
 local isAliveAndCanFight = Utils.isAliveAndCanFight
 local isToT = Utils.isToT
+local startChunk
+local singleCharacterTurn
 
 local function setTurnComplete(uuid)
     if State.Session.SwarmTurnActive then
         local entity = Ext.Entity.Get(uuid)
         if entity.TurnBased then
-            print(getDisplayName(uuid), "Setting turn complete", uuid)
+            -- print(getDisplayName(uuid), "Setting turn complete", uuid)
             entity.TurnBased.HadTurnInCombat = true
             entity.TurnBased.RequestedEndTurn = true
             entity.TurnBased.TurnActionsCompleted = true
@@ -21,7 +23,7 @@ end
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity.TurnBased then
-        print(getDisplayName(uuid), "Unsetting turn complete", uuid)
+        -- print(getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
@@ -110,6 +112,15 @@ local function resetSwarmTurnComplete()
     end
 end
 
+local function isChunkDone(chunkIndex)
+    for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
+        if not State.Session.SwarmTurnComplete[uuid] then
+            return false
+        end
+    end
+    return true
+end
+
 local function completeSwarmTurn(uuid)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex
@@ -129,92 +140,6 @@ local function completeSwarmTurn(uuid)
     end
 end
 
-local function isControlledByDefaultAI(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
-        debugPrint("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
-        State.Session.SwarmTurnComplete[uuid] = true
-        return true
-    end
-    return false
-end
-
-local function useRemainingActions(brawler, callback)
-    if brawler and brawler.uuid then
-        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
-        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
-        print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
-        if numActions == 0 and numBonusActions == 0 then
-            if State.Session.QueuedCompanionAIAction[brawler.uuid] then
-                State.Session.QueuedCompanionAIAction[brawler.uuid] = false
-                local entity = Ext.Entity.Get(brawler.uuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity:Replicate("TurnBased")
-                end
-            end
-            if callback then callback(brawler.uuid) end
-        else
-            if numActions > 0 then
-                local actionResult = AI.pulseAction(brawler)
-                print(brawler.displayName, "action result", actionResult)
-                if not actionResult and numBonusActions > 0 then
-                    local bonusActionResult = AI.pulseAction(brawler, true)
-                    print(brawler.displayName, "bonus action result (1)", bonusActionResult)
-                    if not bonusActionResult then
-                        -- should this call completeSwarmTurn?
-                        if callback then callback(brawler.uuid) end
-                    end
-                end
-            elseif numBonusActions > 0 then
-                local bonusActionResult = AI.pulseAction(brawler, true)
-                print(brawler.displayName, "bonus action result (2)", bonusActionResult)
-                if not bonusActionResult then
-                    if callback then callback(brawler.uuid) end
-                end
-            end
-        end
-    end
-end
-
-local function swarmAction(brawler)
-    print(brawler.displayName, "swarmAction")
-    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
-        useRemainingActions(brawler, completeSwarmTurn)
-    elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
-        useRemainingActions(brawler)
-    end
-end
-
-local function singleCharacterTurn(brawler, brawlerIndex)
-    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
-    local hostCharacterUuid = Osi.GetHostCharacter()
-    if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
-        print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
-        Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
-    end
-    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
-        debugPrint("don't take turn", brawler.uuid, brawler.displayName)
-        return false
-    end
-    if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
-        return false
-    end
-    Ext.Timer.WaitFor(brawlerIndex*25, function ()
-        swarmAction(brawler)
-    end)
-    return true
-end
-
-local function isChunkDone(chunkIndex)
-    for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
-        if not State.Session.SwarmTurnComplete[uuid] then
-            return false
-        end
-    end
-    return true
-end
-
 local function forceCompleteChunk(chunkIndex)
     for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
         if not State.Session.SwarmTurnComplete[uuid] then
@@ -223,7 +148,8 @@ local function forceCompleteChunk(chunkIndex)
     end
 end
 
-local function startChunk(chunkIndex, canActBeforeDelay)
+startChunk = function (chunkIndex, canActBeforeDelay)
+    print("****************startChunk", chunkIndex)
     local chunk = State.Session.BrawlerChunks[chunkIndex]
     if not chunk then
         return
@@ -247,6 +173,83 @@ local function startChunk(chunkIndex, canActBeforeDelay)
     end)
 end
 
+local function isControlledByDefaultAI(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
+        debugPrint("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
+        State.Session.SwarmTurnComplete[uuid] = true
+        return true
+    end
+    return false
+end
+
+local function useRemainingActions(brawler, callback)
+    if brawler and brawler.uuid then
+        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
+        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
+        -- print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
+        if numActions == 0 and numBonusActions == 0 then
+            if State.Session.QueuedCompanionAIAction[brawler.uuid] then
+                State.Session.QueuedCompanionAIAction[brawler.uuid] = false
+                local entity = Ext.Entity.Get(brawler.uuid)
+                if entity and entity.TurnBased then
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity:Replicate("TurnBased")
+                end
+            end
+            if callback then callback(brawler.uuid) end
+        else
+            if numActions > 0 then
+                local actionResult = AI.pulseAction(brawler)
+                -- print(brawler.displayName, "action result", actionResult)
+                if not actionResult and numBonusActions > 0 then
+                    local bonusActionResult = AI.pulseAction(brawler, true)
+                    -- print(brawler.displayName, "bonus action result (1)", bonusActionResult)
+                    if not bonusActionResult then
+                        -- should this call completeSwarmTurn?
+                        if callback then callback(brawler.uuid) end
+                    end
+                end
+            elseif numBonusActions > 0 then
+                local bonusActionResult = AI.pulseAction(brawler, true)
+                -- print(brawler.displayName, "bonus action result (2)", bonusActionResult)
+                if not bonusActionResult then
+                    if callback then callback(brawler.uuid) end
+                end
+            end
+        end
+    end
+end
+
+local function swarmAction(brawler)
+    -- print(brawler.displayName, "swarmAction")
+    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+        useRemainingActions(brawler, completeSwarmTurn)
+    elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
+        useRemainingActions(brawler)
+    end
+end
+
+singleCharacterTurn = function (brawler, brawlerIndex)
+    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
+    local hostCharacterUuid = Osi.GetHostCharacter()
+    if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
+        -- print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
+        Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
+    end
+    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
+        debugPrint("don't take turn", brawler.uuid, brawler.displayName)
+        return false
+    end
+    if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
+        return false
+    end
+    Ext.Timer.WaitFor(brawlerIndex*25, function ()
+        swarmAction(brawler)
+    end)
+    return true
+end
+
 local function startEnemyTurn()
     debugPrint("startEnemyTurn")
     local canActBeforeDelay = State.Session.CanActBeforeDelay
@@ -261,9 +264,11 @@ local function startEnemyTurn()
         if Osi.IsPartyMember(uuid, 1) == 0 then
             State.Session.BrawlerChunks[ci] = State.Session.BrawlerChunks[ci] or {}
             State.Session.BrawlerChunks[ci][uuid] = b
+            print("CHUNK", ci, count, b.displayName)
             count = count + 1
             if count >= chunkSize then
                 ci = ci + 1
+                print("")
                 count = 0
             end
         end

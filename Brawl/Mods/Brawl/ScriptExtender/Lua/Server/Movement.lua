@@ -59,17 +59,9 @@ end
 local function setMovementToMax(entity)
     if entity and entity.Uuid and entity.Uuid.EntityUuid and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
-        -- if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] and resources[Constants.ACTION_RESOURCES.Movement][1].Amount == 0.0 then
-        --     local uuid = entity.Uuid.EntityUuid
-        --     if State.Session.TBSMActionResourceListeners[uuid] ~= nil then
-        --         Ext.Entity.Unsubscribe(State.Session.TBSMActionResourceListeners[uuid])
-        --         State.Session.TBSMActionResourceListeners[uuid] = nil
-        --     end
-            resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
-            resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
-            entity:Replicate("ActionResources")
-            -- AI.queueSpellRequest(uuid, "Shout_Dash", uuid, nil, true)
-        -- end
+        resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
+        resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
+        entity:Replicate("ActionResources")
     end
 end
 
@@ -134,7 +126,7 @@ local function moveToTargetUuid(uuid, targetUuid, override, callback)
 end
 
 local function moveToPosition(uuid, position, override, callback)
-    print("moveToPosition", uuid, override, position[1], position[2], position[3])
+    -- print("moveToPosition", uuid, override, position[1], position[2], position[3])
     if override then
         clearOsirisQueue(uuid)
     end

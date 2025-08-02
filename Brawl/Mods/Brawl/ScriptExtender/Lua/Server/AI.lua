@@ -81,11 +81,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    print(getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
-    -- if isPausedRequest then
-    --     Pause.midActionLock(casterEntity)
-    --     -- Pause.lock(casterEntity)
-    -- end
+    -- print(getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
     return request.RequestGuid
 end
 
