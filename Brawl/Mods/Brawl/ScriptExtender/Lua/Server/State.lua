@@ -81,7 +81,6 @@ local Session = {
     ModStatusMessageTimer = nil,
     ActiveMovements = {},
     TurnBasedSwarmModePlayerTurnEnded = {},
-    TBSMActionResourceListeners = {},
     TBSMToTSkippedPrepRound = false,
     SwarmTurnComplete = {},
     ResurrectedPlayer = {},
@@ -90,6 +89,8 @@ local Session = {
     SwarmTurnActive = nil,
     Leaderboard = {},
     LeaderboardUpdateTimer = nil,
+    BrawlerChunks = {},
+    CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
