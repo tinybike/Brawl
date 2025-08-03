@@ -395,12 +395,16 @@ local function timeIt(fn, ...)
     return Ext.Utils.MonotonicTime() - t0
 end
 
-local function averageTime(fn, n, ...)
+local function totalTime(fn, n, ...)
     local sum = 0
     for i = 1, n do
         sum = sum + timeIt(fn, ...)
     end
-    return sum / n
+    return sum
+end
+
+local function averageTime(fn, n, ...)
+    return totalTime(fn, n, ...) / n
 end
 
 return {
@@ -448,5 +452,6 @@ return {
     removeNegativeStatuses = removeNegativeStatuses,
     getOriginatorPrototype = getOriginatorPrototype,
     averageTime = averageTime,
+    totalTime = totalTime,
     getPersistentModVars = getPersistentModVars,
 }

@@ -118,10 +118,7 @@ end
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-            State.Session.SwarmTurnTimer = nil
-        end
+        Swarm.cancelTimers()
         State.Session.SwarmTurnActive = false
         State.Session.SwarmTurnTimerCombatRound = nil
         State.Session.QueuedCompanionAIAction = {}
@@ -141,10 +138,7 @@ local function onCombatEnded(combatGuid)
     if State.Settings.TurnBasedSwarmMode then
         State.Session.StoryActionIDs = {}
         State.Session.SwarmTurnComplete = {}
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-            State.Session.SwarmTurnTimer = nil
-        end
+        Swarm.cancelTimers()
         Leaderboard.dumpToConsole()
         Leaderboard.postDataToClients()
     end
@@ -709,10 +703,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     local casterUuid = Osi.GetUUID(casterGuid)
     -- print(getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
-    if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
-        debugPrint("resuming swarm turn timer (CastedSpell)")
-        Ext.Timer.Resume(State.Session.SwarmTurnTimer)
-    end
+    Swarm.resumeTimers()
     if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
         if State.Session.Players then
             local areaRadius = Ext.Stats.Get(spellName).AreaRadius
@@ -980,9 +971,8 @@ local function onReactionInterruptActionNeeded(characterGuid)
     if State.Settings.TurnBasedSwarmMode then
         debugPrint("ReactionInterruptActionNeeded", characterGuid)
         local uuid = Osi.GetUUID(characterGuid)
-        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and State.Session.SwarmTurnTimer ~= nil then
-            debugPrint("pausing swarm turn timer")
-            Ext.Timer.Pause(State.Session.SwarmTurnTimer)
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 then
+            Swarm.pauseTimers()
         end
     end
 end
@@ -1013,11 +1003,8 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
     if State.Settings.TurnBasedSwarmMode then
         print("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
         local uuid = Osi.GetUUID(characterGuid)
-        if uuid and Osi.IsPartyMember(uuid, 1) == 1 then
-            if State.Session.SwarmTurnTimer ~= nil and isAutoTriggered == 0 then
-                debugPrint("resuming swarm turn timer (interrupt used)")
-                Ext.Timer.Resume(State.Session.SwarmTurnTimer)
-            end
+        if uuid and Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
+            Swarm.resumeTimers()
         end
     end
 end
@@ -1025,9 +1012,7 @@ end
 -- thank u focus
 local function onServerInterruptDecision()
     for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
-        if State.Settings.TurnBasedSwarmMode and State.Session.SwarmTurnTimer ~= nil then
-            return Ext.Timer.Resume(State.Session.SwarmTurnTimer)
-        end
+        Swarm.resumeTimers()
     end
 end
 

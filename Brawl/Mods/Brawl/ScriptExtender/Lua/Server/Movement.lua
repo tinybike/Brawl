@@ -61,6 +61,7 @@ local function setMovementToMax(entity)
         local resources = entity.ActionResources.Resources
         resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
         resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
+        resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 1.0
         entity:Replicate("ActionResources")
     end
 end
@@ -210,8 +211,33 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
     end
 end
 
+-- Jump has a base range of 4.5 m / 15 ft and is increased by 1 m / 3 ft for 2 points of Strength above 10
+local function calculateJumpDistance(uuid)
+    local strength = Osi.GetAbility(uuid, "Strength") or 10
+    local jumpDistance = 4.5 + math.max(0, math.floor((strength - 10)/2))
+    if Osi.HasPassive(uuid, "UnarmoredMovement_DifficultTerrain") == 1 then
+        jumpDistance = jumpDistance + 6
+    end
+    if Osi.HasPassive(uuid, "RemarkableAthlete_Jump") == 1 then
+        jumpDistance = jumpDistance + 3
+    end
+    if Osi.HasActiveStatus(uuid, "LONG_JUMP") == 1 then
+        jumpDistance = jumpDistance*3
+    end
+    if Osi.HasPassive(uuid, "Athlete_StandUp") == 1 then
+        jumpDistance = jumpDistance*1.5
+    end
+    if Osi.HasActiveStatus(uuid, "RAGE_TOTEM_TIGER") == 1 then
+        jumpDistance = jumpDistance*1.5
+    end
+    if Osi.HasActiveStatus(uuid, "ENCUMBERED_LIGHT") == 1 then
+        jumpDistance = jumpDistance*0.5
+    end
+    return jumpDistance
+end
+
 local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
-    print(Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
+    -- print(Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
     local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
     local dashed = false
@@ -474,6 +500,7 @@ return {
     moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,
     moveToDistanceFromTarget = moveToDistanceFromTarget,
+    calculateJumpDistance = calculateJumpDistance,
     moveIntoPositionForSpell = moveIntoPositionForSpell,
     holdPosition = holdPosition,
     repositionRelativeToTarget = repositionRelativeToTarget,
