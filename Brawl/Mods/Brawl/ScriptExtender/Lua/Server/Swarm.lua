@@ -365,7 +365,7 @@ local function checkAllPlayersFinishedTurns()
         -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
             local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
-            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
+            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
             if M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
