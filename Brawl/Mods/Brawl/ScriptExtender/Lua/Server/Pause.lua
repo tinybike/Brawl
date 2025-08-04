@@ -219,7 +219,7 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            if State.Session.RemainingMovement[entityUuid] ~= nil and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
+            if State.Session.RemainingMovement[entityUuid] ~= nil and M.Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
                 if entityUuid and isInFTB(movingEntity) then
                     if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
                         print("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
@@ -235,7 +235,7 @@ local function startTruePause(entityUuid)
                     end
                 end
             end
-            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(entity)
+            State.Session.RemainingMovement[entityUuid] = M.Movement.getRemainingMovement(entity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
@@ -293,13 +293,13 @@ local function startTruePause(entityUuid)
         --     State.Session.ActionResourcesListeners[entityUuid] = nil
         -- end
         -- State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-        --     if State.Session.RemainingMovement[entityUuid] ~= nil and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
+        --     if State.Session.RemainingMovement[entityUuid] ~= nil and M.Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
         --         if entityUuid and isInFTB(movingEntity) then
         --             if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
         --                 print("enqueue movement (raw coords)", entityUuid)
         --                 debugDump(State.Session.LastClickPosition[entityUuid].position)
         --                 lock(movingEntity)
-        --                 Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
+        --                 M.Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
         --                     if err then
         --                         return Utils.showNotification(entityUuid, err, 2)
         --                     end
@@ -309,7 +309,7 @@ local function startTruePause(entityUuid)
         --             end
         --         end
         --     end
-        --     State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(movingEntity)
+        --     State.Session.RemainingMovement[entityUuid] = M.Movement.getRemainingMovement(movingEntity)
         -- end, entity)
         -- if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
         --     Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
