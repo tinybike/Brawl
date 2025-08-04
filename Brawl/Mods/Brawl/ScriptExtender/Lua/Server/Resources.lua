@@ -200,13 +200,13 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
-        print("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
+        debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
         return false
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
-            print("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
+            debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
             return false
         end
     end

@@ -325,7 +325,9 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 moveToPosition(attackerUuid, farPos, override, callback)
             end
         end)
-        path.CanUseLadders = true
+        if path then
+            path.CanUseLadders = true
+        end
         return true
     end
     return tryMove(baseMove)
