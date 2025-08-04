@@ -380,7 +380,7 @@ local function onGainedControl(targetGuid)
 end
 
 local function onCharacterJoinedParty(character)
-    debugPrint("CharacterJoinedParty", character)
+    print("CharacterJoinedParty", character)
     local uuid = M.Osi.GetUUID(character)
     if uuid then
         if State.Session.Players and not State.Session.Players[uuid] then

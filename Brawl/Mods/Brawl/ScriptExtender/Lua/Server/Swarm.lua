@@ -362,11 +362,18 @@ end
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
-        -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
-        for playerUuid, _ in pairs(players) do
+        for playerUuid, player in pairs(players) do
             local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
-            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
-            if M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled, player.isFreshSummon)
+            if player.isFreshSummon then
+                player.isFreshSummon = false
+                if not isUncontrolled then
+                    local entity = Ext.Entity.Get(playerUuid)
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity:Replicate("TurnBased")
+                end
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] = true
+            elseif M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
         end
