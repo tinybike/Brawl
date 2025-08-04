@@ -83,6 +83,7 @@ local Session = {
     SwarmTurnActive = nil,
     Leaderboard = {},
     LeaderboardUpdateTimer = nil,
+    LeaderboardPendingUpdateOnly = nil,
     BrawlerChunks = {},
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
