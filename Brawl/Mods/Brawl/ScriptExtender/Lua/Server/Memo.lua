@@ -146,8 +146,12 @@ M.memoizeAll = function ()
 end
 
 M.clear = function ()
-    for bucketName, _ in next, Cache do
-        Cache[bucketName] = {}
+    for _, bucketGroup in next, Cache do
+        for _, bucket in next, bucketGroup do
+            for k in next, bucket do
+                bucket[k] = nil
+            end
+        end
     end
 end
 
