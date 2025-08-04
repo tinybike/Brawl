@@ -11,10 +11,10 @@ Quests = require("Server/Quests.lua")
 Commands = require("Server/Commands.lua")
 Listeners = require("Server/Listeners.lua")
 Swarm = require("Server/Swarm.lua")
+M = require("Server/Memo.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
 local isToT = Utils.isToT
 
 function stopPulseAction(brawler, remainInBrawl)
@@ -30,7 +30,7 @@ function stopPulseAction(brawler, remainInBrawl)
 end
 
 function startPulseAction(brawler)
-    if Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
+    if M.Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
     end
     if Constants.IS_TRAINING_DUMMY[brawler.uuid] then
@@ -65,7 +65,7 @@ function startBrawlFizzler(level)
 end
 
 function stopPulseAddNearby(uuid)
-    debugPrint("stopPulseAddNearby", uuid, getDisplayName(uuid))
+    debugPrint("stopPulseAddNearby", uuid, M.Utils.getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] ~= nil then
         Ext.Timer.Cancel(State.Session.PulseAddNearbyTimers[uuid])
         State.Session.PulseAddNearbyTimers[uuid] = nil
@@ -73,7 +73,7 @@ function stopPulseAddNearby(uuid)
 end
 
 function startPulseAddNearby(uuid)
-    debugPrint("startPulseAddNearby", uuid, getDisplayName(uuid))
+    debugPrint("startPulseAddNearby", uuid, M.Utils.getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] == nil then
         State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAddNearby(uuid)
@@ -132,9 +132,9 @@ function cleanupAll()
     stopAllPulseRepositionTimers()
     stopAllPulseActionTimers()
     stopAllBrawlFizzlers()
-    local hostCharacter = Osi.GetHostCharacter()
+    local hostCharacter = M.Osi.GetHostCharacter()
     if hostCharacter then
-        local level = Osi.GetRegion(hostCharacter)
+        local level = M.Osi.GetRegion(hostCharacter)
         if level then
             Roster.endBrawl(level)
         end
@@ -162,7 +162,7 @@ end
 function startToTTimers()
     debugPrint("startToTTimers")
     stopToTTimers()
-    local hostCharacter = Osi.GetHostCharacter()
+    local hostCharacter = M.Osi.GetHostCharacter()
     if not Mods.ToT.Player.InCamp() then
         State.Session.ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
             if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then

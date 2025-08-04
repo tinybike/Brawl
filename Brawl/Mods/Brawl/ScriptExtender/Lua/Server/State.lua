@@ -1,11 +1,5 @@
--- local Constants = require("Server/Constants.lua")
--- local Utils = require("Server/Utils.lua")
--- local Resources = require("Server/Resources.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
-local isSilenced = Utils.isSilenced
 
 -- Settings
 local Settings = {
@@ -22,7 +16,7 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    TurnBasedSwarmMode = false,
+    TurnBasedSwarmMode = true,
     LeaderboardEnabled = true,
 }
 if MCM then
@@ -46,6 +40,7 @@ end
 -- Session state
 local Session = {
     SpellTable = {},
+    SpellTableByName = {},
     Listeners = {},
     Brawlers = {},
     Players = {},
@@ -63,7 +58,7 @@ local Session = {
     PartyMembersHitpointsListeners = {},
     ActionResourcesListeners = {},
     TurnBasedListeners = {},
-    SpellCastMovementListeners = {},
+    SpellCastPrepareEndEvent = {},
     FTBLockedIn = {},
     LastClickPosition = {},
     ActiveCombatGroups = {},
@@ -73,14 +68,13 @@ local Session = {
     HealRequestedTimer = {},
     CountdownTimer = {},
     ExtraAttacksRemaining = {},
-    StoryActionIDSpellName = {},
+    StoryActionIDs = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     ActiveMovements = {},
     TurnBasedSwarmModePlayerTurnEnded = {},
-    TBSMActionResourceListeners = {},
     TBSMToTSkippedPrepRound = false,
     SwarmTurnComplete = {},
     ResurrectedPlayer = {},
@@ -88,6 +82,10 @@ local Session = {
     SwarmTurnTimerCombatRound = nil,
     SwarmTurnActive = nil,
     Leaderboard = {},
+    LeaderboardUpdateTimer = nil,
+    BrawlerChunks = {},
+    CurrentChunkTimer = nil,
+    QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -137,14 +135,14 @@ local function extraAttackSpellCheck(spell)
 end
 
 local function parseSpellCosts(spell, costType)
-    local costs = Utils.split(spell[costType], ";")
+    local costs = M.Utils.split(spell[costType], ";")
     local spellCosts = {
         ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
         LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
     }
     -- local hitCost = nil -- divine smite only..?
     for _, cost in ipairs(costs) do
-        local costTable = Utils.split(cost, ":")
+        local costTable = M.Utils.split(cost, ":")
         local costLabel = costTable[1]:match("^%s*(.-)%s*$")
         local costAmount = tonumber(costTable[#costTable])
         if costLabel == "SpellSlotsGroup" then
@@ -328,6 +326,18 @@ local function checkForDirectHeal(spell)
     return false
 end
 
+local function isAutoPathfinding(spell)
+    if spell and spell.Trajectories then
+        local trajectories = M.Utils.split(spell.Trajectories, ",")
+        for _, trajectory in ipairs(trajectories) do
+            if trajectory == Constants.MAGIC_MISSILE_PATHFIND_UUID then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -380,6 +390,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isDirectHeal = checkForDirectHeal(spell),
             hasApplyStatus = checkForApplyStatus(spell),
             isBonusAction = costs.BonusActionPoint ~= nil,
+            isAutoPathfinding = isAutoPathfinding(spell),
         }
         return spellInfo
     end
@@ -429,7 +440,7 @@ local function getAllSpellsOfType(spellType, hostLevel)
         local spell = Ext.Stats.Get(spellName)
         if isSpellOfType(spell, spellType) then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
-                local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
+                local containerSpellNames = M.Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
                     allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName, hostLevel)
                 end
@@ -473,7 +484,7 @@ local function getArchetype(uuid)
         end
     end
     if archetype == nil or archetype == "" then
-        archetype = Osi.GetActiveArchetype(uuid)
+        archetype = M.Osi.GetActiveArchetype(uuid)
     end
     if not Constants.ARCHETYPE_WEIGHTS[archetype] then
         if archetype == nil or archetype == "base" then
@@ -501,7 +512,7 @@ local function checkForDownedOrDeadPlayers()
     local players = Session.Players
     if players then
         for uuid, player in pairs(players) do
-            if Osi.IsDead(uuid) == 1 or Utils.isDowned(uuid) then
+            if M.Osi.IsDead(uuid) == 1 or M.Utils.isDowned(uuid) then
                 Utils.clearOsirisQueue(uuid)
                 Osi.LieOnGround(uuid)
             end
@@ -512,7 +523,7 @@ end
 local function areAnyPlayersBrawling()
     if Session.Players then
         for playerUuid, player in pairs(Session.Players) do
-            local level = Osi.GetRegion(playerUuid)
+            local level = M.Osi.GetRegion(playerUuid)
             if level and Session.Brawlers[level] and Session.Brawlers[level][playerUuid] then
                 return true
             end
@@ -524,7 +535,7 @@ end
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
+        if M.Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end
@@ -546,18 +557,10 @@ local function getPlayerByUserId(userId)
     return nil
 end
 
-local function getBrawlerByUuid(uuid)
-    local level = Osi.GetRegion(uuid)
-    if level and Session.Brawlers[level] then
-        return Session.Brawlers[level][uuid]
-    end
-    return nil
-end
-
 local function isPartyInRealTime()
     if Session.Players then
         for uuid, _ in pairs(Session.Players) do
-            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
+            if M.Osi.IsInForceTurnBasedMode(uuid) == 1 then
                 return false
             end
         end
@@ -567,16 +570,12 @@ end
 
 local function getSpellByName(name)
     if name then
-        local spellType = getSpellTypeByName(name)
-        if spellType and Session.SpellTable[spellType] then
-            return Session.SpellTable[spellType][name]
-        end
+        return Session.SpellTableByName[name]
     end
-    return nil
 end
 
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
-    if isSilenced(uuid) then
+    if M.Utils.isSilenced(uuid) then
         return false
     end
     for _, preparedSpell in ipairs(preparedSpells) do
@@ -592,7 +591,7 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionO
         if isUsableHeal then
             if Settings.HogwildMode then
                 return true
-            elseif Resources.hasEnoughToCastSpell(uuid, spellName) then
+            elseif M.Resources.hasEnoughToCastSpell(uuid, spellName) then
                 return true
             end
         end
@@ -601,12 +600,17 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionO
 end
 
 local function buildSpellTable()
-    local hostLevel = Osi.GetLevel(Osi.GetHostCharacter())
+    local hostLevel = M.Osi.GetLevel(M.Osi.GetHostCharacter())
     local spellTable = {}
+    local spellTableByName = {}
     for _, spellType in ipairs(Constants.ALL_SPELL_TYPES) do
         spellTable[spellType] = getAllSpellsOfType(spellType, hostLevel)
+        for spellName, spell in pairs(spellTable[spellType]) do
+            spellTableByName[spellName] = spell
+        end
     end
     Session.SpellTable = spellTable
+    Session.SpellTableByName = spellTableByName
 end
 
 local function resetSpellData()
@@ -632,7 +636,7 @@ local function uncapMovementDistance(entityUuid)
         modVars.MovementDistances = {}
     end
     local movementDistances = modVars.MovementDistances
-    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
+    if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
         -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
@@ -654,7 +658,7 @@ end
 local function capMovementDistance(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local movementDistances = modVars.MovementDistances
-    if movementDistances and movementDistances[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+    if movementDistances and movementDistances[entityUuid] ~= nil and M.Osi.IsCharacter(entityUuid) == 1 then
         -- debugPrint("Cap movement distance", entityUuid)
         -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
@@ -670,14 +674,14 @@ local function capMovementDistance(entityUuid)
         end
         movementDistances[entityUuid] = nil
         modVars.MovementDistances = movementDistances
-        -- debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
+        -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
 local function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
-    if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+    if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and M.Osi.IsCharacter(entityUuid) == 1 then
         -- debugPrint("Reverting hitpoints", entityUuid)
         -- debugDump(modifiedHitpoints[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
@@ -694,7 +698,7 @@ local function revertHitpoints(entityUuid)
         entity:Replicate("Health")
         modifiedHitpoints[entityUuid] = nil
         modVars.ModifiedHitpoints = modifiedHitpoints
-        -- debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Reverted hitpoints:", entityUuid, M.Utils.getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
@@ -704,7 +708,7 @@ local function modifyHitpoints(entityUuid)
         modVars.ModifiedHitpoints = {}
     end
     local modifiedHitpoints = modVars.ModifiedHitpoints
-    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
+    if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
         -- debugPrint("modify hitpoints", entityUuid, Settings.HitpointsMultiplier)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxHp = entity.Health.MaxHp
@@ -721,13 +725,13 @@ local function modifyHitpoints(entityUuid)
         modifiedHitpoints[entityUuid].maxHp = entity.Health.MaxHp
         modifiedHitpoints[entityUuid].multiplier = Settings.HitpointsMultiplier
         modVars.ModifiedHitpoints = modifiedHitpoints
-        -- debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Modified hitpoints:", entityUuid, M.Utils.getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
 local function uncapPartyMembersMovementDistances()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
         capMovementDistance(partyMemberUuid)
         uncapMovementDistance(partyMemberUuid)
         if Session.PartyMembersMovementResourceListeners[partyMemberUuid] ~= nil then
@@ -759,7 +763,7 @@ end
 
 local function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
         revertHitpoints(partyMemberUuid)
         modifyHitpoints(partyMemberUuid)
         if Session.PartyMembersHitpointsListeners[partyMemberUuid] ~= nil then
@@ -819,7 +823,7 @@ local function setMaxPartySize()
 end
 
 local function setupPlayer(guid)
-    local uuid = Osi.GetUUID(guid)
+    local uuid = M.Osi.GetUUID(guid)
     if uuid then
         if not Session.Players then
             Session.Players = {}
@@ -827,7 +831,7 @@ local function setupPlayer(guid)
         Session.Players[uuid] = {
             uuid = uuid,
             guid = guid,
-            displayName = getDisplayName(uuid),
+            displayName = M.Utils.getDisplayName(uuid),
             userId = Osi.GetReservedUserID(uuid),
         }
         Osi.SetCanJoinCombat(uuid, 1)
@@ -891,7 +895,6 @@ return {
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
-    getBrawlerByUuid = getBrawlerByUuid,
     isPartyInRealTime = isPartyInRealTime,
     getSpellByName = getSpellByName,
     hasDirectHeal = hasDirectHeal,

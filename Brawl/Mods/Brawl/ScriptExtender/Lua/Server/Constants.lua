@@ -4,12 +4,16 @@ Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
-Constants.SWARM_TURN_TIMEOUT = 20000
 Constants.BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 Constants.LIE_ON_GROUND_TIMEOUT = 3500
+Constants.LEADERBOARD_UPDATE_TIMEOUT = 100
+Constants.SWARM_TURN_TIMEOUT = 10000
+Constants.SWARM_CHUNK_SIZE = 30
 Constants.COUNTDOWN_TURN_INTERVAL = 6000
 Constants.MOD_STATUS_MESSAGE_DURATION = 2000
 Constants.ENTER_COMBAT_RANGE = 20
+Constants.TRACKING_DISTANCE_RT = 12
+Constants.TRACKING_DISTANCE_TBSM = 20
 Constants.NEARBY_RADIUS = 35
 Constants.MELEE_RANGE = 1.5
 Constants.GAP_CLOSER_DISTANCE = 5
@@ -25,6 +29,14 @@ Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS = 5
 Constants.UNCAPPED_MOVEMENT_DISTANCE = 1000
 Constants.NULL_UUID = "00000000-0000-0000-0000-000000000000"
 Constants.LOOPING_COMBAT_ANIMATION_ID = "7bb52cd4-0b1c-4926-9165-fa92b75876a3" -- monk animation, should prob be a lookup?
+Constants.ABILITIES = {
+    Strength = 2,
+    Dexterity = 3,
+    Constitution = 4,
+    Intelligence = 5,
+    Wisdom = 6,
+    Charisma = 7,
+}
 Constants.ACTION_RESOURCES = {
     ActionPoint = "734cbcfb-8922-4b6d-8330-b2a7e4c14b6a",
     ArcaneRecoveryPoint = "74737a08-7a77-457b-9740-ae363be2b80f",
@@ -353,5 +365,16 @@ Constants.LEADERBOARD_EXCLUDED_HEALS = {
     "ShortResting",
     "TimelessBody",
 }
+Constants.COUNTERSPELLS = {
+    "Target_Counterspell",
+    "Target_MAG_CounterSpell",
+    "Target_Counterspell_Success",
+    "Target_CounterSpell_Mindflayer",
+    "Target_Counterspell_4",
+    "Target_Counterspell_5",
+    "Target_Counterspell_6",
+    "Target_MOD_Dread_Counterspell",
+}
+Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 
 return Constants

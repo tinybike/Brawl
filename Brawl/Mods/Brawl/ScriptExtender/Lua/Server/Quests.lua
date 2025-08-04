@@ -1,11 +1,5 @@
--- local Constants = require("Server/Constants.lua")
--- local Utils = require("Server/Utils.lua")
--- local State = require("Server/State.lua")
--- local Roster = require("Server/Roster.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isAliveAndCanFight = Utils.isAliveAndCanFight
 local onLakesideRitualTurn
 local onNautiloidTransponderTurn
 
@@ -52,19 +46,19 @@ end
 onLakesideRitualTurn = function (uuid, turnsRemaining)
     debugPrint("onLakesideRitualTurn", turnsRemaining, Osi.QRY_HAV_IsRitualActive())
     if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then
-        if Osi.IsInForceTurnBasedMode(uuid) == 0 then
+        if M.Osi.IsInForceTurnBasedMode(uuid) == 0 then
             local currentTurn = Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS - turnsRemaining
             Osi.PROC_HAV_LiftingTheCurse_SpawnWave(currentTurn)
             Osi.PROC_HAV_LiftingTheCurse_DeclareRound(currentTurn)
             Ext.Timer.WaitFor(200, function ()
-                if Osi.IsInForceTurnBasedMode(uuid) == 0 then
+                if M.Osi.IsInForceTurnBasedMode(uuid) == 0 then
                     Roster.addNearbyToBrawlers(uuid, 30)
-                    local level = Osi.GetRegion(uuid)
+                    local level = M.Osi.GetRegion(uuid)
                     if level and State.Session.Brawlers then
                         local brawlersInLevel = State.Session.Brawlers[level]
                         if brawlersInLevel then
                             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                                if Osi.IsEnemy(uuid, brawlerUuid) == 1 then
+                                if M.Osi.IsEnemy(uuid, brawlerUuid) == 1 then
                                     if math.random() > 0.85 then
                                         brawler.targetUuid = Constants.HALSIN_PORTAL_UUID
                                         brawler.lockedOnTarget = true
@@ -78,7 +72,7 @@ onLakesideRitualTurn = function (uuid, turnsRemaining)
             lakesideRitualCountdown(uuid, turnsRemaining)
         end
     else
-        local level = Osi.GetRegion(uuid)
+        local level = M.Osi.GetRegion(uuid)
         Roster.removeBrawler(level, Constants.HALSIN_PORTAL_UUID)
         Roster.checkForEndOfBrawl(level)
     end
@@ -86,13 +80,13 @@ end
 
 onNautiloidTransponderTurn = function (uuid, turnsRemaining)
     debugPrint("onNautiloidTransponderTurn", turnsRemaining)
-    if turnsRemaining > 0 and Osi.IsInForceTurnBasedMode(uuid) == 0 then
-        local level = Osi.GetRegion(uuid)
+    if turnsRemaining > 0 and M.Osi.IsInForceTurnBasedMode(uuid) == 0 then
+        local level = M.Osi.GetRegion(uuid)
         if level == "TUT_Avernus_C" then
             Roster.addNearbyToBrawlers(uuid, 30)
             if State.Session.Brawlers then
                 local brawlersInLevel = State.Session.Brawlers[level]
-                if brawlersInLevel and isAliveAndCanFight(Constants.TUT_ZHALK_UUID) and isAliveAndCanFight(Constants.TUT_MIND_FLAYER_UUID) then
+                if brawlersInLevel and M.Utils.isAliveAndCanFight(Constants.TUT_ZHALK_UUID) and M.Utils.isAliveAndCanFight(Constants.TUT_MIND_FLAYER_UUID) then
                     if not brawlersInLevel[Constants.TUT_ZHALK_UUID] then
                         Roster.addBrawler(Constants.TUT_ZHALK_UUID, true)
                     end
