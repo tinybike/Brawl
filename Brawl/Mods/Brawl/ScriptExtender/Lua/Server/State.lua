@@ -600,7 +600,7 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionO
 end
 
 local function buildSpellTable()
-    local hostLevel = Osi.GetLevel(Osi.GetHostCharacter())
+    local hostLevel = M.Osi.GetLevel(M.Osi.GetHostCharacter())
     local spellTable = {}
     local spellTableByName = {}
     for _, spellType in ipairs(Constants.ALL_SPELL_TYPES) do
