@@ -81,6 +81,7 @@ local Memoizable = {
     },
     AI = {
         "getResistanceWeight",
+        "isNpcSpellUsable",
     },
     Roster = {
         "getBrawlerByUuid",
