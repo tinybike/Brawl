@@ -153,7 +153,7 @@ end
 --         local brawlersInLevel = State.Session.Brawlers[level]
 --         if brawlersInLevel then
 --             local brawler = brawlersInLevel[entityUuid]
---             if brawler and brawler.uuid and Utils.canAct(entityUuid) then
+--             if brawler and brawler.uuid and M.Utils.canAct(entityUuid) then
 --                 print("*****PULSEACTION STUFF WHILE PAUSED*****", brawler.uuid, brawler.displayName)
 --                 -- Doesn't currently have an attack target, so let's find one
 --                 if brawler.targetUuid == nil then
@@ -167,7 +167,7 @@ end
 --                         debugPrint("Locked-on target, attacking", brawler.displayName, entityUuid, "->", M.Utils.getDisplayName(brawler.targetUuid))
 --                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
 --                     end
---                     if Osi.GetDistanceTo(entityUuid, brawler.targetUuid) <= Utils.getTrackingDistance() then
+--                     if Osi.GetDistanceTo(entityUuid, brawler.targetUuid) <= M.Utils.getTrackingDistance() then
 --                         debugPrint("Remaining on target, attacking", brawler.displayName, entityUuid, "->", M.Utils.getDisplayName(brawler.targetUuid))
 --                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
 --                     end
@@ -316,7 +316,7 @@ local function startTruePause(entityUuid)
         --     State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
         -- end
         -- Enqueue actions/movements for non-party NPCs
-        if M.Osi.IsPartyMember(entityUuid, 1) == 0 and Utils.canAct(entityUuid) and not isLocked(entity) then
+        if M.Osi.IsPartyMember(entityUuid, 1) == 0 and M.Utils.canAct(entityUuid) and not isLocked(entity) then
             AI.act(M.Roster.getBrawlerByUuid(entityUuid))
         end
     end
@@ -328,7 +328,7 @@ local function queueCompanionAIActions()
         local players = State.Session.Players
         if players then
             for uuid, player in pairs(players) do
-                if M.Utils.isAliveAndCanFight(uuid) and (not player.isControllingDirectly or State.Settings.FullAuto) and Utils.canAct(uuid) then
+                if M.Utils.isAliveAndCanFight(uuid) and (not player.isControllingDirectly or State.Settings.FullAuto) and M.Utils.canAct(uuid) then
                     local entity = Ext.Entity.Get(uuid)
                     if State.Settings.TurnBasedSwarmMode then
                         if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then

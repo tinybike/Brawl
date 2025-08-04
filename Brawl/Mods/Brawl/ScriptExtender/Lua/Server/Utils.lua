@@ -89,7 +89,7 @@ local function getNearby(source, radius)
 end
 
 local function checkNearby()
-    local nearby = getNearby(M.Osi.GetHostCharacter(), 50)
+    local nearby = M.Utils.getNearby(M.Osi.GetHostCharacter(), 50)
     for _, uuid in ipairs(nearby) do
         _P(M.Utils.getDisplayName(uuid), uuid, M.Osi.CanJoinCombat(uuid))
     end

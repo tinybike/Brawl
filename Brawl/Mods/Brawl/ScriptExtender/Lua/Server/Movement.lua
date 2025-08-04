@@ -182,7 +182,7 @@ end
 
 local function repositionRelativeToTarget(brawlerUuid, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawlerUuid)
-    local distanceToTarget = Osi.GetDistanceTo(brawlerUuid, targetUuid)
+    local distanceToTarget = M.Osi.GetDistanceTo(brawlerUuid, targetUuid)
     if archetype == "melee" then
         if distanceToTarget > Constants.MELEE_RANGE then
             Osi.FlushOsirisQueue(brawlerUuid)
@@ -207,24 +207,24 @@ end
 -- Jump has a base range of 4.5 m / 15 ft and is increased by 1 m / 3 ft for 2 points of Strength above 10
 local function calculateJumpDistance(uuid)
     local entity = Ext.Entity.Get(uuid)
-    local strength = Utils.getAbility(entity) or 10
+    local strength = M.Utils.getAbility(entity) or 10
     local jumpDistance = 4.5 + math.max(0, math.floor((strength - 10)/2))
-    if Utils.hasPassive(entity, "UnarmoredMovement_DifficultTerrain") then
+    if M.Utils.hasPassive(entity, "UnarmoredMovement_DifficultTerrain") then
         jumpDistance = jumpDistance + 6
     end
-    if Utils.hasPassive(entity, "RemarkableAthlete_Jump") then
+    if M.Utils.hasPassive(entity, "RemarkableAthlete_Jump") then
         jumpDistance = jumpDistance + 3
     end
-    if Utils.hasStatus(entity, "LONG_JUMP") then
+    if M.Utils.hasStatus(entity, "LONG_JUMP") then
         jumpDistance = jumpDistance*3
     end
-    if Utils.hasPassive(entity, "Athlete_StandUp") then
+    if M.Utils.hasPassive(entity, "Athlete_StandUp") then
         jumpDistance = jumpDistance*1.5
     end
-    if Utils.hasStatus(entity, "RAGE_TOTEM_TIGER") then
+    if M.Utils.hasStatus(entity, "RAGE_TOTEM_TIGER") then
         jumpDistance = jumpDistance*1.5
     end
-    if Utils.hasStatus(entity, "ENCUMBERED_LIGHT") then
+    if M.Utils.hasStatus(entity, "ENCUMBERED_LIGHT") then
         jumpDistance = jumpDistance*0.5
     end
     return jumpDistance
@@ -232,21 +232,21 @@ end
 
 local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, callback)
     -- print(M.Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
-    local spellRange = Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
-    local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
+    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+    local baseMove = M.Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
     local dashed = false
     local override = not State.Settings.TurnBasedSwarmMode
     local dashAvailable = State.Settings.TurnBasedSwarmMode
     -- if unit can’t move or has zero movement, just callback and exit
     -- NB: check for movement skills like burrow, misty step, jump, charge, force tunnel, etc?
-    if baseMove <= 0 or not Utils.canMove(attackerUuid) then
+    if baseMove <= 0 or not M.Utils.canMove(attackerUuid) then
         if callback then callback() end
         return true
     end
     local function tryMove(allowedDistance)
         -- print("tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
-        local distToTarget = Osi.GetDistanceTo(attackerUuid, targetUuid)
+        local distToTarget = M.Osi.GetDistanceTo(attackerUuid, targetUuid)
         local need = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
@@ -254,7 +254,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
             return true
         end
         -- dash if we need more than base move
-        if dashAvailable and need > allowedDistance and not bonusActionOnly and not dashed and Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
+        if dashAvailable and need > allowedDistance and not bonusActionOnly and not dashed and M.Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
             AI.useSpellOnTarget(attackerUuid, attackerUuid, "Shout_Dash_NPC")
             dashed = true
             return tryMove(baseMove*2)
@@ -353,7 +353,7 @@ local function resetPlayersMovementSpeed()
 end
 
 local function setMovementSpeedThresholds()
-    State.Session.MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS[Utils.getDifficulty()]
+    State.Session.MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS[M.Utils.getDifficulty()]
 end
 
 return {

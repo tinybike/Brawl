@@ -135,14 +135,14 @@ local function extraAttackSpellCheck(spell)
 end
 
 local function parseSpellCosts(spell, costType)
-    local costs = Utils.split(spell[costType], ";")
+    local costs = M.Utils.split(spell[costType], ";")
     local spellCosts = {
         ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
         LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
     }
     -- local hitCost = nil -- divine smite only..?
     for _, cost in ipairs(costs) do
-        local costTable = Utils.split(cost, ":")
+        local costTable = M.Utils.split(cost, ":")
         local costLabel = costTable[1]:match("^%s*(.-)%s*$")
         local costAmount = tonumber(costTable[#costTable])
         if costLabel == "SpellSlotsGroup" then
@@ -328,7 +328,7 @@ end
 
 local function isAutoPathfinding(spell)
     if spell and spell.Trajectories then
-        local trajectories = Utils.split(spell.Trajectories, ",")
+        local trajectories = M.Utils.split(spell.Trajectories, ",")
         for _, trajectory in ipairs(trajectories) do
             if trajectory == Constants.MAGIC_MISSILE_PATHFIND_UUID then
                 return true
@@ -440,7 +440,7 @@ local function getAllSpellsOfType(spellType, hostLevel)
         local spell = Ext.Stats.Get(spellName)
         if isSpellOfType(spell, spellType) then
             if spell.ContainerSpells and spell.ContainerSpells ~= "" then
-                local containerSpellNames = Utils.split(spell.ContainerSpells, ";")
+                local containerSpellNames = M.Utils.split(spell.ContainerSpells, ";")
                 for _, containerSpellName in ipairs(containerSpellNames) do
                     allSpellsOfType[containerSpellName] = getSpellInfo(spellType, containerSpellName, hostLevel)
                 end

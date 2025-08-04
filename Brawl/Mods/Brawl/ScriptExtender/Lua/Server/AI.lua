@@ -30,7 +30,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
         },
         RequestGuid = Utils.createUuid(),
         Spell = {
-            OriginatorPrototype = Utils.getOriginatorPrototype(spellName, stats),
+            OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
             ProgressionSource = Constants.NULL_UUID,
             Prototype = spellName,
             Source = Constants.NULL_UUID,
@@ -801,7 +801,7 @@ local function act(brawler, bonusActionOnly)
                     debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
                     return findTarget(brawler, bonusActionOnly)
                 end
-                if M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) and M.Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= Utils.getTrackingDistance() then
+                if M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) and M.Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= M.Utils.getTrackingDistance() then
                     debugPrint(brawler.displayName, "Remaining on target, attacking", M.Utils.getDisplayName(brawler.targetUuid), bonusActionOnly)
                     return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
                 end

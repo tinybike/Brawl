@@ -346,9 +346,9 @@ local function startSwarmTurn()
                 Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
                 State.Session.SwarmTurnTimer = nil
             end
-            State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
+            State.Session.SwarmTurnTimerCombatRound = M.Utils.getCurrentCombatRound()
             State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*Constants.SWARM_TURN_TIMEOUT, function ()
-                if Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
+                if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
                     print("************************Swarm turn timer finished - setting all enemy turns complete...")
                     setAllEnemyTurnsComplete()
                     State.Session.SwarmTurnTimerCombatRound = nil
@@ -364,8 +364,8 @@ local function checkAllPlayersFinishedTurns()
     if players then
         -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
-            local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
-            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
+            local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
+            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
             if M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end

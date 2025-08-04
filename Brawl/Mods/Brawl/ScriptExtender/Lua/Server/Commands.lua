@@ -282,7 +282,7 @@ local function setAttackMoveTarget(playerUuid, targetUuid)
     debugPrint("Set attack-move target", playerUuid, targetUuid)
     setAwaitingTarget(playerUuid, false)
     local level = M.Osi.GetRegion(playerUuid)
-    if level and targetUuid and not Utils.isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
+    if level and targetUuid and not M.Utils.isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
         Utils.applyAttackMoveTargetVfx(targetUuid)
         if not State.Session.Brawlers[level][targetUuid] then
             Roster.addBrawler(targetUuid, true)
@@ -303,14 +303,14 @@ local function onActionButton(data, isController)
         end
         local actionButtonLabel = tonumber(data.Payload)
         if Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and M.Utils.isAliveAndCanFight(player.uuid) then
-            local spellName = Utils.getSpellNameBySlot(player.uuid, Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel])
+            local spellName = M.Utils.getSpellNameBySlot(player.uuid, Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel])
             if spellName ~= nil then
                 local spell = State.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
                     return Resources.useSpellAndResources(player.uuid, player.uuid, spellName)
                 end
-                -- if Utils.isZoneSpell(spellName) or Utils.isProjectileSpell(spellName) then
+                -- if M.Utils.isZoneSpell(spellName) or M.Utils.isProjectileSpell(spellName) then
                 --     return Resources.useSpellAndResources(player.uuid, nil, spellName)
                 -- end
                 if State.Session.PlayerMarkedTarget[player.uuid] == nil or M.Osi.IsDead(State.Session.PlayerMarkedTarget[player.uuid]) == 1 then

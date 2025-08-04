@@ -182,7 +182,7 @@ local function onEnteredForceTurnBased(entityGuid)
                 end
             end
         end
-        if Utils.isAliveAndCanFight(entityUuid) then
+        if M.Utils.isAliveAndCanFight(entityUuid) then
             Utils.clearOsirisQueue(entityUuid)
             if State.Settings.TruePause then
                 Pause.startTruePause(entityUuid)
@@ -389,16 +389,16 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 State.boostPlayerInitiative(uuid)
                 State.recapPartyMembersMovementDistances()
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
             else
                 State.uncapPartyMembersMovementDistances()
                 -- Pause.checkTruePauseParty()
             end
         end
-        if State.areAnyPlayersBrawling() then
+        if M.State.areAnyPlayersBrawling() then
             Roster.addBrawler(uuid, true)
         end
-        if Osi.IsSummon(uuid) == 1 then
+        if M.Osi.IsSummon(uuid) == 1 then
             State.Session.Players[uuid].isFreshSummon = true
         end
     end
@@ -457,7 +457,7 @@ local function hasExtraAttacksRemaining(uuid)
 end
 
 local function checkExtraAttacksReady(attackerUuid, defenderUuid)
-    return hasExtraAttacksRemaining(attackerUuid) and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid)
+    return hasExtraAttacksRemaining(attackerUuid) and M.Utils.isAliveAndCanFight(attackerUuid) and M.Utils.isAliveAndCanFight(defenderUuid)
 end
 
 local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
@@ -483,7 +483,7 @@ local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, dam
 end
 
 local function useActionPointSurplus(uuid, resourceType)
-    local pointSurplus = math.floor(Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
+    local pointSurplus = math.floor(M.Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
     if pointSurplus > 0 then
         Resources.decreaseActionResource(uuid, resourceType, pointSurplus)
     end
@@ -492,17 +492,17 @@ end
 
 local function useBonusAttacks(uuid)
     local numBonusAttacks = 0
-    if Osi.GetEquippedWeapon(uuid) ~= nil then
-        if Osi.HasActiveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK") == 1 then
+    if M.Osi.GetEquippedWeapon(uuid) ~= nil then
+        if M.Osi.HasActiveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK") == 1 then
             Osi.RemoveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK", "")
             numBonusAttacks = numBonusAttacks + 1
         end
-        if Osi.HasActiveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK") == 1 then
+        if M.Osi.HasActiveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK") == 1 then
             Osi.RemoveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK", "")
             numBonusAttacks = numBonusAttacks + 1
         end
     else
-        if Osi.HasActiveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE") == 1 then
+        if M.Osi.HasActiveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE") == 1 then
             Osi.RemoveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE", "")
             numBonusAttacks = numBonusAttacks + 1
         end
@@ -519,18 +519,18 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
         return
     end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
-        if not State.Settings.TurnBasedSwarmMode or Utils.isPugnacious(attackerUuid) then
+        if not State.Settings.TurnBasedSwarmMode or M.Utils.isPugnacious(attackerUuid) then
             if State.Session.StoryActionIDs[storyActionID] and State.Session.StoryActionIDs[storyActionID].spellName then
                 debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
                 State.Session.StoryActionIDs[storyActionID] = nil
                 local spell = State.getSpellByName(spellName)
                 if spell ~= nil and spell.triggersExtraAttack == true then
-                    if State.Settings.TurnBasedSwarmMode and Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
+                    if State.Settings.TurnBasedSwarmMode and M.Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
                         return nil
                     end
                     if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
                         local brawler = M.Roster.getBrawlerByUuid(attackerUuid)
-                        if brawler and Utils.isAliveAndCanFight(attackerUuid) and Utils.isAliveAndCanFight(defenderUuid) then
+                        if brawler and M.Utils.isAliveAndCanFight(attackerUuid) and M.Utils.isAliveAndCanFight(defenderUuid) then
                             local numBonusAttacks = useBonusAttacks(attackerUuid)
                             debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
                             State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
@@ -937,7 +937,7 @@ end
 
 local function onLeveledUp(character)
     debugPrint("LeveledUp", character)
-    if character ~= nil and Osi.IsPartyMember(character, 1) == 1 then
+    if character ~= nil and M.Osi.IsPartyMember(character, 1) == 1 then
         State.buildSpellTable()
     end
 end

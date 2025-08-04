@@ -228,7 +228,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     -- debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     -- Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
-    -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
+    -- local x, y, z = M.Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
     return true
 end

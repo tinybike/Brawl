@@ -14,6 +14,7 @@ local Memoizable = {
         "GetCombatGroupID",
         "GetDisplayName",
         "GetDistanceTo",
+        "GetEquippedWeapon",
         "GetHitpoints",
         "GetHitpointsPercentage",
         "GetHostCharacter",
@@ -35,6 +36,7 @@ local Memoizable = {
         "IsInvisible",
         "IsPartyMember",
         "IsPlayer",
+        "IsSummon",
         "ResolveTranslatedString",
     },
     Utils = {
@@ -55,6 +57,7 @@ local Memoizable = {
         "isHealerArchetype",
         "isBrawlingWithValidTarget",
         "isOnSameLevel",
+        "getTrackingDistance",
         "getForwardVector",
         "getPointInFrontOf",
         "isCounterspell",
