@@ -1,5 +1,3 @@
-local getDisplayName = Utils.getDisplayName
-
 local function initialize()
     State.Session.Leaderboard = {}
     local players = State.Session.Players
@@ -51,7 +49,7 @@ end
 local function updateKills(uuid)
     if State.Settings.LeaderboardEnabled and Osi.IsCharacter(uuid) == 1 then
         State.Session.Leaderboard[uuid] = State.Session.Leaderboard[uuid] or {}
-        State.Session.Leaderboard[uuid].name = State.Session.Leaderboard[uuid].name or (getDisplayName(uuid) or "")
+        State.Session.Leaderboard[uuid].name = State.Session.Leaderboard[uuid].name or (M.Utils.getDisplayName(uuid) or "")
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
         postDataToClients(true)
@@ -61,11 +59,11 @@ end
 local function updateHealing(healerUuid, targetUuid, amount)
     if State.Settings.LeaderboardEnabled and Osi.IsCharacter(targetUuid) == 1 then
         State.Session.Leaderboard[targetUuid] = State.Session.Leaderboard[targetUuid] or {}
-        State.Session.Leaderboard[targetUuid].name = State.Session.Leaderboard[targetUuid].name or (getDisplayName(targetUuid) or "")
+        State.Session.Leaderboard[targetUuid].name = State.Session.Leaderboard[targetUuid].name or (M.Utils.getDisplayName(targetUuid) or "")
         State.Session.Leaderboard[targetUuid].healingTaken = State.Session.Leaderboard[targetUuid].healingTaken or 0
         State.Session.Leaderboard[targetUuid].healingTaken = State.Session.Leaderboard[targetUuid].healingTaken + amount
         State.Session.Leaderboard[healerUuid] = State.Session.Leaderboard[healerUuid] or {}
-        State.Session.Leaderboard[healerUuid].name = State.Session.Leaderboard[healerUuid].name or (getDisplayName(healerUuid) or "")
+        State.Session.Leaderboard[healerUuid].name = State.Session.Leaderboard[healerUuid].name or (M.Utils.getDisplayName(healerUuid) or "")
         State.Session.Leaderboard[healerUuid].healingDone = State.Session.Leaderboard[healerUuid].healingDone or 0
         if Osi.IsEnemy(healerUuid, targetUuid) == 1 then
             amount = -amount
@@ -78,12 +76,12 @@ end
 local function updateDamage(attackerUuid, defenderUuid, amount)
     if State.Settings.LeaderboardEnabled and Osi.IsCharacter(defenderUuid) == 1 then
         State.Session.Leaderboard[defenderUuid] = State.Session.Leaderboard[defenderUuid] or {}
-        State.Session.Leaderboard[defenderUuid].name = State.Session.Leaderboard[defenderUuid].name or (getDisplayName(defenderUuid) or "")
+        State.Session.Leaderboard[defenderUuid].name = State.Session.Leaderboard[defenderUuid].name or (M.Utils.getDisplayName(defenderUuid) or "")
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken or 0
         State.Session.Leaderboard[defenderUuid].damageTaken = State.Session.Leaderboard[defenderUuid].damageTaken + amount
         if attackerUuid ~= defenderUuid then
             State.Session.Leaderboard[attackerUuid] = State.Session.Leaderboard[attackerUuid] or {}
-            State.Session.Leaderboard[attackerUuid].name = State.Session.Leaderboard[attackerUuid].name or (getDisplayName(attackerUuid) or "")
+            State.Session.Leaderboard[attackerUuid].name = State.Session.Leaderboard[attackerUuid].name or (M.Utils.getDisplayName(attackerUuid) or "")
             State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone or 0
             if Osi.IsEnemy(attackerUuid, defenderUuid) == 0 then
                 amount = -amount

@@ -1,7 +1,5 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
-local isAliveAndCanFight = Utils.isAliveAndCanFight
 local isToT = Utils.isToT
 local startChunk
 local singleCharacterTurn
@@ -45,7 +43,7 @@ local function setTurnComplete(uuid)
     if State.Session.SwarmTurnActive then
         local entity = Ext.Entity.Get(uuid)
         if entity.TurnBased then
-            -- print(getDisplayName(uuid), "Setting turn complete", uuid)
+            -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
             entity.TurnBased.HadTurnInCombat = true
             entity.TurnBased.RequestedEndTurn = true
             entity.TurnBased.TurnActionsCompleted = true
@@ -58,7 +56,7 @@ end
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity.TurnBased then
-        -- print(getDisplayName(uuid), "Unsetting turn complete", uuid)
+        -- print(M.Utils.getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
@@ -69,12 +67,12 @@ end
 
 local function setAllEnemyTurnsComplete()
     debugPrint("setAllEnemyTurnsComplete")
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     setTurnComplete(brawlerUuid)
                 end
             end
@@ -84,12 +82,12 @@ end
 
 local function unsetAllEnemyTurnsComplete()
     debugPrint("unsetAllEnemyTurnsComplete")
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     unsetTurnComplete(brawlerUuid)
                 end
             end
@@ -99,12 +97,12 @@ end
 
 local function allBrawlersCanAct()
     local brawlersCanAct = {}
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                brawlersCanAct[brawlerUuid] = Utils.canAct(brawlerUuid)
+                brawlersCanAct[brawlerUuid] = M.Utils.canAct(brawlerUuid)
             end
         end
     end
@@ -112,12 +110,12 @@ local function allBrawlersCanAct()
 end
 
 local function checkSwarmTurnComplete()
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for uuid, brawler in pairs(brawlersInLevel) do
-                if Osi.IsPartyMember(uuid, 1) == 0 and not State.Session.SwarmTurnComplete[uuid] then
+                if M.Osi.IsPartyMember(uuid, 1) == 0 and not State.Session.SwarmTurnComplete[uuid] then
                     debugPrint(brawler.displayName, "swarm turn not complete for", uuid, Osi.GetActionResourceValuePersonal(uuid, "ActionPoint", 0), Osi.GetActionResourceValuePersonal(uuid, "BonusActionPoint", 0))
                     return false
                 end
@@ -129,13 +127,13 @@ end
 
 local function resetSwarmTurnComplete()
     debugPrint("resetSwarmTurnComplete")
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for uuid, _ in pairs(brawlersInLevel) do
-                if Osi.IsPartyMember(uuid, 1) == 0 then
-                    debugPrint("setting turn complete for", uuid, Utils.getDisplayName(uuid))
+                if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                    debugPrint("setting turn complete for", uuid, M.Utils.getDisplayName(uuid))
                     local entity = Ext.Entity.Get(uuid)
                     if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
                         setTurnComplete(uuid)
@@ -171,7 +169,7 @@ local function completeSwarmTurn(uuid)
         end
     end
     setTurnComplete(uuid)
-    debugPrint(Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
+    debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
     -- _D(State.Session.SwarmTurnComplete)
     if checkSwarmTurnComplete() then
         resetSwarmTurnComplete()
@@ -222,7 +220,7 @@ end
 local function isControlledByDefaultAI(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
-        debugPrint("entity ACTIVE, using default AI instead...", uuid, Utils.getDisplayName(uuid))
+        debugPrint("entity ACTIVE, using default AI instead...", uuid, M.Utils.getDisplayName(uuid))
         State.Session.SwarmTurnComplete[uuid] = true
         return true
     end
@@ -231,8 +229,8 @@ end
 
 local function useRemainingActions(brawler, callback)
     if brawler and brawler.uuid then
-        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
-        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
+        local numActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
+        local numBonusActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
         -- print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
         if numActions == 0 and numBonusActions == 0 then
             if State.Session.QueuedCompanionAIAction[brawler.uuid] then
@@ -277,13 +275,13 @@ local function swarmAction(brawler)
 end
 
 singleCharacterTurn = function (brawler, brawlerIndex)
-    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, Utils.canAct(brawler.uuid))
-    local hostCharacterUuid = Osi.GetHostCharacter()
-    if isToT() and Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not Utils.isPlayerOrAlly(brawler.uuid) then
+    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid))
+    local hostCharacterUuid = M.Osi.GetHostCharacter()
+    if isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
         print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not Utils.canAct(brawler.uuid) then
+    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
@@ -298,14 +296,14 @@ end
 
 local function startEnemyTurn()
     debugPrint("startEnemyTurn")
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
+    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             State.Session.BrawlerChunks = {}
             local chunkIndex, brawlersInChunk = 1, 0
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
                     State.Session.BrawlerChunks[chunkIndex][brawlerUuid] = brawler
                     print("CHUNK", chunkIndex, brawlersInChunk, brawler.displayName)
@@ -329,7 +327,7 @@ end
 local function startSwarmTurn()
     local shouldFreezePlayers = {}
     for uuid, _ in pairs(State.Session.Players) do
-        shouldFreezePlayers[uuid] = Utils.isToT() or Osi.IsInCombat(uuid) == 1
+        shouldFreezePlayers[uuid] = Utils.isToT() or M.Osi.IsInCombat(uuid) == 1
     end
     State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
     State.Session.CanActBeforeDelay = allBrawlersCanAct()
@@ -367,8 +365,8 @@ local function checkAllPlayersFinishedTurns()
         -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
         for playerUuid, _ in pairs(players) do
             local isUncontrolled = Utils.hasLoseControlStatus(playerUuid)
-            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], isAliveAndCanFight(playerUuid), isUncontrolled)
-            if isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+            debugPrint("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
+            if M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
                 return false
             end
         end

@@ -1,11 +1,5 @@
--- local Constants = require("Server/Constants.lua")
--- local Utils = require("Server/Utils.lua")
--- local Resources = require("Server/Resources.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
-local isSilenced = Utils.isSilenced
 
 -- Settings
 local Settings = {
@@ -490,7 +484,7 @@ local function getArchetype(uuid)
         end
     end
     if archetype == nil or archetype == "" then
-        archetype = Osi.GetActiveArchetype(uuid)
+        archetype = M.Osi.GetActiveArchetype(uuid)
     end
     if not Constants.ARCHETYPE_WEIGHTS[archetype] then
         if archetype == nil or archetype == "base" then
@@ -518,7 +512,7 @@ local function checkForDownedOrDeadPlayers()
     local players = Session.Players
     if players then
         for uuid, player in pairs(players) do
-            if Osi.IsDead(uuid) == 1 or Utils.isDowned(uuid) then
+            if M.Osi.IsDead(uuid) == 1 or M.Utils.isDowned(uuid) then
                 Utils.clearOsirisQueue(uuid)
                 Osi.LieOnGround(uuid)
             end
@@ -529,7 +523,7 @@ end
 local function areAnyPlayersBrawling()
     if Session.Players then
         for playerUuid, player in pairs(Session.Players) do
-            local level = Osi.GetRegion(playerUuid)
+            local level = M.Osi.GetRegion(playerUuid)
             if level and Session.Brawlers[level] and Session.Brawlers[level][playerUuid] then
                 return true
             end
@@ -541,7 +535,7 @@ end
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
+        if M.Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end
@@ -566,7 +560,7 @@ end
 local function isPartyInRealTime()
     if Session.Players then
         for uuid, _ in pairs(Session.Players) do
-            if Osi.IsInForceTurnBasedMode(uuid) == 1 then
+            if M.Osi.IsInForceTurnBasedMode(uuid) == 1 then
                 return false
             end
         end
@@ -581,7 +575,7 @@ local function getSpellByName(name)
 end
 
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
-    if isSilenced(uuid) then
+    if M.Utils.isSilenced(uuid) then
         return false
     end
     for _, preparedSpell in ipairs(preparedSpells) do
@@ -597,7 +591,7 @@ local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionO
         if isUsableHeal then
             if Settings.HogwildMode then
                 return true
-            elseif Resources.hasEnoughToCastSpell(uuid, spellName) then
+            elseif M.Resources.hasEnoughToCastSpell(uuid, spellName) then
                 return true
             end
         end
@@ -642,7 +636,7 @@ local function uncapMovementDistance(entityUuid)
         modVars.MovementDistances = {}
     end
     local movementDistances = modVars.MovementDistances
-    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
+    if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
         -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
@@ -664,7 +658,7 @@ end
 local function capMovementDistance(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local movementDistances = modVars.MovementDistances
-    if movementDistances and movementDistances[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+    if movementDistances and movementDistances[entityUuid] ~= nil and M.Osi.IsCharacter(entityUuid) == 1 then
         -- debugPrint("Cap movement distance", entityUuid)
         -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
@@ -680,14 +674,14 @@ local function capMovementDistance(entityUuid)
         end
         movementDistances[entityUuid] = nil
         modVars.MovementDistances = movementDistances
-        -- debugPrint("Capped distance:", entityUuid, getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
+        -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
 local function revertHitpoints(entityUuid)
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     local modifiedHitpoints = modVars.ModifiedHitpoints
-    if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and Osi.IsCharacter(entityUuid) == 1 then
+    if modifiedHitpoints and modifiedHitpoints[entityUuid] ~= nil and M.Osi.IsCharacter(entityUuid) == 1 then
         -- debugPrint("Reverting hitpoints", entityUuid)
         -- debugDump(modifiedHitpoints[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
@@ -704,7 +698,7 @@ local function revertHitpoints(entityUuid)
         entity:Replicate("Health")
         modifiedHitpoints[entityUuid] = nil
         modVars.ModifiedHitpoints = modifiedHitpoints
-        -- debugPrint("Reverted hitpoints:", entityUuid, getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Reverted hitpoints:", entityUuid, M.Utils.getDisplayName(entityUuid), entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
@@ -714,7 +708,7 @@ local function modifyHitpoints(entityUuid)
         modVars.ModifiedHitpoints = {}
     end
     local modifiedHitpoints = modVars.ModifiedHitpoints
-    if Osi.IsCharacter(entityUuid) == 1 and Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
+    if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and modifiedHitpoints[entityUuid] == nil then
         -- debugPrint("modify hitpoints", entityUuid, Settings.HitpointsMultiplier)
         local entity = Ext.Entity.Get(entityUuid)
         local originalMaxHp = entity.Health.MaxHp
@@ -731,13 +725,13 @@ local function modifyHitpoints(entityUuid)
         modifiedHitpoints[entityUuid].maxHp = entity.Health.MaxHp
         modifiedHitpoints[entityUuid].multiplier = Settings.HitpointsMultiplier
         modVars.ModifiedHitpoints = modifiedHitpoints
-        -- debugPrint("Modified hitpoints:", entityUuid, getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
+        -- debugPrint("Modified hitpoints:", entityUuid, M.Utils.getDisplayName(entityUuid), originalMaxHp, originalHp, entity.Health.MaxHp, entity.Health.Hp)
     end
 end
 
 local function uncapPartyMembersMovementDistances()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
         capMovementDistance(partyMemberUuid)
         uncapMovementDistance(partyMemberUuid)
         if Session.PartyMembersMovementResourceListeners[partyMemberUuid] ~= nil then
@@ -769,7 +763,7 @@ end
 
 local function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = Osi.GetUUID(partyMember[1])
+        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
         revertHitpoints(partyMemberUuid)
         modifyHitpoints(partyMemberUuid)
         if Session.PartyMembersHitpointsListeners[partyMemberUuid] ~= nil then
@@ -829,7 +823,7 @@ local function setMaxPartySize()
 end
 
 local function setupPlayer(guid)
-    local uuid = Osi.GetUUID(guid)
+    local uuid = M.Osi.GetUUID(guid)
     if uuid then
         if not Session.Players then
             Session.Players = {}
@@ -837,7 +831,7 @@ local function setupPlayer(guid)
         Session.Players[uuid] = {
             uuid = uuid,
             guid = guid,
-            displayName = getDisplayName(uuid),
+            displayName = M.Utils.getDisplayName(uuid),
             userId = Osi.GetReservedUserID(uuid),
         }
         Osi.SetCanJoinCombat(uuid, 1)

@@ -1,10 +1,5 @@
--- local Constants = require("Server/Constants.lua")
--- local Utils = require("Server/Utils.lua")
--- local State = require("Server/State.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
 local clearOsirisQueue = Utils.clearOsirisQueue
 
 local function decreaseActionResource(uuid, resourceType, amount)
@@ -74,19 +69,19 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     end
     for costType, costValue in pairs(spell.costs) do
         if costType == "ShortRest" or costType == "LongRest" then
-            if costValue and not checkSpellCharge(casterUuid, spellName) then
+            if costValue and not M.Resources.checkSpellCharge(casterUuid, spellName) then
                 return false
             end
         elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
             if costType == "SpellSlot" then
                 local spellLevel = upcastLevel == nil and costValue or upcastLevel
-                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
+                local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
                 if availableResourceValue < 1 then
                     debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                     return false
                 end
             else
-                local availableResourceValue = Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
+                local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
                 if availableResourceValue ~= nil and availableResourceValue < costValue then
                     debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
                     return false
@@ -111,7 +106,7 @@ local function removeActionInProgress(uuid, spellName)
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, getDisplayName(uuid), actionsInProgress[i])
+                debugPrint("remove action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i])
                 table.remove(actionsInProgress, i)
             end
             return true
@@ -192,7 +187,7 @@ local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, v
 end
 
 local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
-    debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
         return false
     end
@@ -202,20 +197,19 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     if upcastLevel ~= nil then
         spellName = spellName .. "_" .. tostring(upcastLevel)
     end
-    local spellRange = Utils.convertSpellRangeToNumber(Utils.getSpellRange(spellName))
-    local distanceTo = Osi.GetDistanceTo(casterUuid, targetUuid)
+    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+    local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
-        print("cast failed, out of range", getDisplayName(casterUuid), getDisplayName(targetUuid), distanceTo, spellRange, spellName)
+        print("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
         return false
     end
-    if spellRange > 2 and Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
+    if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
-            print("cast failed, no line of sight", getDisplayName(casterUuid), getDisplayName(targetUuid), spellName)
+            print("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
             return false
         end
     end
-    -- 
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)
@@ -231,7 +225,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     -- clearOsirisQueue(casterUuid)
     -- State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    -- debugPrint(getDisplayName(casterUuid), "casting on target", spellName, targetUuid, getDisplayName(targetUuid))
+    -- debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     -- Osi.UseSpell(casterUuid, spellName, targetUuid)
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = Utils.getPointInFrontOf(casterUuid, 1.0)
@@ -241,6 +235,7 @@ end
 
 return {
     decreaseActionResource = decreaseActionResource,
+    checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,

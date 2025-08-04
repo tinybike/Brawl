@@ -1,13 +1,5 @@
--- local Constants = require("Server/Constants.lua")
--- local Utils = require("Server/Utils.lua")
--- local State = require("Server/State.lua")
--- local Movement = require("Server/Movement.lua")
--- local Listeners = require("Server/Listeners.lua")
-
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local getDisplayName = Utils.getDisplayName
-local isAliveAndCanFight = Utils.isAliveAndCanFight
 
 local function getNumExtraAttacks(entityUuid)
     if Osi.HasPassive(entityUuid, "ExtraAttack_3") == 1 or Osi.HasPassive(entityUuid, "WildStrike_3") == 1 or Osi.HasPassive(entityUuid, "Slayer_ExtraAttack_3") == 1 then
@@ -51,16 +43,16 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
         local level = Osi.GetRegion(entityUuid)
         local okToAdd = false
         if replaceExistingBrawler then
-            okToAdd = level and State.Session.Brawlers[level] ~= nil and isAliveAndCanFight(entityUuid)
+            okToAdd = level and State.Session.Brawlers[level] ~= nil and M.Utils.isAliveAndCanFight(entityUuid)
         else
-            okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and isAliveAndCanFight(entityUuid)
+            okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and M.Utils.isAliveAndCanFight(entityUuid)
         end
         if State.Settings.TurnBasedSwarmMode and Utils.isToT() and Mods.ToT.PersistentVars.Scenario and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
             debugPrint("ADDING COMBAT HELPER TO BRAWLERS")
             okToAdd = true
         end
         if okToAdd then
-            local displayName = getDisplayName(entityUuid)
+            local displayName = M.Utils.getDisplayName(entityUuid)
             local brawler = {
                 uuid = entityUuid,
                 displayName = displayName,
@@ -213,6 +205,21 @@ local function getBrawlerByName(name)
     end
 end
 
+local function getBrawlersSortedByDistance(entityUuid)
+    local brawlersSortedByDistance = {}
+    local level = Osi.GetRegion(entityUuid)
+    local brawlersInLevel = State.Session.Brawlers[level]
+    if brawlersInLevel then
+        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            if isOnSameLevel(brawlerUuid, entityUuid) and M.Utils.isAliveAndCanFight(brawlerUuid) then
+                table.insert(brawlersSortedByDistance, {brawlerUuid, Osi.GetDistanceTo(entityUuid, brawlerUuid)})
+            end
+        end
+        table.sort(brawlersSortedByDistance, function (a, b) return a[2] < b[2] end)
+    end
+    return brawlersSortedByDistance
+end
+
 local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
     local nearby = Utils.getNearby(entityUuid, nearbyRadius)
     for _, uuid in ipairs(nearby) do
@@ -245,7 +252,7 @@ end
 
 local function disableLockedOnTarget(uuid)
     local level = Osi.GetRegion(uuid)
-    if level and isAliveAndCanFight(uuid) then
+    if level and M.Utils.isAliveAndCanFight(uuid) then
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel[uuid] then
             brawlersInLevel[uuid].lockedOnTarget = false
@@ -285,6 +292,7 @@ return {
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
     endBrawl = endBrawl,
+    getBrawlersSortedByDistance = getBrawlersSortedByDistance,
     addNearbyToBrawlers = addNearbyToBrawlers,
     addNearbyEnemiesToBrawlers = addNearbyEnemiesToBrawlers,
     addPlayersInEnterCombatRangeToBrawlers = addPlayersInEnterCombatRangeToBrawlers,

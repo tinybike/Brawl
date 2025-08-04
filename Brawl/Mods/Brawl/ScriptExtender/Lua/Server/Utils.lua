@@ -1,6 +1,3 @@
--- local Constants = require("Server/Constants.lua")
--- local State = require("Server/State.lua")
-
 local function debugPrint(...)
     if Constants.DEBUG_LOGGING then
         _P(...)
@@ -30,9 +27,9 @@ local function dumpEntityToFile(entityUuid)
 end
 
 local function getDisplayName(entityUuid)
-    local displayName = Osi.GetDisplayName(entityUuid)
+    local displayName = M.Osi.GetDisplayName(entityUuid)
     if displayName ~= nil then
-        return Osi.ResolveTranslatedString(displayName)
+        return M.Osi.ResolveTranslatedString(displayName)
     end
 end
 
@@ -40,21 +37,21 @@ local function isAliveAndCanFight(entityUuid)
     if Constants.IS_TRAINING_DUMMY[entityUuid] == true then
         return true
     end
-    local isDead = Osi.IsDead(entityUuid)
+    local isDead = M.Osi.IsDead(entityUuid)
     if isDead == nil then
         return false
     end
     if isDead == 1 then
         return false
     end
-    local hitpoints = Osi.GetHitpoints(entityUuid)
+    local hitpoints = M.Osi.GetHitpoints(entityUuid)
     if hitpoints == nil then
         return false
     end
     if hitpoints == 0 then
         return false
     end
-    local canFight = Osi.CanFight(entityUuid)
+    local canFight = M.Osi.CanFight(entityUuid)
     if canFight == nil then
         return false
     end
@@ -81,7 +78,7 @@ local function getNearby(source, radius)
                 local distance = sqrt(dx*dx + dy*dy + dz*dz)
                 if distance <= radius and e.IsCharacter and e.Uuid then
                     local uuid = e.Uuid.EntityUuid
-                    if uuid and isAliveAndCanFight(uuid) then
+                    if uuid and M.Utils.isAliveAndCanFight(uuid) then
                         nearby[#nearby + 1] = uuid
                     end
                 end
@@ -92,28 +89,28 @@ local function getNearby(source, radius)
 end
 
 local function checkNearby()
-    local nearby = getNearby(Osi.GetHostCharacter(), 50)
+    local nearby = getNearby(M.Osi.GetHostCharacter(), 50)
     for _, uuid in ipairs(nearby) do
-        _P(getDisplayName(uuid), uuid, Osi.CanJoinCombat(uuid))
+        _P(M.Utils.getDisplayName(uuid), uuid, M.Osi.CanJoinCombat(uuid))
     end
 end
 
 local function isDowned(entityUuid)
-    return Osi.IsDead(entityUuid) == 0 and Osi.GetHitpoints(entityUuid) == 0
+    return M.Osi.IsDead(entityUuid) == 0 and M.Osi.GetHitpoints(entityUuid) == 0
 end
 
 local function isPlayerOrAlly(entityUuid)
-    return Osi.IsPlayer(entityUuid) == 1 or Osi.IsAlly(Osi.GetHostCharacter(), entityUuid) == 1
+    return M.Osi.IsPlayer(entityUuid) == 1 or M.Osi.IsAlly(M.Osi.GetHostCharacter(), entityUuid) == 1
 end
 
 local function isPugnacious(potentialEnemyUuid, uuid)
     if uuid == nil then
-        uuid = Osi.GetHostCharacter()
+        uuid = M.Osi.GetHostCharacter()
         if uuid == nil then
             return nil
         end
     end
-    return Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
+    return M.Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
@@ -128,8 +125,8 @@ end
 -- thank u focus
 ---@return "EASY"|"MEDIUM"|"HARD"|"HONOUR"
 local function getDifficulty()
-    local difficulty = Osi.GetRulesetModifierString("cac2d8bd-c197-4a84-9df1-f86f54ad4521")
-    if difficulty == "HARD" and Osi.GetRulesetModifierBool("338450d9-d77d-4950-9e1e-0e7f12210bb3") == 1 then
+    local difficulty = M.Osi.GetRulesetModifierString("cac2d8bd-c197-4a84-9df1-f86f54ad4521")
+    if difficulty == "HARD" and M.Osi.GetRulesetModifierBool("338450d9-d77d-4950-9e1e-0e7f12210bb3") == 1 then
         return "HONOUR"
     end
     return difficulty
@@ -149,11 +146,11 @@ local function split(inputstr, sep)
 end
 
 local function isZoneSpell(spellName)
-    return split(spellName, "_")[1] == "Zone"
+    return M.Utils.split(spellName, "_")[1] == "Zone"
 end
 
 local function isProjectileSpell(spellName)
-    return split(spellName, "_")[1] == "Projectile"
+    return M.Utils.split(spellName, "_")[1] == "Projectile"
 end
 
 local function convertSpellRangeToNumber(range)
@@ -179,7 +176,7 @@ local function getSpellRange(spellName)
         return "MeleeMainWeaponRange"
     end
     local spell = Ext.Stats.Get(spellName)
-    if isZoneSpell(spellName) then
+    if M.Utils.isZoneSpell(spellName) then
         return spell.Range
     elseif spell.TargetRadius ~= "" then
         return spell.TargetRadius
@@ -191,14 +188,14 @@ local function getSpellRange(spellName)
 end
 
 local function isVisible(uuid, targetUuid)
-    if Osi.HasActiveStatus(uuid, "TRUESIGHT") == 1 or Osi.HasActiveStatus(uuid, "MOD_Generic_Truesight") == 1 then
+    if M.Osi.HasActiveStatus(uuid, "TRUESIGHT") == 1 or M.Osi.HasActiveStatus(uuid, "MOD_Generic_Truesight") == 1 then
         return true
     end
-    local hasSeeInvisibility = Osi.HasActiveStatus(uuid, "SEE_INVISIBILITY") == 1 or Osi.HasActiveStatus(uuid, "MAG_SEE_INVISIBILITY_HIDDEN_IGNORE_RESTING") == 1
-    if hasSeeInvisibility and Osi.GetDistanceTo(uuid, targetUuid) <= 9 then
+    local hasSeeInvisibility = M.Osi.HasActiveStatus(uuid, "SEE_INVISIBILITY") == 1 or M.Osi.HasActiveStatus(uuid, "MAG_SEE_INVISIBILITY_HIDDEN_IGNORE_RESTING") == 1
+    if hasSeeInvisibility and M.Osi.GetDistanceTo(uuid, targetUuid) <= 9 then
         return true
     end
-    return Osi.IsInvisible(targetUuid) == 0 and Osi.HasActiveStatus(targetUuid, "SNEAKING") == 0
+    return M.Osi.IsInvisible(targetUuid) == 0 and M.Osi.HasActiveStatus(targetUuid, "SNEAKING") == 0
 end
 
 local function isMeleeArchetype(archetype)
@@ -210,12 +207,12 @@ local function isHealerArchetype(archetype)
 end
 
 local function isBrawlingWithValidTarget(brawler)
-    return brawler.isInBrawl and brawler.targetUuid ~= nil and isAliveAndCanFight(brawler.targetUuid)
+    return brawler.isInBrawl and brawler.targetUuid ~= nil and M.Utils.isAliveAndCanFight(brawler.targetUuid)
 end
 
 local function isOnSameLevel(uuid1, uuid2)
-    local level1 = Osi.GetRegion(uuid1)
-    local level2 = Osi.GetRegion(uuid2)
+    local level1 = M.Osi.GetRegion(uuid1)
+    local level2 = M.Osi.GetRegion(uuid2)
     return level1 ~= nil and level2 ~= nil and level1 == level2
 end
 
@@ -234,7 +231,7 @@ local function getForwardVector(entityUuid)
 end
 
 local function getPointInFrontOf(entityUuid, distance)
-    local forwardX, forwardY, forwardZ = getForwardVector(entityUuid)
+    local forwardX, forwardY, forwardZ = M.Utils.getForwardVector(entityUuid)
     local translate = entity.Transform.Transform.Translate
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance
 end
@@ -257,7 +254,7 @@ local function removeNegativeStatuses(uuid)
 end
 
 local function clearOsirisQueue(uuid)
-    -- print("clearOsirisQueue", uuid, getDisplayName(uuid))
+    -- print("clearOsirisQueue", uuid, M.Utils.getDisplayName(uuid))
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end
@@ -268,9 +265,9 @@ end
 
 local function isSilenced(uuid)
     -- nb: what other labels can silences have? :/
-    if Osi.HasActiveStatus(uuid, "SILENCED") == 1 then
+    if M.Osi.HasActiveStatus(uuid, "SILENCED") == 1 then
         return true
-    elseif Osi.HasActiveStatus(uuid, "SHA_SILENTLIBRARY_LIBRARIANSILENCE_STATUS") == 1 then
+    elseif M.Osi.HasActiveStatus(uuid, "SHA_SILENTLIBRARY_LIBRARIANSILENCE_STATUS") == 1 then
         return true
     end
     return false
@@ -318,12 +315,12 @@ local function getTrackingDistance()
 end
 
 local function canAct(uuid)
-    if not uuid or isDowned(uuid) or not isAliveAndCanFight(uuid) then
+    if not uuid or M.Utils.isDowned(uuid) or not M.Utils.isAliveAndCanFight(uuid) then
         return false
     end
     for _, noActionStatus in ipairs(Constants.NO_ACTION_STATUSES) do
-        if Osi.HasActiveStatus(uuid, noActionStatus) == 1 then
-            debugPrint(getDisplayName(uuid), "has a no action status", noActionStatus)
+        if M.Osi.HasActiveStatus(uuid, noActionStatus) == 1 then
+            debugPrint(M.Utils.getDisplayName(uuid), "has a no action status", noActionStatus)
             return false
         end
     end
@@ -346,22 +343,40 @@ end
 local function hasLoseControlStatus(uuid)
     local entity = Ext.Entity.Get(uuid)
     -- NB: not yet in SE release branch
-    -- if Ext.Entity.Get(uuid).StatusLoseControl ~= nil then
-    --     return true
-    -- end
-    if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
-        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
-            local stats = Ext.Stats.Get(status.StatusId, nil, false)
-            if stats ~= nil then
-                for _, flag in ipairs(stats.StatusPropertyFlags) do
-                    if flag == "LoseControl" or flag == "LoseControlFriendly" then
-                        return true
-                    end
-                end
-            end
-        end
+    if entity and entity.StatusLoseControl ~= nil then
+        return true
     end
+    -- if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+    --     for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+    --         local stats = Ext.Stats.Get(status.StatusId, nil, false)
+    --         if stats ~= nil then
+    --             for _, flag in ipairs(stats.StatusPropertyFlags) do
+    --                 if flag == "LoseControl" or flag == "LoseControlFriendly" then
+    --                     return true
+    --                 end
+    --             end
+    --         end
+    --     end
+    -- end
     return false
+end
+
+local function isHostileTarget(uuid, targetUuid)
+    local isBrawlerPlayerOrAlly = M.Utils.isPlayerOrAlly(uuid)
+    local isPotentialTargetPlayerOrAlly = M.Utils.isPlayerOrAlly(targetUuid)
+    local isHostile = false
+    if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
+        isHostile = false
+    elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
+    elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
+    elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+    else
+        debugPrint(M.Utils.getDisplayName(uuid), "isHostileTarget: what happened here?", uuid, targetUuid, M.Utils.getDisplayName(targetUuid))
+    end
+    return isHostile
 end
 
 local function getCurrentCombatRound()
@@ -370,6 +385,81 @@ local function getCurrentCombatRound()
         local combatEntity = serverEnterRequestEntities[1]
         if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
             return combatEntity.TurnOrder.field_40
+        end
+    end
+end
+
+local function hasStatus(entity, targetStatus)
+    if entity and entity.StatusContainer and entity.StatusContainer.Statuses then
+        for _, status in pairs(entity.StatusContainer.Statuses) do
+            if status == targetStatus then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function hasPassive(entity, targetPassive)
+    if entity and entity.PassiveContainer and entity.PassiveContainer.Passives then
+        for _, passiveEntity in ipairs(entity.PassiveContainer.Passives) do
+            if passiveEntity.Passive and passiveEntity.Passive.PassiveId == targetPassive then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function getAbility(entity, ability)
+    if entity and entity.Stats and entity.Stats.Abilities and Constants.ABILITIES[ability] then
+        return entity.Stats.Abilities[Constants.ABILITIES[ability]]
+    end
+end
+
+local function isConcentrating(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity then
+        local concentration = entity.Concentration
+        if concentration and concentration.SpellId and concentration.SpellId.OriginatorPrototype ~= "" then
+            return true
+        end
+    end
+    return false
+end
+
+local function isValidHostileTarget(uuid, targetUuid)
+    if not M.Utils.isVisible(uuid, targetUuid) then
+        return false
+    elseif not M.Utils.isAliveAndCanFight(targetUuid) and not M.Utils.isDowned(targetUuid) then
+        return false
+    else
+        local entity = Ext.Entity.Get(targetUuid)
+        if entity then
+            if M.Utils.hasStatus(entity, "SANCTUARY") then
+                return false
+            elseif M.Utils.hasStatus(entity, "INVULNERABLE") then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+local function getSpellNameBySlot(uuid, slot)
+    local entity = Ext.Entity.Get(uuid)
+    -- NB: is this always index 6?
+    if entity and entity.HotbarContainer and entity.HotbarContainer.Containers and entity.HotbarContainer.Containers.DefaultBarContainer then
+        local customBar = entity.HotbarContainer.Containers.DefaultBarContainer[6]
+        local spellName = nil
+        for _, element in ipairs(customBar.Elements) do
+            if element.Slot == slot then
+                if element.SpellId then
+                    return element.SpellId.OriginatorPrototype
+                else
+                    return nil
+                end
+            end
         end
     end
 end
@@ -446,7 +536,14 @@ return {
     canAct = canAct,
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
+    isHostileTarget = isHostileTarget,
     getCurrentCombatRound = getCurrentCombatRound,
+    hasStatus = hasStatus,
+    hasPassive = hasPassive,
+    getAbility = getAbility,
+    isConcentrating = isConcentrating,
+    isValidHostileTarget = isValidHostileTarget,
+    getSpellNameBySlot = getSpellNameBySlot,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
