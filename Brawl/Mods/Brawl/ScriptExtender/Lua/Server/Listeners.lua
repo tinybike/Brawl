@@ -936,8 +936,8 @@ local function onOnCriminalMergedWithCrime(crimeID, criminal)
 end
 
 local function onLeveledUp(character)
-    debugPrint("LeveledUp", character, Osi.GetRegion(character))
-    if character ~= nil and Osi.IsPartyMember(character, 1) == 1 and Osi.GetRegion(character) then
+    debugPrint("LeveledUp", character)
+    if character ~= nil and Osi.IsPartyMember(character, 1) == 1 then
         State.buildSpellTable()
     end
 end

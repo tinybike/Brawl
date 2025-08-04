@@ -1,7 +1,5 @@
 local M = {}
 local Cache = {}
-local VAL = {}
-
 local Memoizable = {
     Osi = {
         "CanFight",
@@ -110,13 +108,16 @@ local Memoizable = {
     },
 }
 
+local VAL, NIL = {}, {}
+
 local function memoize(fn, bucket)
     return function (...)
         local sub = bucket
         for i = 1, select("#", ...) do
             local k = select(i, ...)
-            sub[k] = sub[k] or {}
-            sub = sub[k]
+            local key = (k == nil) and NIL or k
+            sub[key] = sub[key] or {}
+            sub = sub[key]
         end
         if sub[VAL] == nil then
             sub[VAL] = table.pack(fn(...))
