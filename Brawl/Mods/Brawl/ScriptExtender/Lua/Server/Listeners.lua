@@ -380,7 +380,7 @@ local function onGainedControl(targetGuid)
 end
 
 local function onCharacterJoinedParty(character)
-    print("CharacterJoinedParty", character)
+    debugPrint("CharacterJoinedParty", character)
     local uuid = M.Osi.GetUUID(character)
     if uuid then
         if State.Session.Players and not State.Session.Players[uuid] then
@@ -716,10 +716,10 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-        print("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
+        debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
         if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
             State.Session.StoryActionIDs[storyActionID] = {}
-            print("removed counterspelled spell from actions in progress and storyactionIDs")
+            debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
             -- if State.Settings.TurnBasedSwarmMode then
             --     local brawler = M.Roster.getBrawlerByUuid(casterUuid)
             --     if brawler then
@@ -732,7 +732,7 @@ end
 
 local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    print(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onDialogStarted(dialog, dialogInstanceId)
@@ -888,7 +888,7 @@ local function onFlagSet(flag, speaker, dialogInstance)
 end
 
 local function onStatusApplied(object, status, causee, storyActionID)
-    -- print("StatusApplied", object, status, causee, storyActionID)
+    -- debugPrint("StatusApplied", object, status, causee, storyActionID)
     -- Shout_DivineIntervention_Healing Shout_DivineIntervention_Healing_Improvement
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
     --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
@@ -972,11 +972,10 @@ local function onServerInterruptUsed(entity, label, component)
             for interruptEvent, interruptInfo in pairs(interrupt) do
                 if interruptEvent.Target and interruptEvent.Target.Uuid and interruptEvent.Target.Uuid.EntityUuid then
                     local targetUuid = interruptEvent.Target.Uuid.EntityUuid
-                    print("interrupted:", M.Utils.getDisplayName(targetUuid), targetUuid)
-                    -- print("interruptor:", M.Utils.getDisplayName(interruptEvent.Source.Uuid.EntityUuid))
+                    debugPrint("interrupted:", M.Utils.getDisplayName(targetUuid), targetUuid)
                     if State.Session.ActionsInProgress[targetUuid] then
-                        print("Actions In Progress")
-                        _D(State.Session.ActionsInProgress[targetUuid])
+                        -- print("Actions In Progress")
+                        -- _D(State.Session.ActionsInProgress[targetUuid])
                         local brawler = M.Roster.getBrawlerByUuid(targetUuid)
                         if brawler then
                             Swarm.swarmAction(brawler)
@@ -990,7 +989,7 @@ end
 
 local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     if State.Settings.TurnBasedSwarmMode then
-        print("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+        debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
         local uuid = M.Osi.GetUUID(characterGuid)
         if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
             Swarm.resumeTimers()

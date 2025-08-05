@@ -177,7 +177,6 @@ local function completeSwarmTurn(uuid)
 end
 
 local function forceCompleteChunk(chunkIndex)
-    print("FORCE COMPLETE CHUNK", chunkIndex)
     for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
         if not State.Session.SwarmTurnComplete[uuid] then
             completeSwarmTurn(uuid)
@@ -188,7 +187,6 @@ end
 startChunk = function (chunkIndex)
     if State.Session.ChunkInProgress ~= chunkIndex then
         State.Session.ChunkInProgress = chunkIndex
-        print("****************startChunk", chunkIndex)
         local chunk = State.Session.BrawlerChunks[chunkIndex]
         if not chunk then
             State.Session.ChunkInProgress = nil
@@ -278,11 +276,11 @@ singleCharacterTurn = function (brawler, brawlerIndex)
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid))
     local hostCharacterUuid = M.Osi.GetHostCharacter()
     if isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
-        print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
+        -- print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
     if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
-        debugPrint("don't take turn", brawler.uuid, brawler.displayName)
+        -- debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
     if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
@@ -306,11 +304,9 @@ local function startEnemyTurn()
                 if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
                     State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
                     State.Session.BrawlerChunks[chunkIndex][brawlerUuid] = brawler
-                    print("CHUNK", chunkIndex, brawlersInChunk, brawler.displayName)
                     brawlersInChunk = brawlersInChunk + 1
                     if brawlersInChunk >= Constants.SWARM_CHUNK_SIZE then
                         chunkIndex = chunkIndex + 1
-                        print("")
                         brawlersInChunk = 0
                     end
                 end
@@ -336,12 +332,10 @@ local function startSwarmTurn()
         if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
             State.Session.TBSMToTSkippedPrepRound = true
             State.Session.SwarmTurnActive = false
-            debugPrint("SKIPPING PREP ROUND...")
             return
         end
         local numChunks = startEnemyTurn()
         if numChunks ~= nil then
-            print("NUMBER OF CHUNKS TOTAL", numChunks)
             if State.Session.SwarmTurnTimer ~= nil then
                 Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
                 State.Session.SwarmTurnTimer = nil
@@ -349,7 +343,7 @@ local function startSwarmTurn()
             State.Session.SwarmTurnTimerCombatRound = M.Utils.getCurrentCombatRound()
             State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*Constants.SWARM_TURN_TIMEOUT, function ()
                 if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
-                    print("************************Swarm turn timer finished - setting all enemy turns complete...")
+                    debugPrint("************************Swarm turn timer finished - setting all enemy turns complete...")
                     setAllEnemyTurnsComplete()
                     State.Session.SwarmTurnTimerCombatRound = nil
                     State.Session.SwarmTurnActive = false
@@ -364,7 +358,7 @@ local function checkAllPlayersFinishedTurns()
     if players then
         for playerUuid, player in pairs(players) do
             local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
-            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled, player.isFreshSummon)
+            -- print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled, player.isFreshSummon)
             if player.isFreshSummon then
                 player.isFreshSummon = false
                 if not isUncontrolled then

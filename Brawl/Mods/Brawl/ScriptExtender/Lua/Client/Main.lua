@@ -51,7 +51,7 @@ local ControllerLeaderboardToggleHotkeyOverride = false
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
-    -- QueueCompanionAIActionsHotkey = MCM.Get("queue_companion_ai_actions_hotkey")
+    QueueCompanionAIActionsHotkey = MCM.Get("queue_companion_ai_actions_hotkey")
     FullAutoToggleHotkey = MCM.Get("full_auto_toggle_hotkey")
     PauseToggleHotkey = MCM.Get("pause_toggle_hotkey")
     TargetCloserEnemyHotkey = MCM.Get("target_closer_enemy_hotkey")
@@ -75,7 +75,7 @@ if MCM then
     }
     ControllerModToggleHotkey = {MCM.Get("controller_mod_toggle_hotkey"), MCM.Get("controller_mod_toggle_hotkey_2")}
     ControllerCompanionAIToggleHotkey = {MCM.Get("controller_companion_ai_toggle_hotkey"), MCM.Get("controller_companion_ai_toggle_hotkey_2")}
-    -- ControllerQueueCompanionAIActionsHotkey = {MCM.Get("controller_queue_companion_ai_actions_hotkey"), MCM.Get("controller_queue_companion_ai_actions_hotkey_2")}
+    ControllerQueueCompanionAIActionsHotkey = {MCM.Get("controller_queue_companion_ai_actions_hotkey"), MCM.Get("controller_queue_companion_ai_actions_hotkey_2")}
     ControllerFullAutoToggleHotkey = {MCM.Get("controller_full_auto_toggle_hotkey"), MCM.Get("controller_full_auto_toggle_hotkey_2")}
     ControllerPauseToggleHotkey = {MCM.Get("controller_pause_toggle_hotkey"), MCM.Get("controller_pause_toggle_hotkey_2")}
     ControllerTargetCloserEnemyHotkey = {MCM.Get("controller_target_closer_enemy_hotkey"), MCM.Get("controller_target_closer_enemy_hotkey_2")}
@@ -99,7 +99,7 @@ if MCM then
     }
     ControllerModToggleHotkeyOverride = MCM.Get("controller_mod_toggle_hotkey_override")
     ControllerCompanionAIToggleHotkeyOverride = MCM.Get("controller_companion_ai_toggle_hotkey_override")
-    -- ControllerQueueCompanionAIActionsHotkeyOverride = MCM.Get("controller_queue_companion_ai_actions_hotkey_override")
+    ControllerQueueCompanionAIActionsHotkeyOverride = MCM.Get("controller_queue_companion_ai_actions_hotkey_override")
     ControllerFullAutoToggleHotkeyOverride = MCM.Get("controller_full_auto_toggle_hotkey_override")
     ControllerPauseToggleHotkeyOverride = MCM.Get("controller_pause_toggle_hotkey_override")
     ControllerTargetCloserEnemyHotkeyOverride = MCM.Get("controller_target_closer_enemy_hotkey_override")

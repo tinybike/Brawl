@@ -31,7 +31,7 @@ end
 local function lock(entity)
     if entity and entity.Uuid then
         local uuid = entity.Uuid.EntityUuid
-        print("locking", uuid)
+        debugPrint("locking", uuid)
         Roster.disableLockedOnTarget(uuid)
         entity.TurnBased.IsActiveCombatTurn = false
         State.Session.FTBLockedIn[uuid] = true
@@ -111,10 +111,10 @@ end
 
 local function midActionLock(entity)
     if entity and entity.Uuid and entity.Uuid.EntityUuid then
-        print("midActionLock", M.Utils.getDisplayName(entity.Uuid.EntityUuid))
+        debugPrint("midActionLock", M.Utils.getDisplayName(entity.Uuid.EntityUuid))
         if entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast then
             local spellCastState = entity.SpellCastIsCasting.Cast.SpellCastState
-            print("got spellcast state")
+            debugPrint("got spellcast state")
             if spellCastState and spellCastState.Targets then
                 local target = spellCastState.Targets[1]
                 if target and (target.Position or target.Target) then
@@ -146,41 +146,6 @@ local function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
 end
 
--- local function queueSingleAction(entityUuid)
---     print("queueSingleAction", entityUuid)
---     local level = M.Osi.GetRegion(entityUuid)
---     if level then
---         local brawlersInLevel = State.Session.Brawlers[level]
---         if brawlersInLevel then
---             local brawler = brawlersInLevel[entityUuid]
---             if brawler and brawler.uuid and M.Utils.canAct(entityUuid) then
---                 print("*****PULSEACTION STUFF WHILE PAUSED*****", brawler.uuid, brawler.displayName)
---                 -- Doesn't currently have an attack target, so let's find one
---                 if brawler.targetUuid == nil then
---                     debugPrint("Find target (no current target)", entityUuid, brawler.displayName)
---                     return AI.findTarget(brawler)
---                 end
---                 -- We have a target and the target is alive
---                 local brawlersInLevel = State.Session.Brawlers[M.Osi.GetRegion(entityUuid)]
---                 if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and M.Utils.isAliveAndCanFight(brawler.targetUuid) and M.Utils.isVisible(brawler.uuid, brawler.targetUuid) then
---                     if brawler.lockedOnTarget then
---                         debugPrint("Locked-on target, attacking", brawler.displayName, entityUuid, "->", M.Utils.getDisplayName(brawler.targetUuid))
---                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
---                     end
---                     if Osi.GetDistanceTo(entityUuid, brawler.targetUuid) <= M.Utils.getTrackingDistance() then
---                         debugPrint("Remaining on target, attacking", brawler.displayName, entityUuid, "->", M.Utils.getDisplayName(brawler.targetUuid))
---                         return AI.actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid])
---                     end
---                 end
---                 -- Has an attack target but it's already dead or unable to fight, so find a new one
---                 debugPrint("Find target (current target invalid)", entityUuid, brawler.displayName)
---                 brawler.targetUuid = nil
---                 return AI.findTarget(brawler)
---             end
---         end
---     end
--- end
-
 -- NB: sometimes ClientControl isn't a valid marker and we end up with 2 characters both marked as directly controlled, so things like cancel queue movement break
 local function startTruePause(entityUuid)
     -- eoc::ActionResourcesComponent: Replicated
@@ -193,7 +158,7 @@ local function startTruePause(entityUuid)
     --      if SpellCastMovement triggered, then ignore the next action resources trigger
     -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
     if M.Utils.isAliveAndCanFight(entityUuid) then
-        print("startTruePause", entityUuid, M.Utils.getDisplayName(entityUuid))
+        debugPrint("startTruePause", entityUuid, M.Utils.getDisplayName(entityUuid))
         Utils.clearOsirisQueue(entityUuid)
         local entity = Ext.Entity.Get(entityUuid)
         if State.Session.TurnBasedListeners[entityUuid] ~= nil then
@@ -206,10 +171,10 @@ local function startTruePause(entityUuid)
             if caster and caster.TurnBased then
                 State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
                 if State.Session.FTBLockedIn[entityUuid] then
-                    print("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
+                    debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
                 end
                 if isFTBAllLockedIn() then
-                    print("all locked in, exiting") 
+                    debugPrint("all locked in, exiting") 
                     allExitFTB()
                 end
             end
@@ -222,14 +187,14 @@ local function startTruePause(entityUuid)
             if State.Session.RemainingMovement[entityUuid] ~= nil and M.Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
                 if entityUuid and isInFTB(movingEntity) then
                     if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                        print("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
+                        debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
                         debugDump(State.Session.LastClickPosition[entityUuid].position)
                         lock(movingEntity)
                         M.Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
                             if err then
                                 return Utils.showNotification(entityUuid, err, 2)
                             end
-                            print("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
+                            debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
                             State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
                         end)
                     end
@@ -242,79 +207,15 @@ local function startTruePause(entityUuid)
             State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
         end
         State.Session.SpellCastPrepareEndEvent[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
-            print("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
+            debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
             local caster = cast.SpellCastState.Caster
             if caster.Uuid.EntityUuid == entityUuid then
-                print("***************SpellCastPrepareEndEvent", entityUuid)
+                debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
                 if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
                     midActionLock(caster)
                 end
             end
         end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastMovement", function (cast, _, _)
-        --     print("SpellCastMovement", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastEvent", function (cast, _, _)
-        --     print("SpellCastEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastLogicExecutionStartEvent", function (cast, _, _)
-        --     print("SpellCastLogicExecutionStartEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastLogicExecutionEndEvent", function (cast, _, _)
-        --     print("SpellCastLogicExecutionEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastTargetsChangedEvent", function (cast, _, _)
-        --     print("SpellCastTargetsChangedEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- Ext.Entity.OnCreateDeferred("SpellCastPreviewEndEvent", function (cast, _, _)
-        --     print("SpellCastPreviewEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-        -- end)
-        -- print("startTruePause", entityUuid, M.Utils.getDisplayName(entityUuid))
-        -- -- if Osi.IsPartyMember(entityUuid, 1) == 1 then
-        -- Utils.clearOsirisQueue(entityUuid)
-        -- local entity = Ext.Entity.Get(entityUuid)
-        -- if State.Session.TurnBasedListeners[entityUuid] ~= nil then
-        --     Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
-        --     State.Session.TurnBasedListeners[entityUuid] = nil
-        -- end
-        -- State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
-        --     -- requested end turn isn't the only thing that can change here
-        --     -- print("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
-        --     if caster and caster.TurnBased then
-        --         State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
-        --         if isFTBAllLockedIn() then
-        --             print("all locked in, exiting") 
-        --             allExitFTB()
-        --         end
-        --     end
-        -- end, entity)
-        -- if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-        --     Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-        --     State.Session.ActionResourcesListeners[entityUuid] = nil
-        -- end
-        -- State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-        --     if State.Session.RemainingMovement[entityUuid] ~= nil and M.Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
-        --         if entityUuid and isInFTB(movingEntity) then
-        --             if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-        --                 print("enqueue movement (raw coords)", entityUuid)
-        --                 debugDump(State.Session.LastClickPosition[entityUuid].position)
-        --                 lock(movingEntity)
-        --                 M.Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
-        --                     if err then
-        --                         return Utils.showNotification(entityUuid, err, 2)
-        --                     end
-        --                     print("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
-        --                     State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
-        --                 end)
-        --             end
-        --         end
-        --     end
-        --     State.Session.RemainingMovement[entityUuid] = M.Movement.getRemainingMovement(movingEntity)
-        -- end, entity)
-        -- if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
-        --     Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
-        --     State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
-        -- end
         -- Enqueue actions/movements for non-party NPCs
         if M.Osi.IsPartyMember(entityUuid, 1) == 0 and M.Utils.canAct(entityUuid) and not isLocked(entity) then
             AI.act(M.Roster.getBrawlerByUuid(entityUuid))
@@ -323,7 +224,7 @@ local function startTruePause(entityUuid)
 end
 
 local function queueCompanionAIActions()
-    print("queueCompanionAIActions")
+    debugPrint("queueCompanionAIActions")
     if State.Settings.CompanionAIEnabled then
         local players = State.Session.Players
         if players then
@@ -333,11 +234,11 @@ local function queueCompanionAIActions()
                     if State.Settings.TurnBasedSwarmMode then
                         if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then
                             State.Session.QueuedCompanionAIAction[uuid] = true
-                            print("queue action (swarm)", player.displayName)
+                            debugPrint("queue action (swarm)", player.displayName)
                             Swarm.swarmAction(M.Roster.getBrawlerByUuid(uuid))
                         end
                     else
-                        print("queue action (ftb)", player.displayName, isInFTB(entity), not isLocked(entity))
+                        debugPrint("queue action (ftb)", player.displayName, isInFTB(entity), not isLocked(entity))
                         if isInFTB(entity) and not isLocked(entity) then
                             AI.act(M.Roster.getBrawlerByUuid(uuid))
                         end
@@ -349,7 +250,7 @@ local function queueCompanionAIActions()
 end
 
 local function checkTruePauseParty()
-    print("checkTruePauseParty")
+    debugPrint("checkTruePauseParty")
     local players = State.Session.Players
     if players then
         if State.Settings.TruePause then
