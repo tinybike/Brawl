@@ -42,7 +42,7 @@ end
 local function setTurnComplete(uuid)
     if State.Session.SwarmTurnActive then
         local entity = Ext.Entity.Get(uuid)
-        if entity.TurnBased then
+        if entity and entity.TurnBased then
             -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
             entity.TurnBased.HadTurnInCombat = true
             entity.TurnBased.RequestedEndTurn = true
@@ -55,7 +55,7 @@ end
 
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if entity.TurnBased then
+    if entity and entity.TurnBased then
         -- print(M.Utils.getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
