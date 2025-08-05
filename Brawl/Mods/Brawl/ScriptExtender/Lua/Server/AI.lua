@@ -127,7 +127,7 @@ local function getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
     -- Adjust by spell level, if we're in hogwild mode
-    if not State.Settings.TurnBasedSwarmMode and State.Settings.HogwildMode then
+    if State.Settings.HogwildMode then
         weight = weight + spell.level*2
     end
     -- NB: factor in amount of healing for healing spells also?
@@ -235,7 +235,7 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     if spell.isSelfOnly and distanceToTarget ~= 0.0 then
         return false
     end
-    if State.Settings.TurnBasedSwarmMode or not State.Settings.HogwildMode then
+    if not State.Settings.HogwildMode then
         -- Make sure we're not exceeding the user's specified AI max spell level
         if spell.level > State.Settings.CompanionAIMaxSpellLevel then
             return false
@@ -375,7 +375,7 @@ end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
     debugPrint(M.Utils.getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
-    if State.Settings.HogwildMode and not State.Settings.TurnBasedSwarmMode then
+    if State.Settings.HogwildMode then
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
         return true
     end
