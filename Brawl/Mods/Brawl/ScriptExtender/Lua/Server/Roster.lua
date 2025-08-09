@@ -52,10 +52,12 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = true
         end
         if okToAdd then
-            local displayName = M.Utils.getDisplayName(entityUuid)
+            if State.Session.Brawlers[level][entityUuid] and State.Session.Brawlers[level][entityUuid].restoreMovementListener then
+                Ext.Entity.Unsubscribe(State.Session.Brawlers[level][entityUuid].restoreMovementListener)
+            end
             local brawler = {
                 uuid = entityUuid,
-                displayName = displayName,
+                displayName = M.Utils.getDisplayName(entityUuid),
                 combatGuid = M.Osi.CombatGetGuidFor(entityUuid),
                 combatGroupId = M.Osi.GetCombatGroupID(entityUuid),
                 isInBrawl = isInBrawl,
@@ -67,20 +69,14 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
-            debugPrint(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
+            debugPrint(brawler.displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
             State.modifyHitpoints(entityUuid)
-            -- If in turn-based swarm mode, then during the player's turn, SetCanJoinCombat=1 for everyone
-            -- and during the enemy turn SetCanJoinCombat=0 for everyone.
-            -- There are no circumstances where the settings should be different for players vs enemies, BUT
-            -- the trigger to change the setting should be the players' turns start/enemy turns starting.
-            -- Players must be LOCKED during enemy turns to avoid RT combat!
-            -- All players should be set to have identical initiatives for this.
-            -- Pause/True Pause should NOT do anything in this mode.
+            Osi.SetCanJoinCombat(entityUuid, 1)
             if State.Settings.TurnBasedSwarmMode then
-                Osi.SetCanJoinCombat(entityUuid, 1)
+                -- Osi.SetCanJoinCombat(entityUuid, 1)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     State.Session.SwarmTurnComplete[entityUuid] = false
@@ -89,15 +85,17 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
                 end
             else
+                -- operate on a timer, using the initiative roll
+                brawler.restoreMovementListener = Ext.Entity.Subscribe("ActionResources", Resources.restoreMovement, Ext.Entity.Get(entityUuid))
                 if Osi.IsPlayer(entityUuid) == 0 then
                     -- brawler.originalCanJoinCombat = M.Osi.CanJoinCombat(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
+                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                     -- thank u lunisole/ghostboats
                     Osi.PROC_SelfHealing_Disable(entityUuid)
                 elseif State.Session.Players[entityUuid] then
                     -- brawler.originalCanJoinCombat = 1
-                    Movement.setPlayerRunToSprint(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
+                    -- Movement.setPlayerRunToSprint(entityUuid)
+                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then

@@ -2,6 +2,23 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local clearOsirisQueue = Utils.clearOsirisQueue
 
+local function restoreActionResource(entity, resourceName)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources
+        if resources[Constants.ACTION_RESOURCES[resourceName]] and resources[Constants.ACTION_RESOURCES[resourceName]][1] then
+            local resource = resources[Constants.ACTION_RESOURCES[resourceName]][1]
+            if resource.Amount < resource.MaxAmount then
+                resource.Amount = resource.MaxAmount
+                entity:Replicate("ActionResources")
+            end
+        end
+    end
+end
+
+local function restoreMovement(entity)
+    restoreActionResource(entity, "Movement")
+end
+
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
@@ -234,6 +251,8 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
 end
 
 return {
+    restoreActionResource = restoreActionResource,
+    restoreMovement = restoreMovement,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
