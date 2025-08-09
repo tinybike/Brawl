@@ -888,11 +888,20 @@ local function onFlagSet(flag, speaker, dialogInstance)
 end
 
 local function onStatusApplied(object, status, causee, storyActionID)
-    -- debugPrint("StatusApplied", object, status, causee, storyActionID)
-    -- Shout_DivineIntervention_Healing Shout_DivineIntervention_Healing_Improvement
+    -- print("StatusApplied", object, status, causee, storyActionID)
+    if status == "DASH" then
+        Movement.setPlayerRunToSprint(M.Osi.GetUUID(object))
+    end
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
     --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
     -- end
+end
+
+local function onStatusRemoved(object, status, causee, applyStoryActionID)
+    -- print("StatusRemoved", object, status, causee, applyStoryActionID)
+    if status == "DASH" then
+        Movement.resetPlayerMovementSpeed(M.Osi.GetUUID(object))
+    end
 end
 
 local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
@@ -1194,6 +1203,10 @@ local function startListeners()
     }
     State.Session.Listeners.StatusApplied = {
         handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.StatusRemoved = {
+        handle = Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", onStatusRemoved),
         stop = Ext.Osiris.UnregisterListener,
     }
     -- State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
