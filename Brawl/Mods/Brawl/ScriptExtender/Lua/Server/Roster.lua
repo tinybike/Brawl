@@ -66,6 +66,26 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
             }
+            local entity = Ext.Entity.Get(entityUuid)
+            -- operate on a timer, using the initiative roll?
+            -- or restore movement perpetually, AP/BAP on a timer?  test and see what feels better...
+            brawler.actionResources = {}
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType)}
+            end
+            brawler.actionResourcesListener = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+                if not State.Settings.TurnBasedSwarmMode then
+                    Resources.restoreActionResource(entity, "Movement")
+                    for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                        local amount = M.Resources.getActionResourceAmount(entity, resourceType)
+                        if amount ~= nil and brawler.actionResources[resourceType] and amount < brawler.actionResources[resourceType].amount then
+                            brawler.actionResources[resourceType].timer = Ext.Timer.WaitFor(brawler.actionInterval, function ()
+                                Resources.increaseActionResource(entity, resourceType, 1.0)
+                            end)
+                        end
+                    end
+                end
+            end, entity)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
@@ -85,8 +105,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
                 end
             else
-                -- operate on a timer, using the initiative roll
-                brawler.restoreMovementListener = Ext.Entity.Subscribe("ActionResources", Resources.restoreMovement, Ext.Entity.Get(entityUuid))
                 if Osi.IsPlayer(entityUuid) == 0 then
                     -- brawler.originalCanJoinCombat = M.Osi.CanJoinCombat(entityUuid)
                     -- Osi.SetCanJoinCombat(entityUuid, 0)
@@ -128,6 +146,11 @@ local function removeBrawler(level, entityUuid)
     local combatGuid = nil
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
+        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+            if brawler.actionResources and brawler.actionResources[resourceType] and brawler.actionResources[resourceType].timer then
+                Ext.Timer.Cancel(brawler.actionResources[resourceType].timer)
+            end
+        end
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if brawler.targetUuid == entityUuid then
                 brawler.targetUuid = nil

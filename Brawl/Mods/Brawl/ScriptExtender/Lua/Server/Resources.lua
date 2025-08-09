@@ -2,36 +2,42 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local clearOsirisQueue = Utils.clearOsirisQueue
 
-local function restoreActionResource(entity, resourceName)
+local function getActionResource(entity, resourceType)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
-        if resources[Constants.ACTION_RESOURCES[resourceName]] and resources[Constants.ACTION_RESOURCES[resourceName]][1] then
-            local resource = resources[Constants.ACTION_RESOURCES[resourceName]][1]
-            if resource.Amount < resource.MaxAmount then
-                resource.Amount = resource.MaxAmount
-                entity:Replicate("ActionResources")
-            end
+        if resources[Constants.ACTION_RESOURCES[resourceType]] and resources[Constants.ACTION_RESOURCES[resourceType]][1] then
+            return resources[Constants.ACTION_RESOURCES[resourceType]][1]
         end
     end
 end
 
-local function restoreMovement(entity)
-    restoreActionResource(entity, "Movement")
+local function getActionResourceAmount(entity, resourceType)
+    return (M.Resources.getActionResource(entity, resourceType) or {}).Amount
+end
+
+local function increaseActionResource(entity, resourceType, amount)
+    local resource = M.Resources.getActionResource(entity, resourceType)
+    if resource then
+        resource.Amount = math.max(resource.MaxAmount, resource.Amount + amount)
+        entity:Replicate("ActionResources")
+    end
+end
+
+local function restoreActionResource(entity, resourceType)
+    local resource = M.Resources.getActionResource(entity, resourceType)
+    if resource and resource.Amount < resource.MaxAmount then
+        resource.Amount = resource.MaxAmount
+        entity:Replicate("ActionResources")
+    end
 end
 
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
-    if entity and entity.ActionResources and entity.ActionResources.Resources then
-        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
-        if resources and resources[1] then
-            if resources[1].Amount >= amount then
-                resources[1].Amount = resources[1].Amount - amount
-            else
-                resources[1].Amount = 0.0
-            end
-        end
+    local resource = M.Resources.getActionResource(entity, resourceType)
+    if resource then
+        resource.Amount = math.min(0.0, resource.Amount - amount)
+        entity:Replicate("ActionResources")
     end
-    entity:Replicate("ActionResources")
 end
 
 local function checkSpellCharge(casterUuid, spellName)
@@ -251,8 +257,10 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
 end
 
 return {
+    getActionResource = getActionResource,
+    getActionResourceAmount = getActionResourceAmount,
+    increaseActionResource = increaseActionResource,
     restoreActionResource = restoreActionResource,
-    restoreMovement = restoreMovement,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,

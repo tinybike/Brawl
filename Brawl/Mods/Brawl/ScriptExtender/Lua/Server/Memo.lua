@@ -92,6 +92,8 @@ local Memoizable = {
         "getBrawlersSortedByDistance",
     },
     Resources = {
+        "getActionResource",
+        "getActionResourceAmount",
         "checkSpellCharge",
         "hasEnoughToCastSpell",
     },
