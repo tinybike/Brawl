@@ -193,7 +193,7 @@ function startToTTimers()
                     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
                         Roster.addNearbyToBrawlers(hostCharacter, 150)
                     end
-                end, turnDuration + 1500)
+                end, turnDuration + math.floor(turnDuration*0.25))
             end
         end
     end
