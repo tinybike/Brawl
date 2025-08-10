@@ -25,30 +25,25 @@ local function onCombatStarted(combatGuid)
     for playerUuid, _ in pairs(State.Session.Players) do
         Roster.addBrawler(playerUuid, true)
     end
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        if State.Settings.TurnBasedSwarmMode then
-            local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-            if serverEnterRequestEntities then
-                local combatEntity = serverEnterRequestEntities[1]
-                if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-                    for _, participant in ipairs(combatEntity.CombatState.Participants) do
-                        if not State.Session.Players[participant.Uuid.EntityUuid] then
-                            Roster.addBrawler(participant.Uuid.EntityUuid, true)
-                        end
-                    end
+    if State.Settings.TurnBasedSwarmMode then
+        local combatEntity = Utils.getCombatEntity()
+        if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+            for _, participant in ipairs(combatEntity.CombatState.Participants) do
+                if not State.Session.Players[participant.Uuid.EntityUuid] then
+                    Roster.addBrawler(participant.Uuid.EntityUuid, true)
                 end
             end
-        else
-            if not isToT() then
-                startBrawlFizzler(level)
-                Ext.Timer.WaitFor(500, function ()
-                    Roster.addNearbyToBrawlers(M.Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-                    State.Session.TurnTimers[combatGuid] = Ext.Timer.WaitFor(0, State.nextCombatRound, State.Settings.ActionInterval*1000)
-                end)
-            else
-                startToTTimers()
+        end
+    else
+        if not isToT() then
+            Roster.addNearbyToBrawlers(M.Osi.CombatGetInvolvedPlayer(combatGuid, 1), Constants.NEARBY_RADIUS, combatGuid)
+            State.Session.TurnTimers[combatGuid] = Ext.Timer.WaitFor(0, State.nextCombatRound, State.Settings.ActionInterval*1000)
+            -- need to adjust initiative rolls -- PlayersUseMeanInitiativeRoll so all players go together?  or just players go first for simplicity
+            if State.Settings.AutoPauseOnCombatStart then
+                Pause.allEnterFTB()
             end
+        else
+            startToTTimers()
         end
     end
 end
@@ -65,8 +60,9 @@ local function onStarted(level)
     Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
     Roster.initBrawlers(level)
+    State.boostPlayerInitiatives()
     if State.Settings.TurnBasedSwarmMode then
-        State.boostPlayerInitiatives()
+        -- State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
     else
         State.uncapPartyMembersMovementDistances()
@@ -393,8 +389,9 @@ local function onCharacterJoinedParty(character)
         if State.Session.Players and not State.Session.Players[uuid] then
             State.setupPlayer(uuid)
             State.setupPartyMembersHitpoints()
+            State.boostPlayerInitiative(uuid)
             if State.Settings.TurnBasedSwarmMode then
-                State.boostPlayerInitiative(uuid)
+                -- State.boostPlayerInitiative(uuid)
                 State.recapPartyMembersMovementDistances()
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
             else

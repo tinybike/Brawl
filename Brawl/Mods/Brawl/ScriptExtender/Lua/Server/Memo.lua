@@ -7,6 +7,7 @@ local Memoizable = {
         "CanSee",
         "CombatIsActive",
         "CombatGetGuidFor",
+        "CombatGetInvolvedPlayer",
         "FindValidPosition",
         "GetActionResourceValuePersonal",
         "GetActiveArchetype",

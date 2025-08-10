@@ -7,6 +7,7 @@ local Settings = {
     CompanionAIEnabled = true,
     TruePause = true,
     AutoPauseOnDowned = true,
+    AutoPauseOnCombatStart = false,
     ActionInterval = 6.0,
     InitiativeDie = 20,
     FullAuto = false,

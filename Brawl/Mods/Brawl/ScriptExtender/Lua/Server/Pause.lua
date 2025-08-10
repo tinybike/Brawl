@@ -61,6 +61,7 @@ local function allEnterFTB()
         end
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             local uuid = M.Osi.GetUUID(player[1])
+            Osi.SetCanJoinCombat(uuid, 0)
             Osi.ForceTurnBasedMode(uuid, 1)
         end
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
@@ -83,6 +84,7 @@ local function allExitFTB()
             local uuid = M.Osi.GetUUID(player[1])
             unlock(Ext.Entity.Get(uuid))
             Osi.ForceTurnBasedMode(uuid, 0)
+            Osi.SetCanJoinCombat(uuid, 1)
             stopTruePause(uuid)
         end
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
