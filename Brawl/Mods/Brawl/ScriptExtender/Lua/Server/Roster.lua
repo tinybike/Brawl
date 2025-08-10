@@ -103,7 +103,8 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
-                if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
+                -- if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
+                if not Pause.isInFTB(entity) then
                     if State.Session.PulseActionTimers[entityUuid] == nil then
                         startPulseAction(brawler)
                     end
@@ -114,7 +115,8 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                     -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
                     stopPulseAction(brawler)
-                    Osi.ForceTurnBasedMode(entityUuid, 1)
+                    -- Osi.ForceTurnBasedMode(entityUuid, 1)
+                    Listeners.onEnteredForceTurnBased(entityUuid)
                     if not State.Session.Players[entityUuid] then
                         brawler.isPaused = true
                         if State.Settings.TruePause then

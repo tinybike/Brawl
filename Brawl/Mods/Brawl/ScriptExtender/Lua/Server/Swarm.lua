@@ -67,13 +67,16 @@ end
 
 local function setAllEnemyTurnsComplete()
     debugPrint("setAllEnemyTurnsComplete")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    setTurnComplete(brawlerUuid)
+    local host = M.Osi.GetHostCharacter()
+    if host then
+        local level = M.Osi.GetRegion(host)
+        if level then
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, _ in pairs(brawlersInLevel) do
+                    if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                        setTurnComplete(brawlerUuid)
+                    end
                 end
             end
         end
@@ -82,13 +85,16 @@ end
 
 local function unsetAllEnemyTurnsComplete()
     debugPrint("unsetAllEnemyTurnsComplete")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    unsetTurnComplete(brawlerUuid)
+    local host = M.Osi.GetHostCharacter()
+    if host then
+        local level = M.Osi.GetRegion(host)
+        if level then
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, _ in pairs(brawlersInLevel) do
+                    if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                        unsetTurnComplete(brawlerUuid)
+                    end
                 end
             end
         end

@@ -97,6 +97,7 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterUserVariable("IsPaused", {Server = true, Client = true, SyncToClient = true, SyncOnWrite = true})
 
 local function nextCombatRound()
     local host = M.Osi.GetHostCharacter()

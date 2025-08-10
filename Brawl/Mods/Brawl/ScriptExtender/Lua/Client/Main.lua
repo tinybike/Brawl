@@ -147,6 +147,9 @@ local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
 local lightBlue = {0.6, 0.8, 1, 1}
 local lightRed = {1, 0.8, 0.8, 1}
+local PinnedNotification = {active = false, text = nil, timer = nil}
+
+Ext.Vars.RegisterUserVariable("IsPaused", {Server = true, Client = true, SyncToClient = true, SyncOnWrite = true})
 
 -- Keybinding stuff from https://github.com/AtilioA/BG3-MCM & modified/re-used with permission
 
@@ -241,7 +244,8 @@ end
 
 local function isInFTB(uuid)
     local entity = Ext.Entity.Get(uuid)
-    return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+    return entity.Vars.IsPaused
+    -- return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
 end
 
 local function getPositionInfo()
@@ -563,14 +567,50 @@ local function getSubtitleWidgetIndex()
     end
 end
 
+local function setSubtitle(text, durationSeconds)
+    local root = Ext.UI.GetRoot()
+    if root then
+        local subtitleWidgetIndex = getSubtitleWidgetIndex()
+        if subtitleWidgetIndex then
+            local dataContext = root:Child(1):Child(1):Child(subtitleWidgetIndex).DataContext
+            dataContext.CurrentSubtitle = text or ""
+            dataContext.CurrentSubtitleDuration = durationSeconds or 0
+        end
+    end
+end
+
+local function maintainPinned()
+    if PinnedNotification.active then
+        setSubtitle(PinnedNotification.text, 3)
+        PinnedNotification.timer = Ext.Timer.WaitFor(2000, maintainPinned)
+    end
+end
+
 -- thank u hippo
 local function showNotification(notification)
-    local subtitleWidgetIndex = getSubtitleWidgetIndex()
-    if subtitleWidgetIndex then
-        local dataContext = Ext.UI.GetRoot():Child(1):Child(1):Child(subtitleWidgetIndex).DataContext
-        dataContext.CurrentSubtitleDuration = (notification.duration ~= "") and tonumber(notification.duration) or 2
-        dataContext.CurrentSubtitle = notification.text
+    local duration = tonumber(notification.duration)
+    if duration == -1 then
+        PinnedNotification.active = true
+        PinnedNotification.text = notification.text or ""
+        if PinnedNotification.timer then
+            Ext.Timer.Cancel(PinnedNotification.timer)
+            PinnedNotification.timer = nil
+        end
+        setSubtitle(PinnedNotification.text, 3)
+        PinnedNotification.timer = Ext.Timer.WaitFor(2000, maintainPinned)
+        return
+    else
+        setSubtitle(notification.text, (duration and duration >= 0) and duration or 2)
     end
+end
+
+local function clearNotification()
+    PinnedNotification.active = false
+    if PinnedNotification.timer then
+        Ext.Timer.Cancel(PinnedNotification.timer)
+        PinnedNotification.timer = nil
+    end
+    setSubtitle("", 0)
 end
 
 local function getDisplayName(uuid)
@@ -731,6 +771,8 @@ local function onNetMessage(data)
         AwaitingTarget = data.Payload == "1"
     elseif data.Channel == "Notification" then
         showNotification(Ext.Json.Parse(data.Payload))
+    elseif data.Channel == "ClearNotification" then
+        clearNotification()
     elseif data.Channel == "Leaderboard" then
         showLeaderboard(Ext.Json.Parse(data.Payload))
     elseif data.Channel == "UpdateLeaderboard" then

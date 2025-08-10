@@ -284,8 +284,16 @@ local function createDummyObject(position)
     return dummyUuid
 end
 
+local function pinNotification(text)
+    Ext.ServerNet.BroadcastMessage("Notification", Ext.Json.Stringify({text = text, duration = -1}))
+end
+
 local function showNotification(uuid, text, duration)
     Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+end
+
+local function clearNotification()
+    Ext.ServerNet.BroadcastMessage("ClearNotification", "")
 end
 
 local function applyAttackMoveTargetVfx(targetUuid)
@@ -532,7 +540,9 @@ return {
     isToT = isToT,
     isSilenced = isSilenced,
     createDummyObject = createDummyObject,
+    pinNotification = pinNotification,
     showNotification = showNotification,
+    clearNotification = clearNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
     applyOnMeTargetVfx = applyOnMeTargetVfx,
     isPlayerTurnEnded = isPlayerTurnEnded,
