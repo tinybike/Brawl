@@ -13,11 +13,11 @@ local function getActionResource(entity, resourceType)
 end
 
 local function getActionResourceMaxAmount(entity, resourceType)
-    return (M.Resources.getActionResource(entity, resourceType) or {}).MaxAmount
+    return (Resources.getActionResource(entity, resourceType) or {}).MaxAmount
 end
 
 local function getActionResourceAmount(entity, resourceType)
-    return (M.Resources.getActionResource(entity, resourceType) or {}).Amount
+    return (Resources.getActionResource(entity, resourceType) or {}).Amount
 end
 
 local function restoreActionResource(entity, resourceType)
