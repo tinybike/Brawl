@@ -6,8 +6,7 @@ local function getActionResource(entity, resourceType)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if resources[Constants.ACTION_RESOURCES[resourceType]] and resources[Constants.ACTION_RESOURCES[resourceType]][1] then
-            local resource = resources[Constants.ACTION_RESOURCES[resourceType]][1]
-            return resource
+            return resources[Constants.ACTION_RESOURCES[resourceType]][1]
         end
     end
 end

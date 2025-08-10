@@ -541,6 +541,7 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    getCombatEntity = getCombatEntity,
     getCurrentCombatRound = getCurrentCombatRound,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
