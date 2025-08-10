@@ -52,8 +52,8 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = true
         end
         if okToAdd then
-            if State.Session.Brawlers[level][entityUuid] and State.Session.Brawlers[level][entityUuid].restoreMovementListener then
-                Ext.Entity.Unsubscribe(State.Session.Brawlers[level][entityUuid].restoreMovementListener)
+            if State.Session.Brawlers[level][entityUuid] and State.Session.Brawlers[level][entityUuid].actionResources and State.Session.Brawlers[level][entityUuid].actionResources.listener then
+                Ext.Entity.Unsubscribe(State.Session.Brawlers[level][entityUuid].actionResources.listener)
             end
             local brawler = {
                 uuid = entityUuid,
@@ -67,25 +67,11 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
             }
             local entity = Ext.Entity.Get(entityUuid)
-            -- operate on a timer, using the initiative roll?
-            -- or restore movement perpetually, AP/BAP on a timer?  test and see what feels better...
             brawler.actionResources = {}
             for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
-                brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType)}
+                brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
             end
-            brawler.actionResourcesListener = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-                if not State.Settings.TurnBasedSwarmMode then
-                    Resources.restoreActionResource(entity, "Movement")
-                    for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
-                        local amount = M.Resources.getActionResourceAmount(entity, resourceType)
-                        if amount ~= nil and brawler.actionResources[resourceType] and amount < brawler.actionResources[resourceType].amount then
-                            brawler.actionResources[resourceType].timer = Ext.Timer.WaitFor(brawler.actionInterval, function ()
-                                Resources.increaseActionResource(entity, resourceType, 1.0)
-                            end)
-                        end
-                    end
-                end
-            end, entity)
+            brawler.actionResources.listener = Ext.Entity.Subscribe("ActionResources", Resources.actionResourcesCallback, entity)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
@@ -146,11 +132,6 @@ local function removeBrawler(level, entityUuid)
     local combatGuid = nil
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
-        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
-            if brawler.actionResources and brawler.actionResources[resourceType] and brawler.actionResources[resourceType].timer then
-                Ext.Timer.Cancel(brawler.actionResources[resourceType].timer)
-            end
-        end
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
             if brawler.targetUuid == entityUuid then
                 brawler.targetUuid = nil
@@ -159,6 +140,21 @@ local function removeBrawler(level, entityUuid)
             end
         end
         if brawlersInLevel[entityUuid] then
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                local actionResources = brawlersInLevel[entityUuid].actionResources
+                if actionResources then
+                    if actionResources[resourceType] then
+                        if actionResources[resourceType].refillQueue then
+                            for _, actionResourceTimer in ipairs(actionResources[resourceType].refillQueue) do
+                                Ext.Timer.Cancel(actionResourceTimer)
+                            end
+                        end
+                    end
+                    if actionResources.listener then
+                        Ext.Entity.Unsubscribe(actionResources.listener)
+                    end
+                end
+            end
             stopPulseAction(brawlersInLevel[entityUuid])
             brawlersInLevel[entityUuid] = nil
         end
@@ -180,7 +176,7 @@ local function removeBrawler(level, entityUuid)
 end
 
 local function endBrawl(level)
-    debugPrint("endBrawl", level)
+    print("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do

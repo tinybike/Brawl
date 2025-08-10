@@ -47,7 +47,7 @@ end
 
 function stopBrawlFizzler(level)
     if State.Session.BrawlFizzler[level] ~= nil then
-        debugPrint("stopping brawl fizz")
+        -- print("stopping brawl fizz")
         Ext.Timer.Cancel(State.Session.BrawlFizzler[level])
         State.Session.BrawlFizzler[level] = nil
     end
@@ -56,11 +56,11 @@ end
 function startBrawlFizzler(level)
     stopBrawlFizzler(level)
     if not State.Settings.TurnBasedSwarmMode then
-        debugPrint("Starting BrawlFizzler", level)
-        State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
-            debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
-            Roster.endBrawl(level)
-        end)
+        -- print("Starting BrawlFizzler", level)
+        -- State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
+        --     print("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
+        --     Roster.endBrawl(level)
+        -- end)
     end
 end
 

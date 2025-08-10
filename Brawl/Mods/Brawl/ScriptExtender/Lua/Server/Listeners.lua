@@ -44,12 +44,12 @@ local function onCombatStarted(combatGuid)
                 startBrawlFizzler(level)
                 Ext.Timer.WaitFor(500, function ()
                     Roster.addNearbyToBrawlers(M.Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-                    Ext.Timer.WaitFor(1500, function ()
-                        if M.Osi.CombatIsActive(combatGuid) then
-                            -- NB: is there a way to do this less aggressively?
-                            Osi.EndCombat(combatGuid)
-                        end
-                    end)
+                    -- Ext.Timer.WaitFor(1500, function ()
+                    --     if M.Osi.CombatIsActive(combatGuid) then
+                    --         -- NB: is there a way to do this less aggressively?
+                    --         Osi.EndCombat(combatGuid)
+                    --     end
+                    -- end)
                 end)
             else
                 startToTTimers()
@@ -105,7 +105,7 @@ local function onLevelGameplayStarted(level, _)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
+    print("CombatRoundStarted", combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.cancelTimers()
         State.Session.SwarmTurnActive = false
@@ -123,7 +123,7 @@ local function onCombatRoundStarted(combatGuid, round)
 end
 
 local function onCombatEnded(combatGuid)
-    debugPrint("CombatEnded", combatGuid)
+    print("CombatEnded", combatGuid)
     if State.Settings.TurnBasedSwarmMode then
         State.Session.StoryActionIDs = {}
         State.Session.SwarmTurnComplete = {}
@@ -131,6 +131,7 @@ local function onCombatEnded(combatGuid)
         Leaderboard.dumpToConsole()
         Leaderboard.postDataToClients()
     end
+    Roster.endBrawl(M.Osi.GetRegion(M.Osi.GetHostCharacter()))
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)

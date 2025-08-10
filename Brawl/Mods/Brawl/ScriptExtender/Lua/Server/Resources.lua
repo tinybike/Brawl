@@ -6,9 +6,14 @@ local function getActionResource(entity, resourceType)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if resources[Constants.ACTION_RESOURCES[resourceType]] and resources[Constants.ACTION_RESOURCES[resourceType]][1] then
-            return resources[Constants.ACTION_RESOURCES[resourceType]][1]
+            local resource = resources[Constants.ACTION_RESOURCES[resourceType]][1]
+            return resource
         end
     end
+end
+
+local function getActionResourceMaxAmount(entity, resourceType)
+    return (M.Resources.getActionResource(entity, resourceType) or {}).MaxAmount
 end
 
 local function getActionResourceAmount(entity, resourceType)
@@ -33,10 +38,69 @@ end
 
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
-    local resource = M.Resources.getActionResource(entity, resourceType)
+    local resource = Resources.getActionResource(entity, resourceType)
     if resource then
         resource.Amount = math.min(0.0, resource.Amount - amount)
         entity:Replicate("ActionResources")
+    end
+end
+
+local function refillTimerComplete(brawler, resourceType)
+    if brawler and brawler.uuid and brawler.actionResources and brawler.actionResources[resourceType] then
+        local entity = Ext.Entity.Get(brawler.uuid)
+        if entity then
+            local uuid = brawler.uuid
+            if uuid == M.Osi.GetHostCharacter() then
+                print(brawler.displayName, "timer complete for, refilling", resourceType)
+            end
+            local resource = Resources.getActionResource(entity, resourceType)
+            if resource then
+                if uuid == M.Osi.GetHostCharacter() then
+                    _D(resource)
+                end
+                local updatedAmount = math.max(resource.MaxAmount, resource.Amount + 1)
+                resource.Amount = updatedAmount
+                brawler.actionResources[resourceType].amount = updatedAmount
+                if uuid == M.Osi.GetHostCharacter() then
+                    print("increased to", updatedAmount)
+                end
+                entity:Replicate("ActionResources")
+            end
+        end
+    end
+end
+
+local function actionResourcesCallback(entity, _, _)
+    if not State.Settings.TurnBasedSwarmMode and entity and entity.Uuid and entity.Uuid.EntityUuid then
+        if Pause.isInFTB(entity) then
+            return Resources.restoreActionResource(entity, "Movement")
+        end
+        local uuid = entity.Uuid.EntityUuid
+        local brawler = Roster.getBrawlerByUuid(uuid)
+        if brawler then
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                local savedActionResource = brawler.actionResources[resourceType]
+                if savedActionResource and savedActionResource.amount then
+                    local resource = Resources.getActionResource(entity, resourceType)
+                    if resource and resource.Amount then
+                        if uuid == M.Osi.GetHostCharacter() then
+                            print(brawler.displayName, "ActionResources check:", resourceType, resource.Amount, savedActionResource.amount)
+                        end
+                        -- was this a decrease? if so, create timer for refilling 1 point
+                        if resource.Amount < savedActionResource.amount then
+                            if uuid == M.Osi.GetHostCharacter() then
+                                print(brawler.displayName, "decrease found of", resourceType)
+                            end
+                            table.insert(savedActionResource.refillQueue, Ext.Timer.WaitFor(brawler.actionInterval, function ()
+                                print("timeout!", resourceType)
+                                refillTimerComplete(brawler, resourceType)
+                            end))
+                        end
+                        savedActionResource.amount = resource.Amount
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -258,10 +322,12 @@ end
 
 return {
     getActionResource = getActionResource,
+    getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
     increaseActionResource = increaseActionResource,
     restoreActionResource = restoreActionResource,
     decreaseActionResource = decreaseActionResource,
+    actionResourcesCallback = actionResourcesCallback,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
