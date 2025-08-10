@@ -486,7 +486,7 @@ end
 local function useActionPointSurplus(uuid, resourceType)
     local pointSurplus = math.floor(M.Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
     if pointSurplus > 0 then
-        Resources.decreaseActionResource(Ext.Entity.Get(uuid), resourceType, pointSurplus)
+        Resources.decreaseActionResource(uuid, resourceType, pointSurplus)
     end
     return pointSurplus
 end

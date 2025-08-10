@@ -20,14 +20,6 @@ local function getActionResourceAmount(entity, resourceType)
     return (M.Resources.getActionResource(entity, resourceType) or {}).Amount
 end
 
-local function increaseActionResource(entity, resourceType, amount)
-    local resource = M.Resources.getActionResource(entity, resourceType)
-    if resource then
-        resource.Amount = math.max(resource.MaxAmount, resource.Amount + amount)
-        entity:Replicate("ActionResources")
-    end
-end
-
 local function restoreActionResource(entity, resourceType)
     local resource = M.Resources.getActionResource(entity, resourceType)
     if resource and resource.Amount < resource.MaxAmount then
@@ -38,11 +30,17 @@ end
 
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
-    local resource = Resources.getActionResource(entity, resourceType)
-    if resource then
-        resource.Amount = math.min(0.0, resource.Amount - amount)
-        entity:Replicate("ActionResources")
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[resourceType]]
+        if resources and resources[1] then
+            if resources[1].Amount >= amount then
+                resources[1].Amount = resources[1].Amount - amount
+            else
+                resources[1].Amount = 0.0
+            end
+        end
     end
+    entity:Replicate("ActionResources")
 end
 
 local function refillTimerComplete(brawler, resourceType)
@@ -58,7 +56,7 @@ local function refillTimerComplete(brawler, resourceType)
                 if uuid == M.Osi.GetHostCharacter() then
                     _D(resource)
                 end
-                local updatedAmount = math.max(resource.MaxAmount, resource.Amount + 1)
+                local updatedAmount = math.min(resource.MaxAmount, resource.Amount + 1)
                 resource.Amount = updatedAmount
                 brawler.actionResources[resourceType].amount = updatedAmount
                 if uuid == M.Osi.GetHostCharacter() then
@@ -324,7 +322,6 @@ return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
-    increaseActionResource = increaseActionResource,
     restoreActionResource = restoreActionResource,
     decreaseActionResource = decreaseActionResource,
     actionResourcesCallback = actionResourcesCallback,
