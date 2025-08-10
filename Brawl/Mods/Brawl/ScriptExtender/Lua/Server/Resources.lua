@@ -101,6 +101,36 @@ local function actionResourcesCallback(entity, _, _)
     end
 end
 
+local function pauseActionResourcesRefillTimers(brawler)
+    if brawler and brawler.actionResources then
+        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+            if brawler.actionResources[resourceType] then
+                local refillQueue = brawler.actionResources[resourceType].refillQueue
+                if refillQueue then
+                    for _, refillTimer in ipairs(refillQueue) do
+                        Ext.Timer.Pause(refillTimer)
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function resumeActionResourcesRefillTimers(brawler)
+    if brawler and brawler.actionResources then
+        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+            if brawler.actionResources[resourceType] then
+                local refillQueue = brawler.actionResources[resourceType].refillQueue
+                if refillQueue then
+                    for _, refillTimer in ipairs(refillQueue) do
+                        Ext.Timer.Resume(refillTimer)
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function checkSpellCharge(casterUuid, spellName)
     -- debugPrint("checking spell charge", casterUuid, spellName)
     if spellName then
@@ -324,6 +354,8 @@ return {
     restoreActionResource = restoreActionResource,
     decreaseActionResource = decreaseActionResource,
     actionResourcesCallback = actionResourcesCallback,
+    pauseActionResourcesRefillTimers = pauseActionResourcesRefillTimers,
+    resumeActionResourcesRefillTimers = resumeActionResourcesRefillTimers,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,

@@ -535,10 +535,10 @@ local function onMCMTurnBasedSwarmMode(value)
                 Roster.endBrawl(level)
             end
         end
-        State.boostPlayerInitiatives()
+        -- State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
     else
-        State.removeBoostPlayerInitiatives()
+        -- State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
         disableMod()
         enableMod()
