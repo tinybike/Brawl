@@ -21,7 +21,7 @@ local function getActionResourceAmount(entity, resourceType)
 end
 
 local function restoreActionResource(entity, resourceType)
-    local resource = M.Resources.getActionResource(entity, resourceType)
+    local resource = Resources.getActionResource(entity, resourceType)
     if resource and resource.Amount < resource.MaxAmount then
         resource.Amount = resource.MaxAmount
         entity:Replicate("ActionResources")

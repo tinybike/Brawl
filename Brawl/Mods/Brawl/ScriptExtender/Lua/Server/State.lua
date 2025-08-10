@@ -87,6 +87,7 @@ local Session = {
     BrawlerChunks = {},
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
+    TurnTimers = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
 }
 
@@ -95,6 +96,24 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
+
+local function nextCombatRound()
+    local host = M.Osi.GetHostCharacter()
+    if host then
+        local level = M.Osi.GetRegion(host)
+        if level then
+            print("nextCombatRound")
+            Session.SwarmTurnActive = true
+            Swarm.setAllEnemyTurnsComplete()
+            Session.SwarmTurnActive = false
+            for uuid, brawler in pairs(Session.Brawlers[level]) do
+                local entity = Ext.Entity.Get(uuid)
+                entity.TurnBased.RequestedEndTurn = true
+                entity:Replicate("TurnBased")
+            end
+        end
+    end
+end
 
 local function hasTargetCondition(targetConditionString, condition)
     local parts = {}
@@ -890,6 +909,7 @@ local function boostPlayerInitiatives()
 end
 
 return {
+    nextCombatRound = nextCombatRound,
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     areAnyPlayersBrawling = areAnyPlayersBrawling,

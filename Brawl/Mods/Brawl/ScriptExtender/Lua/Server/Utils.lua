@@ -379,13 +379,17 @@ local function isHostileTarget(uuid, targetUuid)
     return isHostile
 end
 
-local function getCurrentCombatRound()
+local function getCombatEntity()
     local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-    if serverEnterRequestEntities then
-        local combatEntity = serverEnterRequestEntities[1]
-        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
-            return combatEntity.TurnOrder.field_40
-        end
+    if serverEnterRequestEntities and serverEnterRequestEntities[1] then
+        return serverEnterRequestEntities[1]
+    end
+end
+
+local function getCurrentCombatRound()
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+        return combatEntity.TurnOrder.field_40
     end
 end
 

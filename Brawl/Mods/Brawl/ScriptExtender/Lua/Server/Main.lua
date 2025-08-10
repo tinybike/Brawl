@@ -164,10 +164,12 @@ function startToTTimers()
     stopToTTimers()
     local hostCharacter = M.Osi.GetHostCharacter()
     if not Mods.ToT.Player.InCamp() then
-        State.Session.ToTRoundTimer = Ext.Timer.WaitFor(6000, function ()
+        local turnDuration = State.Settings.ActionInterval*1000
+        State.Session.ToTRoundTimer = Ext.Timer.WaitFor(turnDuration, function ()
             if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
                 debugPrint("********************Moving ToT forward********************")
                 Mods.ToT.Scenario.ForwardCombat()
+                State.nextCombatRound()
                 if State.Session.ToTRoundAddNearbyTimer ~= nil then
                     Ext.Timer.Cancel(State.Session.ToTRoundAddNearbyTimer)
                     State.Session.ToTRoundAddNearbyTimer = nil
@@ -191,7 +193,7 @@ function startToTTimers()
                     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
                         Roster.addNearbyToBrawlers(hostCharacter, 150)
                     end
-                end, 8500)
+                end, turnDuration + 1500)
             end
         end
     end
