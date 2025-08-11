@@ -47,20 +47,12 @@ local function refillTimerComplete(brawler, resourceType)
         local entity = Ext.Entity.Get(brawler.uuid)
         if entity then
             local uuid = brawler.uuid
-            if uuid == M.Osi.GetHostCharacter() then
-                print(brawler.displayName, "timer complete for, refilling", resourceType)
-            end
             local resource = Resources.getActionResource(entity, resourceType)
             if resource then
-                if uuid == M.Osi.GetHostCharacter() then
-                    _D(resource)
-                end
                 local updatedAmount = math.min(resource.MaxAmount, resource.Amount + 1)
                 resource.Amount = updatedAmount
                 brawler.actionResources[resourceType].amount = updatedAmount
-                if uuid == M.Osi.GetHostCharacter() then
-                    print("increased to", updatedAmount)
-                end
+                print("Timer complete", brawler.displayName, resourceType, updatedAmount)
                 entity:Replicate("ActionResources")
             end
         end
@@ -80,16 +72,9 @@ local function actionResourcesCallback(entity, _, _)
                 if savedActionResource and savedActionResource.amount then
                     local resource = Resources.getActionResource(entity, resourceType)
                     if resource and resource.Amount then
-                        if uuid == M.Osi.GetHostCharacter() then
-                            print(brawler.displayName, "ActionResources check:", resourceType, resource.Amount, savedActionResource.amount)
-                        end
                         -- was this a decrease? if so, create timer for refilling 1 point
                         if resource.Amount < savedActionResource.amount then
-                            if uuid == M.Osi.GetHostCharacter() then
-                                print(brawler.displayName, "decrease found of", resourceType)
-                            end
                             table.insert(savedActionResource.refillQueue, Ext.Timer.WaitFor(brawler.actionInterval, function ()
-                                print("timeout!", resourceType)
                                 refillTimerComplete(brawler, resourceType)
                             end))
                         end
@@ -123,6 +108,7 @@ local function resumeActionResourcesRefillTimers(brawler)
                 local refillQueue = brawler.actionResources[resourceType].refillQueue
                 if refillQueue then
                     for _, refillTimer in ipairs(refillQueue) do
+                        print(brawler.displayName, "resume timer for", resourceType)
                         Ext.Timer.Resume(refillTimer)
                     end
                 end

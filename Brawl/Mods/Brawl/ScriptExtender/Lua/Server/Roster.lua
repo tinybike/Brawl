@@ -52,9 +52,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = true
         end
         if okToAdd then
-            if State.Session.Brawlers[level][entityUuid] and State.Session.Brawlers[level][entityUuid].actionResources and State.Session.Brawlers[level][entityUuid].actionResources.listener then
-                Ext.Entity.Unsubscribe(State.Session.Brawlers[level][entityUuid].actionResources.listener)
-            end
             local brawler = {
                 uuid = entityUuid,
                 displayName = M.Utils.getDisplayName(entityUuid),
@@ -67,11 +64,16 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
             }
             local entity = Ext.Entity.Get(entityUuid)
-            brawler.actionResources = {}
-            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
-                brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
+            local existingBrawler = State.Session.Brawlers[level][entityUuid]
+            if existingBrawler and existingBrawler.actionResources then
+                brawler.actionResources = existingBrawler.actionResources
+            else
+                brawler.actionResources = {}
+                for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                    brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
+                end
+                brawler.actionResources.listener = Ext.Entity.Subscribe("ActionResources", Resources.actionResourcesCallback, entity)
             end
-            brawler.actionResources.listener = Ext.Entity.Subscribe("ActionResources", Resources.actionResourcesCallback, entity)
             -- if State.getArchetype(entityUuid) == "barbarian" then
             --     brawler.rage = getRageAbility(entityUuid)
             -- end
