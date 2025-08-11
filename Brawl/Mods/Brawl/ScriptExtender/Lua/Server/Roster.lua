@@ -279,9 +279,10 @@ local function disableLockedOnTarget(uuid)
     end
 end
 
+-- NB: don't end brawl during pause?
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = M.State.getNumEnemiesRemaining(level)
-    debugPrint("Number of enemies remaining:", numEnemiesRemaining)
+    print("Number of enemies remaining:", numEnemiesRemaining)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
     end

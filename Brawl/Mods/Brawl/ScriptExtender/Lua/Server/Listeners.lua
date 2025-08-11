@@ -35,25 +35,25 @@ local function onCombatStarted(combatGuid)
             end
         end
     else
-        if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-            for _, participant in ipairs(combatEntity.CombatState.Participants) do
-                local entity = Ext.Entity.Get(entityUuid)
-                if entity and entity.TurnBased then
-                    if State.Session.Players[participant.Uuid.EntityUuid] then
-                        entity.TurnBased.IsActiveCombatTurn = true
-                        entity.TurnBased.HadTurnInCombat = false
-                        entity.TurnBased.RequestedEndTurn = false
-                        entity.TurnBased.TurnActionsCompleted = false
-                    else
-                        entity.TurnBased.IsActiveCombatTurn = false
-                        entity.TurnBased.HadTurnInCombat = true
-                        entity.TurnBased.RequestedEndTurn = true
-                        entity.TurnBased.TurnActionsCompleted = true
-                    end
-                    entity:Replicate("TurnBased")
-                end
-            end
-        end
+        -- if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+        --     for _, participant in ipairs(combatEntity.CombatState.Participants) do
+        --         local entity = Ext.Entity.Get(entityUuid)
+        --         if entity and entity.TurnBased then
+        --             if State.Session.Players[participant.Uuid.EntityUuid] then
+        --                 entity.TurnBased.IsActiveCombatTurn = true
+        --                 entity.TurnBased.HadTurnInCombat = false
+        --                 entity.TurnBased.RequestedEndTurn = false
+        --                 entity.TurnBased.TurnActionsCompleted = false
+        --             else
+        --                 entity.TurnBased.IsActiveCombatTurn = false
+        --                 entity.TurnBased.HadTurnInCombat = true
+        --                 entity.TurnBased.RequestedEndTurn = true
+        --                 entity.TurnBased.TurnActionsCompleted = true
+        --             end
+        --             entity:Replicate("TurnBased")
+        --         end
+        --     end
+        -- end
         if not isToT() then
             Roster.addNearbyToBrawlers(M.Osi.CombatGetInvolvedPlayer(combatGuid, 1), Constants.NEARBY_RADIUS, combatGuid)
             State.Session.TurnTimers[combatGuid] = Ext.Timer.WaitFor(0, State.nextCombatRound, State.Settings.ActionInterval*1000)
