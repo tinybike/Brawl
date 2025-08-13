@@ -852,7 +852,7 @@ local function setupPlayer(guid)
         Session.Players[uuid] = {
             uuid = uuid,
             guid = guid,
-            displayName = M.Utils.getDisplayName(uuid),
+            displayName = Utils.getDisplayName(uuid),
             userId = Osi.GetReservedUserID(uuid),
         }
         Osi.SetCanJoinCombat(uuid, 1)

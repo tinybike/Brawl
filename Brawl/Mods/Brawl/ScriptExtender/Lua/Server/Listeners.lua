@@ -25,8 +25,8 @@ local function onCombatStarted(combatGuid)
     for playerUuid, _ in pairs(State.Session.Players) do
         Roster.addBrawler(playerUuid, true)
     end
-    local combatEntity = Utils.getCombatEntity()
     if State.Settings.TurnBasedSwarmMode then
+        local combatEntity = Utils.getCombatEntity()
         if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
             for _, participant in ipairs(combatEntity.CombatState.Participants) do
                 if not State.Session.Players[participant.Uuid.EntityUuid] then
@@ -35,6 +35,7 @@ local function onCombatStarted(combatGuid)
             end
         end
     else
+        -- local combatEntity = Utils.getCombatEntity()
         -- if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
         --     for _, participant in ipairs(combatEntity.CombatState.Participants) do
         --         local entity = Ext.Entity.Get(entityUuid)
@@ -155,21 +156,38 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    debugPrint("EnteredCombat", entityGuid, combatGuid)
     local entityUuid = M.Osi.GetUUID(entityGuid)
     if entityUuid then
+        print("EnteredCombat", entityGuid, combatGuid)
         Roster.addBrawler(entityUuid, true)
-        if State.Settings.TurnBasedSwarmMode and M.Osi.IsPartyMember(entityUuid, 1) == 1 and State.Session.ResurrectedPlayer[entityUuid] then
-            State.Session.ResurrectedPlayer[entityUuid] = nil
-            local initiativeRoll = Roster.rollForInitiative(entityUuid)
-            local entity = Ext.Entity.Get(entityUuid)
-            if entity and entity.CombatParticipant then
-                entity.CombatParticipant.InitiativeRoll = initiativeRoll
-                if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
-                    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = initiativeRolls
-                    entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+        if State.Settings.TurnBasedSwarmMode then
+            if M.Osi.IsPartyMember(entityUuid, 1) == 1 and State.Session.ResurrectedPlayer[entityUuid] then
+                State.Session.ResurrectedPlayer[entityUuid] = nil
+                local initiativeRoll = Roster.rollForInitiative(entityUuid)
+                local entity = Ext.Entity.Get(entityUuid)
+                if entity and entity.CombatParticipant then
+                    entity.CombatParticipant.InitiativeRoll = initiativeRoll
+                    if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+                        entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = initiativeRolls
+                        entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+                    end
+                    entity:Replicate("CombatParticipant")
                 end
-                entity:Replicate("CombatParticipant")
+            end
+        else
+            local combatEntity = Utils.getCombatEntity()
+            if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+                for _, participant in ipairs(combatEntity.CombatState.Participants) do
+                    local entity = Ext.Entity.Get(entityUuid)
+                    if entity and entity.TurnBased then
+                        if State.Session.Players[participant.Uuid.EntityUuid] then
+                            entity.TurnBased.IsActiveCombatTurn = true
+                        else
+                            entity.TurnBased.IsActiveCombatTurn = false
+                        end
+                        entity:Replicate("TurnBased")
+                    end
+                end
             end
         end
     end
