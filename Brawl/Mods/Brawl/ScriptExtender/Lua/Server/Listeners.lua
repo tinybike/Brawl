@@ -460,7 +460,7 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 State.boostPlayerInitiative(uuid)
                 State.recapPartyMembersMovementDistances()
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
             else
                 State.uncapPartyMembersMovementDistances()
                 -- Pause.checkTruePauseParty()

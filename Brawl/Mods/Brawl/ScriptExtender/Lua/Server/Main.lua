@@ -73,7 +73,7 @@ function stopPulseAddNearby(uuid)
 end
 
 function startPulseAddNearby(uuid)
-    debugPrint("startPulseAddNearby", uuid, M.Utils.getDisplayName(uuid))
+    debugPrint("startPulseAddNearby", uuid, Utils.getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] == nil then
         State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAddNearby(uuid)
