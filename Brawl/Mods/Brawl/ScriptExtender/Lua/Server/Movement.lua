@@ -55,6 +55,7 @@ local function setMovementToMax(entity)
         resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
         resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
         resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 1.0
+        resources[Constants.ACTION_RESOURCES.ReactionActionPoint][1].Amount = 1.0
         entity:Replicate("ActionResources")
     end
 end

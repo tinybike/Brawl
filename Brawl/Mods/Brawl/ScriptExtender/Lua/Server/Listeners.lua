@@ -960,9 +960,9 @@ end
 
 local function onStatusApplied(object, status, causee, storyActionID)
     -- print("StatusApplied", object, status, causee, storyActionID)
-    if status == "DASH" then
-        Movement.setPlayerRunToSprint(M.Osi.GetUUID(object))
-    end
+    -- if status == "DASH" then
+    --     Movement.setPlayerRunToSprint(M.Osi.GetUUID(object))
+    -- end
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
     --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
     -- end
