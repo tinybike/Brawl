@@ -148,7 +148,7 @@ local function onCombatEnded(combatGuid)
         end
         local host = M.Osi.GetHostCharacter()
         if host then
-            local level = M.Osi.GetRegion()
+            local level = M.Osi.GetRegion(host)
             if level then
                 Roster.endBrawl()
             end
