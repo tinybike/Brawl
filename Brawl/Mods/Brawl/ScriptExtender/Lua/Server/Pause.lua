@@ -98,6 +98,8 @@ local function allExitFTB()
                 end
             end
         end
+        -- need timer?
+        Utils.setPlayerTurnsActive()
     end
 end
 

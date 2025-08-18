@@ -386,6 +386,29 @@ local function getCombatEntity()
     end
 end
 
+local function setPlayerTurnsActive()
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        local groupsPlayers = {}
+        local groupsEnemies = {}
+        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
+            if info.IsPlayer then
+                table.insert(groupsPlayers, info)
+            else
+                table.insert(groupsEnemies, info)
+            end
+        end
+        local numPlayerGroups = #groupsPlayers
+        for i = 1, numPlayerGroups do
+            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
+        end
+        for i = 1, #groupsEnemies do
+            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
+        end
+    end
+    return groupsReordered
+end
+
 local function getCurrentCombatRound()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
@@ -556,4 +579,5 @@ return {
     averageTime = averageTime,
     totalTime = totalTime,
     getPersistentModVars = getPersistentModVars,
+    setPlayerTurnsActive = setPlayerTurnsActive,
 }

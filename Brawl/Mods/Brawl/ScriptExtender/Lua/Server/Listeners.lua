@@ -129,6 +129,7 @@ local function onCombatRoundStarted(combatGuid, round)
         else
             onCombatStarted(combatGuid)
         end
+        Utils.setPlayerTurnsActive()
     end
 end
 
