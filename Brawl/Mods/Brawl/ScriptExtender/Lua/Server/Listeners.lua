@@ -247,6 +247,7 @@ local function onLeftForceTurnBased(entityGuid)
             local brawler = Roster.getBrawlerByUuid(entityUuid)
             if brawler then
                 Resources.resumeActionResourcesRefillTimers(brawler)
+                Utils.joinCombat(entityUuid)
             end
             if State.Session.Players and State.Session.Players[entityUuid] then
                 if State.Session.Players[entityUuid].isFreshSummon then
@@ -257,7 +258,6 @@ local function onLeftForceTurnBased(entityGuid)
                     State.Session.FTBLockedIn[entityUuid] = nil
                 end
                 State.Session.RemainingMovement[entityUuid] = nil
-                local brawler = Roster.getBrawlerByUuid(entityUuid)
                 if brawler then
                     brawler.isInBrawl = false
                     if State.isPlayerControllingDirectly(entityUuid) then
@@ -770,10 +770,9 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-        debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
         if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
+            debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
             State.Session.StoryActionIDs[storyActionID] = {}
-            debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
             -- if State.Settings.TurnBasedSwarmMode then
             --     local brawler = M.Roster.getBrawlerByUuid(casterUuid)
             --     if brawler then

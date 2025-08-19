@@ -404,18 +404,10 @@ local function getInitiativeRoll(uuid)
 end
 
 local function setPlayersSwarmGroup()
-    local combatEntity = getCombatEntity()
-    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-        for _, participant in ipairs(combatEntity.CombatState.Participants) do
-            local entity = Ext.Entity.Get(entityUuid)
-            if entity and entity.TurnBased then
-                local uuid = participant.Uuid.EntityUuid
-                if State.Session.Players[uuid] then
-                    print("start init roll", getInitiativeRoll(uuid))
-                    Osi.RequestSetSwarmGroup(uuid, "PLAYERS_SWARM_GROUP")
-                    print("end init roll", getInitiativeRoll(uuid))
-                end
-            end
+    local players = State.Session.Players
+    if players then
+        for uuid, _ in pairs(players) do
+            Osi.RequestSetSwarmGroup(uuid, "PLAYERS_SWARM_GROUP")
         end
     end
 end
@@ -427,20 +419,20 @@ local function setPlayerTurnsActive()
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
             if info.IsPlayer then
+                -- _D(info)
                 table.insert(groupsPlayers, info)
             else
                 table.insert(groupsEnemies, info)
             end
         end
         local numPlayerGroups = #groupsPlayers
-        print("num before", #combatEntity.TurnOrder.Groups)
+        -- NB: repeated entries for players, fix this?
         for i = 1, numPlayerGroups do
             combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        print("num after", #combatEntity.TurnOrder.Groups)
     end
 end
 

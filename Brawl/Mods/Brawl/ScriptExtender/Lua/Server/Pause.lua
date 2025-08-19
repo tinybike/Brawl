@@ -77,6 +77,7 @@ local function allEnterFTB()
     end
 end
 
+-- NB: points timers should never be firing while paused, why is this happening?
 local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
@@ -103,10 +104,6 @@ local function allExitFTB()
                     end
                     Utils.setPlayersSwarmGroup()
                     Utils.setPlayerTurnsActive()
-                    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-                        local uuid = M.Osi.GetUUID(player[1])
-                        Utils.joinCombat(uuid)
-                    end
                 end
             end
         end
