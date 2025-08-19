@@ -386,6 +386,40 @@ local function getCombatEntity()
     end
 end
 
+local function joinCombat(uuid)
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.ServerEnterRequest and combatEntity.ServerEnterRequest.EnterRequests then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and M.Osi.CanJoinCombat(uuid) == 1 and M.Osi.IsInCombat(uuid) == 0 then
+            combatEntity.ServerEnterRequest.EnterRequests[entity] = true
+        end
+    end
+end
+
+local function getInitiativeRoll(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.CombatParticipant then
+        return entity.CombatParticipant.InitiativeRoll
+    end
+end
+
+local function setPlayersSwarmGroup()
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+        for _, participant in ipairs(combatEntity.CombatState.Participants) do
+            local entity = Ext.Entity.Get(entityUuid)
+            if entity and entity.TurnBased then
+                local uuid = participant.Uuid.EntityUuid
+                if State.Session.Players[uuid] then
+                    print("start init roll", getInitiativeRoll(uuid))
+                    Osi.RequestSetSwarmGroup(uuid, "PLAYERS_SWARM_GROUP")
+                    print("end init roll", getInitiativeRoll(uuid))
+                end
+            end
+        end
+    end
+end
+
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
@@ -399,14 +433,15 @@ local function setPlayerTurnsActive()
             end
         end
         local numPlayerGroups = #groupsPlayers
+        print("num before", #combatEntity.TurnOrder.Groups)
         for i = 1, numPlayerGroups do
             combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
+        print("num after", #combatEntity.TurnOrder.Groups)
     end
-    return groupsReordered
 end
 
 local function getCurrentCombatRound()
@@ -565,6 +600,10 @@ return {
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
     getCombatEntity = getCombatEntity,
+    joinCombat = joinCombat,
+    getInitiativeRoll = getInitiativeRoll,
+    setPlayersSwarmGroup = setPlayersSwarmGroup,
+    setPlayerTurnsActive = setPlayerTurnsActive,
     getCurrentCombatRound = getCurrentCombatRound,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
@@ -579,5 +618,4 @@ return {
     averageTime = averageTime,
     totalTime = totalTime,
     getPersistentModVars = getPersistentModVars,
-    setPlayerTurnsActive = setPlayerTurnsActive,
 }

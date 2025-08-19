@@ -70,6 +70,7 @@ local Memoizable = {
         "isHostileTarget",
         "isValidHostileTarget",
         "getSpellNameBySlot",
+        "getInitiativeRoll",
         "getCurrentCombatRound",
         "hasStatus",
         "hasPassive",

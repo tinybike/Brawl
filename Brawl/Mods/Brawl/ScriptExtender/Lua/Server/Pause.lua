@@ -86,6 +86,7 @@ local function allExitFTB()
             Osi.ForceTurnBasedMode(uuid, 0)
             Osi.SetCanJoinCombat(uuid, 1)
             stopTruePause(uuid)
+            Utils.joinCombat(uuid)
         end
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
         local brawlersInLevel = State.Session.Brawlers[level]
@@ -95,10 +96,11 @@ local function allExitFTB()
                     unlock(Ext.Entity.Get(brawlerUuid))
                     Osi.ForceTurnBasedMode(brawlerUuid, 0)
                     stopTruePause(brawlerUuid)
+                    Utils.joinCombat(brawlerUuid)
                 end
             end
         end
-        -- need timer?
+        Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()
     end
 end
