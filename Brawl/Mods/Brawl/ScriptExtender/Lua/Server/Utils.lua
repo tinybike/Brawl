@@ -419,20 +419,44 @@ local function setPlayerTurnsActive()
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
             if info.IsPlayer then
-                -- _D(info)
                 table.insert(groupsPlayers, info)
             else
                 table.insert(groupsEnemies, info)
             end
         end
-        local numPlayerGroups = #groupsPlayers
-        -- NB: repeated entries for players, fix this?
-        for i = 1, numPlayerGroups do
-            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
+        local function dedupMembers(group)
+            local seen = {}
+            local j = 1
+            for i = 1, #group.Members do
+                local member = group.Members[i]
+                local ent = member.Entity
+                if not seen[ent] then
+                    seen[ent] = true
+                    group.Members[j] = member
+                    j = j + 1
+                end
+            end
+            for i = j, #group.Members do
+                group.Members[i] = nil
+            end
         end
-        for i = 1, #groupsEnemies do
-            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
+        for _, group in ipairs(groupsPlayers) do
+            dedupMembers(group)
         end
+        for _, group in ipairs(groupsEnemies) do
+            dedupMembers(group)
+        end
+        local allGroups = {}
+        for _, group in ipairs(groupsPlayers) do
+            table.insert(allGroups, group)
+        end
+        for _, group in ipairs(groupsEnemies) do
+            table.insert(allGroups, group)
+        end
+        for i = 1, #allGroups do
+            combatEntity.TurnOrder.Groups[i] = allGroups[i]
+        end
+        _D(combatEntity.TurnOrder.Groups)
     end
 end
 

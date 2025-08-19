@@ -53,6 +53,7 @@ local function stopTruePause(entityUuid)
     end
 end
 
+-- NB: need to either disable the built-in AI or force-pause it during pause
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
