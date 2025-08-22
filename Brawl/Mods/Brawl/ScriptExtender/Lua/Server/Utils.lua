@@ -415,47 +415,33 @@ end
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        print("init")
+        _D(combatEntity.TurnOrder.Groups)
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
             if info.IsPlayer then
+                -- _D(info)
                 table.insert(groupsPlayers, info)
             else
                 table.insert(groupsEnemies, info)
             end
         end
-        local function dedupMembers(group)
-            local seen = {}
-            local j = 1
-            for i = 1, #group.Members do
-                local member = group.Members[i]
-                local ent = member.Entity
-                if not seen[ent] then
-                    seen[ent] = true
-                    group.Members[j] = member
-                    j = j + 1
-                end
-            end
-            for i = j, #group.Members do
-                group.Members[i] = nil
-            end
+        -- need to COPY the enemy groups to prevent overwriting while doing a swap here
+        local numPlayerGroups = #groupsPlayers
+        for i = 1, numPlayerGroups do
+            print("player group", i)
+            _D(groupsPlayers[i])
+            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
-        for _, group in ipairs(groupsPlayers) do
-            dedupMembers(group)
+        print("mid")
+        _D(combatEntity.TurnOrder.Groups)
+        for i = 1, #groupsEnemies do
+            print("enemy group", i, i + numPlayerGroups)
+            _D(groupsEnemies[i])
+            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        for _, group in ipairs(groupsEnemies) do
-            dedupMembers(group)
-        end
-        local allGroups = {}
-        for _, group in ipairs(groupsPlayers) do
-            table.insert(allGroups, group)
-        end
-        for _, group in ipairs(groupsEnemies) do
-            table.insert(allGroups, group)
-        end
-        for i = 1, #allGroups do
-            combatEntity.TurnOrder.Groups[i] = allGroups[i]
-        end
+        print("after")
         _D(combatEntity.TurnOrder.Groups)
     end
 end
