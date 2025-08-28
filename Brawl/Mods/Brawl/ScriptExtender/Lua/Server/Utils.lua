@@ -421,30 +421,82 @@ local function setPlayerTurnsActive()
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
             if info.IsPlayer then
-                -- _D(info)
                 table.insert(groupsPlayers, info)
             else
                 table.insert(groupsEnemies, info)
             end
         end
-        -- need to COPY the enemy groups to prevent overwriting while doing a swap here
+        print("first enemy group")
+        _D(groupsEnemies[1])
         local numPlayerGroups = #groupsPlayers
         for i = 1, numPlayerGroups do
-            print("player group", i)
-            _D(groupsPlayers[i])
             combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
-        print("mid")
-        _D(combatEntity.TurnOrder.Groups)
-        for i = 1, #groupsEnemies do
-            print("enemy group", i, i + numPlayerGroups)
-            _D(groupsEnemies[i])
-            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
-        end
+        combatEntity.TurnOrder.Groups[1 + numPlayerGroups] = groupsEnemies[2]
         print("after")
         _D(combatEntity.TurnOrder.Groups)
     end
 end
+
+-- local function setPlayerTurnsActive()
+--     local combatEntity = getCombatEntity()
+--     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+--         print("init")
+--         _D(combatEntity.TurnOrder.Groups)
+--         local playerGroups = {}
+--         for i, group in ipairs(combatEntity.TurnOrder.Groups) do
+--             if group.IsPlayer then
+--                 table.insert(playerGroups, i)
+--             end
+--         end
+--         print("player group indices")
+--         _D(playerGroups)
+--         for i, playerGroup in ipairs(playerGroups) do
+--             local tempGroup = combatEntity.TurnOrder.Groups[i]
+--             local deepcopyOfGroup = {
+--                 Initiative = tempGroup.Initiative,
+--                 IsPlayer = tempGroup.IsPlayer,
+--                 Members = {},
+--                 Round = tempGroup.Round,
+--                 Team = tempGroup.Team,
+--             }
+--             local numGroupMembers = #tempGroup.Members
+--             local numNewGroupMembers = #combatEntity.TurnOrder.Groups[playerGroup].Members
+--             print("num group members", numGroupMembers, numNewGroupMembers)
+--             for _, member in ipairs(tempGroup.Members) do
+--                 table.insert(deepcopyOfGroup.Members, {Entity = member.Entity, Initiative = member.Initiative})
+--             end
+--             print("deep copy of group", i)
+--             _D(tempGroup)
+--             _D(deepcopyOfGroup)
+--             combatEntity.TurnOrder.Groups[i] = combatEntity.TurnOrder.Groups[playerGroup]
+--             print("replacing individual members of player group's old location with enemy group", playerGroup)
+--             combatEntity.TurnOrder.Groups[playerGroup].Initiative = deepcopyOfGroup.Initiative
+--             combatEntity.TurnOrder.Groups[playerGroup].IsPlayer = deepcopyOfGroup.IsPlayer
+--             combatEntity.TurnOrder.Groups[playerGroup].Round = deepcopyOfGroup.Round
+--             combatEntity.TurnOrder.Groups[playerGroup].Team = deepcopyOfGroup.Team
+--             for i, member in ipairs(deepcopyOfGroup.Members) do
+--                 print("replacing member", i)
+--                 _D(member)
+--                 combatEntity.TurnOrder.Groups[playerGroup].Members[i].Entity = member.Entity
+--                 combatEntity.TurnOrder.Groups[playerGroup].Members[i].Initiative = member.Initiative
+--             end
+--             print("midway")
+--             _D(combatEntity.TurnOrder.Groups[playerGroup])
+--             if numGroupMembers < numNewGroupMembers then
+--                 for i = numNewGroupMembers, numGroupMembers + 1, -1 do
+--                     print("set member to nil", i)
+--                     combatEntity.TurnOrder.Groups[playerGroup].Members[i] = nil
+--                 end
+--             end
+--             print("group after")
+--             _D(combatEntity.TurnOrder.Groups[playerGroup])
+--         end
+--         print("after")
+--         combatEntity:Replicate("TurnOrder")
+--         _D(combatEntity.TurnOrder.Groups)
+--     end
+-- end
 
 local function getCurrentCombatRound()
     local combatEntity = getCombatEntity()
