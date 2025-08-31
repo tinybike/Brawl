@@ -449,7 +449,7 @@ local function onCharacterJoinedParty(character)
                 -- Pause.checkTruePauseParty()
             end
         end
-        if M.State.areAnyPlayersBrawling() then
+        if State.areAnyPlayersBrawling() then
             Roster.addBrawler(uuid, true)
         end
         if M.Osi.IsSummon(uuid) == 1 then

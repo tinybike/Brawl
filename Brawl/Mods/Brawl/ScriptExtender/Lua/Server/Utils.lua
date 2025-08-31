@@ -412,11 +412,32 @@ local function setPlayersSwarmGroup()
     end
 end
 
+local function showTurnOrderGroups(groups)
+    for i, group in ipairs(groups) do
+        if group.Members then
+            local groupStr = ""
+            if group.IsPlayer then
+                groupStr = groupStr .. "    "
+            end
+            groupStr = groupStr .. tostring(i)
+            for j, member in ipairs(group.Members) do
+                if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                    if j > 1 then
+                        groupStr = groupStr .. " +"
+                    end
+                    groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
+                end
+            end
+            print(groupStr)
+        end
+    end
+end
+
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        print("init")
-        _D(combatEntity.TurnOrder.Groups)
+        print("********init***********")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
@@ -426,15 +447,18 @@ local function setPlayerTurnsActive()
                 table.insert(groupsEnemies, info)
             end
         end
-        print("first enemy group")
-        _D(groupsEnemies[1])
+        -- print("first enemy group")
+        -- _D(groupsEnemies[1])
         local numPlayerGroups = #groupsPlayers
         for i = 1, numPlayerGroups do
             combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
-        combatEntity.TurnOrder.Groups[1 + numPlayerGroups] = groupsEnemies[2]
-        print("after")
-        _D(combatEntity.TurnOrder.Groups)
+        -- combatEntity.TurnOrder.Groups[1 + numPlayerGroups] = groupsEnemies[2]
+        for i = 1, #groupsEnemies do
+            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
+        end
+        print("********after*********")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
     end
 end
 

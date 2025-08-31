@@ -660,19 +660,21 @@ local function uncapMovementDistance(entityUuid)
     if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
         -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
-        local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity:Replicate("ActionResources")
+            movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
+            movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
+            modVars.MovementDistances = movementDistances
+            -- _D(movementDistances)
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity:Replicate("ActionResources")
-        movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
-        movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
-        modVars.MovementDistances = movementDistances
-        -- _D(movementDistances)
     end
 end
 
@@ -683,19 +685,21 @@ local function capMovementDistance(entityUuid)
         -- debugPrint("Cap movement distance", entityUuid)
         -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
+                entity:Replicate("ActionResources")
+            end
+            movementDistances[entityUuid] = nil
+            modVars.MovementDistances = movementDistances
+            -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
-            entity:Replicate("ActionResources")
-        end
-        movementDistances[entityUuid] = nil
-        modVars.MovementDistances = movementDistances
-        -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
