@@ -438,6 +438,8 @@ local function setPlayerTurnsActive()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         print("********init***********")
         showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        print("---groups2")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
@@ -459,6 +461,8 @@ local function setPlayerTurnsActive()
         end
         print("********after*********")
         showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        print("---groups2")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
     end
 end
 

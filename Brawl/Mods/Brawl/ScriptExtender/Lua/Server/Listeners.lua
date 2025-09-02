@@ -44,7 +44,7 @@ local function onCombatStarted(combatGuid)
             end
             Utils.setPlayersSwarmGroup()
         else
-            startToTTimers()
+            startToTTimers(combatGuid)
         end
     end
 end
@@ -106,7 +106,7 @@ local function onCombatRoundStarted(combatGuid, round)
         Swarm.unsetAllEnemyTurnsComplete()
     else
         if isToT() then
-            startToTTimers()
+            startToTTimers(combatGuid)
         else
             onCombatStarted(combatGuid)
         end
@@ -273,7 +273,10 @@ local function onLeftForceTurnBased(entityGuid)
                     if isHostCharacter then
                         startBrawlFizzler(level)
                         if isToT() then
-                            startToTTimers()
+                            local combatGuid = M.Osi.CombatGetGuidFor(entityUuid)
+                            if combatGuid then
+                                startToTTimers(combatGuid)
+                            end
                         end
                     end
                     local brawlersInLevel = State.Session.Brawlers[level]

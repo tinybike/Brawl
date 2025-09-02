@@ -394,10 +394,10 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
             local targetDistanceToParty = M.Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
             -- debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
             actionToTake = decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE, bonusActionOnly)
-            debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
+            print(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
         else
             actionToTake = decideActionOnTarget(brawler, target.uuid, preparedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-            debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
+            print(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
         end
         if not actionToTake then
             debugPrint("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
