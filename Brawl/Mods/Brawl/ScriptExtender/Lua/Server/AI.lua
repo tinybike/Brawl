@@ -57,7 +57,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    -- print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
+    print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
     return request.RequestGuid
 end
 
@@ -423,8 +423,11 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
                 return false
             end
         end
+        if M.Osi.HasActiveStatus(brawler.uuid, "SANCTUARY") == 1 then
+            Osi.RemoveStatus(brawler.uuid, "SANCTUARY")
+        end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-            debugPrint(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
+            print(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
             useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
         end)
         return true

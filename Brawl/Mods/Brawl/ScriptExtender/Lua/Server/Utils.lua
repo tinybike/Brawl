@@ -436,10 +436,10 @@ end
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        print("********init***********")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
-        print("---groups2")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
+        -- print("********init***********")
+        -- showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        -- print("---groups2")
+        -- showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
@@ -449,20 +449,17 @@ local function setPlayerTurnsActive()
                 table.insert(groupsEnemies, info)
             end
         end
-        -- print("first enemy group")
-        -- _D(groupsEnemies[1])
         local numPlayerGroups = #groupsPlayers
         for i = 1, numPlayerGroups do
             combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
         end
-        -- combatEntity.TurnOrder.Groups[1 + numPlayerGroups] = groupsEnemies[2]
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        print("********after*********")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
-        print("---groups2")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
+        -- print("********after*********")
+        -- showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        -- print("---groups2")
+        -- showTurnOrderGroups(combatEntity.TurnOrder.Groups2)
     end
 end
 

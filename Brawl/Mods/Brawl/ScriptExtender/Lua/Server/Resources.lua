@@ -62,7 +62,7 @@ end
 local function actionResourcesCallback(entity, _, _)
     if not State.Settings.TurnBasedSwarmMode and entity and entity.Uuid and entity.Uuid.EntityUuid then
         if Pause.isInFTB(entity) then
-            return Resources.restoreActionResource(entity, "Movement")
+            return restoreActionResource(entity, "Movement")
         end
         local uuid = entity.Uuid.EntityUuid
         local brawler = Roster.getBrawlerByUuid(uuid)
@@ -70,9 +70,11 @@ local function actionResourcesCallback(entity, _, _)
             for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
                 local savedActionResource = brawler.actionResources[resourceType]
                 if savedActionResource and savedActionResource.amount then
-                    local resource = Resources.getActionResource(entity, resourceType)
+                    local resource = getActionResource(entity, resourceType)
                     if resource and resource.Amount then
                         -- was this a decrease? if so, create timer for refilling 1 point
+                        -- just compare to max amount? does that work for things like Haste?
+                        -- print("Resource comparison:", resource.Amount, savedActionResource.amount, resource.Amount < savedActionResource.amount, resource.MaxAmount)
                         if resource.Amount < savedActionResource.amount then
                             table.insert(savedActionResource.refillQueue, Ext.Timer.WaitFor(brawler.actionInterval, function ()
                                 refillTimerComplete(brawler, resourceType)
@@ -287,7 +289,7 @@ local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, v
 end
 
 local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
-    debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
+    print(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
         return false
     end
@@ -300,18 +302,19 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
-        debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
+        print("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
         return false
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
-            debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
+            print("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
             return false
         end
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    print("resources available:", Osi.GetActionResourceValuePersonal(casterUuid, "ActionPoint", 0), Osi.GetActionResourceValuePersonal(casterUuid, "BonusActionPoint", 0))
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)
     -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
     --     return false

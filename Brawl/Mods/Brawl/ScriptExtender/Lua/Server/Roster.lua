@@ -68,6 +68,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             if existingBrawler and existingBrawler.actionResources then
                 brawler.actionResources = existingBrawler.actionResources
             else
+                -- does this work for entities that get pulled out of the brawl and then re-entered?
                 brawler.actionResources = {}
                 for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
                     brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
@@ -173,6 +174,16 @@ local function removeBrawler(level, entityUuid)
         end
         if State.Session.ResurrectedPlayer[entityUuid] ~= nil then
             State.Session.ResurrectedPlayer[entityUuid] = nil
+        end
+    end
+end
+
+local function addCombatParticipantsToBrawlers()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+        for _, participant in ipairs(combatEntity.CombatState.Participants) do
+            print(M.Utils.getDisplayName(participant.Uuid.EntityUuid), "adding to brawlers")
+            addBrawler(participant.Uuid.EntityUuid, true)
         end
     end
 end
@@ -311,6 +322,7 @@ return {
     rollForInitiative = rollForInitiative,
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
+    addCombatParticipantsToBrawlers = addCombatParticipantsToBrawlers,
     endBrawl = endBrawl,
     getBrawlersSortedByDistance = getBrawlersSortedByDistance,
     addNearbyToBrawlers = addNearbyToBrawlers,

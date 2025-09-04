@@ -22,31 +22,20 @@ local function onCombatStarted(combatGuid)
     else
         Constants.ENTER_COMBAT_RANGE = 20
     end
-    for playerUuid, _ in pairs(State.Session.Players) do
-        Roster.addBrawler(playerUuid, true)
+    -- for playerUuid, _ in pairs(State.Session.Players) do
+    --     Roster.addBrawler(playerUuid, true)
+    -- end
+    Roster.addCombatParticipantsToBrawlers()
+    if isToT() then
+        return startToTTimers()
     end
-    if State.Settings.TurnBasedSwarmMode then
-        local combatEntity = Utils.getCombatEntity()
-        if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-            for _, participant in ipairs(combatEntity.CombatState.Participants) do
-                if not State.Session.Players[participant.Uuid.EntityUuid] then
-                    Roster.addBrawler(participant.Uuid.EntityUuid, true)
-                end
-            end
-        end
-    else
-        if not isToT() then
-            Roster.addNearbyToBrawlers(M.Osi.CombatGetInvolvedPlayer(combatGuid, 1), Constants.NEARBY_RADIUS, combatGuid)
-            State.Session.TurnTimers[combatGuid] = Ext.Timer.WaitFor(0, State.nextCombatRound, State.Settings.ActionInterval*1000)
-            -- need to adjust initiative rolls -- PlayersUseMeanInitiativeRoll so all players go together?  or just players go first for simplicity
-            if State.Settings.AutoPauseOnCombatStart then
-                Pause.allEnterFTB()
-            end
-            Utils.setPlayersSwarmGroup()
-        else
-            startToTTimers(combatGuid)
-        end
+    Roster.addNearbyToBrawlers(M.Osi.CombatGetInvolvedPlayer(combatGuid, 1), Constants.NEARBY_RADIUS, combatGuid)
+    State.Session.TurnTimers[combatGuid] = Ext.Timer.WaitFor(0, State.nextCombatRound, State.Settings.ActionInterval*1000)
+    -- need to adjust initiative rolls -- PlayersUseMeanInitiativeRoll so all players go together?  or just players go first for simplicity
+    if State.Settings.AutoPauseOnCombatStart then
+        Pause.allEnterFTB()
     end
+    Utils.setPlayersSwarmGroup()
 end
 
 local function onStarted(level)
