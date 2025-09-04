@@ -2,6 +2,31 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local clearOsirisQueue = Utils.clearOsirisQueue
 
+local function getActionResource(entity, resourceType)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        local resources = entity.ActionResources.Resources
+        if resources[Constants.ACTION_RESOURCES[resourceType]] and resources[Constants.ACTION_RESOURCES[resourceType]][1] then
+            return resources[Constants.ACTION_RESOURCES[resourceType]][1]
+        end
+    end
+end
+
+local function getActionResourceMaxAmount(entity, resourceType)
+    return (Resources.getActionResource(entity, resourceType) or {}).MaxAmount
+end
+
+local function getActionResourceAmount(entity, resourceType)
+    return (Resources.getActionResource(entity, resourceType) or {}).Amount
+end
+
+local function restoreActionResource(entity, resourceType)
+    local resource = Resources.getActionResource(entity, resourceType)
+    if resource and resource.Amount < resource.MaxAmount then
+        resource.Amount = resource.MaxAmount
+        entity:Replicate("ActionResources")
+    end
+end
+
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
@@ -234,6 +259,9 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
 end
 
 return {
+    getActionResource = getActionResource,
+    getActionResourceMaxAmount = getActionResourceMaxAmount,
+    getActionResourceAmount = getActionResourceAmount,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
