@@ -104,13 +104,17 @@ local function nextCombatRound()
         local level = M.Osi.GetRegion(host)
         if level then
             print("nextCombatRound")
-            Session.SwarmTurnActive = true
-            Swarm.setAllEnemyTurnsComplete()
-            Session.SwarmTurnActive = false
-            for uuid, brawler in pairs(Session.Brawlers[level]) do
+            for uuid, _ in pairs(Session.Brawlers[level]) do
                 local entity = Ext.Entity.Get(uuid)
-                entity.TurnBased.RequestedEndTurn = true
-                entity:Replicate("TurnBased")
+                if entity and entity.TurnBased then
+                    print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
+                    if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                        entity.TurnBased.HadTurnInCombat = true
+                        entity.TurnBased.TurnActionsCompleted = true
+                    end
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity:Replicate("TurnBased")
+                end
             end
         end
     end
