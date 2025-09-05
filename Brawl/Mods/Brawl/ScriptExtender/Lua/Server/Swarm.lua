@@ -49,6 +49,10 @@ local function setTurnComplete(uuid)
             entity.TurnBased.TurnActionsCompleted = true
             entity:Replicate("TurnBased")
             State.Session.SwarmTurnComplete[uuid] = true
+            if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+                Ext.Timer.Cancel(uuid)
+                State.Session.SwarmBrawlerIndexDelay[uuid] = nil
+            end
         end
     end
 end
@@ -62,6 +66,16 @@ local function unsetTurnComplete(uuid)
         entity.TurnBased.TurnActionsCompleted = false
         entity:Replicate("TurnBased")
         State.Session.SwarmTurnComplete[uuid] = false
+        -- Resources.restoreActionResource(entity, "Movement")
+    end
+end
+
+local function resetChunkState()
+    State.Session.ChunkInProgress = nil
+    State.Session.CurrentChunkIndex = nil
+    if State.Session.CurrentChunkTimer then
+        Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
+        State.Session.CurrentChunkTimer = nil
     end
 end
 
@@ -78,6 +92,7 @@ local function setAllEnemyTurnsComplete()
             end
         end
     end
+    resetChunkState()
 end
 
 local function unsetAllEnemyTurnsComplete()
@@ -93,6 +108,7 @@ local function unsetAllEnemyTurnsComplete()
             end
         end
     end
+    resetChunkState()
 end
 
 local function allBrawlersCanAct()
@@ -157,6 +173,7 @@ end
 local function completeSwarmTurn(uuid)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex
+        debugPrint("completeSwarmTurn", uuid, chunkIndex, isChunkDone(chunkIndex), State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
         if chunkIndex and isChunkDone(chunkIndex) then
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
@@ -185,6 +202,7 @@ local function forceCompleteChunk(chunkIndex)
 end
 
 startChunk = function (chunkIndex)
+    debugPrint("startChunk", chunkIndex, State.Session.ChunkInProgress)
     if State.Session.ChunkInProgress ~= chunkIndex then
         State.Session.ChunkInProgress = chunkIndex
         local chunk = State.Session.BrawlerChunks[chunkIndex]
@@ -274,19 +292,23 @@ end
 
 singleCharacterTurn = function (brawler, brawlerIndex)
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid))
+    debugPrint("remaining movement", Movement.getMovementDistanceAmount(Ext.Entity.Get(brawler.uuid)))
     local hostCharacterUuid = M.Osi.GetHostCharacter()
     if isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
-        -- print("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
+        debugPrint("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
     if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
-        -- debugPrint("don't take turn", brawler.uuid, brawler.displayName)
+        debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
     if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
+        debugPrint("controlled by default AI/swarm turn complete", brawler.displayName)
         return false
     end
-    Ext.Timer.WaitFor(brawlerIndex*25, function ()
+    State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*25, function ()
+        State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
+        debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*25)
         swarmAction(brawler)
     end)
     return true
@@ -380,6 +402,7 @@ return {
     cancelTimers = cancelTimers,
     resumeTimers = resumeTimers,
     pauseTimers = pauseTimers,
+    resetChunkState = resetChunkState,
     setTurnComplete = setTurnComplete,
     unsetTurnComplete = unsetTurnComplete,
     setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,

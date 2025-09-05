@@ -537,6 +537,7 @@ local function onMCMTurnBasedSwarmMode(value)
         end
         State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
+        Swarm.resetChunkState()
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
