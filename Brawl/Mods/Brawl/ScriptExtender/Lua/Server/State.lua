@@ -138,6 +138,16 @@ local function hasTargetCondition(targetConditionString, condition)
     return false
 end
 
+local function getToTCombatHelper()
+    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario then
+        return Mods.ToT.PersistentVars.Scenario.CombatHelper
+    end
+end
+
+local function isToTCombatHelper(uuid)
+    return Utils.isToT() and Mods.ToT.PersistentVars.Scenario and uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper
+end
+
 local function isSafeAoESpell(spellName)
     for _, safeAoESpell in ipairs(Constants.SAFE_AOE_SPELLS) do
         if spellName == safeAoESpell then
@@ -932,6 +942,8 @@ return {
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
+    getToTCombatHelper = getToTCombatHelper,
+    isToTCombatHelper = isToTCombatHelper,
     disableDynamicCombatCamera = disableDynamicCombatCamera,
     isPartyInRealTime = isPartyInRealTime,
     getSpellByName = getSpellByName,

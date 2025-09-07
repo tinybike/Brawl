@@ -167,7 +167,7 @@ function startToTTimers(combatGuid)
         local turnDuration = State.Settings.ActionInterval*1000
         State.Session.ToTRoundTimer = Ext.Timer.WaitFor(turnDuration, function ()
             if Mods.ToT.PersistentVars.Scenario then
-                print("advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
+                debugPrint("ToT advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
                 if Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
                     Mods.ToT.Scenario.ForwardCombat()
                 end

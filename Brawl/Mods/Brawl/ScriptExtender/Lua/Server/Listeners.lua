@@ -97,6 +97,16 @@ local function onCombatRoundStarted(combatGuid, round)
     else
         if isToT() then
             startToTTimers(combatGuid)
+            local helperUuid = State.getToTCombatHelper()
+            if helperUuid then
+                local helperEntity = Ext.Entity.Get(helperUuid)
+                if helperEntity and helperEntity.TurnBased then
+                    helperEntity.TurnBased.HadTurnInCombat = true
+                    helperEntity.TurnBased.RequestedEndTurn = true
+                    helperEntity.TurnBased.TurnActionsCompleted = true
+                    helperEntity:Replicate("TurnBased")
+                end
+            end
         else
             onCombatStarted(combatGuid)
         end
