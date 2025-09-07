@@ -724,6 +724,11 @@ local function updateLeaderboard(data)
     end
 end
 
+local function disableDynamicCombatCamera()
+    local globalSwitches = Ext.Utils.GetGlobalSwitches()
+    globalSwitches.GameCameraEnableDynamicCombatCamera = false
+end
+
 local function onNetMessage(data)
     if data.Channel == "GainedControl" then
         DirectlyControlledCharacter = data.Payload
@@ -737,6 +742,8 @@ local function onNetMessage(data)
         if LeaderboardWindow then
             updateLeaderboard(Ext.Json.Parse(data.Payload))
         end
+    elseif data.Channel == "DisableDynamicCombatCamera" then
+        disableDynamicCombatCamera()
     end
 end
 

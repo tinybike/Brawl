@@ -158,6 +158,10 @@ local function spellId(spell, spellName)
     return spell.Name == spellName
 end
 
+local function disableDynamicCombatCamera()
+    Ext.ServerNet.BroadcastMessage("DisableDynamicCombatCamera", "")
+end
+
 local function extraAttackSpellCheck(spell)
     return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
 end
@@ -928,6 +932,7 @@ return {
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
+    disableDynamicCombatCamera = disableDynamicCombatCamera,
     isPartyInRealTime = isPartyInRealTime,
     getSpellByName = getSpellByName,
     hasDirectHeal = hasDirectHeal,

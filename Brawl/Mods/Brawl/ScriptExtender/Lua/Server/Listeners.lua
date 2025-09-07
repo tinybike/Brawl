@@ -54,6 +54,7 @@ local function onStarted(level)
         State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
     else
+        State.disableDynamicCombatCamera()
         State.uncapPartyMembersMovementDistances()
         Pause.checkTruePauseParty()
     end
