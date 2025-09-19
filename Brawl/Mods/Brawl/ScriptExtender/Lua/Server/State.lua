@@ -107,6 +107,7 @@ local function nextCombatRound()
         local level = M.Osi.GetRegion(host)
         if level then
             print("nextCombatRound")
+            Ext.ServerNet.BroadcastMessage("NextCombatRound", host)
             for uuid, _ in pairs(Session.Brawlers[level]) do
                 local entity = Ext.Entity.Get(uuid)
                 if entity and entity.TurnBased then

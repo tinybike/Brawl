@@ -95,6 +95,7 @@ local function onCombatRoundStarted(combatGuid, round)
         -- State.Session.ActionsInProgress = {}
         Swarm.unsetAllEnemyTurnsComplete()
     else
+        Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
         if isToT() then
             startToTTimers(combatGuid)
             local helperUuid = State.getToTCombatHelper()

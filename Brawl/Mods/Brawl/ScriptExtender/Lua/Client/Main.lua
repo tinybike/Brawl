@@ -729,6 +729,8 @@ local function disableDynamicCombatCamera()
     globalSwitches.GameCameraEnableDynamicCombatCamera = false
 end
 
+local DirectlyControlledCharacterCurrentRound = 2
+
 local function onNetMessage(data)
     if data.Channel == "GainedControl" then
         DirectlyControlledCharacter = data.Payload
@@ -744,6 +746,16 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
+    elseif data.Channel == "NextCombatRound" then
+        DirectlyControlledCharacterCurrentRound = 2
+    elseif data.Channel == "CombatRoundStarted" then
+        for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+            if child.Name == "PlayerPortraits" then
+                local character = child.DataContext.CurrentPlayer.AssignedCharacters[DirectlyControlledCharacterCurrentRound]
+                child.DataContext.SelectCharacter:Execute(character)
+                break
+            end
+        end
     end
 end
 
