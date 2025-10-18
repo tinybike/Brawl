@@ -950,8 +950,9 @@ local function onStatusApplied(object, status, causee, storyActionID)
     --     Movement.setPlayerRunToSprint(M.Osi.GetUUID(object))
     -- end
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
-    --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
-    -- end
+    if status == "Shout_DivineIntervention_Healing" or status == "Shout_DivineIntervention_Healing_Improvement" then
+        Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
+    end
 end
 
 local function onStatusRemoved(object, status, causee, applyStoryActionID)
