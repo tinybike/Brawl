@@ -751,17 +751,17 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     -- print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
     Swarm.resumeTimers()
-    -- if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
-    --     if State.Session.Players then
-    --         local areaRadius = Ext.Stats.Get(spellName).AreaRadius
-    --         for uuid, _ in pairs(State.Session.Players) do
-    --             if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
-    --                 -- print("removing negative statuses from", M.Utils.getDisplayName(uuid), uuid)
-    --                 Utils.removeNegativeStatuses(uuid)
-    --             end
-    --         end
-    --     end
-    -- end
+    if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
+        if State.Session.Players then
+            local areaRadius = Ext.Stats.Get(spellName).AreaRadius
+            for uuid, _ in pairs(State.Session.Players) do
+                if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
+                    print("removing negative statuses from", M.Utils.getDisplayName(uuid), uuid)
+                    Utils.removeNegativeStatuses(uuid)
+                end
+            end
+        end
+    end
     if Resources.removeActionInProgress(casterUuid, spellName) then
         -- print("Removed action in progress for", M.Utils.getDisplayName(casterUuid), spellName)
         if State.Settings.TurnBasedSwarmMode then
@@ -950,9 +950,8 @@ local function onStatusApplied(object, status, causee, storyActionID)
     --     Movement.setPlayerRunToSprint(M.Osi.GetUUID(object))
     -- end
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
-    if status == "Shout_DivineIntervention_Healing" or status == "Shout_DivineIntervention_Healing_Improvement" then
-        Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
-    end
+    --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
+    -- end
 end
 
 local function onStatusRemoved(object, status, causee, applyStoryActionID)
