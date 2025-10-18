@@ -889,10 +889,10 @@ end
 
 local function onStatusApplied(object, status, causee, storyActionID)
     -- debugPrint("StatusApplied", object, status, causee, storyActionID)
-    -- Shout_DivineIntervention_Healing Shout_DivineIntervention_Healing_Improvement
     -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
-    --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
-    -- end
+    if status == "Shout_DivineIntervention_Healing" or status == "Shout_DivineIntervention_Healing_Improvement" then
+        Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
+    end
 end
 
 local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
