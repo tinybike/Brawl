@@ -956,9 +956,9 @@ end
 
 local function onStatusRemoved(object, status, causee, applyStoryActionID)
     -- print("StatusRemoved", object, status, causee, applyStoryActionID)
-    if status == "DASH" then
-        Movement.resetPlayerMovementSpeed(M.Osi.GetUUID(object))
-    end
+    -- if status == "DASH" then
+    --     Movement.resetPlayerMovementSpeed(M.Osi.GetUUID(object))
+    -- end
 end
 
 local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
