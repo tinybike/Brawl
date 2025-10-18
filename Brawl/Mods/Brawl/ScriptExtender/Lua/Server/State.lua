@@ -111,7 +111,7 @@ local function nextCombatRound()
             for uuid, _ in pairs(Session.Brawlers[level]) do
                 local entity = Ext.Entity.Get(uuid)
                 if entity and entity.TurnBased then
-                    print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
+                    -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
                     if M.Osi.IsPartyMember(uuid, 1) == 0 then
                         entity.TurnBased.HadTurnInCombat = true
                         entity.TurnBased.TurnActionsCompleted = true

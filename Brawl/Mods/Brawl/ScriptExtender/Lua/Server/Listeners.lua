@@ -108,8 +108,8 @@ local function onCombatRoundStarted(combatGuid, round)
                     helperEntity:Replicate("TurnBased")
                 end
             end
-        else
-            onCombatStarted(combatGuid)
+        -- else
+        --     onCombatStarted(combatGuid)
         end
         Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()

@@ -123,6 +123,7 @@ if MCM then
     }
 end
 local DirectlyControlledCharacter = nil
+local DirectlyControlledCharacterIndex = 1
 local AwaitingTarget = false
 local IsControllerButtonPressed = {
     A = false,
@@ -242,6 +243,21 @@ end
 local function isInFTB(uuid)
     local entity = Ext.Entity.Get(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function setDirectlyControlledCharacterIndex()
+    local directlyControlledCharacterUuid = getDirectlyControlledCharacter()
+    for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+        if child.Name == "PlayerPortraits" then
+            local assignedCharacters = child.DataContext.CurrentPlayer.AssignedCharacters
+            for characterIndex, assignedCharacter in ipairs(assignedCharacters) do
+                if assignedCharacter.EntityUUID == directlyControlledCharacterUuid then
+                    DirectlyControlledCharacterIndex = characterIndex
+                end
+            end
+            break
+        end
+    end
 end
 
 local function getPositionInfo()
@@ -729,7 +745,16 @@ local function disableDynamicCombatCamera()
     globalSwitches.GameCameraEnableDynamicCombatCamera = false
 end
 
-local DirectlyControlledCharacterCurrentRound = 2
+-- thank u focus
+local function directlyControlCharacterByIndex(characterIndex)
+    for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+        if child.Name == "PlayerPortraits" then
+            local character = child.DataContext.CurrentPlayer.AssignedCharacters[characterIndex]
+            child.DataContext.SelectCharacter:Execute(character)
+            break
+        end
+    end
+end
 
 local function onNetMessage(data)
     if data.Channel == "GainedControl" then
@@ -747,15 +772,9 @@ local function onNetMessage(data)
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
     elseif data.Channel == "NextCombatRound" then
-        DirectlyControlledCharacterCurrentRound = 2
+        setDirectlyControlledCharacterIndex()
     elseif data.Channel == "CombatRoundStarted" then
-        for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
-            if child.Name == "PlayerPortraits" then
-                local character = child.DataContext.CurrentPlayer.AssignedCharacters[DirectlyControlledCharacterCurrentRound]
-                child.DataContext.SelectCharacter:Execute(character)
-                break
-            end
-        end
+        directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
     end
 end
 
