@@ -700,6 +700,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
                 if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
                     print("removing negative statuses from", M.Utils.getDisplayName(uuid), uuid)
                     Utils.removeNegativeStatuses(uuid)
+                    -- Resources.restoreSpellSlots(uuid)
                 end
             end
         end

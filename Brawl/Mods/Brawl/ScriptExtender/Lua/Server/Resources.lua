@@ -19,6 +19,25 @@ local function getActionResourceAmount(entity, resourceType)
     return (Resources.getActionResource(entity, resourceType) or {}).Amount
 end
 
+local function restoreSpellSlots(uuid)
+    if uuid then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.ActionResources and entity.ActionResources.Resources then
+            local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.SpellSlot]
+            if spellSlots then
+                print("restoring spell slots", uuid)
+                for _, spellSlot in ipairs(spellSlots) do
+                    _D(spellSlot)
+                    if spellSlot.Amount < spellSlot.MaxAmount then
+                        spellSlot.Amount = spellSlot.MaxAmount
+                    end
+                end
+            end
+            entity:Replicate("ActionResources")
+        end
+    end
+end
+
 local function restoreActionResource(entity, resourceType)
     local resource = Resources.getActionResource(entity, resourceType)
     if resource and resource.Amount < resource.MaxAmount then
@@ -262,6 +281,7 @@ return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
+    restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
