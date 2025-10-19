@@ -162,9 +162,11 @@ local function resetSwarmTurnComplete()
 end
 
 local function isChunkDone(chunkIndex)
-    for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
-        if not State.Session.SwarmTurnComplete[uuid] then
-            return false
+    if State.Session.BrawlerChunks[chunkIndex] then
+        for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
+            if not State.Session.SwarmTurnComplete[uuid] then
+                return false
+            end
         end
     end
     return true
