@@ -246,10 +246,18 @@ local function isCounterspell(spellName)
 end
 
 local function removeNegativeStatuses(uuid)
-    Osi.RemoveStatusesWithGroup(uuid, "SG_Charmed")
-    Osi.RemoveStatusesWithGroup(uuid, "SG_Petrified")
-    Osi.RemoveStatusesWithGroup(uuid, "SG_Cursed")
-    Osi.RemoveStatusesWithGroup(uuid, "SG_Stunned")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Charmed")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Petrified")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Cursed")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Stunned")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Incapacitated")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Blinded")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Polymorph")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Condition")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Prone")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Surface")
+    -- Osi.RemoveStatusesWithGroup(uuid, "SG_Dominated")
+    -- Osi.RemoveStatus(uuid, "SILENCED")
     Osi.RemoveStatus(uuid, "ATT_FEEBLEMIND", "")
 end
 
