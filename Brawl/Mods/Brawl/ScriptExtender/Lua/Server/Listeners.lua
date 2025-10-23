@@ -278,13 +278,14 @@ end
 
 local function onTurnEnded(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        debugPrint("TurnEnded", entityGuid)
+        -- print("TurnEnded", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid and M.Roster.getBrawlerByUuid(entityUuid) then
-            if M.Osi.IsPartyMember(entityGuid, 1) == 1 then
+            if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
+                -- print("setting turn ended", entityGuid)
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
                 if Swarm.checkAllPlayersFinishedTurns() then
-                    debugPrint("Started Swarm turn!")
+                    -- print("Started Swarm turn!")
                     Swarm.unsetAllEnemyTurnsComplete()
                     Swarm.startSwarmTurn()
                 end
@@ -395,11 +396,16 @@ local function onCharacterJoinedParty(character)
                 -- Pause.checkTruePauseParty()
             end
         end
-        if M.State.areAnyPlayersBrawling() then
-            Roster.addBrawler(uuid, true)
-        end
         if M.Osi.IsSummon(uuid) == 1 then
             State.Session.Players[uuid].isFreshSummon = true
+            local ownerUuid = Osi.CharacterGetOwner(uuid)
+            if ownerUuid and not Utils.hasLoseControlStatus(uuid) then
+                Osi.RequestSetSwarmGroup(ownerUuid, "PLAYER_SWARM_GROUP")
+                Osi.RequestSetSwarmGroup(uuid, "PLAYER_SWARM_GROUP")
+            end
+        end
+        if State.areAnyPlayersBrawling() then
+            Roster.addBrawler(uuid, true)
         end
     end
 end
@@ -867,25 +873,27 @@ end
 -- end
 
 local function onFlagSet(flag, speaker, dialogInstance)
-    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
-    -- if not State.Settings.TurnBasedSwarmMode then
-        if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-            Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-            Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-        elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
-            Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-            Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-        elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
-            Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-            Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-        elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
-            Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-            Quests.nautiloidTransponderCountdown(M.Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-        elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
-            Quests.questTimerCancel("TUT_Helm_Timer")
-            Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    -- print("FlagSet", flag, speaker, dialogInstance)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+        Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+        Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+    elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
+        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
+        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+        Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+        Quests.nautiloidTransponderCountdown(M.Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+        Quests.questTimerCancel("TUT_Helm_Timer")
+        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
+        if not State.Settings.TurnBasedSwarmMode then
+            State.endBrawls()
         end
-    -- end
+    end
 end
 
 local function onStatusApplied(object, status, causee, storyActionID)

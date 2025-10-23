@@ -1,13 +1,13 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = false
+Constants.DEBUG_LOGGING = true
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
 Constants.BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 Constants.LIE_ON_GROUND_TIMEOUT = 3500
 Constants.LEADERBOARD_UPDATE_TIMEOUT = 100
-Constants.SWARM_TURN_TIMEOUT = 10000
+Constants.SWARM_TURN_TIMEOUT = 15000
 Constants.SWARM_CHUNK_SIZE = 20
 Constants.COUNTDOWN_TURN_INTERVAL = 6000
 Constants.MOD_STATUS_MESSAGE_DURATION = 2000
@@ -393,5 +393,7 @@ Constants.COUNTERSPELLS = {
     "Target_MOD_Dread_Counterspell",
 }
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
+Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
+Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 
 return Constants

@@ -247,7 +247,7 @@ local function useRemainingActions(brawler, callback)
     if brawler and brawler.uuid then
         local numActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
         local numBonusActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
-        -- print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
+        print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
         if numActions == 0 and numBonusActions == 0 then
             if State.Session.QueuedCompanionAIAction[brawler.uuid] then
                 State.Session.QueuedCompanionAIAction[brawler.uuid] = false
@@ -261,10 +261,10 @@ local function useRemainingActions(brawler, callback)
         else
             if numActions > 0 then
                 local actionResult = AI.pulseAction(brawler)
-                -- print(brawler.displayName, "action result", actionResult)
+                print(brawler.displayName, "action result", actionResult)
                 if not actionResult and numBonusActions > 0 then
                     local bonusActionResult = AI.pulseAction(brawler, true)
-                    -- print(brawler.displayName, "bonus action result (1)", bonusActionResult)
+                    print(brawler.displayName, "bonus action result (1)", bonusActionResult)
                     if not bonusActionResult then
                         -- should this call completeSwarmTurn?
                         if callback then callback(brawler.uuid) end
@@ -272,7 +272,7 @@ local function useRemainingActions(brawler, callback)
                 end
             elseif numBonusActions > 0 then
                 local bonusActionResult = AI.pulseAction(brawler, true)
-                -- print(brawler.displayName, "bonus action result (2)", bonusActionResult)
+                print(brawler.displayName, "bonus action result (2)", bonusActionResult)
                 if not bonusActionResult then
                     if callback then callback(brawler.uuid) end
                 end
@@ -378,11 +378,19 @@ end
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
-        -- _D(State.Session.TurnBasedSwarmModePlayerTurnEnded)
-        for playerUuid, _ in pairs(players) do
-            local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
-            print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled)
-            if M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
+        for uuid, player in pairs(players) do
+            if Utils.hasLoseControlStatus(uuid) then
+                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
+            end
+            if player.isFreshSummon then
+                player.isFreshSummon = false
+                local entity = Ext.Entity.Get(uuid)
+                if entity and entity.TurnBased and not entity.TurnBased.IsActiveCombatTurn then
+                    State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
+                end
+            end
+            print("Checking finished turns", uuid, M.Utils.getDisplayName(uuid), State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid], Utils.isAliveAndCanFight(uuid), Utils.hasLoseControlStatus(uuid))
+            if Utils.isAliveAndCanFight(uuid) and not State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] then
                 return false
             end
         end
@@ -390,29 +398,6 @@ local function checkAllPlayersFinishedTurns()
     end
     return nil
 end
-
--- local function checkAllPlayersFinishedTurns()
---     local players = State.Session.Players
---     if players then
---         for playerUuid, player in pairs(players) do
---             local isUncontrolled = M.Utils.hasLoseControlStatus(playerUuid)
---             -- print("Checking finished turns", playerUuid, State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid], M.Utils.isAliveAndCanFight(playerUuid), isUncontrolled, player.isFreshSummon)
---             if player.isFreshSummon then
---                 player.isFreshSummon = false
---                 if not isUncontrolled then
---                     local entity = Ext.Entity.Get(playerUuid)
---                     entity.TurnBased.RequestedEndTurn = true
---                     entity:Replicate("TurnBased")
---                 end
---                 State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] = true
---             elseif M.Utils.isAliveAndCanFight(playerUuid) and not isUncontrolled and not State.Session.TurnBasedSwarmModePlayerTurnEnded[playerUuid] then
---                 return false
---             end
---         end
---         return true
---     end
---     return nil
--- end
 
 return {
     cancelTimers = cancelTimers,

@@ -528,13 +528,7 @@ local function onMCMTurnBasedSwarmMode(value)
         stopAllPulseRepositionTimers()
         stopAllPulseActionTimers()
         stopAllBrawlFizzlers()
-        local hostCharacter = M.Osi.GetHostCharacter()
-        if hostCharacter then
-            local level = M.Osi.GetRegion(hostCharacter)
-            if level then
-                Roster.endBrawl(level)
-            end
-        end
+        State.endBrawls()
         State.boostPlayerInitiatives()
         State.recapPartyMembersMovementDistances()
         Swarm.resetChunkState()

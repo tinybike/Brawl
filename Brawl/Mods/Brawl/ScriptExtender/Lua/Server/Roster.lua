@@ -85,6 +85,10 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 if M.Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     State.Session.SwarmTurnComplete[entityUuid] = false
                     Osi.PROC_SelfHealing_Disable(entityUuid)
+                    -- if Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
+                    --     print("added ally", M.Utils.getDisplayName(entityUuid), entityUuid)
+                    --     State.boostAllyInitiative(entityUuid)
+                    -- end
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
                 end
@@ -144,6 +148,10 @@ local function removeBrawler(level, entityUuid)
         Osi.SetCanJoinCombat(entityUuid, 1)
         if M.Osi.IsPartyMember(entityUuid, 1) == 0 then
             State.revertHitpoints(entityUuid)
+            -- if State.Settings.TurnBasedSwarmMode and Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
+            --     print("remove ally brawler", entityUuid, M.Utils.getDisplayName(entityUuid))
+            --     State.removeBoostAllyInitiative(entityUuid)
+            -- end
         else
             State.Session.PlayerCurrentTarget[entityUuid] = nil
             State.Session.PlayerMarkedTarget[entityUuid] = nil

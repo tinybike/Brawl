@@ -870,15 +870,25 @@ end
 local function removeBoostPlayerInitiatives()
     local players = Session.Players
     if players then
-        for playerUuid, _ in pairs(players) do
-            Osi.RemoveBoosts(playerUuid, "Initiative(1234)", 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+        for uuid, _ in pairs(players) do
+            Osi.RemoveBoosts(uuid, Constants.PLAYER_INITIATIVE_BOOST, 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
         end
     end
 end
 
-local function boostPlayerInitiative(playerUuid)
-    debugPrint("Boosting player initiative", playerUuid)
-    Osi.AddBoosts(playerUuid, "Initiative(1234)", "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", playerUuid)
+local function boostPlayerInitiative(uuid)
+    debugPrint("Boosting player initiative", uuid)
+    Osi.AddBoosts(uuid, Constants.PLAYER_INITIATIVE_BOOST, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
+end
+
+local function removeBoostAllyInitiative(uuid)
+    debugPrint("Removing boost ally initiative", uuid)
+    Osi.RemoveBoosts(uuid, Constants.ALLY_INITIATIVE_BOOST, 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
+end
+
+local function boostAllyInitiative(uuid)
+    debugPrint("Boosting ally initiative", uuid)
+    Osi.AddBoosts(uuid, Constants.ALLY_INITIATIVE_BOOST, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
 end
 
 local function boostPlayerInitiatives()
@@ -888,6 +898,16 @@ local function boostPlayerInitiatives()
     if players then
         for playerUuid, _ in pairs(players) do
             boostPlayerInitiative(playerUuid)
+        end
+    end
+end
+
+local function endBrawls()
+    local hostCharacter = M.Osi.GetHostCharacter()
+    if hostCharacter then
+        local level = M.Osi.GetRegion(hostCharacter)
+        if level then
+            Roster.endBrawl(level)
         end
     end
 end
@@ -919,6 +939,9 @@ return {
     removeBoostPlayerInitiatives = removeBoostPlayerInitiatives,
     boostPlayerInitiatives = boostPlayerInitiatives,
     boostPlayerInitiative = boostPlayerInitiative,
+    removeBoostAllyInitiative = removeBoostAllyInitiative,
+    boostAllyInitiative = boostAllyInitiative,
+    endBrawls = endBrawls,
     Settings = Settings,
     Session = Session,
 }

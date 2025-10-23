@@ -132,13 +132,7 @@ function cleanupAll()
     stopAllPulseRepositionTimers()
     stopAllPulseActionTimers()
     stopAllBrawlFizzlers()
-    local hostCharacter = M.Osi.GetHostCharacter()
-    if hostCharacter then
-        local level = M.Osi.GetRegion(hostCharacter)
-        if level then
-            Roster.endBrawl(level)
-        end
-    end
+    State.endBrawls()
     State.revertAllModifiedHitpoints()
     State.recapPartyMembersMovementDistances()
     State.resetSpellData()

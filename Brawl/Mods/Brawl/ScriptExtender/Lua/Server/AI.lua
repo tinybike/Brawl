@@ -715,13 +715,13 @@ local function findTarget(brawler, bonusActionOnly)
                     local result
                     if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
                         result = actOnHostileTarget(brawler, targetBrawler, bonusActionOnly)
-                        debugPrint(brawler.displayName, "result (hostile)", result, bonusActionOnly)
+                        print(brawler.displayName, "result (hostile)", result, bonusActionOnly)
                         if result == true and not bonusActionOnly then
                             brawler.targetUuid = targetUuid
                         end
                     else
                         result = actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly)
-                        debugPrint(brawler.displayName, "result (friendly)", result, bonusActionOnly)
+                        print(brawler.displayName, "result (friendly)", result, bonusActionOnly)
                     end
                     if result == true then
                         return true
@@ -731,7 +731,7 @@ local function findTarget(brawler, bonusActionOnly)
             debugDump(weightedTargets)
         end
         if not bonusActionOnly then
-            debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
+            print(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
             Movement.holdPosition(brawler.uuid)
         end
         return false

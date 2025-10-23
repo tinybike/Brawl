@@ -60,8 +60,12 @@ local function allEnterFTB()
             stopToTTimers()
         end
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            local uuid = M.Osi.GetUUID(player[1])
-            Osi.ForceTurnBasedMode(uuid, 1)
+            if player and player[1] then
+                local uuid = M.Osi.GetUUID(player[1])
+                if uuid then
+                    Osi.ForceTurnBasedMode(uuid, 1)
+                end
+            end
         end
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
         local brawlersInLevel = State.Session.Brawlers[level]
@@ -80,10 +84,14 @@ local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            local uuid = M.Osi.GetUUID(player[1])
-            unlock(Ext.Entity.Get(uuid))
-            Osi.ForceTurnBasedMode(uuid, 0)
-            stopTruePause(uuid)
+            if player and player[1] then
+                local uuid = M.Osi.GetUUID(player[1])
+                if uuid then
+                    unlock(Ext.Entity.Get(uuid))
+                    Osi.ForceTurnBasedMode(uuid, 0)
+                    stopTruePause(uuid)
+                end
+            end
         end
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
         local brawlersInLevel = State.Session.Brawlers[level]
@@ -133,10 +141,14 @@ end
 local function isFTBAllLockedIn()
     -- debugDump(State.Session.FTBLockedIn)
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-        local uuid = M.Osi.GetUUID(player[1])
-        -- debugPrint("checking ftb for", uuid, Osi.IsInForceTurnBasedMode(uuid))
-        if not State.Session.FTBLockedIn[uuid] and M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
-            return false
+        if player and player[1] then
+            local uuid = M.Osi.GetUUID(player[1])
+            if uuid then
+                -- debugPrint("checking ftb for", uuid, Osi.IsInForceTurnBasedMode(uuid))
+                if not State.Session.FTBLockedIn[uuid] and M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+                    return false
+                end
+            end
         end
     end
     return true
@@ -184,13 +196,13 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            if State.Session.RemainingMovement[entityUuid] ~= nil and M.Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
+            if State.Session.RemainingMovement[entityUuid] ~= nil and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
                 if entityUuid and isInFTB(movingEntity) then
                     if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
                         debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
                         debugDump(State.Session.LastClickPosition[entityUuid].position)
                         lock(movingEntity)
-                        M.Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
+                        Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
                             if err then
                                 return Utils.showNotification(entityUuid, err, 2)
                             end
@@ -200,7 +212,7 @@ local function startTruePause(entityUuid)
                     end
                 end
             end
-            State.Session.RemainingMovement[entityUuid] = M.Movement.getRemainingMovement(entity)
+            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(entity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
@@ -217,7 +229,7 @@ local function startTruePause(entityUuid)
             end
         end)
         -- Enqueue actions/movements for non-party NPCs
-        if M.Osi.IsPartyMember(entityUuid, 1) == 0 and M.Utils.canAct(entityUuid) and not isLocked(entity) then
+        if Osi.IsPartyMember(entityUuid, 1) == 0 and Utils.canAct(entityUuid) and not isLocked(entity) then
             AI.act(M.Roster.getBrawlerByUuid(entityUuid))
         end
     end
