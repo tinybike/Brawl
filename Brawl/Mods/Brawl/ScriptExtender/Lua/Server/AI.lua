@@ -373,16 +373,17 @@ local function decideActionOnTarget(brawler, targetUuid, preparedSpells, distanc
     return getHighestWeightSpell(weightedSpells)
 end
 
-local function useSpellOnTarget(attackerUuid, targetUuid, spellName)
+local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSuccess, onFailed)
     debugPrint(M.Utils.getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
+    -- TODO callbacks
     if State.Settings.HogwildMode then
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
         return true
     end
-    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName)
+    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName, onSuccess, onFailed)
 end
 
-local function actOnHostileTarget(brawler, target, bonusActionOnly)
+local function actOnHostileTarget(brawler, target, bonusActionOnly, onSuccess, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
     if brawler and target then
         local actionToTake = nil
@@ -420,19 +421,25 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly)
                 end
                 debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
             else
-                return false
+                return onFailed()
             end
         end
         Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
             debugPrint(brawler.displayName, "onMovementCompleted", target.displayName, actionToTake)
-            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+            useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
+                print(brawler.displayName, "success (hostile)", bonusActionOnly)
+                if not bonusActionOnly then
+                    brawler.targetUuid = targetUuid
+                end
+                onSuccess()
+            end, onFailed)
         end)
-        return true
+        return onSuccess()
     end
-    return false
+    return onFailed()
 end
 
-local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
+local function actOnFriendlyTarget(brawler, target, bonusActionOnly, onSuccess, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
     if preparedSpells ~= nil then
@@ -441,11 +448,13 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         local spellTypes = {"Healing"}
         if brawler.uuid == target.uuid and not M.State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
             debugPrint(brawler.displayName, "No direct heals found (self)", bonusActionOnly)
-            return false
+            return onFailed()
+            -- return false
         end
         if brawler.uuid ~= target.uuid and not M.State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
             debugPrint(brawler.displayName, "No direct heals found (other)", bonusActionOnly)
-            return false
+            return onFailed()
+            -- return false
         end
         local actionToTake = nil
         if M.Osi.IsPlayer(brawler.uuid) == 1 then
@@ -456,16 +465,21 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly)
         debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid, bonusActionOnly)
         if actionToTake then
             Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-                useSpellOnTarget(brawler.uuid, target.uuid, actionToTake)
+                useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
+                    print(brawler.displayName, "success (friendly)", bonusActionOnly)
+                    onSuccess()
+                end, onFailed)
             end)
-            return true
+            -- return true
         elseif bonusActionOnly then
             debugPrint(brawler.displayName, "No friendly bonus actions available for", brawler.uuid, bonusActionOnly)
-            return true
+            -- return true
+            return onSuccess()
         end
-        return false
+        return onFailed()
+        -- return false
     end
-    return false
+    return onFailed()
 end
 
 local function getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
@@ -676,7 +690,7 @@ local function decideOnTarget(weightedTargets)
     return nil
 end
 
-local function findTarget(brawler, bonusActionOnly)
+local function findTarget(brawler, bonusActionOnly, onSuccess, onFailed)
     local level = M.Osi.GetRegion(brawler.uuid)
     if level then
         local brawlersSortedByDistance = M.Roster.getBrawlersSortedByDistance(brawler.uuid)
@@ -694,15 +708,13 @@ local function findTarget(brawler, bonusActionOnly)
                 local friendlyTargetUuid = M.AI.whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and brawlersInLevel[friendlyTargetUuid] then
                     debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
-                    if actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly) then
+                    actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, function ()
                         State.Session.HealRequested[userId] = false
-                        return true
-                    end
-                    return false
+                        onSuccess()
+                    end, onFailed)
                 end
             end
         end
-        -- Attacking
         if brawlersInLevel then
             local weightedTargets = getWeightedTargets(brawler, brawlersInLevel)
             local targetUuid = decideOnTarget(weightedTargets)
@@ -711,18 +723,13 @@ local function findTarget(brawler, bonusActionOnly)
                 if targetBrawler then
                     local result
                     if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
-                        result = actOnHostileTarget(brawler, targetBrawler, bonusActionOnly)
-                        print(brawler.displayName, "result (hostile)", result, bonusActionOnly)
-                        if result == true and not bonusActionOnly then
-                            brawler.targetUuid = targetUuid
-                        end
+                        actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, onSuccess, onFailed)
                     else
-                        result = actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly)
-                        print(brawler.displayName, "result (friendly)", result, bonusActionOnly)
+                        actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly, onSuccess, onFailed)
                     end
-                    if result == true then
-                        return true
-                    end
+                    -- if result == true then
+                    --     return true
+                    -- end
                 end
             end
             debugDump(weightedTargets)
@@ -731,7 +738,8 @@ local function findTarget(brawler, bonusActionOnly)
             print(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
             Movement.holdPosition(brawler.uuid)
         end
-        return false
+        -- return false
+        return onFailed()
     end
 end
 
@@ -764,7 +772,7 @@ local function checkForBrawlToJoin(brawler)
     end
 end
 
-local function act(brawler, bonusActionOnly)
+local function act(brawler, bonusActionOnly, onSuccess, onFailed)
     if brawler and brawler.uuid then
         -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
         --     should this generally be handled by the healing logic, instead of special-casing it here?
@@ -776,7 +784,7 @@ local function act(brawler, bonusActionOnly)
                     brawler.targetUuid = nil
                     debugPrint(brawler.displayName, "Helping target", playerUuid, M.Utils.getDisplayName(playerUuid))
                     return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
-                        useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help")
+                        useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", onSuccess, onFailed)
                     end)
                 end
             end
@@ -784,7 +792,7 @@ local function act(brawler, bonusActionOnly)
         -- Doesn't currently have an attack target, so let's find one
         if brawler.targetUuid == nil then
             debugPrint(brawler.displayName, "Find target (no current target)", brawler.uuid, bonusActionOnly)
-            return findTarget(brawler, bonusActionOnly)
+            return findTarget(brawler, bonusActionOnly, onSuccess, onFailed)
         end
         -- We have a target and the target is alive
         local brawlersInLevel = State.Session.Brawlers[M.Osi.GetRegion(brawler.uuid)]
@@ -792,35 +800,35 @@ local function act(brawler, bonusActionOnly)
             if not State.Settings.TurnBasedSwarmMode or M.Movement.findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
                 if brawler.lockedOnTarget and M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) then
                     debugPrint(brawler.displayName, "Locked-on target, attacking", M.Utils.getDisplayName(brawler.targetUuid), bonusActionOnly)
-                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly, onSuccess, onFailed)
                 end
                 if M.Utils.isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
                     debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
-                    return findTarget(brawler, bonusActionOnly)
+                    return findTarget(brawler, bonusActionOnly, onSuccess, onFailed)
                 end
                 if M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) and M.Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= M.Utils.getTrackingDistance() then
                     debugPrint(brawler.displayName, "Remaining on target, attacking", M.Utils.getDisplayName(brawler.targetUuid), bonusActionOnly)
-                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly)
+                    return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly, onSuccess, onFailed)
                 end
             end
         end
         -- Has an attack target but it's already dead or unable to fight, so find a new one
         debugPrint(brawler.displayName, "Find target (current target invalid)", brawler.uuid, bonusActionOnly)
         brawler.targetUuid = nil
-        return findTarget(brawler, bonusActionOnly)
+        return findTarget(brawler, bonusActionOnly, onSuccess, onFailed)
     end
 end
 
 -- Brawlers doing dangerous stuff
 -- TODO this needs to be restructured to use callbacks instead of returning
-local function pulseAction(brawler, bonusActionOnly)
+local function pulseAction(brawler, bonusActionOnly, onSuccess, onFailed)
     -- Brawler is alive and able to fight: let's go!
     if brawler and brawler.uuid and M.Utils.canAct(brawler.uuid) then
         if not brawler.isPaused and (not isPlayerControllingDirectly(brawler.uuid) or State.Settings.FullAuto) then
             if not State.Settings.TurnBasedSwarmMode then
                 Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
             end
-            return act(brawler, bonusActionOnly)
+            return act(brawler, bonusActionOnly, onSuccess, onFailed)
         end
         -- If this brawler is dead or unable to fight, stop this pulse
         return stopPulseAction(brawler)

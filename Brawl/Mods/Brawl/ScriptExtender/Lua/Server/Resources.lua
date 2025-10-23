@@ -230,10 +230,11 @@ local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, v
     return true
 end
 
-local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel, onSuccess, onFailed)
     debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
-        return false
+        -- return false
+        return onFailed()
     end
     if variant ~= nil then
         spellName = variant
@@ -245,13 +246,14 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
-        return false
+        -- return false
+        return onFailed()
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
             debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
-            return false
+            return onFailed()
         end
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
@@ -274,7 +276,8 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
     -- local x, y, z = M.Utils.getPointInFrontOf(casterUuid, 1.0)
     -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
-    return true
+    -- return true
+    onSuccess()
 end
 
 return {
