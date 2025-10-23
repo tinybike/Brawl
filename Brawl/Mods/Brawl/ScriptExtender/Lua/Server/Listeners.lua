@@ -712,7 +712,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         end
     end
     if Resources.removeActionInProgress(casterUuid, spellName) then
-        -- print("Removed action in progress for", M.Utils.getDisplayName(casterUuid), spellName)
+        print("Removed action in progress for", M.Utils.getDisplayName(casterUuid), spellName)
         if State.Settings.TurnBasedSwarmMode then
             local brawler = M.Roster.getBrawlerByUuid(casterUuid)
             if brawler then

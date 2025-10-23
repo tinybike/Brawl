@@ -40,19 +40,20 @@ local function pauseTimers()
 end
 
 local function setTurnComplete(uuid)
-    if State.Session.SwarmTurnActive then
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.TurnBased then
-            -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
-            entity.TurnBased.HadTurnInCombat = true
-            entity.TurnBased.RequestedEndTurn = true
-            entity.TurnBased.TurnActionsCompleted = true
-            entity:Replicate("TurnBased")
-            State.Session.SwarmTurnComplete[uuid] = true
-            if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
-                Ext.Timer.Cancel(uuid)
-                State.Session.SwarmBrawlerIndexDelay[uuid] = nil
-            end
+    if State.Session.QueuedCompanionAIAction[uuid] then
+        State.Session.QueuedCompanionAIAction[uuid] = false
+    end
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased then
+        print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
+        entity.TurnBased.HadTurnInCombat = true
+        entity.TurnBased.RequestedEndTurn = true
+        entity.TurnBased.TurnActionsCompleted = true
+        entity:Replicate("TurnBased")
+        State.Session.SwarmTurnComplete[uuid] = true
+        if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+            Ext.Timer.Cancel(uuid)
+            State.Session.SwarmBrawlerIndexDelay[uuid] = nil
         end
     end
 end
@@ -81,13 +82,15 @@ end
 
 local function setAllEnemyTurnsComplete()
     debugPrint("setAllEnemyTurnsComplete")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    setTurnComplete(brawlerUuid)
+    if State.Session.SwarmTurnActive then
+        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+        if level then
+            local brawlersInLevel = State.Session.Brawlers[level]
+            if brawlersInLevel then
+                for brawlerUuid, _ in pairs(brawlersInLevel) do
+                    if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
+                        setTurnComplete(brawlerUuid)
+                    end
                 end
             end
         end
@@ -243,37 +246,32 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
-local function useRemainingActions(brawler, callback)
+local function useRemainingActions(brawler, callback, count)
     if brawler and brawler.uuid then
-        local numActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
-        local numBonusActions = M.Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
-        print(brawler.displayName, "useRemainingActions", brawler.uuid, numActions, numBonusActions)
-        if numActions == 0 and numBonusActions == 0 then
-            if State.Session.QueuedCompanionAIAction[brawler.uuid] then
-                State.Session.QueuedCompanionAIAction[brawler.uuid] = false
-                local entity = Ext.Entity.Get(brawler.uuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity:Replicate("TurnBased")
-                end
-            end
+        count = count or 0
+        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
+        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
+        print(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
+        if (numActions == 0 and numBonusActions == 0) or count > 10 then
+            setTurnComplete(brawler.uuid)
             if callback then callback(brawler.uuid) end
         else
             if numActions > 0 then
                 local actionResult = AI.pulseAction(brawler)
                 print(brawler.displayName, "action result", actionResult)
-                if not actionResult and numBonusActions > 0 then
-                    local bonusActionResult = AI.pulseAction(brawler, true)
-                    print(brawler.displayName, "bonus action result (1)", bonusActionResult)
-                    if not bonusActionResult then
-                        -- should this call completeSwarmTurn?
+                if not actionResult then
+                    if numBonusActions > 0 then
+                        useRemainingActions(brawler, callback, count + 1)
+                    else
+                        setTurnComplete(brawler.uuid)
                         if callback then callback(brawler.uuid) end
                     end
                 end
             elseif numBonusActions > 0 then
                 local bonusActionResult = AI.pulseAction(brawler, true)
-                print(brawler.displayName, "bonus action result (2)", bonusActionResult)
+                print(brawler.displayName, "bonus action result", bonusActionResult)
                 if not bonusActionResult then
+                    setTurnComplete(brawler.uuid)
                     if callback then callback(brawler.uuid) end
                 end
             end
