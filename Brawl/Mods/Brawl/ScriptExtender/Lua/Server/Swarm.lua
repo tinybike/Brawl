@@ -1,6 +1,7 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local isToT = Utils.isToT
+local noop = Utils.noop
 local startChunk
 local singleCharacterTurn
 
@@ -247,6 +248,7 @@ local function isControlledByDefaultAI(uuid)
 end
 
 local function useRemainingActions(brawler, callback, count)
+    callback = callback or noop
     if brawler and brawler.uuid then
         count = count or 0
         local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
@@ -254,28 +256,24 @@ local function useRemainingActions(brawler, callback, count)
         print(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
         if (numActions == 0 and numBonusActions == 0) or count > 10 then
             setTurnComplete(brawler.uuid)
-            if callback then callback(brawler.uuid) end
-        else
-            if numActions > 0 then
-                local actionResult = AI.pulseAction(brawler)
-                print(brawler.displayName, "action result", actionResult)
-                if not actionResult then
-                    if numBonusActions > 0 then
-                        useRemainingActions(brawler, callback, count + 1)
-                    else
-                        setTurnComplete(brawler.uuid)
-                        if callback then callback(brawler.uuid) end
-                    end
-                end
-            elseif numBonusActions > 0 then
-                local bonusActionResult = AI.pulseAction(brawler, true)
-                print(brawler.displayName, "bonus action result", bonusActionResult)
-                if not bonusActionResult then
-                    setTurnComplete(brawler.uuid)
-                    if callback then callback(brawler.uuid) end
-                end
-            end
+            return callback(brawler.uuid)
         end
+        if numActions == 0 then
+            return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action submitted") end, function ()
+                print(brawler.displayName, "bonus action failed")
+                setTurnComplete(brawler.uuid)
+                callback(brawler.uuid)
+            end)
+        end
+        AI.pulseAction(brawler, false, function () print(brawler.displayName, "action submitted") end, function ()
+            print(brawler.displayName, "action failed")
+            if numBonusActions > 0 then
+                useRemainingActions(brawler, callback, count + 1)
+            else
+                setTurnComplete(brawler.uuid)
+                callback(brawler.uuid)
+            end
+        end)
     end
 end
 

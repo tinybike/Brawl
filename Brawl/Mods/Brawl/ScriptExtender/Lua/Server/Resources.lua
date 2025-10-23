@@ -1,6 +1,7 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local clearOsirisQueue = Utils.clearOsirisQueue
+local noop = Utils.noop
 
 local function getActionResource(entity, resourceType)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
@@ -142,7 +143,7 @@ local function removeActionInProgress(uuid, spellName)
         local actionsInProgressIndex = nil
         local actionsInProgress = State.Session.ActionsInProgress[uuid]
         for i, actionInProgress in ipairs(actionsInProgress) do
-            if actionInProgress == spellName then
+            if actionInProgress.spellName == spellName then
                 foundActionInProgress = true
                 actionsInProgressIndex = i
                 break
@@ -212,28 +213,12 @@ local function deductCastedSpell(uuid, spellName)
     end
 end
 
-local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant, upcastLevel)
-    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-        return false
-    end
-    if variant ~= nil then
-        spellName = variant
-    end
-    if upcastLevel ~= nil then
-        spellName = spellName .. "_" .. tostring(upcastLevel)
-    end
-    debugPrint("casting at position", spellName, position[1], position[2], position[3])
-    clearOsirisQueue(casterUuid)
-    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
-    return true
-end
-
-local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel, onSuccess, onFailed)
+local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
+    onSubmitted = onSubmitted or noop
+    onCompleted = onCompleted or noop
+    onFailed = onFailed or noop
     debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
-        -- return false
         return onFailed()
     end
     if variant ~= nil then
@@ -246,7 +231,6 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
-        -- return false
         return onFailed()
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
@@ -257,27 +241,9 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
         end
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
+    table.insert(State.Session.ActionsInProgress[casterUuid], {spellName = spellName, callback = onCompleted})
     AI.queueSpellRequest(casterUuid, spellName, targetUuid)
-    -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-    --     return false
-    -- end
-    -- if variant ~= nil then
-    --     spellName = variant
-    -- end
-    -- if upcastLevel ~= nil then
-    --     spellName = spellName .. "_" .. tostring(upcastLevel)
-    -- end
-    -- clearOsirisQueue(casterUuid)
-    -- State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    -- debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
-    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
-    -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
-    -- local x, y, z = M.Utils.getPointInFrontOf(casterUuid, 1.0)
-    -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
-    -- return true
-    onSuccess()
+    onSubmitted()
 end
 
 return {
