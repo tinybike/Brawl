@@ -5,63 +5,6 @@ local clearOsirisQueue = Utils.clearOsirisQueue
 local isToT = Utils.isToT
 local noop = Utils.noop
 
--- thank u focus and mazzle
--- cache values so we don't have to get from stats
-local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
-    local stats = Ext.Stats.Get(spellName)
-    if not castOptions then
-        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
-        if State.Settings.TurnBasedSwarmMode then
-            table.insert(castOptions, "NoMovement")
-        end
-    end
-    local casterEntity = Ext.Entity.Get(casterUuid)
-    local request = {
-        CastOptions = castOptions,
-        CastPosition = nil,
-        Item = nil,
-        Caster = casterEntity,
-        NetGuid = "",
-        Originator = {
-            ActionGuid = Constants.NULL_UUID,
-            CanApplyConcentration = true,
-            InterruptId = "",
-            PassiveId = "",
-            Statusid = "",
-        },
-        RequestGuid = Utils.createUuid(),
-        Spell = {
-            OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
-            ProgressionSource = Constants.NULL_UUID,
-            Prototype = spellName,
-            Source = Constants.NULL_UUID,
-            SourceType = "Osiris",
-        },
-        StoryActionId = 0,
-        Targets = {{
-            Position = nil,
-            Target = Ext.Entity.Get(targetUuid),
-            Target2 = nil,
-            TargetProxy = nil,
-            TargetingType = stats.SpellType,
-        }},
-        field_70 = nil,
-        field_A8 = 1,
-    }
-    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
-    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(casterEntity)
-    if insertAtFront or isPausedRequest then
-        for i = #queuedRequests, 1, -1 do
-            queuedRequests[i + 1] = queuedRequests[i]
-        end
-        queuedRequests[1] = request
-    else
-        queuedRequests[#queuedRequests + 1] = request
-    end
-    -- print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
-    return request.RequestGuid
-end
-
 local function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
         return 7
@@ -925,5 +868,4 @@ return {
     pulseAction = pulseAction,
     pulseReposition = pulseReposition,
     pulseAddNearby = pulseAddNearby,
-    queueSpellRequest = queueSpellRequest,
 }

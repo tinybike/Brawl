@@ -61,8 +61,8 @@ end
 local function onStarted(level)
     debugPrint("onStarted")
     M.memoizeAll()
-    State.resetSpellData()
-    State.buildSpellTable()
+    Spells.resetSpellData()
+    Spells.buildSpellTable()
     State.setMaxPartySize()
     State.resetPlayers()
     State.setIsControllingDirectly()
@@ -696,8 +696,8 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    -- print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
-    -- _D(State.Session.ActionsInProgress[casterUuid])
+    print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    _D(State.Session.ActionsInProgress[casterUuid])
     Swarm.resumeTimers()
     if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
         if State.Session.Players then
@@ -711,28 +711,13 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             end
         end
     end
-    if Resources.removeActionInProgress(casterUuid, spellName) then
-        print("Removed action in progress for", M.Utils.getDisplayName(casterUuid), spellName)
-        if State.Settings.TurnBasedSwarmMode then
-            local brawler = M.Roster.getBrawlerByUuid(casterUuid)
-            if brawler then
-                Swarm.swarmAction(brawler)
-            end
-        end
-        -- Resources.deductCastedSpell(casterUuid, spellName)
-    end
+    Resources.completeActionInProgress(casterUuid, spellName)
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
         debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
         if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
             State.Session.StoryActionIDs[storyActionID] = {}
             debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
-            -- if State.Settings.TurnBasedSwarmMode then
-            --     local brawler = M.Roster.getBrawlerByUuid(casterUuid)
-            --     if brawler then
-            --         Swarm.swarmAction(brawler)
-            --     end
-            -- end
         end
     end
 end
@@ -946,7 +931,7 @@ end
 local function onLeveledUp(character)
     debugPrint("LeveledUp", character)
     if character ~= nil and M.Osi.IsPartyMember(character, 1) == 1 then
-        State.buildSpellTable()
+        Spells.buildSpellTable()
     end
 end
 

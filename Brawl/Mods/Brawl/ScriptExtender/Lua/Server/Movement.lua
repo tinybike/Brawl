@@ -263,7 +263,6 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 dashed = true
                 tryMove(baseMove*2)
             end, onFailed)
-            dashed = true
         end
         -- find a valid point just outside the target
         local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, attackerUuid, 1)

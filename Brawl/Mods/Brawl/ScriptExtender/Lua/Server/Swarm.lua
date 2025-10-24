@@ -259,14 +259,20 @@ local function useRemainingActions(brawler, callback, count)
             return callback(brawler.uuid)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action submitted") end, function ()
-                print(brawler.displayName, "bonus action failed")
+            return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action SUBMITTED") end, function ()
+                print(brawler.displayName, "bonus action COMPLETED")
+                useRemainingActions(brawler, callback, count + 1)
+            end, function ()
+                print(brawler.displayName, "bonus action FAILED")
                 setTurnComplete(brawler.uuid)
                 callback(brawler.uuid)
             end)
         end
-        AI.pulseAction(brawler, false, function () print(brawler.displayName, "action submitted") end, function ()
-            print(brawler.displayName, "action failed")
+        AI.pulseAction(brawler, false, function () print(brawler.displayName, "action SUBMITTED") end, function ()
+            print(brawler.displayName, "action COMPLETED")
+            useRemainingActions(brawler, callback, count + 1)
+        end, function ()
+            print(brawler.displayName, "action FAILED")
             if numBonusActions > 0 then
                 useRemainingActions(brawler, callback, count + 1)
             else

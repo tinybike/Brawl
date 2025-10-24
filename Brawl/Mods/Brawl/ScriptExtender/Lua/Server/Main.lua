@@ -1,6 +1,7 @@
 Constants = require("Server/Constants.lua")
 Utils = require("Server/Utils.lua")
 State = require("Server/State.lua")
+Spells = require("Server/Spells.lua")
 Resources = require("Server/Resources.lua")
 Movement = require("Server/Movement.lua")
 Leaderboard = require("Server/Leaderboard.lua")
@@ -135,7 +136,7 @@ function cleanupAll()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
     State.recapPartyMembersMovementDistances()
-    State.resetSpellData()
+    Spells.resetSpellData()
 end
 
 function stopToTTimers()

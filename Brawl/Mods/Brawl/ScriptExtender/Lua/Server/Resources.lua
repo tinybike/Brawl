@@ -137,7 +137,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     return true
 end
 
-local function removeActionInProgress(uuid, spellName)
+local function completeActionInProgress(uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
@@ -146,18 +146,17 @@ local function removeActionInProgress(uuid, spellName)
             if actionInProgress.spellName == spellName then
                 foundActionInProgress = true
                 actionsInProgressIndex = i
+                if actionInProgress.callback then actionInProgress.callback() end
                 break
             end
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i])
+                debugPrint("remove action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i].spellName)
                 table.remove(actionsInProgress, i)
             end
-            return true
         end
     end
-    return false
 end
 
 local function deductCastedSpell(uuid, spellName)
@@ -213,6 +212,62 @@ local function deductCastedSpell(uuid, spellName)
     end
 end
 
+-- thank u focus and mazzle
+local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
+    local stats = Ext.Stats.Get(spellName)
+    if not castOptions then
+        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        if State.Settings.TurnBasedSwarmMode then
+            table.insert(castOptions, "NoMovement")
+        end
+    end
+    local casterEntity = Ext.Entity.Get(casterUuid)
+    local request = {
+        CastOptions = castOptions,
+        CastPosition = nil,
+        Item = nil,
+        Caster = casterEntity,
+        NetGuid = "",
+        Originator = {
+            ActionGuid = Constants.NULL_UUID,
+            CanApplyConcentration = true,
+            InterruptId = "",
+            PassiveId = "",
+            Statusid = "",
+        },
+        RequestGuid = Utils.createUuid(),
+        Spell = {
+            OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
+            ProgressionSource = Constants.NULL_UUID,
+            Prototype = spellName,
+            Source = Constants.NULL_UUID,
+            SourceType = "Osiris",
+        },
+        StoryActionId = 0,
+        Targets = {{
+            Position = nil,
+            Target = Ext.Entity.Get(targetUuid),
+            Target2 = nil,
+            TargetProxy = nil,
+            TargetingType = stats.SpellType,
+        }},
+        field_70 = nil,
+        field_A8 = 1,
+    }
+    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
+    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(casterEntity)
+    if insertAtFront or isPausedRequest then
+        for i = #queuedRequests, 1, -1 do
+            queuedRequests[i + 1] = queuedRequests[i]
+        end
+        queuedRequests[1] = request
+    else
+        queuedRequests[#queuedRequests + 1] = request
+    end
+    -- print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
+    return request.RequestGuid
+end
+
 local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or noop
     onCompleted = onCompleted or noop
@@ -242,7 +297,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
     table.insert(State.Session.ActionsInProgress[casterUuid], {spellName = spellName, callback = onCompleted})
-    AI.queueSpellRequest(casterUuid, spellName, targetUuid)
+    queueSpellRequest(casterUuid, spellName, targetUuid)
     onSubmitted()
 end
 
@@ -256,6 +311,6 @@ return {
     hasEnoughToCastSpell = hasEnoughToCastSpell,
     removeActionInProgress = removeActionInProgress,
     deductCastedSpell = deductCastedSpell,
-    useSpellAndResourcesAtPosition = useSpellAndResourcesAtPosition,
+    queueSpellRequest = queueSpellRequest,
     useSpellAndResources = useSpellAndResources,
 }
