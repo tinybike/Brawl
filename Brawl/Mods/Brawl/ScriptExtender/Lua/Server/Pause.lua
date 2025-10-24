@@ -246,7 +246,7 @@ local function queueCompanionAIActions()
                     if State.Settings.TurnBasedSwarmMode then
                         if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then
                             State.Session.QueuedCompanionAIAction[uuid] = true
-                            debugPrint("queue action (swarm)", player.displayName)
+                            print("queue action (swarm)", player.displayName)
                             Swarm.swarmAction(M.Roster.getBrawlerByUuid(uuid))
                         end
                     else

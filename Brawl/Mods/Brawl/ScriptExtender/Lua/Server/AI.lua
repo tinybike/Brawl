@@ -324,7 +324,7 @@ local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
         return onSuccess()
     end
-    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName, onSubmitted, onCompleted, onFailed)
+    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
 end
 
 local function selectRandomSpell(preparedSpells)
@@ -367,7 +367,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, onSubmitted,
         debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
     end
     if not actionToTake then
-        print("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
+        debugPrint("No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
         return onFailed()
         -- TODO do we need this fallback...?
         -- if M.Osi.IsPlayer(brawler.uuid) == 1 or State.Settings.TurnBasedSwarmMode then
@@ -382,7 +382,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, onSubmitted,
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         debugPrint(brawler.displayName, "movement completed", target.displayName, actionToTake)
         useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
-            print(brawler.displayName, "success (hostile)", bonusActionOnly)
+            debugPrint(brawler.displayName, "success (hostile)", bonusActionOnly)
             if not bonusActionOnly then
                 brawler.targetUuid = targetUuid
             end
@@ -419,7 +419,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, onSubmitted
         if actionToTake then
             Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
                 useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
-                    print(brawler.displayName, "success (friendly)", bonusActionOnly)
+                    debugPrint(brawler.displayName, "success (friendly)", bonusActionOnly)
                     onSuccess()
                 end, onFailed)
             end)
@@ -584,7 +584,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
                     if not State.Settings.TurnBasedSwarmMode and (distanceToTarget > 30 or (isHostile and not canSeeTarget)) then
                         ableToTarget = false
                     end
-                    print(ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
+                    debugPrint(ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
                     if isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                         local hasPathToTarget = nil
                         if (isHostile and M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid)) or (M.State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true, bonusActionOnly)) then
@@ -688,7 +688,7 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
             debugDump(weightedTargets)
         end
         if not bonusActionOnly then
-            print(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
+            debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
             Movement.holdPosition(brawler.uuid)
         end
         -- return false

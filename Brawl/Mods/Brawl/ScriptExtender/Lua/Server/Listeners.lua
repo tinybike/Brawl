@@ -696,16 +696,16 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
-    _D(State.Session.ActionsInProgress[casterUuid])
+    -- print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- _D(State.Session.ActionsInProgress[casterUuid])
     Swarm.resumeTimers()
     if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
         if State.Session.Players then
             local areaRadius = Ext.Stats.Get(spellName).AreaRadius
             for uuid, _ in pairs(State.Session.Players) do
                 if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
-                    print("removing negative statuses from", M.Utils.getDisplayName(uuid), uuid)
                     Utils.removeNegativeStatuses(uuid)
+                    Resources.restoreActionResource(Ext.Entity.Get(uuid), "WarPriestActionPoint")
                     -- Resources.restoreSpellSlots(uuid)
                 end
             end

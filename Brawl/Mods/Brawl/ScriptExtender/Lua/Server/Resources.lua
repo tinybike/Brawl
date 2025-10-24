@@ -26,9 +26,7 @@ local function restoreSpellSlots(uuid)
         if entity and entity.ActionResources and entity.ActionResources.Resources then
             local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.SpellSlot]
             if spellSlots then
-                print("restoring spell slots", uuid)
                 for _, spellSlot in ipairs(spellSlots) do
-                    _D(spellSlot)
                     if spellSlot.Amount < spellSlot.MaxAmount then
                         spellSlot.Amount = spellSlot.MaxAmount
                     end
@@ -309,7 +307,7 @@ return {
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
-    removeActionInProgress = removeActionInProgress,
+    completeActionInProgress = completeActionInProgress,
     deductCastedSpell = deductCastedSpell,
     queueSpellRequest = queueSpellRequest,
     useSpellAndResources = useSpellAndResources,
