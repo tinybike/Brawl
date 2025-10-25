@@ -505,6 +505,8 @@ local function averageTime(fn, n, ...)
     return totalTime(fn, n, ...) / n
 end
 
+local function noop() end
+
 return {
     debugPrint = debugPrint,
     debugDump = debugDump,
@@ -559,4 +561,5 @@ return {
     averageTime = averageTime,
     totalTime = totalTime,
     getPersistentModVars = getPersistentModVars,
+    noop = noop,
 }

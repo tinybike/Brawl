@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -382,6 +382,7 @@ Constants.LEADERBOARD_EXCLUDED_HEALS = {
     "ShortResting",
     "TimelessBody",
 }
+Constants.MAX_SPELL_EXCLUSIONS = 3
 Constants.COUNTERSPELLS = {
     "Target_Counterspell",
     "Target_MAG_CounterSpell",
@@ -391,6 +392,17 @@ Constants.COUNTERSPELLS = {
     "Target_Counterspell_5",
     "Target_Counterspell_6",
     "Target_MOD_Dread_Counterspell",
+}
+Constants.BONUS_ACTION_DASH = {
+    "Shout_Dash_CunningAction",
+    "Shout_Dash_BonusAction",
+    -- "Shout_Dash_StepOfTheWind",
+    "Shout_LOW_Dolor_Dash",
+}
+Constants.TELEPORTS = {
+    "Target_MistyStep",
+    "Target_MistyStep_Githyanki",
+    "Projectile_Jump",
 }
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"

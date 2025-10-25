@@ -1,6 +1,7 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local clearOsirisQueue = Utils.clearOsirisQueue
+local noop = Utils.noop
 
 local function getActionResource(entity, resourceType)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
@@ -25,9 +26,7 @@ local function restoreSpellSlots(uuid)
         if entity and entity.ActionResources and entity.ActionResources.Resources then
             local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES.SpellSlot]
             if spellSlots then
-                print("restoring spell slots", uuid)
                 for _, spellSlot in ipairs(spellSlots) do
-                    _D(spellSlot)
                     if spellSlot.Amount < spellSlot.MaxAmount then
                         spellSlot.Amount = spellSlot.MaxAmount
                     end
@@ -105,9 +104,6 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
         debugPrint("Error: spell not found")
         return false
     end
-    -- if spell and spell.costs then
-    --     debugDump(spell.costs)
-    -- end
     if upcastLevel ~= nil then
         debugPrint("Upcasted spell level", upcastLevel)
     end
@@ -136,27 +132,26 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     return true
 end
 
-local function removeActionInProgress(uuid, spellName)
+local function completeActionInProgress(uuid, spellName)
     if State.Session.ActionsInProgress[uuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
         local actionsInProgress = State.Session.ActionsInProgress[uuid]
         for i, actionInProgress in ipairs(actionsInProgress) do
-            if actionInProgress == spellName then
+            if actionInProgress.spellName == spellName then
                 foundActionInProgress = true
                 actionsInProgressIndex = i
+                if actionInProgress.callback then actionInProgress.callback() end
                 break
             end
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i])
+                debugPrint("complete action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i].spellName)
                 table.remove(actionsInProgress, i)
             end
-            return true
         end
     end
-    return false
 end
 
 local function deductCastedSpell(uuid, spellName)
@@ -212,28 +207,69 @@ local function deductCastedSpell(uuid, spellName)
     end
 end
 
-local function useSpellAndResourcesAtPosition(casterUuid, position, spellName, variant, upcastLevel)
-    if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-        return false
+-- thank u focus and mazzle
+local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
+    local stats = Ext.Stats.Get(spellName)
+    if not castOptions then
+        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        if State.Settings.TurnBasedSwarmMode then
+            table.insert(castOptions, "NoMovement")
+        end
     end
-    if variant ~= nil then
-        spellName = variant
+    local casterEntity = Ext.Entity.Get(casterUuid)
+    local request = {
+        CastOptions = castOptions,
+        CastPosition = nil,
+        Item = nil,
+        Caster = casterEntity,
+        NetGuid = "",
+        Originator = {
+            ActionGuid = Constants.NULL_UUID,
+            CanApplyConcentration = true,
+            InterruptId = "",
+            PassiveId = "",
+            Statusid = "",
+        },
+        RequestGuid = Utils.createUuid(),
+        Spell = {
+            OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
+            ProgressionSource = Constants.NULL_UUID,
+            Prototype = spellName,
+            Source = Constants.NULL_UUID,
+            SourceType = "Osiris",
+        },
+        StoryActionId = 0,
+        Targets = {{
+            Position = nil,
+            Target = Ext.Entity.Get(targetUuid),
+            Target2 = nil,
+            TargetProxy = nil,
+            TargetingType = stats.SpellType,
+        }},
+        field_70 = nil,
+        field_A8 = 1,
+    }
+    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
+    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(casterEntity)
+    if insertAtFront or isPausedRequest then
+        for i = #queuedRequests, 1, -1 do
+            queuedRequests[i + 1] = queuedRequests[i]
+        end
+        queuedRequests[1] = request
+    else
+        queuedRequests[#queuedRequests + 1] = request
     end
-    if upcastLevel ~= nil then
-        spellName = spellName .. "_" .. tostring(upcastLevel)
-    end
-    debugPrint("casting at position", spellName, position[1], position[2], position[3])
-    clearOsirisQueue(casterUuid)
-    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    Osi.UseSpellAtPosition(casterUuid, spellName, position[1], position[2], position[3])
-    return true
+    -- print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
+    return request.RequestGuid
 end
 
-local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel)
+local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
+    onSubmitted = onSubmitted or noop
+    onCompleted = onCompleted or noop
+    onFailed = onFailed or noop
     debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
-        return false
+        return onFailed("no target")
     end
     if variant ~= nil then
         spellName = variant
@@ -245,48 +281,32 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
-        return false
+        return onFailed("out of range")
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
             debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
-            return false
+            return onFailed("no line of sight")
         end
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    AI.queueSpellRequest(casterUuid, spellName, targetUuid)
-    -- if not hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel) then
-    --     return false
-    -- end
-    -- if variant ~= nil then
-    --     spellName = variant
-    -- end
-    -- if upcastLevel ~= nil then
-    --     spellName = spellName .. "_" .. tostring(upcastLevel)
-    -- end
-    -- clearOsirisQueue(casterUuid)
-    -- State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
-    -- table.insert(State.Session.ActionsInProgress[casterUuid], spellName)
-    -- debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
-    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
-    -- for Zone (and projectile, maybe if pressing shift?) spells, shoot in direction of facing
-    -- local x, y, z = M.Utils.getPointInFrontOf(casterUuid, 1.0)
-    -- Osi.UseSpellAtPosition(casterUuid, spellName, x, y, z, 1)
-    return true
+    table.insert(State.Session.ActionsInProgress[casterUuid], {spellName = spellName, callback = onCompleted})
+    queueSpellRequest(casterUuid, spellName, targetUuid)
+    onSubmitted()
 end
 
 return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
+    restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
-    removeActionInProgress = removeActionInProgress,
+    completeActionInProgress = completeActionInProgress,
     deductCastedSpell = deductCastedSpell,
-    useSpellAndResourcesAtPosition = useSpellAndResourcesAtPosition,
+    queueSpellRequest = queueSpellRequest,
     useSpellAndResources = useSpellAndResources,
 }
