@@ -308,15 +308,15 @@ local function onActionButton(data, isController)
                 local spell = State.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
-                    return Actions.useSpellAndResources(player.uuid, player.uuid, spellName)
+                    return Actions.useSpellOnTarget(player.uuid, player.uuid, spellName)
                 end
                 -- if M.Utils.isZoneSpell(spellName) or M.Utils.isProjectileSpell(spellName) then
-                --     return Actions.useSpellAndResources(player.uuid, nil, spellName)
+                --     return Actions.useSpellOnTarget(player.uuid, nil, spellName)
                 -- end
                 if State.Session.PlayerMarkedTarget[player.uuid] == nil or M.Osi.IsDead(State.Session.PlayerMarkedTarget[player.uuid]) == 1 then
                     buildClosestEnemyBrawlers(player.uuid)
                 end
-                return Actions.useSpellAndResources(player.uuid, State.Session.PlayerMarkedTarget[player.uuid], spellName)
+                return Actions.useSpellOnTarget(player.uuid, State.Session.PlayerMarkedTarget[player.uuid], spellName)
             end
         end
     end

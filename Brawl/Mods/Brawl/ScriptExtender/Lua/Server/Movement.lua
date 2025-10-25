@@ -259,7 +259,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
     onFailed = onFailed or noop
     print(M.Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
-    local baseMove = M.Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
+    local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
     local dashed = false
     local override = not State.Settings.TurnBasedSwarmMode
     local dashAvailable = State.Settings.TurnBasedSwarmMode
@@ -284,12 +284,11 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
             local dashSpell = selectDash(attackerUuid, bonusActionOnly)
             if not dashSpell then
                 dashAvailable = false
-                return tryMove(baseMove)
+                return tryMove(Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0))
             end
             return Actions.useSpellOnTarget(attackerUuid, attackerUuid, dashSpell, noop, function ()
                 dashed = true
-                baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
-                tryMove(baseMove)
+                tryMove(Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0))
             end, onFailed)
         end
         -- find a valid point just outside the target
@@ -299,7 +298,6 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
         end
         -- queue pathfinding
         local goalPos = {gx, gy, gz}
-        local dashAllow = baseMove*2
         local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(attackerUuid), goalPos, function (path)
             if not path or not path.GoalFound or #path.Nodes == 0 then
                 -- -- if no path, try teleporting if we have one available
@@ -320,7 +318,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
             local nextPos, nextDist = nil, nil
             for _, n in ipairs(path.Nodes) do
                 local d = n.Distance
-                -- furthest reachable without dash
+                -- furthest reachable
                 if d <= allowedDistance and d > farDist then
                     farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
                 end
@@ -328,13 +326,11 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 if not nextPos and d > allowedDistance then
                     nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
                 end
-                -- is this node in spell range (using dash max)?
-                if d <= dashAllow then
-                    local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
-                    local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
-                    if eu <= spellRange and d > bestDist then
-                        bestPos, bestDist = {px, py, pz}, d
-                    end
+                -- in spell range?
+                local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
+                local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
+                if eu <= spellRange and d > bestDist then
+                    bestPos, bestDist = {px, py, pz}, d
                 end
             end
             -- 1) if bestPos is within baseMove, move there

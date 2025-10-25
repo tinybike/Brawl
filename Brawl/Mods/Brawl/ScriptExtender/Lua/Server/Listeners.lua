@@ -696,36 +696,73 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    -- print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     -- _D(State.Session.ActionsInProgress[casterUuid])
-    Swarm.resumeTimers()
-    if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
-        if State.Session.Players then
-            local areaRadius = Ext.Stats.Get(spellName).AreaRadius
-            for uuid, _ in pairs(State.Session.Players) do
-                if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
-                    Utils.removeNegativeStatuses(uuid)
-                    Resources.restoreActionResource(Ext.Entity.Get(uuid), "WarPriestActionPoint")
-                    -- Resources.restoreSpellSlots(uuid)
+    -- Swarm.resumeTimers()
+    -- if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
+    --     if State.Session.Players then
+    --         local areaRadius = Ext.Stats.Get(spellName).AreaRadius
+    --         for uuid, _ in pairs(State.Session.Players) do
+    --             if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
+    --                 Utils.removeNegativeStatuses(uuid)
+    --                 Resources.restoreActionResource(Ext.Entity.Get(uuid), "WarPriestActionPoint")
+    --                 -- Resources.restoreSpellSlots(uuid)
+    --             end
+    --         end
+    --     end
+    -- end
+    -- Actions.completeActionInProgress(casterUuid, spellName)
+    -- if M.Utils.isCounterspell(spellName) then
+    --     local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
+    --     debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
+    --     if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
+    --         State.Session.StoryActionIDs[storyActionID] = {}
+    --         debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
+    --     end
+    -- end
+end
+
+-- thank u Norb and Mazzle
+local function onSpellCastFinishedEvent(cast, _, _)
+    print("SpellCastFinishedEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
+    -- _D(cast:GetAllComponents())
+    _D(cast.SpellCastOutcome)
+    local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
+    local requestUuid = cast.SpellCastState.SpellCastGuid
+    local storyActionId = cast.ServerSpellCastState.StoryActionId
+    _D(State.Session.ActionsInProgress[casterUuid])
+    local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
+    if actionInProgress then
+        local outcome = cast.SpellCastOutcome.Result
+        if outcome == "CantCast" or outcome == "Canceled" then
+            actionInProgress.onFailed(outcome)
+        elseif outcome == "None" then
+            print("Spell cast succeeded")
+            Swarm.resumeTimers() -- for interrupts, does this need to be here?
+            local spellName = actionInProgress.spellName
+            if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
+                local areaRadius = Ext.Stats.Get(spellName).AreaRadius
+                for uuid, _ in pairs(State.Session.Players) do
+                    if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
+                        Utils.removeNegativeStatuses(uuid)
+                        Resources.restoreAllActionResources(uuid)
+                        -- Resources.restoreSpellSlots(uuid)
+                    end
                 end
             end
-        end
-    end
-    Actions.completeAction(casterUuid, spellName)
-    if M.Utils.isCounterspell(spellName) then
-        local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-        debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
-        if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
-            State.Session.StoryActionIDs[storyActionID] = {}
-            debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
+            actionInProgress.onCompleted()
+            Actions.removeActionInProgress(casterUuid, requestUuid)
+        else
+            print("what outcome is this?", outcome)
+            _D(actionInProgress)
         end
     end
 end
 
-local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
-    local casterUuid = M.Osi.GetUUID(casterGuid)
-    debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
-end
+-- local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
+--     local casterUuid = M.Osi.GetUUID(casterGuid)
+--     debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+-- end
 
 local function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)
@@ -1117,14 +1154,18 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("UsingSpell", 5, "after", onUsingSpell),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.CastedSpell = {
-        handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- State.Session.Listeners.CastedSpell = {
+    --     handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     -- State.Session.Listeners.CastSpellFailed = {
     --     handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
     --     stop = Ext.Osiris.UnregisterListener,
     -- }
+    State.Session.Listeners.SpellCastFinishedEvent = {
+        handle = Ext.Entity.OnCreateDeferred("SpellCastFinishedEvent", onSpellCastFinishedEvent),
+        stop = Ext.Entity.Unsubscribe,
+    }
     State.Session.Listeners.DialogStarted = {
         handle = Ext.Osiris.RegisterListener("DialogStarted", 2, "before", onDialogStarted),
         stop = Ext.Osiris.UnregisterListener,

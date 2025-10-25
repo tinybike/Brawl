@@ -2,29 +2,42 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local noop = Utils.noop
 
-local function registerAction(uuid, spellName, callback)
-    State.Session.ActionsInProgress[uuid] = State.Session.ActionsInProgress[uuid] or {}
-    table.insert(State.Session.ActionsInProgress[uuid], {spellName = spellName, callback = callback})
+local function getActionInProgress(casterUuid, requestUuid)
+    local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
+    if actionsInProgress and next(actionsInProgress) then
+        for i, actionInProgress in ipairs(actionsInProgress) do
+            if actionInProgress.requestUuid == requestUuid then
+                return actionInProgress
+            end
+        end
+    end
 end
 
-local function completeAction(uuid, spellName)
-    if State.Session.ActionsInProgress[uuid] then
+local function registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
+    State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
+    table.insert(State.Session.ActionsInProgress[casterUuid], {
+        spellName = spellName,
+        requestUuid = requestUuid,
+        onCompleted = onCompleted or noop,
+        onFailed = onFailed or noop,
+    })
+end
+
+local function removeActionInProgress(casterUuid, requestUuid)
+    if State.Session.ActionsInProgress[casterUuid] then
         local foundActionInProgress = false
         local actionsInProgressIndex = nil
-        local actionsInProgress = State.Session.ActionsInProgress[uuid]
+        local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
         for i, actionInProgress in ipairs(actionsInProgress) do
-            if actionInProgress.spellName == spellName then
+            if actionInProgress.requestUuid == requestUuid then
                 foundActionInProgress = true
                 actionsInProgressIndex = i
-                if actionInProgress.callback then
-                    actionInProgress.callback()
-                end
                 break
             end
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("complete action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i].spellName)
+                debugPrint("complete action in progress", i, M.Utils.getDisplayName(casterUuid), actionsInProgress[i].spellName)
                 table.remove(actionsInProgress, i)
             end
         end
@@ -32,10 +45,14 @@ local function completeAction(uuid, spellName)
 end
 
 -- thank u focus and mazzle
-local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions, insertAtFront)
+local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
-        castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        if State.Settings.HogwildMode then
+            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls", "IgnoreCastChecks", "IgnoreTargetChecks"}
+        else
+            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
+        end
         if State.Settings.TurnBasedSwarmMode then
             table.insert(castOptions, "NoMovement")
         end
@@ -83,7 +100,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, castOptions,
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    -- print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity))
+    print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity), request.RequestGuid)
     return request.RequestGuid
 end
 
@@ -114,24 +131,21 @@ local function useSpell(casterUuid, targetUuid, spellName, variant, upcastLevel,
             return onFailed("no line of sight")
         end
     end
-    registerAction(casterUuid, spellName, onCompleted)
-    queueSpellRequest(casterUuid, spellName, targetUuid)
+    local requestUuid = Utils.createUuid()
+    registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
+    queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid)
     onSubmitted()
 end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
-    if State.Settings.HogwildMode then
-        Osi.UseSpell(attackerUuid, spellName, targetUuid)
-        registerAction(attackerUuid, spellName, onCompleted)
-        return onSubmitted()
-    end
     return useSpell(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
 end
 
 return {
-    registerAction = registerAction,
-    completeAction = completeAction,
+    getActionInProgress = getActionInProgress,
+    registerActionInProgress = registerActionInProgress,
+    removeActionInProgress = removeActionInProgress,
     queueSpellRequest = queueSpellRequest,
     useSpell = useSpell,
     useSpellOnTarget = useSpellOnTarget,

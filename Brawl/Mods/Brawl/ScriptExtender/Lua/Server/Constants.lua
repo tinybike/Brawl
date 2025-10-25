@@ -370,7 +370,6 @@ Constants.UNUSABLE_NPC_SPELLS = {
     "Target_Devour_ShadowMound",
     "Target_LOW_RamazithsTower_Nightsong_Globe_1",
     "Target_Dip_NPC",
-    "Target_QuiveringPalm",
     "Target_TAD_ConcentratedBlast",
     "Projectile_SneakAttack",
     -- "Target_Shove",

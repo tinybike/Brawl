@@ -43,6 +43,34 @@ local function restoreActionResource(entity, resourceType)
     end
 end
 
+local function getActionResourceInfo(uuid)
+    return Ext.StaticData.Get(uuid, "ActionResource")
+end
+
+local function getActionResourceName(uuid)
+    local actionResourceInfo = getActionResourceInfo(uuid)
+    if actionResourceInfo then
+        return actionResourceInfo.Name
+    end
+end
+
+-- thank u celerev and hippo0o
+local function restoreAllActionResources(entityUuid)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity and entity.ActionResources and entity.ActionResources.Resources then
+        for resourceUuid, resourceList in pairs(entity.ActionResources.Resources) do
+            for _, resource in pairs(resourceList) do
+                local actionResourceInfo = M.Resources.getActionResourceInfo(resource.ResourceUUID)
+                if actionResourceInfo and actionResourceInfo.Name and not actionResourceInfo.IsSpellResource then
+                    debugPrint("restoring resource", M.Utils.getDisplayName(entityUuid), actionResourceInfo.Name)
+                    resource.Amount = resource.MaxAmount
+                end
+            end
+        end
+        entity:Replicate("ActionResources")
+    end
+end
+
 local function decreaseActionResource(uuid, resourceType, amount)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.ActionResources and entity.ActionResources.Resources then
@@ -102,20 +130,17 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
         debugPrint("Error: spell not found")
         return false
     end
-    if upcastLevel ~= nil then
-        debugPrint("Upcasted spell level", upcastLevel)
-    end
     for costType, costValue in pairs(spell.costs) do
         if costType == "ShortRest" or costType == "LongRest" then
             if costValue and not M.Resources.checkSpellCharge(casterUuid, spellName) then
                 return false
             end
         elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
-            if costType == "SpellSlot" then
+            if costType == "SpellSlot" or costType == "WarlockSpellSlot" then
                 local spellLevel = upcastLevel == nil and costValue or upcastLevel
                 local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
                 if availableResourceValue < 1 then
-                    debugPrint("SpellSlot: Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
+                    debugPrint(costType, "Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
                     return false
                 end
             else
@@ -187,6 +212,9 @@ return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
+    getActionResourceInfo = getActionResourceInfo,
+    getActionResourceName = getActionResourceName,
+    restoreAllActionResources = restoreAllActionResources,
     restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
