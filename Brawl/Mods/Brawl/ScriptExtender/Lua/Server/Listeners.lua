@@ -711,7 +711,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             end
         end
     end
-    Resources.completeActionInProgress(casterUuid, spellName)
+    Actions.completeAction(casterUuid, spellName)
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
         debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))

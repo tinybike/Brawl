@@ -5,18 +5,6 @@ local clearOsirisQueue = Utils.clearOsirisQueue
 local isToT = Utils.isToT
 local noop = Utils.noop
 
-local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted, onCompleted, onFailed)
-    debugPrint(M.Utils.getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
-    if State.Settings.HogwildMode then
-        -- TODO onCompleted setup? use new casting for this
-        Osi.UseSpell(attackerUuid, spellName, targetUuid)
-        State.Session.ActionsInProgress[attackerUuid] = State.Session.ActionsInProgress[attackerUuid] or {}
-        table.insert(State.Session.ActionsInProgress[attackerUuid], {spellName = spellName, callback = onCompleted})
-        return onSubmitted()
-    end
-    return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
-end
-
 local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
     if not brawler or not target then
@@ -59,7 +47,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
-        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, function ()
+        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
             if not bonusActionOnly then
                 brawler.targetUuid = targetUuid
@@ -110,7 +98,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
         return actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, onCompleted, onFailed)
+        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, onCompleted, onFailed)
     end, onFailed)
 end
 
@@ -209,7 +197,7 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
                 brawler.targetUuid = nil
                 debugPrint(brawler.displayName, "Helping target", playerUuid, M.Utils.getDisplayName(playerUuid))
                 return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
-                    useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", onSubmitted, onCompleted, onFailed)
+                    Actions.useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", onSubmitted, onCompleted, onFailed)
                 end, onFailed)
             end
         end
@@ -326,7 +314,6 @@ end
 return {
     actOnHostileTarget = actOnHostileTarget,
     actOnFriendlyTarget = actOnFriendlyTarget,
-    useSpellOnTarget = useSpellOnTarget,
     findTarget = findTarget,
     act = act,
     pulseAction = pulseAction,

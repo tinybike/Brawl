@@ -286,7 +286,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 dashAvailable = false
                 return tryMove(baseMove)
             end
-            return AI.useSpellOnTarget(attackerUuid, attackerUuid, dashSpell, noop, function ()
+            return Actions.useSpellOnTarget(attackerUuid, attackerUuid, dashSpell, noop, function ()
                 dashed = true
                 baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
                 tryMove(baseMove)
@@ -307,7 +307,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 -- if not teleport then
                 --     return onFailed()
                 -- end
-                -- return AI.useSpellOnTarget(attackerUuid, targetUuid, teleport, noop, function ()
+                -- return Actions.useSpellOnTarget(attackerUuid, targetUuid, teleport, noop, function ()
                 --     print("teleport successful")
                 --     baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
                 --     tryMove(baseMove)
