@@ -160,7 +160,6 @@ end
 
 -- NB need to allow healing, buffs, debuffs etc for companions too
 local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
-    -- This should never happen but...
     if spellName == nil or spell == nil then
         return false
     end
@@ -172,11 +171,11 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
         return false
     end
     -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
-    if spell.isSafeAoE == false then
-        if not allowAoE and spell.type == "Damage" and (spell.areaRadius > 0 or M.Utils.isZoneSpell(spellName)) then
+    if (spell.areaRadius > 0 or M.Utils.isZoneSpell(spellName)) and not spell.isSafeAoE then
+        if not allowAoE and spell.type == "Damage" then
             return false
         end
-        if allowAoE and spell.isEvocation == false then
+        if allowAoE and not spell.isEvocation then
             return false
         end
     end
@@ -277,7 +276,10 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                     break
                 end
             end
-            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
+            local isOk = isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
+            print("is comp spell available?", uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly, isOk)
+            _D(spell)
+            if isOk then
                 debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
@@ -335,7 +337,6 @@ local function checkEntityConditions(uuid, conditions)
     for fn, conditionPair in pairs(conditions) do
         for req, condition in pairs(conditionPair) do
             for _, label in ipairs(condition) do
-                print("checking condition", fn, M.Utils.getDisplayName(uuid), label, req)
                 if (fn == "IsImmuneToStatus" and M.Osi[fn](uuid, label, "") or M.Osi[fn](uuid, label)) ~= tonumber(req) then
                     return false
                 end
@@ -346,7 +347,7 @@ local function checkEntityConditions(uuid, conditions)
 end
 
 local function checkConditions(uuids, spell)
-    if not spell.conditions then
+    if not spell.conditions or not next(spell.conditions) then
         return true
     end
     for k, conditions in pairs(spell.conditions) do
@@ -503,6 +504,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
             if M.Utils.isAliveAndCanFight(potentialTargetUuid) or M.Utils.isDowned(potentialTargetUuid) then
                 if brawler.uuid == potentialTargetUuid then
                     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+                    debugPrint("has direct heal?", M.State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly))
                     if M.State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
                         local targetHp = M.Osi.GetHitpoints(potentialTargetUuid)
                         local targetHpPct = M.Osi.GetHitpointsPercentage(potentialTargetUuid)

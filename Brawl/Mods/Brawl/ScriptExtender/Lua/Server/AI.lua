@@ -10,7 +10,9 @@ local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted
     if State.Settings.HogwildMode then
         -- TODO onCompleted setup? use new casting for this
         Osi.UseSpell(attackerUuid, spellName, targetUuid)
-        return onSuccess()
+        State.Session.ActionsInProgress[attackerUuid] = State.Session.ActionsInProgress[attackerUuid] or {}
+        table.insert(State.Session.ActionsInProgress[attackerUuid], {spellName = spellName, callback = onCompleted})
+        return onSubmitted()
     end
     return Resources.useSpellAndResources(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
 end
@@ -18,7 +20,7 @@ end
 local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
     if not brawler or not target then
-        return onFailed()
+        return onFailed("brawler/target not found")
     end
     local actionToTake = nil
     local spellTypes = {"Control", "Damage"}
@@ -36,7 +38,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     end
     if not actionToTake then
         print("***No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
-        return onFailed()
+        return onFailed("no hostile actions found")
         -- TODO do we need this fallback...?
         -- if M.Osi.IsPlayer(brawler.uuid) == 1 or State.Settings.TurnBasedSwarmMode then
         --     return onFailed()
@@ -47,46 +49,42 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         --     return onFailed()
         -- end
     end
-    if not M.Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
-        print("conditions not satisfied, excluding spell")
+    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
         table.insert(excludedSpells, actionToTake)
-        if #excludedSpells > 3 then
-            return onFailed()
+        if #excludedSpells > Constants.MAX_SPELL_EXCLUSIONS then
+            return onFailed("too many exclusions")
         end
         return actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
-        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
-            debugPrint(brawler.displayName, "success (hostile)", bonusActionOnly)
+        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, function ()
+            debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
             if not bonusActionOnly then
                 brawler.targetUuid = targetUuid
             end
-            onSuccess()
+            onCompleted()
         end, onFailed)
-    end, function ()
-        print(brawler.displayName, "movement failed (hostile)", target.displayName, actionToTake)
-        onFailed()
-    end)
+    end, onFailed)
 end
 
 local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
     if not preparedSpells then
-        return onFailed()
+        return onFailed("no prepared spells")
     end
     -- todo: Utility/Buff spells
     debugPrint(brawler.displayName, "acting on friendly target", brawler.uuid, target.displayName, bonusActionOnly)
     local spellTypes = {"Healing"}
     if brawler.uuid == target.uuid and not M.State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly) then
         debugPrint(brawler.displayName, "No direct heals found (self)", bonusActionOnly)
-        return onFailed()
+        return onFailed("no direct heals found (self)")
     end
     if brawler.uuid ~= target.uuid and not M.State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly) then
         debugPrint(brawler.displayName, "No direct heals found (other)", bonusActionOnly)
-        return onFailed()
+        return onFailed("no direct heals found (other)")
     end
     local actionToTake = nil
     if M.Osi.IsPlayer(brawler.uuid) == 1 then
@@ -96,31 +94,24 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
     end
     debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid, bonusActionOnly)
     if not actionToTake then
-        print(brawler.displayName, "No friendly actions available for", brawler.uuid, bonusActionOnly)
-        return onFailed()
+        debugPrint(brawler.displayName, "No friendly actions available for", brawler.uuid, bonusActionOnly)
+        return onFailed("no friendly actions available")
         -- if not bonusActionOnly then
         --     return onFailed()
         -- end
-        -- return onSuccess()
+        -- return onSubmitted()
     end
-    if not M.Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
+    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
         table.insert(excludedSpells, actionToTake)
-        if #excludedSpells > 3 then
-            return onFailed()
+        if #excludedSpells > Constants.MAX_SPELL_EXCLUSIONS then
+            return onFailed("too many exclusions")
         end
         return actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        print(brawler.displayName, "movement completed (friendly)", target.displayName, actionToTake)
-        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, function ()
-            debugPrint(brawler.displayName, "success (friendly)", bonusActionOnly)
-            onSuccess()
-        end, onFailed)
-    end, function ()
-        print(brawler.displayName, "movement failed (friendly)", target.displayName, actionToTake)
-        onFailed()
-    end) 
+        useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, onCompleted, onFailed)
+    end, onFailed)
 end
 
 local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
@@ -141,38 +132,34 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
                 local friendlyTargetUuid = M.Pick.whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and brawlersInLevel[friendlyTargetUuid] then
                     debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
-                    actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, nil, function ()
+                    return actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, nil, function ()
                         State.Session.HealRequested[userId] = false
-                        onSuccess()
+                        onSubmitted()
                     end, onFailed)
                 end
             end
         end
         if brawlersInLevel then
             local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel)
+            debugDump(weightedTargets)
             local targetUuid = M.Pick.decideOnTarget(weightedTargets)
             if targetUuid then
                 local targetBrawler = brawlersInLevel[targetUuid]
                 if targetBrawler then
                     local result
                     if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
-                        actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
+                        return actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
                     else
-                        actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
+                        return actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
                     end
-                    -- if result == true then
-                    --     return true
-                    -- end
                 end
             end
-            debugDump(weightedTargets)
         end
         if not bonusActionOnly then
             debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
             Movement.holdPosition(brawler.uuid)
         end
-        -- return false
-        return onFailed()
+        return onFailed("can't find target")
     end
 end
 
@@ -206,10 +193,11 @@ local function checkForBrawlToJoin(brawler)
 end
 
 local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    onSuccess = onSuccess or noop
+    onSubmitted = onSubmitted or noop
+    onCompleted = onCompleted or noop
     onFailed = onFailed or noop
     if not brawler or not brawler.uuid then
-        return onFailed()
+        return onFailed("brawler not found")
     end
     -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
     --     should this generally be handled by the healing logic, instead of special-casing it here?
@@ -222,7 +210,7 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
                 debugPrint(brawler.displayName, "Helping target", playerUuid, M.Utils.getDisplayName(playerUuid))
                 return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
                     useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", onSubmitted, onCompleted, onFailed)
-                end)
+                end, onFailed)
             end
         end
     end
@@ -258,18 +246,18 @@ end
 -- Brawlers doing dangerous stuff
 -- TODO this needs to be restructured to use callbacks instead of returning
 local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    onSuccess = onSuccess or noop
+    onSubmitted = onSubmitted or noop
     onFailed = onFailed or noop
     -- If this brawler is dead or unable to fight, stop this pulse
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
         stopPulseAction(brawler)
-        return onFailed()
+        return onFailed("can't fight")
     end
     if brawler.isPaused then
-        return onFailed()
+        return onFailed("paused")
     end
     if isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
-        return onFailed()
+        return onFailed("player control")
     end
     -- Brawler is alive and able to fight: let's go!
     if not State.Settings.TurnBasedSwarmMode then

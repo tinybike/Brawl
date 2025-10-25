@@ -104,9 +104,6 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
         debugPrint("Error: spell not found")
         return false
     end
-    -- if spell and spell.costs then
-    --     debugDump(spell.costs)
-    -- end
     if upcastLevel ~= nil then
         debugPrint("Upcasted spell level", upcastLevel)
     end
@@ -150,7 +147,7 @@ local function completeActionInProgress(uuid, spellName)
         end
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
-                debugPrint("remove action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i].spellName)
+                debugPrint("complete action in progress", i, M.Utils.getDisplayName(uuid), actionsInProgress[i].spellName)
                 table.remove(actionsInProgress, i)
             end
         end
@@ -272,7 +269,7 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     onFailed = onFailed or noop
     debugPrint(M.Utils.getDisplayName(casterUuid), "casting on target", spellName, targetUuid, M.Utils.getDisplayName(targetUuid))
     if targetUuid == nil then
-        return onFailed()
+        return onFailed("no target")
     end
     if variant ~= nil then
         spellName = variant
@@ -284,13 +281,13 @@ local function useSpellAndResources(casterUuid, targetUuid, spellName, variant, 
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)
-        return onFailed()
+        return onFailed("out of range")
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
         local spell = not State.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
             debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
-            return onFailed()
+            return onFailed("no line of sight")
         end
     end
     State.Session.ActionsInProgress[casterUuid] = State.Session.ActionsInProgress[casterUuid] or {}
@@ -303,6 +300,7 @@ return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
     getActionResourceAmount = getActionResourceAmount,
+    restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
     checkSpellCharge = checkSpellCharge,
