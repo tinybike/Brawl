@@ -1,9 +1,10 @@
-local TagNameToUuid = {}
+local debugPrint = Utils.debugPrint
+local debugDump = Utils.debugDump
 
 local function buildTagNameToUuid()
-    TagNameToUuid = {}
+    State.Session.TagNameToUuid = {}
     for _, uuid in ipairs(Ext.StaticData.GetAll("Tag")) do
-        TagNameToUuid[Ext.StaticData.Get(uuid, "Tag").Name] = uuid
+        State.Session.TagNameToUuid[Ext.StaticData.Get(uuid, "Tag").Name] = uuid
     end
 end
 
@@ -22,10 +23,10 @@ local function hasCondition(conditionString, condition)
     return false
 end
 
-local function hasConditionList(conditionString, condition)
+function hasConditionList(conditionString, condition)
     local yesList = {}
     local noList = {}
-    local normalized = conditionString:gsub("%s*and%s*", "|")
+    local normalized = conditionString:gsub("%s*and%s*", "|"):gsub("[ \t;]+$", "")
     local terms = {}
     local i = 1
     while i <= #normalized do
@@ -50,15 +51,18 @@ local function hasConditionList(conditionString, condition)
     for _, term in ipairs(terms) do
         local label = term:match(noPattern)
         if label then
-            table.insert(noList, (escaped == "Tagged") and TagNameToUuid[label] or label)
+            table.insert(noList, (escaped == "Tagged") and State.Session.TagNameToUuid[label] or label)
         else
             label = term:match(yesPattern)
             if label then
-                table.insert(yesList, (escaped == "Tagged") and TagNameToUuid[label] or label)
+                table.insert(yesList, (escaped == "Tagged") and State.Session.TagNameToUuid[label] or label)
             end
         end
     end
-    return {yes = yesList, no = noList}
+    if not next(yesList) and not next(noList) then
+        return nil
+    end
+    return {["1"] = next(yesList) and yesList or nil, ["0"] = next(noList) and noList or nil}
 end
 
 local function isSafeAoESpell(spellName)
@@ -289,6 +293,18 @@ local function isAutoPathfinding(spell)
     return false
 end
 
+local function parseRequirementString(str)
+    if str ~= "" then
+        local reqs = {
+            IsTagged = hasConditionList(str, "Tagged"),
+            HasActiveStatus = hasConditionList(str, "HasStatus"),
+            HasPassive = hasConditionList(str, "HasPassive"),
+            IsImmuneToStatus = hasConditionList(str, "IsImmuneToStatus"),
+        }
+        return next(reqs) ~= nil and reqs or nil
+    end
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -318,21 +334,6 @@ local function getSpellInfo(spellType, spellName, hostLevel)
                 costs[hitCost] = hitCostAmount
             end
         end
-        local conditions = {target = {}, caster = {}}
-        if spell.TargetConditions ~= "" then
-            conditions.target = {
-                tag = hasConditionList(spell.TargetConditions, "Tagged"),
-                status = hasConditionList(spell.TargetConditions, "HasStatus"),
-                passive = hasConditionList(spell.TargetConditions, "HasPassive"),
-            }
-        end
-        if spell.RequirementConditions ~= "" then
-            conditions.caster = {
-                tag = hasConditionList(spell.RequirementConditions, "Tagged"),
-                status = hasConditionList(spell.RequirementConditions, "HasStatus"),
-                passive = hasConditionList(spell.RequirementConditions, "HasPassive"),
-            }
-        end
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -355,7 +356,10 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             hasApplyStatus = checkForApplyStatus(spell),
             isSelfOnly = hasCondition(spell.TargetConditions, "Self()"),
             isCharacterOnly = hasCondition(spell.TargetConditions, "Character()"),
-            conditions = conditions,
+            conditions = {
+                caster = parseRequirementString(spell.RequirementConditions),
+                target = parseRequirementString(spell.TargetConditions),
+            },
             outOfCombatOnly = outOfCombatOnly,
             isAutoPathfinding = isAutoPathfinding(spell),
         }

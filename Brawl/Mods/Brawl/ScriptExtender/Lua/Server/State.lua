@@ -69,6 +69,7 @@ local Session = {
     CountdownTimer = {},
     ExtraAttacksRemaining = {},
     StoryActionIDs = {},
+    TagNameToUuid = {},
     ToTTimer = nil,
     ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
