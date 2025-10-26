@@ -269,6 +269,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
     print(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
+    local swarmTurnActiveInitial = State.Session.SwarmTurnActive
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
     -- if unit can’t move at all (sentinel foe etc)
     if not M.Utils.canMove(uuid) then
@@ -306,6 +307,10 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             print("dashing")
             return Actions.useSpellOnTarget(uuid, uuid, dashSpell, noop, function ()
                 Ext.Timer.WaitFor(500, function ()
+                    -- if this is an NPC acting during Swarm Turn, make sure the swarm turn is still active now
+                    if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+                        return onFailed("swarm turn expired")
+                    end
                     tryMove(getRemainingMovementByUuid(uuid), Resources.getBonusActionPointsRemaining(uuid) > 0, true)
                 end)
             end, onFailed)
@@ -330,7 +335,10 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 end
                 return Actions.useSpellOnTarget(uuid, targetUuid, teleport, noop, function ()
                     print("teleport successful")
-                    Ext.Timer.WaitFor(250, function ()
+                    Ext.Timer.WaitFor(500, function ()
+                        if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+                            return onFailed("swarm turn expired")
+                        end
                         tryMove(getRemainingMovementByUuid(uuid), isDashAvailable, isBonusDashOnly)
                     end)
                 end, onFailed)

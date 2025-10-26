@@ -180,8 +180,8 @@ end
 
 local function completeSwarmTurn(uuid)
     if State.Session.SwarmTurnActive then
-        local chunkIndex = State.Session.CurrentChunkIndex
-        debugPrint("completeSwarmTurn", uuid, chunkIndex, isChunkDone(chunkIndex), State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
+        local chunkIndex = State.Session.CurrentChunkIndex or 1
+        print("completeSwarmTurn", uuid, chunkIndex, isChunkDone(chunkIndex), State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
         if chunkIndex and isChunkDone(chunkIndex) then
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
