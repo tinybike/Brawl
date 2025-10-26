@@ -270,13 +270,19 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
             return callback(brawler.uuid)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action SUBMITTED") end, function ()
+            return AI.pulseAction(brawler, true, function ()
+                print(brawler.displayName, "bonus action SUBMITTED")
+                -- add catch-all failure after 5 sec?
+            end, function ()
                 print(brawler.displayName, "bonus action COMPLETED")
                 Ext.Timer.WaitFor(500, function ()
                     useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
                 end)
             end, function (err)
                 print(brawler.displayName, "bonus action FAILED", err)
+                if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+                    return callback(brawler.uuid)
+                end
                 setTurnComplete(brawler.uuid)
                 callback(brawler.uuid)
             end)
@@ -291,6 +297,9 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
             if numBonusActions > 0 then
                 useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
             else
+                if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+                    return callback(brawler.uuid)
+                end
                 setTurnComplete(brawler.uuid)
                 callback(brawler.uuid)
             end

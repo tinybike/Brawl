@@ -737,29 +737,30 @@ end
 
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
-    -- _D(cast:GetAllComponents())
-    local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
-    local requestUuid = cast.SpellCastState.SpellCastGuid
-    local storyActionId = cast.ServerSpellCastState.StoryActionId
-    local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
-    if actionInProgress then
-        print("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid))
-        _D(cast.SpellCastOutcome)
-        print("actionInProgress")
-        _D(actionInProgress)
-        local outcome = cast.SpellCastOutcome.Result
-        if outcome == "None" then
-            local spellName = actionInProgress.spellName
-            print("Spell cast succeeded!")
-            Swarm.resumeTimers() -- for interrupts, does this need to be here?
-            Utils.checkDivineIntervention(spellName, casterUuid)
-            print("onCompleted")
-            actionInProgress.onCompleted()
-            Resources.deductCastedSpell(casterUuid, spellName)
-            Actions.removeActionInProgress(casterUuid, requestUuid)
-        else
-            print("onFailed")
-            actionInProgress.onFailed(outcome)
+    if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
+        local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
+        local requestUuid = cast.SpellCastState.SpellCastGuid
+        local storyActionId = cast.ServerSpellCastState.StoryActionId
+        local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
+        if actionInProgress then
+            print("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid))
+            _D(cast.SpellCastOutcome)
+            print("actionInProgress")
+            _D(actionInProgress)
+            local outcome = cast.SpellCastOutcome.Result
+            if outcome == "None" then
+                local spellName = actionInProgress.spellName
+                print("Spell cast succeeded!")
+                Swarm.resumeTimers() -- for interrupts, does this need to be here?
+                Utils.checkDivineIntervention(spellName, casterUuid)
+                print("onCompleted")
+                actionInProgress.onCompleted()
+                Resources.deductCastedSpell(casterUuid, spellName)
+                Actions.removeActionInProgress(casterUuid, requestUuid)
+            else
+                print("onFailed")
+                actionInProgress.onFailed(outcome)
+            end
         end
     end
 end
