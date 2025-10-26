@@ -581,5 +581,9 @@ return {
         max_party_size = onMCMMaxPartySize,
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
         leaderboard_enabled = function (v) State.Settings.LeaderboardEnabled = v end,
+        no_freeze_on_bonus_actions_during_pause = function (v) State.Settings.NoFreezeOnBonusActionsDuringPause = v end,
+        swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
+        swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
+        autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,
     },
 }

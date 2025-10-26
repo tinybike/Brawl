@@ -272,6 +272,9 @@ local function onTurnStarted(entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
+            if State.Settings.FullAuto then
+                Pause.queueCompanionAIActions()
+            end
         end
     end
 end
@@ -706,7 +709,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         Swarm.resumeTimers() -- for interrupts, does this need to be here?
         Utils.checkDivineIntervention(spellName, casterUuid)
         print("onCompleted")
-        actionInProgress.onCompleted()
+        actionInProgress.onCompleted(spellName)
         Resources.deductCastedSpell(casterUuid, spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
     end
@@ -738,6 +741,7 @@ end
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
+        _D(cast:GetAllComponents())
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
@@ -754,11 +758,15 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 Utils.checkDivineIntervention(spellName, casterUuid)
                 print("onCompleted")
-                actionInProgress.onCompleted()
+                actionInProgress.onCompleted(spellName)
                 Resources.deductCastedSpell(casterUuid, spellName)
                 Actions.removeActionInProgress(casterUuid, requestUuid)
             else
                 print("onFailed")
+                if outcome == "CantSpendUseCosts" then
+                    -- check for ActionResourceBlock boosts? why did this fail
+                    _D(cast:GetAllComponents())
+                end
                 actionInProgress.onFailed(outcome)
             end
         end

@@ -18,6 +18,10 @@ local Settings = {
     MaxPartySize = 4,
     TurnBasedSwarmMode = true,
     LeaderboardEnabled = true,
+    NoFreezeOnBonusActionsDuringPause = false,
+    SwarmTurnTimeout = 15.0,
+    SwarmChunkSize = 20,
+    AutotriggerSwarmModeCompanionAI = false,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -35,6 +39,10 @@ if MCM then
     Settings.MaxPartySize = MCM.Get("max_party_size")
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
     Settings.LeaderboardEnabled = MCM.Get("leaderboard_enabled")
+    Settings.NoFreezeOnBonusActionsDuringPause = MCM.Get("no_freeze_on_bonus_actions_during_pause")
+    Settings.SwarmTurnTimeout = MCM.Get("swarm_turn_timeout")
+    Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
+    Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
 end
 
 -- Session state

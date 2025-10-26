@@ -148,6 +148,48 @@
                             "Default": false,
                             "Description": "If checked, the AI will go hogwild, freely using any of their spells/abilities with zero resource costs.",
                             "Handles": {"DescriptionHandle": "h82826325ge87dg4b9fga2d4g1918131934e8", "NameHandle": "h3a37f938gf803g45f1gb3bage75ca7adae42"}
+                        }, {
+                            "Id": "no_freeze_on_bonus_actions_during_pause",
+                            "Name": "No Freeze On Bonus Actions During Pause",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, bonus actions will not freeze your character during pause.",
+                            "Handles": {"DescriptionHandle": "h9171238bg39d1g467bg8aafg98324b7187db", "NameHandle": "h24fda523g1755g46ccg8092g4c22b8cf77b2"}
+                        }
+                    ]
+                }, {
+                    "SectionId": "features_swarm",
+                    "SectionName": "Swarm Mode Combat Features (Host)",
+                    "Settings": [
+                        {
+                            "Id": "swarm_turn_timeout",
+                            "Name": "Enemy Turn Time Limit (Seconds)",
+                            "Type": "slider_float",
+                            "Default": 15.0,
+                            "Options": {
+                                "Min": 1.0,
+                                "Max": 300.0
+                            },
+                            "Description": "Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 15 seconds)",
+                            "Handles": {"DescriptionHandle": "h5953a09fg95d0g4129g9b58gb45e5956b68a", "NameHandle": "h5499cb52gcfe1g4f30g8fe5gda15f0ca7f7a"}
+                        }, {
+                            "Id": "swarm_chunk_size",
+                            "Name": "Enemy Swarm Group Size",
+                            "Type": "slider_int",
+                            "Default": 20,
+                            "Options": {
+                                "Min": 2,
+                                "Max": 50
+                            },
+                            "Description": "The maximum number of enemies that can act at the same time.  Users with less powerful computers may need to decrease this value.  The default value is 20.  Warning: values above 30 may cause the game to slow or crash during large encounters!",
+                            "Handles": {"DescriptionHandle": "hb00484a5g8cb3g44efg82f7ga70e3bb5c28f", "NameHandle": "h88255cdfg90c3g4242ga828g7977f63a4977"}
+                        },  {
+                            "Id": "autotrigger_swarm_mode_companion_ai",
+                            "Name": "Automatically Trigger Swarm Mode Companion AI",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, and Companion AI is enabled, your companions will automatically act using Brawl's AI at the beginning of your team's turn.  If not checked, the companion AI can be triggered using the Queue Companion AI Action hotkey (LCtrl+C by default).",
+                            "Handles": {"DescriptionHandle": "hc0055a4eg3a8eg4736g89d3gdc6b9f0bf36f", "NameHandle": "hf6e63658g1ccfg4abdgab30g7ee2f50b9a70"}
                         }
                     ]
                 }

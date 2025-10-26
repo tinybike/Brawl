@@ -90,4 +90,12 @@
     <content contentuid="h2275bb32gda39g4c15gbf85g6b201d24f197" version="1">Leaderboard Toggle Hotkey 2 (Optional)</content>
     <content contentuid="hd2ff1055g739fg4113g97eeg96c84b8d23e2" version="1">Override</content>
     <content contentuid="h40bfe888g839bg49e8ga9bdge9a9bc209c92" version="1">If checked, override this button's default functionality.</content>
+    <content contentuid="h24fda523g1755g46ccg8092g4c22b8cf77b2" version="1">No Freeze On Bonus Actions During Pause</content>
+    <content contentuid="h9171238bg39d1g467bg8aafg98324b7187db" version="1">If checked, bonus actions will not freeze your character during pause.</content>
+    <content contentuid="h5499cb52gcfe1g4f30g8fe5gda15f0ca7f7a" version="1">Enemy Turn Time Limit (Seconds)</content>
+    <content contentuid="h5953a09fg95d0g4129g9b58gb45e5956b68a" version="1">Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 15 seconds)</content>
+    <content contentuid="h88255cdfg90c3g4242ga828g7977f63a4977" version="1">Enemy Swarm Group Size</content>
+    <content contentuid="hb00484a5g8cb3g44efg82f7ga70e3bb5c28f" version="1">The maximum number of enemies that can act at the same time.  Users with less powerful computers may need to decrease this value.  The default value is 20.  Warning: values above 30 may cause the game to slow or crash during large encounters!</content>
+    <content contentuid="hf6e63658g1ccfg4abdgab30g7ee2f50b9a70" version="1">Automatically Trigger Swarm Mode Companion AI</content>
+    <content contentuid="hc0055a4eg3a8eg4736g89d3gdc6b9f0bf36f" version="1">If checked, and Companion AI is enabled, your companions will automatically act using Brawl's AI at the beginning of your team's turn.  If not checked, the companion AI can be triggered using the Queue Companion AI Action hotkey (LCtrl+C by default).</content>
 </contentList>

@@ -147,7 +147,7 @@ local function useSpell(casterUuid, targetUuid, spellName, variant, upcastLevel,
     local requestUuid = Utils.createUuid()
     registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
     queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid)
-    onSubmitted()
+    onSubmitted(spellName, targetUuid, requestUuid)
 end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted, onCompleted, onFailed)

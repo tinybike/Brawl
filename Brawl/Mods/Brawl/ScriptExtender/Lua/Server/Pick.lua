@@ -276,10 +276,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                     break
                 end
             end
-            local isOk = isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
-            -- print("is comp spell available?", uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly, isOk)
-            -- _D(spell)
-            if isOk then
+            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
                 -- debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end

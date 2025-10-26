@@ -5,6 +5,10 @@ local noop = Utils.noop
 local startChunk
 local singleCharacterTurn
 
+local function getSwarmTurnTimeout()
+    return math.floor(State.Settings.SwarmTurnTimeout*1000)
+end
+
 local function cancelTimers()
     if State.Settings.TurnBasedSwarmMode then
         if State.Session.SwarmTurnTimer ~= nil then
@@ -231,7 +235,7 @@ startChunk = function (chunkIndex)
                 idx = idx + 1
             end
         end
-        State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(Constants.SWARM_TURN_TIMEOUT, function ()
+        State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(getSwarmTurnTimeout(), function ()
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
                 forceCompleteChunk(chunkIndex)
@@ -270,11 +274,11 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
             return callback(brawler.uuid)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function ()
-                print(brawler.displayName, "bonus action SUBMITTED")
+            return AI.pulseAction(brawler, true, function (spellName, targetUuid, requestUuid)
+                print(brawler.displayName, "bonus action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
                 -- add catch-all failure after 5 sec?
-            end, function ()
-                print(brawler.displayName, "bonus action COMPLETED")
+            end, function (spellName)
+                print(brawler.displayName, "bonus action COMPLETED", spellName)
                 Ext.Timer.WaitFor(500, function ()
                     useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
                 end)
@@ -287,8 +291,10 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
                 callback(brawler.uuid)
             end)
         end
-        AI.pulseAction(brawler, false, function () print(brawler.displayName, "action SUBMITTED") end, function ()
-            print(brawler.displayName, "action COMPLETED")
+        AI.pulseAction(brawler, false, function (spellName, targetUuid, requestUuid)
+            print(brawler.displayName, "action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
+        end, function (spellName)
+            print(brawler.displayName, "action COMPLETED", spellName)
             Ext.Timer.WaitFor(500, function ()
                 useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
             end)
@@ -353,7 +359,7 @@ local function startEnemyTurn()
                     State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
                     State.Session.BrawlerChunks[chunkIndex][brawlerUuid] = brawler
                     brawlersInChunk = brawlersInChunk + 1
-                    if brawlersInChunk >= Constants.SWARM_CHUNK_SIZE then
+                    if brawlersInChunk >= State.Settings.SwarmChunkSize then
                         chunkIndex = chunkIndex + 1
                         brawlersInChunk = 0
                     end
@@ -390,7 +396,7 @@ local function startSwarmTurn()
                 State.Session.SwarmTurnTimer = nil
             end
             State.Session.SwarmTurnTimerCombatRound = M.Utils.getCurrentCombatRound()
-            State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*Constants.SWARM_TURN_TIMEOUT, function ()
+            State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
                 if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
                     debugPrint("************************Swarm turn timer finished - setting all enemy turns complete...")
                     setAllEnemyTurnsComplete()

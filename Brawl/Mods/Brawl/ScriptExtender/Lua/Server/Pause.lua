@@ -219,12 +219,22 @@ local function startTruePause(entityUuid)
             State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
         end
         State.Session.SpellCastPrepareEndEvent[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
-            debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-            local caster = cast.SpellCastState.Caster
-            if caster.Uuid.EntityUuid == entityUuid then
-                debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
-                if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
-                    midActionLock(caster)
+            if cast.SpellCastState and cast.SpellCastState.Caster then
+                debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
+                local caster = cast.SpellCastState.Caster
+                if caster.Uuid.EntityUuid == entityUuid then
+                    debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
+                    if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
+                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
+                            local spellName = cast.SpellCastState.SpellId.OriginatorPrototype
+                            print("checking spell for bonus", spellName)
+                            _D(M.State.getSpellByName(spellName))
+                            if M.State.getSpellByName(spellName).isBonusAction then
+                                return
+                            end
+                        end
+                        midActionLock(caster)
+                    end
                 end
             end
         end)
