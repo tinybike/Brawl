@@ -100,6 +100,7 @@ local Session = {
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
+    AutotriggeredSwarmModeCompanionAI = false,
 }
 
 -- Persistent state

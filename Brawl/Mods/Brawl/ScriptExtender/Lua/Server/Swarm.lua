@@ -263,13 +263,13 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
             return callback(brawler.uuid)
         end
         count = count or 0
-        -- Resources.getActionResourceAmount(Ext.Entity.Get(brawler.uuid), "BonusActionPoint")
-        -- local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
-        -- local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
         local numActions = Resources.getActionPointsRemaining(brawler.uuid)
         local numBonusActions = Resources.getBonusActionPointsRemaining(brawler.uuid)
         print(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
-        if (numActions == 0 and numBonusActions == 0) or count > 3 then
+        if (numActions == 0 and numBonusActions == 0) or count > 10 then
+            if count > 10 then
+                print(count, "counter limit reached, what happened here??")
+            end
             setTurnComplete(brawler.uuid)
             return callback(brawler.uuid)
         end
