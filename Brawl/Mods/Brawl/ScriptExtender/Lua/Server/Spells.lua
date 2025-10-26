@@ -23,7 +23,7 @@ local function hasCondition(conditionString, condition)
     return false
 end
 
-function hasConditionList(conditionString, condition)
+local function hasConditionList(conditionString, condition)
     local yesList = {}
     local noList = {}
     local normalized = conditionString:gsub("%s*and%s*", "|"):gsub("[ \t;]+$", "")
@@ -241,13 +241,13 @@ local function checkForUnarmedDamage(spell)
     return false
 end
 
-local function checkForApplyStatus(spell)
-    if spell and spell.SpellSuccess then
-        for j, spellSuccess in ipairs(spell.SpellSuccess) do
+local function checkForApplyStatus(spell, applyStatusType)
+    if spell and spell[applyStatusType] then
+        for j, spellSuccess in ipairs(spell[applyStatusType]) do
             if spellSuccess.Functors then
                 for i, functor in ipairs(spellSuccess.Functors) do
-                    if functor.TypeId == "ApplyStatus" then
-                        return true
+                    if functor.TypeId == "ApplyStatus" and functor.StatusId then
+                        return functor.StatusId
                     end
                 end
             end
@@ -353,7 +353,8 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isDirectHeal = checkForDirectHeal(spell),
             isBonusAction = costs.BonusActionPoint ~= nil,
             isSafeAoE = isSafeAoESpell(spellName),
-            hasApplyStatus = checkForApplyStatus(spell),
+            applyStatusOnSuccess = checkForApplyStatus(spell, "SpellSuccess"),
+            applyStatus = checkForApplyStatus(spell, "SpellProperties"),
             isSelfOnly = hasCondition(spell.TargetConditions, "Self()"),
             isCharacterOnly = hasCondition(spell.TargetConditions, "Character()"),
             conditions = {
@@ -474,7 +475,32 @@ local function resetSpellData()
     end
 end
 
+local function getRageAbility(entityUuid)
+    if entityUuid then
+        local entity = Ext.Entity.Get(entityUuid)
+        if entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+            local preparedSpells = entity.SpellBookPrepares.PreparedSpells
+            for _, rageAbility in ipairs(Constants.RAGE_ABILITIES) do
+                for _, preparedSpell in ipairs(preparedSpells) do
+                    local spellName = preparedSpell.OriginatorPrototype
+                    if spellName and Utils.startsWith(spellName, rageAbility) then
+                        return spellName
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function getSpellByName(name)
+    if name then
+        return State.Session.SpellTableByName[name]
+    end
+end
+
 return {
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
+    getRageAbility = getRageAbility,
+    getSpellByName = getSpellByName,
 }

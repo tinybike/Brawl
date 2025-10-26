@@ -228,8 +228,8 @@ local function startTruePause(entityUuid)
                         if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
                             local spellName = cast.SpellCastState.SpellId.OriginatorPrototype
                             print("checking spell for bonus", spellName)
-                            _D(M.State.getSpellByName(spellName))
-                            if M.State.getSpellByName(spellName).isBonusAction then
+                            _D(M.Spells.getSpellByName(spellName))
+                            if M.Spells.getSpellByName(spellName).isBonusAction then
                                 return
                             end
                         end

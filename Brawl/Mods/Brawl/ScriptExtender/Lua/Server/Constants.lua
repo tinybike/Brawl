@@ -152,6 +152,7 @@ Constants.PLAYER_ARCHETYPES = {
     "healer_melee",
     "melee_magic",
     "monk",
+    "barbarian",
 }
 Constants.ARCHETYPE_WEIGHTS = {
     mage = {
@@ -318,7 +319,12 @@ Constants.SAFE_AOE_SPELLS = {
     "Target_GuardianOfFaith",
     "Target_KiResonation_Blast",
 }
-Constants.RAGE_BOOSTS = {"RAGE", "RAGE_FRENZY", "RAGE_GIANT"}
+Constants.RAGE_ABILITIES = {
+    "Shout_Rage_Giant",
+    "Shout_Rage_Frenzy",
+    "Shout_Rage_WildMagic",
+    "Shout_Rage",
+}
 Constants.SPELL_REQUEST_FLAGS = {
     IgnoreHasSpell = 0x1,
     IgnoreCastChecks = 0x2,

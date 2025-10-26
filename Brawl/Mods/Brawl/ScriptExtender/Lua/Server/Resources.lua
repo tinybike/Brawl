@@ -133,7 +133,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     if variant ~= nil then
         spellName = variant
     end
-    local spell = State.getSpellByName(spellName)
+    local spell = Spells.getSpellByName(spellName)
     if not spell then
         debugPrint("Error: spell not found")
         return false
@@ -165,7 +165,7 @@ end
 
 local function deductCastedSpell(uuid, spellName)
     local entity = Ext.Entity.Get(uuid)
-    local spell = State.getSpellByName(spellName)
+    local spell = Spells.getSpellByName(spellName)
     if entity and spell then
         for costType, costValue in pairs(spell.costs) do
             if costType == "ShortRest" or costType == "LongRest" then

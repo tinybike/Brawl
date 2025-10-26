@@ -535,7 +535,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
             if State.Session.StoryActionIDs[storyActionID] and State.Session.StoryActionIDs[storyActionID].spellName then
                 debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
                 State.Session.StoryActionIDs[storyActionID] = nil
-                local spell = State.getSpellByName(spellName)
+                local spell = Spells.getSpellByName(spellName)
                 if spell ~= nil and spell.triggersExtraAttack == true then
                     if State.Settings.TurnBasedSwarmMode and M.Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
                         return nil
@@ -835,7 +835,7 @@ local function onTeleportedToCamp(character)
     debugPrint("TeleportedToCamp", character)
     local entityUuid = M.Osi.GetUUID(character)
     -- NB: use this for RT too? why remove all?
-    if State.Session.TurnBasedSwarmMode then
+    if State.Settings.TurnBasedSwarmMode then
         if entityUuid then
             local level = M.Osi.GetRegion(entityUuid)
             local brawler = M.Roster.getBrawlerByUuid(entityUuid)

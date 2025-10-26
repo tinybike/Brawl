@@ -500,6 +500,10 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
+local function startsWith(str, prefix)
+    return str:sub(1, #prefix) == prefix
+end
+
 local function timeIt(fn, ...)
     local t0 = Ext.Utils.MonotonicTime()
     fn(...)
@@ -572,6 +576,7 @@ return {
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
     getOriginatorPrototype = getOriginatorPrototype,
+    startsWith = startsWith,
     averageTime = averageTime,
     totalTime = totalTime,
     getPersistentModVars = getPersistentModVars,

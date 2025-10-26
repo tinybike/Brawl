@@ -206,12 +206,6 @@ local function isPartyInRealTime()
     return true
 end
 
-local function getSpellByName(name)
-    if name then
-        return Session.SpellTableByName[name]
-    end
-end
-
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
     if M.Utils.isSilenced(uuid) then
         return false
@@ -523,7 +517,6 @@ return {
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
     isPartyInRealTime = isPartyInRealTime,
-    getSpellByName = getSpellByName,
     hasDirectHeal = hasDirectHeal,
     revertHitpoints = revertHitpoints,
     modifyHitpoints = modifyHitpoints,

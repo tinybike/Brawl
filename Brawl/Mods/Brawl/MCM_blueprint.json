@@ -57,7 +57,7 @@
                             "Name": "Active Character Archetype",
                             "Type": "enum",
                             "Default": "",
-                            "Options": {"Choices": ["", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic", "monk"]},
+                            "Options": {"Choices": ["", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic", "monk", "barbarian"]},
                             "Description": "Combat archetype for your currently selected character",
                             "Handles": {"DescriptionHandle": "h5fba396bg3ea9g42c8g99f7gd52fad9d7c46", "NameHandle": "h08b6adc8ge129g45a0ga62bgdd4a013d0e2b"}
                         }, {

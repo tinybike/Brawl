@@ -37,7 +37,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         --     return onFailed()
         -- end
     end
-    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
+    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.Spells.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
         table.insert(excludedSpells, actionToTake)
         if #excludedSpells > Constants.MAX_SPELL_EXCLUSIONS then
@@ -89,7 +89,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
         -- end
         -- return onSubmitted()
     end
-    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.State.getSpellByName(actionToTake)) then
+    if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.Spells.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
         table.insert(excludedSpells, actionToTake)
         if #excludedSpells > Constants.MAX_SPELL_EXCLUSIONS then
@@ -201,6 +201,10 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
                 end, onFailed)
             end
         end
+    end
+    -- Rage check for barbarians: if rage is available and we're not already raging, then we should use it
+    if State.Settings.TurnBasedSwarmMode and Pick.shouldRage(brawler.uuid, brawler.rage) then
+        return Actions.startRage(brawler.uuid, brawler.rage, onSubmitted, onCompleted, onFailed)
     end
     -- Doesn't currently have an attack target, so let's find one
     if brawler.targetUuid == nil then

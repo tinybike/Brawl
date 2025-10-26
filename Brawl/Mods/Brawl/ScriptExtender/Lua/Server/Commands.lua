@@ -305,7 +305,7 @@ local function onActionButton(data, isController)
         if Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and M.Utils.isAliveAndCanFight(player.uuid) then
             local spellName = M.Utils.getSpellNameBySlot(player.uuid, Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel])
             if spellName ~= nil then
-                local spell = State.getSpellByName(spellName)
+                local spell = Spells.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
                     return Actions.useSpellOnTarget(player.uuid, player.uuid, spellName)
@@ -511,6 +511,7 @@ local function onMCMActiveCharacterArchetype(archetype)
         modVars.PartyArchetypes = partyArchetypes
         local brawler = M.Roster.getBrawlerByUuid(uuid)
         if brawler ~= nil then
+            brawler.rage = (archetype == "barbarian") and Spells.getRageAbility(uuid) or nil
             brawler.archetype = archetype
         end
     end

@@ -83,7 +83,7 @@ local function getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight
         if spell.isSafeAoE and spell.areaRadius > 1 then
             weight = weight + 3*spell.areaRadius
         end
-        if spell.hasApplyStatus then
+        if spell.applyStatusOnSuccess then
             weight = weight + archetypeWeights.applyDebuff
         end
         -- If this spell is available at all, that means the target is resonating, so you probably want to go ahead and detonate it!
@@ -334,7 +334,15 @@ local function checkEntityConditions(uuid, conditions)
     for fn, conditionPair in pairs(conditions) do
         for req, condition in pairs(conditionPair) do
             for _, label in ipairs(condition) do
-                if (fn == "IsImmuneToStatus" and M.Osi[fn](uuid, label, "") or M.Osi[fn](uuid, label)) ~= tonumber(req) then
+                local res
+                if fn == "IsImmuneToStatus" then
+                    res = M.Osi[fn](uuid, label, "")
+                elseif fn == "HasActiveStatus" and Utils.startsWith(label, "SG_") then
+                    res = M.Osi.HasActiveStatusWithGroup(uuid, label)
+                else
+                    res = M.Osi[fn](uuid, label)
+                end
+                if res ~= tonumber(req) then
                     return false
                 end
             end
@@ -352,6 +360,7 @@ local function checkConditions(uuids, spell)
             return false
         end
     end
+    return true
 end
 
 local function selectRandomSpell(preparedSpells)
@@ -581,6 +590,10 @@ local function decideOnTarget(weightedTargets)
     return nil
 end
 
+local function shouldRage(uuid, rage)
+    return rage and checkConditions({caster = uuid, target = uuid}, M.Spells.getSpellByName(rage))
+end
+
 return {
     getResistanceWeight = getResistanceWeight,
     getSpellWeight = getSpellWeight,
@@ -595,4 +608,5 @@ return {
     whoNeedsHealing = whoNeedsHealing,
     getWeightedTargets = getWeightedTargets,
     decideOnTarget = decideOnTarget,
+    shouldRage = shouldRage,
 }

@@ -28,16 +28,6 @@ local function rollForInitiative(uuid)
     return initiative
 end
 
--- local function getRageAbility(entityUuid)
---     local preparedSpells = Ext.Entity.Get(entityUuid).SpellBookPrepares.PreparedSpells
---     for _, preparedSpell in ipairs(preparedSpells) do
---         if preparedSpell.OriginatorPrototype == "Shout_Rage" or preparedSpell.OriginatorPrototype == "Shout_Rage_Frenzy" or preparedSpell.OriginatorPrototype == "Shout_Rage_Giant" or preparedSpell.OriginatorPrototype == "Shout_Rage_WildMagic" then
---             return preparedSpell.OriginatorPrototype
---         end
---     end
---     return nil
--- end
-
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = M.Osi.GetRegion(entityUuid)
@@ -64,9 +54,10 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
             }
-            -- if State.getArchetype(entityUuid) == "barbarian" then
-            --     brawler.rage = getRageAbility(entityUuid)
-            -- end
+            if State.getArchetype(entityUuid) == "barbarian" then
+                print("barb archetype, setting rage")
+                brawler.rage = Spells.getRageAbility(entityUuid)
+            end
             debugPrint(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}

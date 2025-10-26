@@ -25,6 +25,7 @@ local Memoizable = {
         "GetRulesetModifierString",
         "GetUUID",
         "HasActiveStatus",
+        "HasActiveStatusWithGroup",
         "HasPassive",
         "HasLineOfSight",
         "IsAlly",
@@ -83,6 +84,9 @@ local Memoizable = {
         "getNumEnemiesRemaining",
         "isPartyInRealTime",
         "hasDirectHeal",
+    },
+    Spells = {
+        "getRageAbility",
         "getSpellByName",
     },
     Pick = {

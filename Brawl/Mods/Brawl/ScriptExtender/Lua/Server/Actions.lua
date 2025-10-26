@@ -138,7 +138,7 @@ local function useSpell(casterUuid, targetUuid, spellName, variant, upcastLevel,
         return onFailed("out of range")
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
-        local spell = not State.getSpellByName(spellName)
+        local spell = not Spells.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
             debugPrint("cast failed, no line of sight", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), spellName)
             return onFailed("no line of sight")
@@ -155,6 +155,18 @@ local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted
     return useSpell(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
 end
 
+local function startRage(uuid, rage, onSubmitted, onCompleted, onFailed)
+    Actions.useSpellOnTarget(uuid, uuid, rage, onSubmitted, function (spellName)
+        if not Utils.startsWith(spellName, "Shout_Rage_Giant") then
+            return onCompleted(spellName)
+        end
+        -- NB: should this onSubmitted just be a noop?  can execute 2x
+        Ext.Timer.WaitFor(750, function ()
+            Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", onSubmitted, onCompleted, onFailed)
+        end)
+    end, onFailed)
+end
+
 return {
     getActionInProgress = getActionInProgress,
     getActionInProgressByName = getActionInProgressByName,
@@ -163,4 +175,5 @@ return {
     queueSpellRequest = queueSpellRequest,
     useSpell = useSpell,
     useSpellOnTarget = useSpellOnTarget,
+    startRage = startRage,
 }
