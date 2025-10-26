@@ -454,6 +454,19 @@ local function isValidHostileTarget(uuid, targetUuid)
     return true
 end
 
+local function checkDivineIntervention(spellName, casterUuid)
+    if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
+        local areaRadius = Ext.Stats.Get(spellName).AreaRadius
+        for uuid, _ in pairs(State.Session.Players) do
+            if M.Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
+                removeNegativeStatuses(uuid)
+                Resources.restoreAllActionResources(uuid)
+                -- Resources.restoreSpellSlots(uuid)
+            end
+        end
+    end
+end
+
 local function getSpellNameBySlot(uuid, slot)
     local entity = Ext.Entity.Get(uuid)
     -- NB: is this always index 6?
@@ -553,6 +566,7 @@ return {
     getAbility = getAbility,
     isConcentrating = isConcentrating,
     isValidHostileTarget = isValidHostileTarget,
+    checkDivineIntervention = checkDivineIntervention,
     getSpellNameBySlot = getSpellNameBySlot,
     createUuid = createUuid,
     isCounterspell = isCounterspell,

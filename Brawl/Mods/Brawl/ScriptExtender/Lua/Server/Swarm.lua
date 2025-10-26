@@ -166,9 +166,11 @@ local function resetSwarmTurnComplete()
 end
 
 local function isChunkDone(chunkIndex)
-    for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
-        if not State.Session.SwarmTurnComplete[uuid] then
-            return false
+    if State.Session.BrawlerChunks[chunkIndex] then
+        for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
+            if not State.Session.SwarmTurnComplete[uuid] then
+                return false
+            end
         end
     end
     return true
@@ -251,32 +253,35 @@ local function useRemainingActions(brawler, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
         count = count or 0
-        local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
-        local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
-        debugPrint(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
+        -- Resources.getActionResourceAmount(Ext.Entity.Get(brawler.uuid), "BonusActionPoint")
+        -- local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
+        -- local numBonusActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "BonusActionPoint", 0) or 0
+        local numActions = Resources.getActionPointsRemaining(brawler.uuid)
+        local numBonusActions = Resources.getBonusActionPointsRemaining(brawler.uuid)
+        print(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
         if (numActions == 0 and numBonusActions == 0) or count > 3 then
             setTurnComplete(brawler.uuid)
             return callback(brawler.uuid)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function () debugPrint(brawler.displayName, "bonus action SUBMITTED") end, function ()
-                debugPrint(brawler.displayName, "bonus action COMPLETED")
+            return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action SUBMITTED") end, function ()
+                print(brawler.displayName, "bonus action COMPLETED")
                 Ext.Timer.WaitFor(500, function ()
                     useRemainingActions(brawler, callback, count)
                 end)
             end, function (err)
-                debugPrint(brawler.displayName, "bonus action FAILED", err)
+                print(brawler.displayName, "bonus action FAILED", err)
                 setTurnComplete(brawler.uuid)
                 callback(brawler.uuid)
             end)
         end
-        AI.pulseAction(brawler, false, function () debugPrint(brawler.displayName, "action SUBMITTED") end, function ()
-            debugPrint(brawler.displayName, "action COMPLETED")
+        AI.pulseAction(brawler, false, function () print(brawler.displayName, "action SUBMITTED") end, function ()
+            print(brawler.displayName, "action COMPLETED")
             Ext.Timer.WaitFor(500, function ()
                 useRemainingActions(brawler, callback, count)
             end)
         end, function (err)
-            debugPrint(brawler.displayName, "action FAILED", err)
+            print(brawler.displayName, "action FAILED", err)
             if numBonusActions > 0 then
                 useRemainingActions(brawler, callback, count + 1)
             else

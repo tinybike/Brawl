@@ -231,86 +231,109 @@ local function calculateJumpDistance(uuid)
     return jumpDistance
 end
 
-local function selectDash(uuid, bonusActionOnly)
-    print("selecting dash", uuid, bonusActionOnly)
+local function selectBonusActionDash(uuid)
     for _, bonusActionDash in ipairs(Constants.BONUS_ACTION_DASH) do
-        print("checking", bonusActionDash)
+        print("checking for bonus action dash", bonusActionDash)
         if Resources.hasEnoughToCastSpell(uuid, bonusActionDash) then
             return bonusActionDash
         end
     end
+end
+
+local function selectDash(uuid, bonusActionOnly)
+    print("selecting dash", uuid, bonusActionOnly)
+    local bonusActionDash = selectBonusActionDash(uuid)
+    if bonusActionDash then
+        return bonusActionDash
+    end
     if not bonusActionOnly then
-        return "Shout_Dash_NPC"
+        return "Shout_Dash"
     end
 end
 
 local function selectTeleport(uuid)
     print("selecting teleport", uuid)
     for _, teleport in ipairs(Constants.TELEPORTS) do
-        print("checking", teleport)
+        -- print("checking", teleport)
         if Resources.hasEnoughToCastSpell(uuid, teleport) then
             return teleport
         end
     end
 end
 
-local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
+local function getRemainingMovementByUuid(uuid)
+    return getRemainingMovement(Ext.Entity.Get(uuid))
+end
+
+local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
-    print(M.Utils.getDisplayName(attackerUuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
+    print(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
-    local baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
-    local dashed = false
-    local override = not State.Settings.TurnBasedSwarmMode
-    local dashAvailable = State.Settings.TurnBasedSwarmMode
-    -- if unit can’t move or has zero movement, just callback and exit
-    -- NB: check for movement skills like burrow, misty step, jump, charge, force tunnel, etc?
-    if not M.Utils.canMove(attackerUuid) then
-        if M.Osi.GetDistanceTo(attackerUuid, targetUuid) - spellRange > 0 then
+    -- if unit can’t move at all (sentinel foe etc)
+    if not M.Utils.canMove(uuid) then
+        if M.Osi.GetDistanceTo(uuid, targetUuid) - spellRange > 0 then
             return onFailed("can't move")
         end
     end
-    local function tryMove(allowedDistance)
+    local baseMove = getRemainingMovementByUuid(uuid)
+    local numActions = Resources.getActionPointsRemaining(uuid)
+    local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
+    local override = not State.Settings.TurnBasedSwarmMode
+    print("starting movement and points", baseMove, numActions, numBonusActions)
+    local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
         print("tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
-        local distToTarget = M.Osi.GetDistanceTo(attackerUuid, targetUuid)
+        local distToTarget = M.Osi.GetDistanceTo(uuid, targetUuid)
         local need = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
             return onSuccess()
         end
         -- dash if we need more than base move
-        if dashAvailable and need > allowedDistance then --and not dashed and M.Osi.HasActiveStatus(attackerUuid, "DASH") == 0 then
-            local dashSpell = selectDash(attackerUuid, bonusActionOnly)
-            if not dashSpell then
-                dashAvailable = false
-                return tryMove(Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0))
+        if isDashAvailable and need > allowedDistance then
+            print("need to dash!")
+            local dashSpell
+            if isBonusDashOnly then
+                dashSpell = selectBonusActionDash(uuid)
+            else
+                dashSpell = selectDash(uuid, bonusActionOnly)
             end
-            return Actions.useSpellOnTarget(attackerUuid, attackerUuid, dashSpell, noop, function ()
-                dashed = true
-                tryMove(Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0))
+            if not dashSpell then
+                print("no dash..")
+                return tryMove(getRemainingMovementByUuid(uuid), false, false)
+            end
+            print("dashing")
+            return Actions.useSpellOnTarget(uuid, uuid, dashSpell, noop, function ()
+                Ext.Timer.WaitFor(250, function ()
+                    tryMove(getRemainingMovementByUuid(uuid), Resources.getBonusActionPointsRemaining(uuid) > 0, true)
+                end)
             end, onFailed)
         end
         -- find a valid point just outside the target
-        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, attackerUuid, 1)
+        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, uuid, 1)
         if not gx then
             return onFailed("no valid points")
         end
+        if need > 0 and allowedDistance == 0 then
+            -- TODO maybe teleport?
+            return onFailed("out of movement")
+        end
         -- queue pathfinding
         local goalPos = {gx, gy, gz}
-        local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(attackerUuid), goalPos, function (path)
+        local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), goalPos, function (path)
             if not path or not path.GoalFound or #path.Nodes == 0 then
-                -- -- if no path, try teleporting if we have one available
-                -- local teleport = selectTeleport(attackerUuid)
-                -- if not teleport then
-                --     return onFailed()
-                -- end
-                -- return Actions.useSpellOnTarget(attackerUuid, targetUuid, teleport, noop, function ()
-                --     print("teleport successful")
-                --     baseMove = Osi.GetActionResourceValuePersonal(attackerUuid, "Movement", 0)
-                --     tryMove(baseMove)
-                -- end, onFailed)
-                return onFailed("path not found")
+                -- if no path, try teleporting if we have one available
+                local teleport = selectTeleport(uuid)
+                if not teleport then
+                    return onFailed("path not found")
+                end
+                return Actions.useSpellOnTarget(uuid, targetUuid, teleport, noop, function ()
+                    print("teleport successful")
+                    Ext.Timer.WaitFor(250, function ()
+                        tryMove(getRemainingMovementByUuid(uuid), isDashAvailable, isBonusDashOnly)
+                    end)
+                end, onFailed)
             end
             -- scan for best in‑range node and fallback
             local bestPos, bestDist = nil, -1
@@ -321,21 +344,25 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 -- furthest reachable
                 if d <= allowedDistance and d > farDist then
                     farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
+                    print("furthest reachable", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- first node beyond base move (for interpolation)
                 if not nextPos and d > allowedDistance then
                     nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
+                    print("next reachable node", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- in spell range?
                 local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
                 local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
                 if eu <= spellRange and d > bestDist then
                     bestPos, bestDist = {px, py, pz}, d
+                    print("in spell range", px, py, pz, d)
                 end
             end
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
-                return moveToPosition(attackerUuid, bestPos, override, onSuccess)
+                print("best within range, moving to")
+                return moveToPosition(uuid, bestPos, override, onSuccess)
             end
             -- 2) interpolation fallback if farDist < baseMove
             if farPos and nextPos and farDist < allowedDistance then
@@ -346,7 +373,7 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                     local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
                     local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
                     local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
-                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0, attackerUuid, 1)
+                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0, uuid, 1)
                     if vx then
                         farPos = {vx, vy, vz}
                         valid = true
@@ -354,6 +381,8 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                     end
                     frac = origFrac*((10 - attempt)/10)
                 end
+                print("interpolation result")
+                _D(farPos)
                 if not valid then
                     return onFailed("interpolation")
                 end
@@ -362,13 +391,14 @@ local function moveIntoPositionForSpell(attackerUuid, targetUuid, spellName, bon
                 return onFailed("nodes")
             end
             -- 3) final fallback move
-            moveToPosition(attackerUuid, farPos, override, onSuccess)
+            print("final fallback move")
+            moveToPosition(uuid, farPos, override, onSuccess)
         end)
         if path then
             path.CanUseLadders = true
         end
     end
-    tryMove(baseMove)
+    tryMove(baseMove, State.Settings.TurnBasedSwarmMode, bonusActionOnly)
 end
 
 local function setPlayerRunToSprint(entityUuid)

@@ -5,8 +5,21 @@ local noop = Utils.noop
 local function getActionInProgress(casterUuid, requestUuid)
     local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
     if actionsInProgress and next(actionsInProgress) then
-        for i, actionInProgress in ipairs(actionsInProgress) do
+        for _, actionInProgress in ipairs(actionsInProgress) do
+            print("checking action", actionInProgress.requestUuid, requestUuid)
             if actionInProgress.requestUuid == requestUuid then
+                return actionInProgress
+            end
+        end
+    end
+end
+
+local function getActionInProgressByName(casterUuid, spellName)
+    local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
+    if actionsInProgress and next(actionsInProgress) then
+        for _, actionInProgress in ipairs(actionsInProgress) do
+            print("checking action by name", actionInProgress.spellName, spellName)
+            if actionInProgress.spellName == spellName then
                 return actionInProgress
             end
         end
@@ -51,7 +64,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
         if State.Settings.HogwildMode then
             castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls", "IgnoreCastChecks", "IgnoreTargetChecks"}
         else
-            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras"}
+            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
         end
         if State.Settings.TurnBasedSwarmMode then
             table.insert(castOptions, "NoMovement")
@@ -71,7 +84,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
             PassiveId = "",
             Statusid = "",
         },
-        RequestGuid = Utils.createUuid(),
+        RequestGuid = requestUuid or Utils.createUuid(),
         Spell = {
             OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
             ProgressionSource = Constants.NULL_UUID,
@@ -144,6 +157,7 @@ end
 
 return {
     getActionInProgress = getActionInProgress,
+    getActionInProgressByName = getActionInProgressByName,
     registerActionInProgress = registerActionInProgress,
     removeActionInProgress = removeActionInProgress,
     queueSpellRequest = queueSpellRequest,

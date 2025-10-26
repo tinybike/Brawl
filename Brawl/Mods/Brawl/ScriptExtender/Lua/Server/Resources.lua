@@ -18,6 +18,14 @@ local function getActionResourceAmount(entity, resourceType)
     return (getActionResource(entity, resourceType) or {}).Amount
 end
 
+local function getActionPointsRemaining(uuid)
+    return getActionResourceAmount(Ext.Entity.Get(uuid), "ActionPoint") or 0
+end
+
+local function getBonusActionPointsRemaining(uuid)
+    return getActionResourceAmount(Ext.Entity.Get(uuid), "BonusActionPoint") or 0
+end
+
 local function restoreSpellSlots(uuid)
     if uuid then
         local entity = Ext.Entity.Get(uuid)
@@ -166,42 +174,43 @@ local function deductCastedSpell(uuid, spellName)
                         for _, spell in ipairs(entity.SpellBook.Spells) do
                             if spell.Id.Prototype == spellName then
                                 spell.Charged = false
+                                print("setting Charged to false", spellName, M.Utils.getDisplayName(uuid))
                                 entity:Replicate("SpellBook")
                                 break
                             end
                         end
                     end
                 end
-            elseif State.Settings.TurnBasedSwarmMode or (costType ~= "ActionPoint" and costType ~= "BonusActionPoint") then
-                if costType == "SpellSlot" then
-                    if entity.ActionResources and entity.ActionResources.Resources then
-                        local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
-                        if spellSlots then
-                            for _, spellSlot in ipairs(spellSlots) do
-                                if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
-                                    spellSlot.Amount = spellSlot.Amount - 1
-                                    break
-                                end
-                            end
-                        end
-                    end
-                else
-                    if not Constants.ACTION_RESOURCES[costType] then
-                        debugPrint("unknown costType", costType)
-                    elseif entity.ActionResources and entity.ActionResources.Resources then
-                        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
-                        if resources then
-                            local resource = resources[1] -- NB: always index 1?
-                            if resource.Amount ~= nil then
-                                if resource.Amount >= costValue then
-                                    resource.Amount = resource.Amount - costValue
-                                else
-                                    resource.Amount = 0
-                                end
-                            end
-                        end
-                    end
-                end
+            -- elseif State.Settings.TurnBasedSwarmMode or (costType ~= "ActionPoint" and costType ~= "BonusActionPoint") then
+            --     if costType == "SpellSlot" then
+            --         if entity.ActionResources and entity.ActionResources.Resources then
+            --             local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
+            --             if spellSlots then
+            --                 for _, spellSlot in ipairs(spellSlots) do
+            --                     if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+            --                         spellSlot.Amount = spellSlot.Amount - 1
+            --                         break
+            --                     end
+            --                 end
+            --             end
+            --         end
+            --     else
+            --         if not Constants.ACTION_RESOURCES[costType] then
+            --             debugPrint("unknown costType", costType)
+            --         elseif entity.ActionResources and entity.ActionResources.Resources then
+            --             local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
+            --             if resources then
+            --                 local resource = resources[1] -- NB: always index 1?
+            --                 if resource.Amount ~= nil then
+            --                     if resource.Amount >= costValue then
+            --                         resource.Amount = resource.Amount - costValue
+            --                     else
+            --                         resource.Amount = 0
+            --                     end
+            --                 end
+            --             end
+            --         end
+            --     end
             end
         end
         entity:Replicate("ActionResources")
@@ -214,6 +223,8 @@ return {
     getActionResourceAmount = getActionResourceAmount,
     getActionResourceInfo = getActionResourceInfo,
     getActionResourceName = getActionResourceName,
+    getActionPointsRemaining = getActionPointsRemaining,
+    getBonusActionPointsRemaining = getBonusActionPointsRemaining,
     restoreAllActionResources = restoreAllActionResources,
     restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
