@@ -192,8 +192,8 @@ local function completeSwarmTurn(uuid)
                 startChunk(chunkIndex + 1)
             end
         end
+        setTurnComplete(uuid)
     end
-    setTurnComplete(uuid)
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
     -- _D(State.Session.SwarmTurnComplete)
     if checkSwarmTurnComplete() then
@@ -251,9 +251,13 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
-local function useRemainingActions(brawler, callback, count)
+local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
+        if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+            print("swarm turn elapsed, just quit")
+            return callback(brawler.uuid)
+        end
         count = count or 0
         -- Resources.getActionResourceAmount(Ext.Entity.Get(brawler.uuid), "BonusActionPoint")
         -- local numActions = Osi.GetActionResourceValuePersonal(brawler.uuid, "ActionPoint", 0) or 0
@@ -269,7 +273,7 @@ local function useRemainingActions(brawler, callback, count)
             return AI.pulseAction(brawler, true, function () print(brawler.displayName, "bonus action SUBMITTED") end, function ()
                 print(brawler.displayName, "bonus action COMPLETED")
                 Ext.Timer.WaitFor(500, function ()
-                    useRemainingActions(brawler, callback, count)
+                    useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
                 end)
             end, function (err)
                 print(brawler.displayName, "bonus action FAILED", err)
@@ -280,12 +284,12 @@ local function useRemainingActions(brawler, callback, count)
         AI.pulseAction(brawler, false, function () print(brawler.displayName, "action SUBMITTED") end, function ()
             print(brawler.displayName, "action COMPLETED")
             Ext.Timer.WaitFor(500, function ()
-                useRemainingActions(brawler, callback, count)
+                useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
             end)
         end, function (err)
             print(brawler.displayName, "action FAILED", err)
             if numBonusActions > 0 then
-                useRemainingActions(brawler, callback, count + 1)
+                useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
             else
                 setTurnComplete(brawler.uuid)
                 callback(brawler.uuid)
@@ -297,9 +301,9 @@ end
 local function swarmAction(brawler)
     debugPrint(brawler.displayName, "swarmAction")
     if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
-        useRemainingActions(brawler, completeSwarmTurn)
+        useRemainingActions(brawler, true, completeSwarmTurn)
     elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
-        useRemainingActions(brawler)
+        useRemainingActions(brawler, false)
     end
 end
 
