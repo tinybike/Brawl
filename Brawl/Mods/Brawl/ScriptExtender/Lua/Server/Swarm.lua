@@ -166,11 +166,13 @@ local function resetSwarmTurnComplete()
 end
 
 local function isChunkDone(chunkIndex)
-    if State.Session.BrawlerChunks[chunkIndex] then
-        for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
-            if not State.Session.SwarmTurnComplete[uuid] then
-                return false
-            end
+    if not State.Session.BrawlerChunks[chunkIndex] then
+        print("error, chunk not found", chunkIndex)
+        _D(State.Session.BrawlerChunks)
+    end
+    for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
+        if not State.Session.SwarmTurnComplete[uuid] then
+            return false
         end
     end
     return true

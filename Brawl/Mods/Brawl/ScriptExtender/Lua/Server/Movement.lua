@@ -305,7 +305,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             print("dashing")
             return Actions.useSpellOnTarget(uuid, uuid, dashSpell, noop, function ()
-                Ext.Timer.WaitFor(250, function ()
+                Ext.Timer.WaitFor(500, function ()
                     tryMove(getRemainingMovementByUuid(uuid), Resources.getBonusActionPointsRemaining(uuid) > 0, true)
                 end)
             end, onFailed)
