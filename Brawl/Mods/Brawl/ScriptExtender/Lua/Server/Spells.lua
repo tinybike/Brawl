@@ -305,6 +305,18 @@ local function parseRequirementString(str)
     end
 end
 
+local function isSingleSelect(spellName)
+    local stats = Ext.Stats.Get(spellName)
+    if stats.SpellFlags then
+        for _, flag in ipairs(stats.SpellFlags) do
+            if flag == "IgnorePreviouslyPickedEntities" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -345,13 +357,14 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             range = spell.Range,
             costs = costs,
             type = spellType,
+            amountOfTargets = spell.AmountOfTargets ~= "" and tonumber(spell.AmountOfTargets) or nil,
             hasVerbalComponent = hasVerbalComponent,
             averageDamage = averageDamage,
             isWeaponOrUnarmedDamage = isWeaponOrUnarmedDamage,
             isUnarmedDamage = checkForUnarmedDamage(spell),
             triggersExtraAttack = extraAttackCheck(spell),
             isDirectHeal = checkForDirectHeal(spell),
-            isBonusAction = costs.BonusActionPoint ~= nil,
+            isBonusAction = costs.BonusActionPoint ~= nil and costs.ActionPoint == nil,
             isSafeAoE = isSafeAoESpell(spellName),
             applyStatusOnSuccess = checkForApplyStatus(spell, "SpellSuccess"),
             applyStatus = checkForApplyStatus(spell, "SpellProperties"),
@@ -499,6 +512,7 @@ local function getSpellByName(name)
 end
 
 return {
+    isSingleSelect = isSingleSelect,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
     getRageAbility = getRageAbility,

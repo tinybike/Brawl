@@ -745,6 +745,8 @@ end
 local function onSpellCastFinishedEvent(cast, _, _)
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
         -- _D(cast:GetAllComponents())
+        _D(cast.SpellCastState)
+        _D(cast.ServerSpellCastState)
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId

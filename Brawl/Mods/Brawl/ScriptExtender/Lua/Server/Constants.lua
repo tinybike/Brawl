@@ -401,6 +401,7 @@ Constants.BONUS_ACTION_DASH = {
 Constants.TELEPORTS = {
     "Target_MistyStep",
     "Target_MistyStep_Githyanki",
+    "Target_UNI_MistyStep_NightWalkers",
     "Projectile_Jump",
 }
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"

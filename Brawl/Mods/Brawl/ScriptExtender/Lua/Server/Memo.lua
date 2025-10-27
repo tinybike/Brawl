@@ -88,6 +88,7 @@ local Memoizable = {
     Spells = {
         "getRageAbility",
         "getSpellByName",
+        "isSingleSelect",
     },
     Pick = {
         "checkConditions",

@@ -150,13 +150,12 @@ local function buildClosestEnemyBrawlers(playerUuid)
     local playerEntity = Ext.Entity.Get(playerUuid)
     local playerPos = playerEntity.Transform.Transform.Translate
     local playerForwardX, playerForwardY, playerForwardZ = M.Utils.getForwardVector(playerUuid)
-    local maxTargets = 10
     local topTargets = {}
     local level = M.Osi.GetRegion(playerUuid)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
-            if M.Utils.isOnSameLevel(brawlerUuid, playerUuid) and M.Utils.isAliveAndCanFight(brawlerUuid) and M.Utils.isPugnacious(brawlerUuid, playerUuid) then
+            if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Utils.isPugnacious(brawlerUuid, playerUuid) then
                 local brawlerEntity = Ext.Entity.Get(brawlerUuid)
                 if brawlerEntity then
                     local adjustedDistance = getAdjustedDistanceTo(playerPos, brawlerEntity.Transform.Transform.Translate, playerForwardX, playerForwardY, playerForwardZ)
@@ -295,6 +294,7 @@ local function onActionButton(data, isController)
     local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player then
         -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
+        local uuid = player.uuid
         if isController then
             local brawler = M.Roster.getBrawlerByUuid(player.uuid)
             if not brawler or brawler.isPaused then
@@ -305,18 +305,20 @@ local function onActionButton(data, isController)
         if Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel] ~= nil and M.Utils.isAliveAndCanFight(player.uuid) then
             local spellName = M.Utils.getSpellNameBySlot(player.uuid, Constants.ACTION_BUTTON_TO_SLOT[actionButtonLabel])
             if spellName ~= nil then
-                local spell = Spells.getSpellByName(spellName)
+                local spell = M.Spells.getSpellByName(spellName)
                 -- NB: maintain separate friendly target list for healing/buffs?
                 if spell ~= nil and (spell.type == "Buff" or spell.type == "Healing") then
-                    return Actions.useSpellOnTarget(player.uuid, player.uuid, spellName)
+                    return Actions.useSpellOnTarget(player.uuid, player.uuid, spellName, true)
                 end
+                -- TODO need zone logic here
                 -- if M.Utils.isZoneSpell(spellName) or M.Utils.isProjectileSpell(spellName) then
                 --     return Actions.useSpellOnTarget(player.uuid, nil, spellName)
                 -- end
-                if State.Session.PlayerMarkedTarget[player.uuid] == nil or M.Osi.IsDead(State.Session.PlayerMarkedTarget[player.uuid]) == 1 then
+                local target = State.Session.PlayerMarkedTarget[player.uuid]
+                if target == nil or M.Osi.IsDead(target) == 1 then
                     buildClosestEnemyBrawlers(player.uuid)
                 end
-                return Actions.useSpellOnTarget(player.uuid, State.Session.PlayerMarkedTarget[player.uuid], spellName)
+                return Actions.useSpellOnTarget(player.uuid, target, spellName, M.Utils.isPugnacious(player.uuid, target))
             end
         end
     end

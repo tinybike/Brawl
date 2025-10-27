@@ -47,7 +47,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
-        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, function ()
+        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, false, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
             if not bonusActionOnly then
                 brawler.targetUuid = targetUuid
@@ -98,7 +98,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
         return actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, onSubmitted, onCompleted, onFailed)
+        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, true, onSubmitted, onCompleted, onFailed)
     end, onFailed)
 end
 
@@ -197,7 +197,7 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
                 brawler.targetUuid = nil
                 debugPrint(brawler.displayName, "Helping target", playerUuid, M.Utils.getDisplayName(playerUuid))
                 return Movement.moveIntoPositionForSpell(brawler.uuid, playerUuid, "Target_Help", bonusActionOnly, function ()
-                    Actions.useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", onSubmitted, onCompleted, onFailed)
+                    Actions.useSpellOnTarget(brawler.uuid, playerUuid, "Target_Help", true, onSubmitted, onCompleted, onFailed)
                 end, onFailed)
             end
         end

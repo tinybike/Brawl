@@ -57,50 +57,94 @@ local function removeActionInProgress(casterUuid, requestUuid)
     end
 end
 
+local function buildTarget(uuid, targetingType)
+    return {Target = Ext.Entity.Get(uuid), TargetingType = targetingType}
+end
+
+local function buildTargets(casterUuid, spellName, targetUuid, targetingType, isFriendlyTarget)
+    local targets = {}
+    table.insert(targets, buildTarget(targetUuid, targetingType))
+    if isFriendlyTarget then
+        local spell = M.Spells.getSpellByName(spellName)
+        local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+        local level = M.Osi.GetRegion(casterUuid)
+        local brawlersInLevel = State.Session.Brawlers[level]
+        if brawlersInLevel and spell.amountOfTargets and spell.amountOfTargets > 1 then
+            local singleSelect = M.Spells.isSingleSelect(spellName)
+            local counter = 0
+            while #targets < spell.amountOfTargets and counter < 25 do
+                counter = counter + 1
+                for extraTargetUuid, _ in pairs(brawlersInLevel) do
+                    if not singleSelect or extraTargetUuid ~= targetUuid then
+                        if M.Osi.IsEnemy(casterUuid, extraTargetUuid) == 0 and M.Osi.GetDistanceTo(casterUuid, extraTargetUuid) <= spellRange then
+                            table.insert(targets, buildTarget(extraTargetUuid, targetingType))
+                            if #targets >= spell.amountOfTargets then
+                                break
+                            end
+                        end
+                    end
+                end
+                if singleSelect then
+                    break
+                end
+            end
+        end
+    end
+    return targets
+end
+
+local function buildSpell(entity, spellName, stats)
+    local originatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats)
+    if State.Settings.HogwildMode then
+        return {
+            OriginatorPrototype = originatorPrototype,
+            ProgressionSource = Constants.NULL_UUID,
+            Prototype = spellName,
+            Source = Constants.NULL_UUID,
+            SourceType = "Osiris",
+        }
+    end
+    if entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+        for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+            if preparedSpell.OriginatorPrototype == originatorPrototype then
+                return {
+                    OriginatorPrototype = originatorPrototype,
+                    ProgressionSource = preparedSpell.ProgressionSource,
+                    Prototype = spellName,
+                    Source = preparedSpell.Source,
+                    SourceType = preparedSpell.SourceType,
+                }
+            end
+        end
+    end
+end
+
 -- thank u focus and mazzle
-local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, castOptions, insertAtFront)
+local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
         if State.Settings.HogwildMode then
-            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls", "IgnoreCastChecks", "IgnoreTargetChecks"}
+            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls"}
         else
-            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+            castOptions = {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras"}
         end
         if State.Settings.TurnBasedSwarmMode then
             table.insert(castOptions, "NoMovement")
         end
     end
+    local targets = buildTargets(casterUuid, spellName, targetUuid, stats.SpellType, isFriendlyTarget)
     local casterEntity = Ext.Entity.Get(casterUuid)
+    local spell = buildSpell(casterEntity, spellName, stats)
+    if not spell then
+        return false
+    end
     local request = {
         CastOptions = castOptions,
-        CastPosition = nil,
-        Item = nil,
         Caster = casterEntity,
-        NetGuid = "",
-        Originator = {
-            ActionGuid = Constants.NULL_UUID,
-            CanApplyConcentration = true,
-            InterruptId = "",
-            PassiveId = "",
-            Statusid = "",
-        },
         RequestGuid = requestUuid or Utils.createUuid(),
-        Spell = {
-            OriginatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats),
-            ProgressionSource = Constants.NULL_UUID,
-            Prototype = spellName,
-            Source = Constants.NULL_UUID,
-            SourceType = "Osiris",
-        },
-        StoryActionId = 0,
-        Targets = {{
-            Position = nil,
-            Target = Ext.Entity.Get(targetUuid),
-            Target2 = nil,
-            TargetProxy = nil,
-            TargetingType = stats.SpellType,
-        }},
-        field_70 = nil,
+        Spell = spell,
+        -- StoryActionId = 0,
+        Targets = targets,
         field_A8 = 1,
     }
     local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
@@ -117,7 +161,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
     return request.RequestGuid
 end
 
-local function useSpell(casterUuid, targetUuid, spellName, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
+local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or noop
     onCompleted = onCompleted or noop
     onFailed = onFailed or noop
@@ -146,23 +190,25 @@ local function useSpell(casterUuid, targetUuid, spellName, variant, upcastLevel,
     end
     local requestUuid = Utils.createUuid()
     registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
-    queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid)
+    if not queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget) then
+        return onFailed("spell construction error")
+    end
     onSubmitted(spellName, targetUuid, requestUuid)
 end
 
-local function useSpellOnTarget(attackerUuid, targetUuid, spellName, onSubmitted, onCompleted, onFailed)
+local function useSpellOnTarget(attackerUuid, targetUuid, spellName, isFriendlyTarget, onSubmitted, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(attackerUuid), "useSpellOnTarget", attackerUuid, targetUuid, spellName)
-    return useSpell(attackerUuid, targetUuid, spellName, nil, nil, onSubmitted, onCompleted, onFailed)
+    return useSpell(attackerUuid, targetUuid, spellName, isFriendlyTarget, nil, nil, onSubmitted, onCompleted, onFailed)
 end
 
 local function startRage(uuid, rage, onSubmitted, onCompleted, onFailed)
-    Actions.useSpellOnTarget(uuid, uuid, rage, onSubmitted, function (spellName)
+    Actions.useSpellOnTarget(uuid, uuid, rage, true, onSubmitted, function (spellName)
         if not Utils.startsWith(spellName, "Shout_Rage_Giant") then
             return onCompleted(spellName)
         end
         -- NB: should this onSubmitted just be a noop?  can execute 2x
         Ext.Timer.WaitFor(750, function ()
-            Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", onSubmitted, onCompleted, onFailed)
+            Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", true, onSubmitted, onCompleted, onFailed)
         end)
     end, onFailed)
 end
