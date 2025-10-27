@@ -88,6 +88,7 @@ local Session = {
     SwarmTurnComplete = {},
     ResurrectedPlayer = {},
     SwarmTurnTimer = nil,
+    ActionSequenceFailsafeTimer = {},
     SwarmTurnTimerCombatRound = nil,
     SwarmTurnActive = nil,
     SwarmBrawlerIndexDelay = {},

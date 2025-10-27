@@ -19,6 +19,11 @@ local function cancelTimers()
             Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
             State.Session.CurrentChunkTimer = nil
         end
+        if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
+            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                Ext.Timer.Cancel(failsafeTimer)
+            end
+        end
     end
 end
 
@@ -30,6 +35,11 @@ local function resumeTimers()
         if State.Session.CurrentChunkTimer ~= nil then
             Ext.Timer.Resume(State.Session.CurrentChunkTimer)
         end
+        if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
+            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                Ext.Timer.Resume(failsafeTimer)
+            end
+        end
     end
 end
 
@@ -40,6 +50,11 @@ local function pauseTimers()
         end
         if State.Session.CurrentChunkTimer ~= nil then
             Ext.Timer.Pause(State.Session.CurrentChunkTimer)
+        end
+        if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
+            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                Ext.Timer.Pause(failsafeTimer)
+            end
         end
     end
 end
@@ -255,6 +270,28 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
+local function terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+    if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+        return callback(uuid)
+    end
+    setTurnComplete(uuid)
+    callback(uuid)
+end
+
+local function startActionSequenceFailsafeTimer(uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
+    local currentCombatRound = M.Utils.getCurrentCombatRound()
+    State.Session.ActionSequenceFailsafeTimer[uuid] = Ext.Timer.WaitFor(Constants.ACTION_MAX_TIME, function ()
+        State.Session.ActionSequenceFailsafeTimer[uuid] = nil
+        if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
+            return callback(uuid)
+        end
+        if Actions.getActionInProgress(uuid, requestUuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
+            print("Action timed out, did we have a silent failure...?", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
+            terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+        end
+    end)
+end
+
 local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
@@ -276,39 +313,31 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         if numActions == 0 then
             return AI.pulseAction(brawler, true, function (spellName, targetUuid, requestUuid)
                 print(brawler.displayName, "bonus action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
-                -- add catch-all failure after 5 sec?
+                startActionSequenceFailsafeTimer(brawler.uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
             end, function (spellName)
                 print(brawler.displayName, "bonus action COMPLETED", spellName)
-                Ext.Timer.WaitFor(500, function ()
+                Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                     useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
                 end)
             end, function (err)
                 print(brawler.displayName, "bonus action FAILED", err)
-                if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-                    return callback(brawler.uuid)
-                end
-                setTurnComplete(brawler.uuid)
-                callback(brawler.uuid)
+                terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end)
         end
         AI.pulseAction(brawler, false, function (spellName, targetUuid, requestUuid)
             print(brawler.displayName, "action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
+            startActionSequenceFailsafeTimer(brawler.uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
         end, function (spellName)
             print(brawler.displayName, "action COMPLETED", spellName)
-            Ext.Timer.WaitFor(500, function ()
+            Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                 useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
             end)
         end, function (err)
             print(brawler.displayName, "action FAILED", err)
-            if numBonusActions > 0 then
-                useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
-            else
-                if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-                    return callback(brawler.uuid)
-                end
-                setTurnComplete(brawler.uuid)
-                callback(brawler.uuid)
+            if numBonusActions == 0 then
+                return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end
+            useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
         end)
     end
 end

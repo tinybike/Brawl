@@ -464,7 +464,7 @@ local function whoNeedsHealing(uuid, level)
     local friendlyTargetUuid = nil
     local brawlersInLevel = State.Session.Brawlers[level]
     for targetUuid, target in pairs(brawlersInLevel) do
-        if M.Utils.isOnSameLevel(uuid, targetUuid) and M.Osi.IsAlly(uuid, targetUuid) == 1 then
+        if M.Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = M.Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
                 minTargetHpPct = targetHpPct
@@ -477,7 +477,8 @@ end
 
 -- Attacking targets: prioritize close targets with less remaining HP
 -- (Lowest weight = most desireable target)
-local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
+local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, healingNeeded)
+    print("GETTING WEIGHTED TARGETS -- is healing needed????????", healingNeeded)
     local weightedTargets = {}
     local isHealer = M.Utils.isHealerArchetype(brawler.archetype)
     local isMelee = nil
@@ -507,7 +508,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly)
         if not isToT() or (Mods.ToT.PersistentVars.Scenario and potentialTargetUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper) then
             debugPrint(brawler.displayName, "checking potential target", M.Utils.getDisplayName(potentialTargetUuid), potentialTargetUuid)
             local weightedTarget
-            if M.Utils.isAliveAndCanFight(potentialTargetUuid) or M.Utils.isDowned(potentialTargetUuid) then
+            if (M.Utils.isAliveAndCanFight(potentialTargetUuid) or M.Utils.isDowned(potentialTargetUuid)) and (healingNeeded or M.Osi.IsAlly(brawler.uuid, potentialTargetUuid) == 0) then
                 if brawler.uuid == potentialTargetUuid then
                     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
                     debugPrint("has direct heal?", M.State.hasDirectHeal(brawler.uuid, preparedSpells, false, bonusActionOnly))

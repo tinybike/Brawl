@@ -76,7 +76,7 @@ local function buildTargets(casterUuid, spellName, targetUuid, targetingType, is
                 counter = counter + 1
                 for extraTargetUuid, _ in pairs(brawlersInLevel) do
                     if not singleSelect or extraTargetUuid ~= targetUuid then
-                        if M.Osi.IsEnemy(casterUuid, extraTargetUuid) == 0 and M.Osi.GetDistanceTo(casterUuid, extraTargetUuid) <= spellRange then
+                        if M.Osi.IsAlly(casterUuid, extraTargetUuid) == 1 and M.Osi.GetDistanceTo(casterUuid, extraTargetUuid) <= spellRange then
                             table.insert(targets, buildTarget(extraTargetUuid, targetingType))
                             if #targets >= spell.amountOfTargets then
                                 break
@@ -207,7 +207,7 @@ local function startRage(uuid, rage, onSubmitted, onCompleted, onFailed)
             return onCompleted(spellName)
         end
         -- NB: should this onSubmitted just be a noop?  can execute 2x
-        Ext.Timer.WaitFor(750, function ()
+        Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
             Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", true, onSubmitted, onCompleted, onFailed)
         end)
     end, onFailed)

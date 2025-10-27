@@ -284,19 +284,25 @@ end
 
 local function onTurnEnded(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        -- print("TurnEnded", entityGuid)
+        print("TurnEnded", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
-        if entityUuid and M.Roster.getBrawlerByUuid(entityUuid) then
-            if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
-                -- print("setting turn ended", entityGuid)
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
-                if Swarm.checkAllPlayersFinishedTurns() then
-                    -- print("Started Swarm turn!")
-                    Swarm.unsetAllEnemyTurnsComplete()
-                    Swarm.startSwarmTurn()
+        if entityUuid then
+            if State.Session.ActionSequenceFailsafeTimer[entityUuid] then
+                Ext.Timer.Cancel(State.Session.ActionSequenceFailsafeTimer[entityUuid])
+                State.Session.ActionSequenceFailsafeTimer[entityUuid] = nil
+            end
+            if M.Roster.getBrawlerByUuid(entityUuid) then
+                if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
+                    -- print("setting turn ended", entityGuid)
+                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
+                    if Swarm.checkAllPlayersFinishedTurns() then
+                        -- print("Started Swarm turn!")
+                        Swarm.unsetAllEnemyTurnsComplete()
+                        Swarm.startSwarmTurn()
+                    end
+                else
+                    Swarm.completeSwarmTurn(entityUuid)
                 end
-            else
-                Swarm.completeSwarmTurn(entityUuid)
             end
         end
     end
@@ -716,29 +722,18 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         Resources.deductCastedSpell(casterUuid, spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
     end
-    -- _D(State.Session.ActionsInProgress[casterUuid])
-    -- Swarm.resumeTimers()
-    -- if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
-    --     if State.Session.Players then
-    --         local areaRadius = Ext.Stats.Get(spellName).AreaRadius
-    --         for uuid, _ in pairs(State.Session.Players) do
-    --             if Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
-    --                 Utils.removeNegativeStatuses(uuid)
-    --                 Resources.restoreActionResource(Ext.Entity.Get(uuid), "WarPriestActionPoint")
-    --                 -- Resources.restoreSpellSlots(uuid)
-    --             end
-    --         end
-    --     end
-    -- end
-    -- Actions.completeActionInProgress(casterUuid, spellName)
-    -- if M.Utils.isCounterspell(spellName) then
-    --     local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-    --     debugPrint("got counterspelled", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
-    --     if originalCastInfo and originalCastInfo.casterUuid and Resources.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName) then
-    --         State.Session.StoryActionIDs[storyActionID] = {}
-    --         debugPrint("removed counterspelled spell from actions in progress and storyactionIDs")
-    --     end
-    -- end
+    if M.Utils.isCounterspell(spellName) then
+        local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
+        print("got counterspelled!", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
+        if originalCastInfo and originalCastInfo.casterUuid then
+            local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
+            if actionInProgress then
+                actionInProgress.onFailed("counterspelled")
+                Actions.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName)
+                State.Session.StoryActionIDs[storyActionID] = {}
+            end
+        end
+    end
 end
 
 -- thank u Norb and Mazzle
