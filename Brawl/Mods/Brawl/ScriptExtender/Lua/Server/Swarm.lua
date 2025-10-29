@@ -77,10 +77,12 @@ local function setTurnComplete(uuid)
         entity.TurnBased.RequestedEndTurn = true
         entity.TurnBased.TurnActionsCompleted = true
         entity:Replicate("TurnBased")
-        State.Session.SwarmTurnComplete[uuid] = true
-        if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
-            Ext.Timer.Cancel(uuid)
-            State.Session.SwarmBrawlerIndexDelay[uuid] = nil
+        if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            State.Session.SwarmTurnComplete[uuid] = true
+            if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+                Ext.Timer.Cancel(uuid)
+                State.Session.SwarmBrawlerIndexDelay[uuid] = nil
+            end
         end
     end
 end
@@ -88,12 +90,14 @@ end
 local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.TurnBased then
-        -- debugPrint(M.Utils.getDisplayName(uuid), "Unsetting turn complete", uuid)
+        debugPrint(M.Utils.getDisplayName(uuid), "Unsetting turn complete", uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
         entity:Replicate("TurnBased")
-        State.Session.SwarmTurnComplete[uuid] = false
+        if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            State.Session.SwarmTurnComplete[uuid] = false
+        end
         -- Resources.restoreActionResource(entity, "Movement")
     end
 end
@@ -293,6 +297,8 @@ local function cancelActionSequenceFailsafeTimer(uuid)
 end
 
 local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveInitial, callback)
+    debugPrint("startActionSequenceFailsafeTimer", uuid, swarmTurnActiveInitial)
+    debugDump(request)
     local isRetry = false
     local currentCombatRound = M.Utils.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
@@ -319,6 +325,7 @@ local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveIn
 end
 
 local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
+    debugPrint("useRemainingActions", brawler.uuid, swarmTurnActiveInitial, count)
     callback = callback or noop
     if brawler and brawler.uuid then
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then

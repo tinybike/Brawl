@@ -174,7 +174,7 @@ local function deductCastedSpell(uuid, spellName)
                         for _, spell in ipairs(entity.SpellBook.Spells) do
                             if spell.Id.Prototype == spellName then
                                 spell.Charged = false
-                                print("setting Charged to false", spellName, M.Utils.getDisplayName(uuid))
+                                debugPrint("setting Charged to false", spellName, M.Utils.getDisplayName(uuid))
                                 entity:Replicate("SpellBook")
                                 break
                             end

@@ -233,7 +233,7 @@ end
 
 local function selectBonusActionDash(uuid)
     for _, bonusActionDash in ipairs(Constants.BONUS_ACTION_DASH) do
-        print("checking for bonus action dash", bonusActionDash)
+        debugPrint("checking for bonus action dash", bonusActionDash)
         if Resources.hasEnoughToCastSpell(uuid, bonusActionDash) then
             return bonusActionDash
         end
@@ -241,7 +241,7 @@ local function selectBonusActionDash(uuid)
 end
 
 local function selectDash(uuid, bonusActionOnly)
-    print("selecting dash", uuid, bonusActionOnly)
+    debugPrint("selecting dash", uuid, bonusActionOnly)
     local bonusActionDash = selectBonusActionDash(uuid)
     if bonusActionDash then
         return bonusActionDash
@@ -252,7 +252,7 @@ local function selectDash(uuid, bonusActionOnly)
 end
 
 local function selectTeleport(uuid)
-    print("selecting teleport", uuid)
+    debugPrint("selecting teleport", uuid)
     for _, teleport in ipairs(Constants.TELEPORTS) do
         -- print("checking", teleport)
         if Resources.hasEnoughToCastSpell(uuid, teleport) then

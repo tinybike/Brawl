@@ -6,7 +6,7 @@ local function getActionInProgress(casterUuid, requestUuid)
     local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
     if actionsInProgress and next(actionsInProgress) then
         for _, actionInProgress in ipairs(actionsInProgress) do
-            -- print("checking action", actionInProgress.requestUuid, requestUuid)
+            -- debugPrint("checking action", actionInProgress.requestUuid, requestUuid)
             if actionInProgress.requestUuid == requestUuid then
                 return actionInProgress
             end
@@ -18,7 +18,7 @@ local function getActionInProgressByName(casterUuid, spellName)
     local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
     if actionsInProgress and next(actionsInProgress) then
         for _, actionInProgress in ipairs(actionsInProgress) do
-            -- print("checking action by name", actionInProgress.spellName, spellName)
+            -- debugPrint("checking action by name", actionInProgress.spellName, spellName)
             if actionInProgress.spellName == spellName then
                 return actionInProgress
             end
@@ -130,7 +130,7 @@ local function submitSpellRequest(request, insertAtFront)
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    print(M.Utils.getDisplayName(request.Caster.Uuid.EntityUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
+    debugPrint(M.Utils.getDisplayName(request.Caster.Uuid.EntityUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
 end
 
 -- thank u focus and mazzle

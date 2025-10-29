@@ -274,6 +274,7 @@ local function onTurnStarted(entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
+            Swarm.unsetTurnComplete(entityUuid)
             if State.Settings.AutotriggerSwarmModeCompanionAI and not State.Session.AutotriggeredSwarmModeCompanionAI then
                 State.Session.AutotriggeredSwarmModeCompanionAI = true
                 Pause.queueCompanionAIActions()
