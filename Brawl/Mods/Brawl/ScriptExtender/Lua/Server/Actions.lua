@@ -119,6 +119,20 @@ local function buildSpell(entity, spellName, stats)
     end
 end
 
+local function submitSpellRequest(request, insertAtFront)
+    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
+    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(request.Caster)
+    if insertAtFront or isPausedRequest then
+        for i = #queuedRequests, 1, -1 do
+            queuedRequests[i + 1] = queuedRequests[i]
+        end
+        queuedRequests[1] = request
+    else
+        queuedRequests[#queuedRequests + 1] = request
+    end
+    print(M.Utils.getDisplayName(casterUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
+end
+
 -- thank u focus and mazzle
 local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
@@ -147,18 +161,8 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
         Targets = targets,
         field_A8 = 1,
     }
-    local queuedRequests = Ext.System.ServerCastRequest.OsirisCastRequests
-    local isPausedRequest = State.Settings.TruePause and Pause.isInFTB(casterEntity)
-    if insertAtFront or isPausedRequest then
-        for i = #queuedRequests, 1, -1 do
-            queuedRequests[i + 1] = queuedRequests[i]
-        end
-        queuedRequests[1] = request
-    else
-        queuedRequests[#queuedRequests + 1] = request
-    end
-    print(M.Utils.getDisplayName(casterUuid), "insert cast request", #queuedRequests, spellName, M.Utils.getDisplayName(targetUuid), isPausedRequest, Pause.isLocked(casterEntity), request.RequestGuid)
-    return request.RequestGuid
+    submitSpellRequest(request, insertAtFront)
+    return request
 end
 
 local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, variant, upcastLevel, onSubmitted, onCompleted, onFailed)
@@ -193,7 +197,7 @@ local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, var
     if not queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget) then
         return onFailed("spell construction error")
     end
-    onSubmitted(spellName, targetUuid, requestUuid)
+    onSubmitted(request)
 end
 
 local function useSpellOnTarget(attackerUuid, targetUuid, spellName, isFriendlyTarget, onSubmitted, onCompleted, onFailed)
@@ -218,6 +222,7 @@ return {
     getActionInProgressByName = getActionInProgressByName,
     registerActionInProgress = registerActionInProgress,
     removeActionInProgress = removeActionInProgress,
+    submitSpellRequest = submitSpellRequest,
     queueSpellRequest = queueSpellRequest,
     useSpell = useSpell,
     useSpellOnTarget = useSpellOnTarget,

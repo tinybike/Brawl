@@ -408,6 +408,6 @@ Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
 Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
-Constants.ACTION_MAX_TIME = 7000
+Constants.ACTION_MAX_TIME = 3000
 
 return Constants

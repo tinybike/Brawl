@@ -9,6 +9,13 @@ local function getSwarmTurnTimeout()
     return math.floor(State.Settings.SwarmTurnTimeout*1000)
 end
 
+local function cancelActionSequenceFailsafeTimer(failsafe)
+    if failsafe and failsafe.timer then
+        Ext.Timer.Cancel(failsafe.timer)
+        failsafe.timer = nil
+    end
+end
+
 local function cancelTimers()
     if State.Settings.TurnBasedSwarmMode then
         if State.Session.SwarmTurnTimer ~= nil then
@@ -20,8 +27,8 @@ local function cancelTimers()
             State.Session.CurrentChunkTimer = nil
         end
         if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
-            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
-                Ext.Timer.Cancel(failsafeTimer)
+            for _, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                cancelActionSequenceFailsafeTimer(failsafe)
             end
         end
     end
@@ -36,8 +43,8 @@ local function resumeTimers()
             Ext.Timer.Resume(State.Session.CurrentChunkTimer)
         end
         if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
-            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
-                Ext.Timer.Resume(failsafeTimer)
+            for _, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                Ext.Timer.Resume(failsafe.timer)
             end
         end
     end
@@ -52,8 +59,8 @@ local function pauseTimers()
             Ext.Timer.Pause(State.Session.CurrentChunkTimer)
         end
         if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
-            for _, failsafeTimer in pairs(State.Session.ActionSequenceFailsafeTimer) do
-                Ext.Timer.Pause(failsafeTimer)
+            for _, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                Ext.Timer.Pause(failsafe.timer)
             end
         end
     end
@@ -278,16 +285,29 @@ local function terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
     callback(uuid)
 end
 
-local function startActionSequenceFailsafeTimer(uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
+local function startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
+    local isRetry = false
+    local uuid = request.Caster.Uuid.EntityUuid
     local currentCombatRound = M.Utils.getCurrentCombatRound()
-    State.Session.ActionSequenceFailsafeTimer[uuid] = Ext.Timer.WaitFor(Constants.ACTION_MAX_TIME, function ()
+    if State.Session.ActionSequenceFailsafeTimer[uuid] then
+        cancelActionSequenceFailsafeTimer(State.Session.ActionSequenceFailsafeTimer[uuid])
+        isRetry = true
+    end
+    State.Session.ActionSequenceFailsafeTimer[uuid] = {}
+    State.Session.ActionSequenceFailsafeTimer[uuid].timer = Ext.Timer.WaitFor(Constants.ACTION_MAX_TIME, function ()
+        print("Failsafe timer expired for", M.Utils.getDisplayName(uuid), swarmTurnActiveInitial, request.Spell.Prototype)
         State.Session.ActionSequenceFailsafeTimer[uuid] = nil
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
             return callback(uuid)
         end
-        if Actions.getActionInProgress(uuid, requestUuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
-            print("Action timed out, did we have a silent failure...?", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
-            terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+        if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
+            print("Action timed out, did we have a silent failure...?", request.Spell.Prototype, request.RequestGuid, isRetry)
+            if not isRetry then
+                return terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+            end
+            request.RequestGuid = Utils.createUuid()
+            print("Resubmitting with new uuid", request.RequestGuid)
+            Actions.submitSpellRequest(request)
         end
     end)
 end
@@ -311,9 +331,9 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
             return callback(brawler.uuid)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function (spellName, targetUuid, requestUuid)
-                print(brawler.displayName, "bonus action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
-                startActionSequenceFailsafeTimer(brawler.uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
+            return AI.pulseAction(brawler, true, function (request)
+                print(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
+                startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
             end, function (spellName)
                 print(brawler.displayName, "bonus action COMPLETED", spellName)
                 Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
@@ -324,9 +344,9 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
                 terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end)
         end
-        AI.pulseAction(brawler, false, function (spellName, targetUuid, requestUuid)
-            print(brawler.displayName, "action SUBMITTED", spellName, M.Utils.getDisplayName(targetUuid), requestUuid)
-            startActionSequenceFailsafeTimer(brawler.uuid, swarmTurnActiveInitial, spellName, targetUuid, requestUuid, callback)
+        AI.pulseAction(brawler, false, function (request)
+            print(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
+            startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
         end, function (spellName)
             print(brawler.displayName, "action COMPLETED", spellName)
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()

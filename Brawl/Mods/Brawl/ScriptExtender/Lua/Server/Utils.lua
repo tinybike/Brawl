@@ -259,6 +259,7 @@ local function removeNegativeStatuses(uuid)
     -- Osi.RemoveStatusesWithGroup(uuid, "SG_Dominated")
     -- Osi.RemoveStatus(uuid, "SILENCED")
     Osi.RemoveStatus(uuid, "ATT_FEEBLEMIND", "")
+    Osi.RemoveStatus(uuid, "ATT_TIMECOMPRESSION", "")
 end
 
 local function clearOsirisQueue(uuid)
