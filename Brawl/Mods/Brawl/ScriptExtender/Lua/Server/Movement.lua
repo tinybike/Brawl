@@ -279,7 +279,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local override = not State.Settings.TurnBasedSwarmMode
     debugPrint("starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
-        debugPrint("tryMove", allowedDistance)
+        debugPrint(M.Utils.getDisplayName(uuid), "tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
         local distToTarget = M.Osi.GetDistanceTo(uuid, targetUuid)
         local need = distToTarget - spellRange
@@ -288,7 +288,9 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             return onSuccess()
         end
         -- dash if we need more than base move
+        -- NB: send this back in onFailed, coordinate thru useRemainingActions?
         if isDashAvailable and need > allowedDistance then
+            -- return onFailed("need to dash")
             debugPrint("need to dash!")
             local dashSpell
             if isBonusDashOnly then
@@ -453,4 +455,7 @@ return {
     setPlayerRunToSprint = setPlayerRunToSprint,
     resetPlayersMovementSpeed = resetPlayersMovementSpeed,
     setMovementSpeedThresholds = setMovementSpeedThresholds,
+    selectDash = selectDash,
+    selectBonusActionDash = selectBonusActionDash,
+    selectTeleport = selectTeleport,
 }

@@ -274,11 +274,13 @@ local function onTurnStarted(entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
             State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = false
-            Swarm.unsetTurnComplete(entityUuid)
-            if State.Settings.AutotriggerSwarmModeCompanionAI and not State.Session.AutotriggeredSwarmModeCompanionAI then
-                State.Session.AutotriggeredSwarmModeCompanionAI = true
-                Pause.queueCompanionAIActions()
-            end
+            Ext.Timer.WaitFor(200, function ()
+                Swarm.unsetTurnComplete(entityUuid)
+                if State.Settings.AutotriggerSwarmModeCompanionAI and not State.Session.AutotriggeredSwarmModeCompanionAI then
+                    State.Session.AutotriggeredSwarmModeCompanionAI = true
+                    Pause.queueCompanionAIActions()
+                end
+            end)
         end
     end
 end
@@ -289,6 +291,7 @@ local function onTurnEnded(entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid then
             Swarm.cancelActionSequenceFailsafeTimer(entityUuid)
+            State.Session.ActionsInProgress[entityUuid] = {}
             if M.Roster.getBrawlerByUuid(entityUuid) then
                 if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
                     -- debugPrint("setting turn ended", entityGuid)

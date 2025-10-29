@@ -296,8 +296,11 @@ local function cancelActionSequenceFailsafeTimer(uuid)
     end
 end
 
-local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveInitial, callback)
-    debugPrint("startActionSequenceFailsafeTimer", uuid, swarmTurnActiveInitial)
+local useRemainingActions
+
+local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
+    local uuid = brawler.uuid
+    debugPrint("startActionSequenceFailsafeTimer", M.Utils.getDisplayName(uuid), swarmTurnActiveInitial)
     debugDump(request)
     local isRetry = false
     local currentCombatRound = M.Utils.getCurrentCombatRound()
@@ -313,18 +316,19 @@ local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveIn
             return callback(uuid)
         end
         if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
-            debugPrint("Action timed out, did we have a silent failure...?", request.Spell.Prototype, request.RequestGuid, isRetry)
+            debugPrint("Action timed out", request.Spell.Prototype, request.RequestGuid, isRetry)
             if not isRetry then
                 return terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
             end
-            request.RequestGuid = Utils.createUuid()
-            debugPrint("Resubmitting with new uuid", request.RequestGuid)
-            Actions.submitSpellRequest(request)
+            -- request.RequestGuid = Utils.createUuid()
+            -- debugPrint("Resubmitting with new uuid", request.RequestGuid)
+            -- Actions.submitSpellRequest(request)
+            useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
         end
     end)
 end
 
-local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
+useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
         if State.Session.SwarmTurnActive then
@@ -354,7 +358,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         if numActions == 0 then
             return AI.pulseAction(brawler, true, function (request)
                 debugPrint(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
-                startActionSequenceFailsafeTimer(brawler.uuid, request, swarmTurnActiveInitial, callback)
+                startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
             end, function (spellName)
                 debugPrint(brawler.displayName, "bonus action COMPLETED", spellName)
                 cancelActionSequenceFailsafeTimer(brawler.uuid)
@@ -369,7 +373,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         end
         AI.pulseAction(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
-            startActionSequenceFailsafeTimer(brawler.uuid, request, swarmTurnActiveInitial, callback)
+            startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
         end, function (spellName)
             debugPrint(brawler.displayName, "action COMPLETED", spellName)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
@@ -379,7 +383,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         end, function (err)
             debugPrint(brawler.displayName, "action FAILED", err)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
-            if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 then
+            if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)

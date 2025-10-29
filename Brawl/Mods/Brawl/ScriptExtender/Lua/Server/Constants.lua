@@ -376,6 +376,7 @@ Constants.UNUSABLE_NPC_SPELLS = {
     "Target_Dip_NPC",
     "Target_TAD_ConcentratedBlast",
     "Projectile_SneakAttack",
+    "Target_SneakAttack",
 }
 Constants.LEADERBOARD_EXCLUDED_HEALS = {
     "ShortResting",
