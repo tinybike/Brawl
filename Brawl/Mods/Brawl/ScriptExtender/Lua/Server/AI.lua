@@ -46,7 +46,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         return actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
+        -- print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
         Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, false, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
             if not bonusActionOnly then

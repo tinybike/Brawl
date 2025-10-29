@@ -284,16 +284,16 @@ end
 
 local function onTurnEnded(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
-        print("TurnEnded", entityGuid)
+        debugPrint("TurnEnded", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid then
             Swarm.cancelActionSequenceFailsafeTimer(entityUuid)
             if M.Roster.getBrawlerByUuid(entityUuid) then
                 if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
-                    -- print("setting turn ended", entityGuid)
+                    -- debugPrint("setting turn ended", entityGuid)
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = true
                     if Swarm.checkAllPlayersFinishedTurns() then
-                        -- print("Started Swarm turn!")
+                        -- debugPrint("Started Swarm turn!")
                         Swarm.unsetAllEnemyTurnsComplete()
                         Swarm.startSwarmTurn()
                     end
@@ -658,7 +658,7 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
     local casterUuid = M.Osi.GetUUID(casterGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
     if casterUuid and targetUuid and spellName then
-        -- print(M.Utils.getDisplayName(casterUuid), "UsingSpellOnTarget", M.Utils.getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
+        -- debugPrint(M.Utils.getDisplayName(casterUuid), "UsingSpellOnTarget", M.Utils.getDisplayName(targetUuid), spellName, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -676,7 +676,7 @@ local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, s
     local casterUuid = M.Osi.GetUUID(casterGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
     if casterUuid and targetUuid and spellName then
-        -- print("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        -- debugPrint("UsingSpellOnZoneWithTarget", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -691,10 +691,10 @@ local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, s
 end
 
 local function onUsingSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
-    -- print(M.Utils.getDisplayName(M.Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- debugPrint(M.Utils.getDisplayName(M.Osi.GetUUID(casterGuid)), "UsingSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
     if casterUuid and spellName then
-        -- print("UsingSpell", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
+        -- debugPrint("UsingSpell", casterGuid, targetGuid, spell, spellType, spellElement, storyActionID)
         if not State.Session.StoryActionIDs[storyActionID] then
             State.Session.StoryActionIDs[storyActionID] = {}
         end
@@ -705,23 +705,23 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    -- print(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
+    -- debugPrint(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
     if actionInProgress then
-        print("actionInProgress")
-        _D(actionInProgress)
+        -- debugPrint("actionInProgress")
+        -- debugDump(actionInProgress)
         local requestUuid = actionInProgress.requestUuid
-        print("Spell cast succeeded! (CastedSpell)")
+        -- debugPrint("Spell cast succeeded! (CastedSpell)")
         Swarm.resumeTimers() -- for interrupts, does this need to be here?
         Utils.checkDivineIntervention(spellName, casterUuid)
-        print("onCompleted")
+        -- debugPrint("onCompleted")
         actionInProgress.onCompleted(spellName)
         Resources.deductCastedSpell(casterUuid, spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-        print("got counterspelled!", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
+        debugPrint("got counterspelled!", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
         if originalCastInfo and originalCastInfo.casterUuid then
             local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
             if actionInProgress then
@@ -736,30 +736,30 @@ end
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
-        -- _D(cast:GetAllComponents())
-        _D(cast.SpellCastState)
-        _D(cast.ServerSpellCastState)
+        -- debugDump(cast:GetAllComponents())
+        -- debugDump(cast.SpellCastState)
+        -- debugDump(cast.ServerSpellCastState)
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
-            print("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid))
-            _D(cast.SpellCastOutcome)
-            print("actionInProgress")
-            _D(actionInProgress)
+            debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid))
+            debugDump(cast.SpellCastOutcome)
+            -- debugPrint("actionInProgress")
+            -- _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             if outcome == "None" then
                 local spellName = actionInProgress.spellName
-                print("Spell cast succeeded!")
+                debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 Utils.checkDivineIntervention(spellName, casterUuid)
-                print("onCompleted")
+                debugPrint("onCompleted")
                 actionInProgress.onCompleted(spellName)
                 Resources.deductCastedSpell(casterUuid, spellName)
                 Actions.removeActionInProgress(casterUuid, requestUuid)
             else
-                print("onFailed")
+                debugPrint("onFailed")
                 if outcome == "CantSpendUseCosts" then
                     -- check for ActionResourceBlock boosts? why did this fail
                     _D(cast:GetAllComponents())
@@ -906,7 +906,7 @@ end
 -- end
 
 local function onFlagSet(flag, speaker, dialogInstance)
-    -- print("FlagSet", flag, speaker, dialogInstance)
+    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
         Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
         Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
@@ -985,12 +985,12 @@ end
 
 local function onEntityEvent(characterGuid, eventUuid)
     if State.Session.ActiveMovements[eventUuid] and State.Session.ActiveMovements[eventUuid].moverUuid then
-        print("EntityEvent", characterGuid, eventUuid)
+        debugPrint("EntityEvent", characterGuid, eventUuid)
         local activeMovement = State.Session.ActiveMovements[eventUuid]
         local characterUuid = M.Osi.GetUUID(characterGuid)
         if characterUuid == activeMovement.moverUuid then
             if activeMovement.onMovementCompleted and type(activeMovement.onMovementCompleted) == "function" then
-                print("movement completed callback")
+                debugPrint("movement completed callback")
                 activeMovement.onMovementCompleted()
             end
             State.Session.ActiveMovements[eventUuid] = nil
@@ -1016,8 +1016,8 @@ local function onServerInterruptUsed(entity, label, component)
                     local targetUuid = interruptEvent.Target.Uuid.EntityUuid
                     debugPrint("interrupted:", M.Utils.getDisplayName(targetUuid), targetUuid)
                     if State.Session.ActionsInProgress[targetUuid] then
-                        -- print("Actions In Progress")
-                        -- _D(State.Session.ActionsInProgress[targetUuid])
+                        -- debugPrint("Actions In Progress")
+                        -- debugDump(State.Session.ActionsInProgress[targetUuid])
                         local brawler = M.Roster.getBrawlerByUuid(targetUuid)
                         if brawler then
                             Swarm.swarmAction(brawler)

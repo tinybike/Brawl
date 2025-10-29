@@ -268,7 +268,7 @@ end
 local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
-    print(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
+    debugPrint(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local swarmTurnActiveInitial = State.Session.SwarmTurnActive
     local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
     -- if unit can’t move at all (sentinel foe etc)
@@ -281,9 +281,9 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local numActions = Resources.getActionPointsRemaining(uuid)
     local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
     local override = not State.Settings.TurnBasedSwarmMode
-    print("starting movement and points", baseMove, numActions, numBonusActions)
+    debugPrint("starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
-        print("tryMove", allowedDistance)
+        debugPrint("tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
         local distToTarget = M.Osi.GetDistanceTo(uuid, targetUuid)
         local need = distToTarget - spellRange
@@ -293,7 +293,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         end
         -- dash if we need more than base move
         if isDashAvailable and need > allowedDistance then
-            print("need to dash!")
+            debugPrint("need to dash!")
             local dashSpell
             if isBonusDashOnly then
                 dashSpell = selectBonusActionDash(uuid)
@@ -301,10 +301,10 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 dashSpell = selectDash(uuid, bonusActionOnly)
             end
             if not dashSpell then
-                print("no dash..")
+                debugPrint("no dash..")
                 return tryMove(getRemainingMovementByUuid(uuid), false, false)
             end
-            print("dashing")
+            debugPrint("dashing")
             return Actions.useSpellOnTarget(uuid, uuid, dashSpell, noop, function ()
                 Ext.Timer.WaitFor(500, function ()
                     -- if this is an NPC acting during Swarm Turn, make sure the swarm turn is still active now
@@ -352,24 +352,24 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 -- furthest reachable
                 if d <= allowedDistance and d > farDist then
                     farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
-                    print("furthest reachable", n.Position[1], n.Position[2], n.Position[3], d)
+                    debugPrint("furthest reachable", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- first node beyond base move (for interpolation)
                 if not nextPos and d > allowedDistance then
                     nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
-                    print("next reachable node", n.Position[1], n.Position[2], n.Position[3], d)
+                    debugPrint("next reachable node", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- in spell range?
                 local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
                 local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
                 if eu <= spellRange and d > bestDist then
                     bestPos, bestDist = {px, py, pz}, d
-                    print("in spell range", px, py, pz, d)
+                    debugPrint("in spell range", px, py, pz, d)
                 end
             end
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
-                print("best within range, moving to")
+                debugPrint("best within range, moving to")
                 return moveToPosition(uuid, bestPos, override, onSuccess)
             end
             -- 2) interpolation fallback if farDist < baseMove
@@ -389,8 +389,8 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     end
                     frac = origFrac*((10 - attempt)/10)
                 end
-                print("interpolation result")
-                _D(farPos)
+                debugPrint("interpolation result")
+                debugDump(farPos)
                 if not valid then
                     return onFailed("interpolation")
                 end
@@ -399,7 +399,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 return onFailed("nodes")
             end
             -- 3) final fallback move
-            print("final fallback move")
+            debugPrint("final fallback move")
             moveToPosition(uuid, farPos, override, onSuccess)
         end)
         if path then

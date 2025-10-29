@@ -478,7 +478,7 @@ end
 -- Attacking targets: prioritize close targets with less remaining HP
 -- (Lowest weight = most desireable target)
 local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, healingNeeded)
-    print("GETTING WEIGHTED TARGETS -- is healing needed????????", healingNeeded)
+    -- print("GETTING WEIGHTED TARGETS -- is healing needed????????", healingNeeded)
     local weightedTargets = {}
     local isHealer = M.Utils.isHealerArchetype(brawler.archetype)
     local isMelee = nil

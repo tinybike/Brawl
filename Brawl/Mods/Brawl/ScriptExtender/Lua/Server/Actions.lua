@@ -6,7 +6,7 @@ local function getActionInProgress(casterUuid, requestUuid)
     local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
     if actionsInProgress and next(actionsInProgress) then
         for _, actionInProgress in ipairs(actionsInProgress) do
-            print("checking action", actionInProgress.requestUuid, requestUuid)
+            -- print("checking action", actionInProgress.requestUuid, requestUuid)
             if actionInProgress.requestUuid == requestUuid then
                 return actionInProgress
             end
@@ -18,7 +18,7 @@ local function getActionInProgressByName(casterUuid, spellName)
     local actionsInProgress = State.Session.ActionsInProgress[casterUuid]
     if actionsInProgress and next(actionsInProgress) then
         for _, actionInProgress in ipairs(actionsInProgress) do
-            print("checking action by name", actionInProgress.spellName, spellName)
+            -- print("checking action by name", actionInProgress.spellName, spellName)
             if actionInProgress.spellName == spellName then
                 return actionInProgress
             end

@@ -1,13 +1,32 @@
-local function debugPrint(...)
-    if Constants.DEBUG_LOGGING then
-        _P(...)
+local function getBasename(path)
+    path = path:gsub("\\", "/")
+    local name = path:match(".*/([^/]+)$") or path
+    return name:match("(.+)%..+$") or name
+end
+
+local function getCallsiteFilename()
+    local S = debug.getinfo(2, "S")
+    if S.short_src then
+        return getBasename(S.short_src)
     end
 end
 
-local function debugDump(...)
-    if Constants.DEBUG_LOGGING then
-        _D(...)
+local function debugDisplay(fn, ...)
+    if not Constants.DEBUG_LOGGING then
+        return
+    elseif Constants.DEBUG_LOGGING == true then
+        fn(...)
+    elseif Constants.DEBUG_LOGGING[getCallsiteFilename()] then
+        fn(...)
     end
+end
+
+local function debugPrint(...)
+    debugDisplay(_P, ...)
+end
+
+local function debugDump(...)
+    debugDisplay(_D, ...)
 end
 
 local function dumpAllEntityKeys(entity)
