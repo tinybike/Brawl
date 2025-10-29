@@ -287,10 +287,7 @@ local function onTurnEnded(entityGuid)
         print("TurnEnded", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         if entityUuid then
-            if State.Session.ActionSequenceFailsafeTimer[entityUuid] then
-                Ext.Timer.Cancel(State.Session.ActionSequenceFailsafeTimer[entityUuid])
-                State.Session.ActionSequenceFailsafeTimer[entityUuid] = nil
-            end
+            Swarm.cancelActionSequenceFailsafeTimer(entityUuid)
             if M.Roster.getBrawlerByUuid(entityUuid) then
                 if M.Osi.IsPartyMember(entityUuid, 1) == 1 then
                     -- print("setting turn ended", entityGuid)
