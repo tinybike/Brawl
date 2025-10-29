@@ -285,9 +285,8 @@ local function terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
     callback(uuid)
 end
 
-local function startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
+local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveInitial, callback)
     local isRetry = false
-    local uuid = request.Caster.Uuid.EntityUuid
     local currentCombatRound = M.Utils.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
         cancelActionSequenceFailsafeTimer(State.Session.ActionSequenceFailsafeTimer[uuid])
@@ -333,7 +332,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         if numActions == 0 then
             return AI.pulseAction(brawler, true, function (request)
                 print(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
-                startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
+                startActionSequenceFailsafeTimer(brawler.uuid, request, swarmTurnActiveInitial, callback)
             end, function (spellName)
                 print(brawler.displayName, "bonus action COMPLETED", spellName)
                 Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
@@ -346,7 +345,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         end
         AI.pulseAction(brawler, false, function (request)
             print(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
-            startActionSequenceFailsafeTimer(request, swarmTurnActiveInitial, callback)
+            startActionSequenceFailsafeTimer(brawler.uuid, request, swarmTurnActiveInitial, callback)
         end, function (spellName)
             print(brawler.displayName, "action COMPLETED", spellName)
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()

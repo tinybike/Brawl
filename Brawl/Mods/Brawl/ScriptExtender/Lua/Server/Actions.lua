@@ -130,7 +130,7 @@ local function submitSpellRequest(request, insertAtFront)
     else
         queuedRequests[#queuedRequests + 1] = request
     end
-    print(M.Utils.getDisplayName(casterUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
+    print(M.Utils.getDisplayName(request.Caster.Uuid.EntityUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
 end
 
 -- thank u focus and mazzle
