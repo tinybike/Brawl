@@ -236,9 +236,9 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
 end
 
 -- Brawlers doing dangerous stuff
--- TODO this needs to be restructured to use callbacks instead of returning
 local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or noop
+    onCompleted = onCompleted or noop
     onFailed = onFailed or noop
     -- If this brawler is dead or unable to fight, stop this pulse
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then

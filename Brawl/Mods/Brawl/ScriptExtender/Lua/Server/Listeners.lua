@@ -745,10 +745,8 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local storyActionId = cast.ServerSpellCastState.StoryActionId
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
-            debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid))
-            debugDump(cast.SpellCastOutcome)
-            -- debugPrint("actionInProgress")
-            -- _D(actionInProgress)
+            debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
+            _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             if outcome == "None" then
                 local spellName = actionInProgress.spellName

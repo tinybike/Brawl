@@ -325,20 +325,28 @@ local function startActionSequenceFailsafeTimer(uuid, request, swarmTurnActiveIn
 end
 
 local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
-    debugPrint("useRemainingActions", brawler.uuid, swarmTurnActiveInitial, count)
     callback = callback or noop
     if brawler and brawler.uuid then
+        if State.Session.SwarmTurnActive then
+            if isControlledByDefaultAI(brawler.uuid) then
+                debugPrint(brawler.displayName, "controlled by default AI, skipping")
+                return callback(brawler.uuid)
+            elseif State.Session.SwarmTurnComplete[brawler.uuid] then
+                debugPrint(brawler.displayName, "swarm turn already complete, skipping")
+                return callback(brawler.uuid)
+            end
+        end
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-            debugPrint("swarm turn elapsed, just quit")
+            debugPrint(brawler.displayName, "swarm turn global timed out")
             return callback(brawler.uuid)
         end
         count = count or 0
         local numActions = Resources.getActionPointsRemaining(brawler.uuid)
         local numBonusActions = Resources.getBonusActionPointsRemaining(brawler.uuid)
-        debugPrint(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid)
+        debugPrint(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid, swarmTurnActiveInitial)
         if (numActions == 0 and numBonusActions == 0) or count > 10 then
             if count > 10 then
-                debugPrint(count, "counter limit reached, what happened here??")
+                debugPrint(brawler.displayName, count, "counter limit reached, what happened here??")
             end
             setTurnComplete(brawler.uuid)
             return callback(brawler.uuid)
@@ -371,7 +379,7 @@ local function useRemainingActions(brawler, swarmTurnActiveInitial, callback, co
         end, function (err)
             debugPrint(brawler.displayName, "action FAILED", err)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
-            if numBonusActions == 0 then
+            if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
@@ -381,7 +389,7 @@ end
 
 local function swarmAction(brawler)
     debugPrint(brawler.displayName, "swarmAction")
-    if State.Session.SwarmTurnActive and not isControlledByDefaultAI(brawler.uuid) and not State.Session.SwarmTurnComplete[brawler.uuid] then
+    if State.Session.SwarmTurnActive then
         useRemainingActions(brawler, true, completeSwarmTurn)
     elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
         useRemainingActions(brawler, false)

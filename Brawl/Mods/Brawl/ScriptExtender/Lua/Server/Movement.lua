@@ -305,7 +305,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 return tryMove(getRemainingMovementByUuid(uuid), false, false)
             end
             debugPrint("dashing")
-            return Actions.useSpellOnTarget(uuid, uuid, dashSpell, noop, function ()
+            return Actions.useSpellOnTarget(uuid, uuid, dashSpell, true, noop, function ()
                 Ext.Timer.WaitFor(500, function ()
                     -- if this is an NPC acting during Swarm Turn, make sure the swarm turn is still active now
                     if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
@@ -333,7 +333,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 if not teleport then
                     return onFailed("path not found")
                 end
-                return Actions.useSpellOnTarget(uuid, targetUuid, teleport, noop, function ()
+                return Actions.useSpellOnTarget(uuid, targetUuid, teleport, false, noop, function ()
                     print("teleport successful")
                     Ext.Timer.WaitFor(500, function ()
                         if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then

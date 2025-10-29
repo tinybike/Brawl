@@ -143,20 +143,18 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
             if costValue and not M.Resources.checkSpellCharge(casterUuid, spellName) then
                 return false
             end
-        elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
-            if costType == "SpellSlot" or costType == "WarlockSpellSlot" then
-                local spellLevel = upcastLevel == nil and costValue or upcastLevel
-                local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
-                if availableResourceValue < 1 then
-                    debugPrint(costType, "Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
-                    return false
-                end
-            else
-                local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
-                if availableResourceValue ~= nil and availableResourceValue < costValue then
-                    debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
-                    return false
-                end
+        elseif costType == "SpellSlot" or costType == "WarlockSpellSlot" then
+            local spellLevel = upcastLevel == nil and costValue or upcastLevel
+            local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, spellLevel)
+            if availableResourceValue < 1 then
+                debugPrint(costType, "Needs 1 level", spellLevel, "slot to cast", spellName, ";", availableResourceValue, "slots available")
+                return false
+            end
+        else
+            local availableResourceValue = M.Osi.GetActionResourceValuePersonal(casterUuid, costType, 0)
+            if availableResourceValue ~= nil and availableResourceValue < costValue then
+                debugPrint(costType, "Needs", costValue, "to cast", spellName, ";", availableResourceValue, "available")
+                return false
             end
         end
     end
