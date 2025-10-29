@@ -194,7 +194,8 @@ local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, var
     end
     local requestUuid = Utils.createUuid()
     registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
-    if not queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget) then
+    local request = queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget)
+    if not request then
         return onFailed("spell construction error")
     end
     onSubmitted(request)
