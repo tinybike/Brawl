@@ -283,6 +283,17 @@ local function initBrawlers(level)
     end
 end
 
+local function getBrawlers()
+    if not State.Session.Brawlers then
+        return {}
+    end
+    local region = M.Utils.getCurrentRegion()
+    if not State.Session.Brawlers[region] then
+        return {}
+    end
+    return State.Session.Brawlers[region]
+end
+
 return {
     getBrawlerByUuid = getBrawlerByUuid,
     getBrawlerByName = getBrawlerByName,
@@ -297,4 +308,5 @@ return {
     disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,
     initBrawlers = initBrawlers,
+    getBrawlers = getBrawlers,
 }

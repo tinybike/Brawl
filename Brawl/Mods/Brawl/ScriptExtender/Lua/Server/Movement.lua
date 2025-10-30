@@ -277,7 +277,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local numActions = Resources.getActionPointsRemaining(uuid)
     local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
     local override = not State.Settings.TurnBasedSwarmMode
-    debugPrint("starting movement and points", baseMove, numActions, numBonusActions)
+    debugPrint(M.Utils.getDisplayName(uuid), "starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
         debugPrint(M.Utils.getDisplayName(uuid), "tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
@@ -288,26 +288,28 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             return onSuccess()
         end
         -- dash if we need more than base move
-        -- NB: send this back in onFailed, coordinate thru useRemainingActions?
         if isDashAvailable and need > allowedDistance then
-            -- return onFailed("need to dash")
-            debugPrint("need to dash!")
-            local dashSpell
+            debugPrint(M.Utils.getDisplayName(uuid), "need to dash")
+            local dashSpellName
             if isBonusDashOnly then
-                dashSpell = selectBonusActionDash(uuid)
+                dashSpellName = selectBonusActionDash(uuid)
             else
-                dashSpell = selectDash(uuid, bonusActionOnly)
+                dashSpellName = selectDash(uuid, bonusActionOnly)
             end
-            if not dashSpell then
-                debugPrint("no dash..")
+            if not dashSpellName then
+                debugPrint(M.Utils.getDisplayName(uuid), "no dash..")
                 return tryMove(getRemainingMovementByUuid(uuid), false, false)
             end
-            debugPrint("dashing")
-            return Actions.useSpellOnTarget(uuid, uuid, dashSpell, true, noop, function ()
-                Ext.Timer.WaitFor(500, function ()
+            debugPrint(M.Utils.getDisplayName(uuid), "dashing")
+            return Actions.useSpellOnTarget(uuid, uuid, dashSpellName, true, function (request)
+                debugPrint(M.Utils.getDisplayName(uuid), "dash request submitted", dashSpellName)
+                Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, onFailed)
+            end, function (spellName)
+                debugPrint(M.Utils.getDisplayName(uuid), "dash ok", spellName)
+                Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                     -- if this is an NPC acting during Swarm Turn, make sure the swarm turn is still active now
                     if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-                        return onFailed("swarm turn expired")
+                        return onFailed("swarm turn expired (dash)")
                     end
                     tryMove(getRemainingMovementByUuid(uuid), Resources.getBonusActionPointsRemaining(uuid) > 0, true)
                 end)
@@ -327,15 +329,21 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), goalPos, function (path)
             if not path or not path.GoalFound or #path.Nodes == 0 then
                 -- if no path, try teleporting if we have one available
-                local teleport = selectTeleport(uuid)
-                if not teleport then
+                local teleportSpellName = selectTeleport(uuid)
+                if not teleportSpellName then
                     return onFailed("path not found")
                 end
-                return Actions.useSpellOnTarget(uuid, targetUuid, teleport, false, noop, function ()
-                    print("teleport successful")
-                    Ext.Timer.WaitFor(500, function ()
+                return Actions.useSpellOnTarget(uuid, targetUuid, teleportSpellName, false, function (request)
+                    debugPrint(M.Utils.getDisplayName(uuid), "teleport request submitted", teleportSpellName)
+                    -- NB: need to do this for RT also for RIC?
+                    if State.Session.TurnBasedSwarmMode then
+                        Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, onFailed)
+                    end
+                end, function (spellName)
+                    debugPrint(M.Utils.getDisplayName(uuid), "teleport ok", spellName)
+                    Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                         if State.Session.TurnBasedSwarmMode and swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-                            return onFailed("swarm turn expired")
+                            return onFailed("swarm turn expired (teleport)")
                         end
                         tryMove(getRemainingMovementByUuid(uuid), isDashAvailable, isBonusDashOnly)
                     end)
@@ -350,24 +358,24 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 -- furthest reachable
                 if d <= allowedDistance and d > farDist then
                     farPos, farDist = {n.Position[1], n.Position[2], n.Position[3]}, d
-                    debugPrint("furthest reachable", n.Position[1], n.Position[2], n.Position[3], d)
+                    debugPrint(M.Utils.getDisplayName(uuid), "furthest reachable", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- first node beyond base move (for interpolation)
                 if not nextPos and d > allowedDistance then
                     nextPos, nextDist = {n.Position[1], n.Position[2], n.Position[3]}, d
-                    debugPrint("next reachable node", n.Position[1], n.Position[2], n.Position[3], d)
+                    debugPrint(M.Utils.getDisplayName(uuid), "next reachable node", n.Position[1], n.Position[2], n.Position[3], d)
                 end
                 -- in spell range?
                 local px, py, pz = n.Position[1], n.Position[2], n.Position[3]
                 local eu = math.sqrt((px - tx)^2 + (py - ty)^2 + (pz - tz)^2)
                 if eu <= spellRange and d > bestDist then
                     bestPos, bestDist = {px, py, pz}, d
-                    debugPrint("in spell range", px, py, pz, d)
+                    debugPrint(M.Utils.getDisplayName(uuid), "in spell range", px, py, pz, d)
                 end
             end
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
-                debugPrint("best within range, moving to")
+                debugPrint(M.Utils.getDisplayName(uuid), "best within range, moving to")
                 return moveToPosition(uuid, bestPos, override, onSuccess)
             end
             -- 2) interpolation fallback if farDist < baseMove
@@ -387,7 +395,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     end
                     frac = origFrac*((10 - attempt)/10)
                 end
-                debugPrint("interpolation result")
+                debugPrint(M.Utils.getDisplayName(uuid), "interpolation result")
                 debugDump(farPos)
                 if not valid then
                     return onFailed("interpolation")

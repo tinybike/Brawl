@@ -532,7 +532,9 @@ local function onMCMTurnBasedSwarmMode(value)
         stopAllPulseActionTimers()
         stopAllBrawlFizzlers()
         State.endBrawls()
-        State.boostPlayerInitiatives()
+        if State.Settings.PlayersGoFirst then
+            State.boostPlayerInitiatives()
+        end
         State.recapPartyMembersMovementDistances()
         Swarm.resetChunkState()
     else
@@ -540,6 +542,15 @@ local function onMCMTurnBasedSwarmMode(value)
         State.uncapPartyMembersMovementDistances()
         disableMod()
         enableMod()
+    end
+end
+
+local function onMCMPlayersGoFirst(value)
+    State.Settings.PlayersGoFirst = value
+    if State.Settings.PlayersGoFirst then
+        State.boostPlayerInitiatives()
+    else
+        State.removeBoostPlayerInitiatives()
     end
 end
 
@@ -585,6 +596,7 @@ return {
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
         leaderboard_enabled = function (v) State.Settings.LeaderboardEnabled = v end,
         no_freeze_on_bonus_actions_during_pause = function (v) State.Settings.NoFreezeOnBonusActionsDuringPause = v end,
+        players_go_first = onMCMPlayersGoFirst,
         swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
         swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
         autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,

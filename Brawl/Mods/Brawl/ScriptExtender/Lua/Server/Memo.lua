@@ -78,6 +78,7 @@ local Memoizable = {
         "getAbility",
         "isConcentrating",
         "getOriginatorPrototype",
+        "getCurrentRegion",
     },
     State = {
         "areAnyPlayersBrawling",
@@ -105,6 +106,7 @@ local Memoizable = {
         "getBrawlerByUuid",
         "getBrawlerByName",
         "getBrawlersSortedByDistance",
+        "getBrawlers",
     },
     Resources = {
         "getActionResourceInfo",

@@ -57,6 +57,110 @@ local function removeActionInProgress(casterUuid, requestUuid)
     end
 end
 
+local function playAttackSound(attackerUuid, defenderUuid, damageType)
+    if damageType == "Slashing" then
+        Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
+        Osi.PlaySound(defenderUuid, "Action_Impact_Slash")
+    elseif damageType == "Piercing" then
+        Osi.PlaySound(attackerUuid, "Action_Cast_PiercingThrust")
+        Osi.PlaySound(defenderUuid, "Action_Impact_PiercingThrust")
+    else
+        Osi.PlaySound(attackerUuid, "Action_Cast_Smash")
+        Osi.PlaySound(defenderUuid, "Action_Impact_Smash")
+    end
+end
+
+local function hasExtraAttacksRemaining(uuid)
+    return State.Session.ExtraAttacksRemaining[uuid] ~= nil and State.Session.ExtraAttacksRemaining[uuid] > 0
+end
+
+local function checkExtraAttacksReady(attackerUuid, defenderUuid)
+    return hasExtraAttacksRemaining(attackerUuid) and M.Utils.isAliveAndCanFight(attackerUuid) and M.Utils.isAliveAndCanFight(defenderUuid)
+end
+
+local function reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+    Ext.Timer.WaitFor(150, function ()
+        if checkExtraAttacksReady(attackerUuid, defenderUuid) then
+            playAttackSound(attackerUuid, defenderUuid, damageType)
+            Ext.Timer.WaitFor(150, function ()
+                if checkExtraAttacksReady(attackerUuid, defenderUuid) then
+                    State.Session.ExtraAttacksRemaining[attackerUuid] = State.Session.ExtraAttacksRemaining[attackerUuid] - 1
+                    debugPrint("Applying damage", defenderUuid, damageAmount, damageType)
+                    Osi.ApplyDamage(defenderUuid, damageAmount, damageType, "")
+                    Osi.ApplyStatus(defenderUuid, "INTERRUPT_RIPOSTE", 1)
+                    Leaderboard.updateDamage(attackerUuid, defenderUuid, damageAmount)
+                    reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                else
+                    State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+                end
+            end)
+        else
+            State.Session.ExtraAttacksRemaining[attackerUuid] = nil
+        end
+    end)
+end
+
+local function useActionPointSurplus(uuid, resourceType)
+    local pointSurplus = math.floor(M.Osi.GetActionResourceValuePersonal(uuid, resourceType, 0) - 1)
+    if pointSurplus > 0 then
+        Resources.decreaseActionResource(uuid, resourceType, pointSurplus)
+    end
+    return pointSurplus
+end
+
+local function useBonusAttacks(uuid)
+    local numBonusAttacks = 0
+    if M.Osi.GetEquippedWeapon(uuid) ~= nil then
+        if M.Osi.HasActiveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK") == 1 then
+            Osi.RemoveStatus(uuid, "GREAT_WEAPON_MASTER_BONUS_ATTACK", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+        if M.Osi.HasActiveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK") == 1 then
+            Osi.RemoveStatus(uuid, "POLEARM_MASTER_BONUS_ATTACK", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+    else
+        if M.Osi.HasActiveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE") == 1 then
+            Osi.RemoveStatus(uuid, "MARTIAL_ARTS_BONUS_UNARMED_STRIKE", "")
+            numBonusAttacks = numBonusAttacks + 1
+        end
+    end
+    if not State.Settings.TurnBasedSwarmMode then
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "ActionPoint")
+        numBonusAttacks = numBonusAttacks + useActionPointSurplus(uuid, "BonusActionPoint")
+    end
+    return numBonusAttacks
+end
+
+local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+    if State.Settings.TurnBasedSwarmMode and not State.Session.SwarmTurnActive then
+        return
+    end
+    if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
+        if not State.Settings.TurnBasedSwarmMode or M.Utils.isPugnacious(attackerUuid) then
+            if State.Session.StoryActionIDs[storyActionID] and State.Session.StoryActionIDs[storyActionID].spellName then
+                debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
+                State.Session.StoryActionIDs[storyActionID] = nil
+                local spell = Spells.getSpellByName(spellName)
+                if spell ~= nil and spell.triggersExtraAttack == true then
+                    if State.Settings.TurnBasedSwarmMode and M.Utils.isPugnacious(attackerUuid) and spell.isBonusAction then
+                        return nil
+                    end
+                    if State.Session.ExtraAttacksRemaining[attackerUuid] == nil then
+                        local brawler = M.Roster.getBrawlerByUuid(attackerUuid)
+                        if brawler and M.Utils.isAliveAndCanFight(attackerUuid) and M.Utils.isAliveAndCanFight(defenderUuid) then
+                            local numBonusAttacks = useBonusAttacks(attackerUuid)
+                            debugPrint("Initiating extra attacks", attackerUuid, spellName, storyActionID, brawler.numExtraAttacks, numBonusAttacks)
+                            State.Session.ExtraAttacksRemaining[attackerUuid] = brawler.numExtraAttacks + numBonusAttacks
+                            reapplyAttackDamage(attackerUuid, defenderUuid, damageAmount, damageType)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function buildTarget(uuid, targetingType)
     return {Target = Ext.Entity.Get(uuid), TargetingType = targetingType}
 end
@@ -223,6 +327,7 @@ return {
     getActionInProgressByName = getActionInProgressByName,
     registerActionInProgress = registerActionInProgress,
     removeActionInProgress = removeActionInProgress,
+    handleExtraAttacks = handleExtraAttacks,
     submitSpellRequest = submitSpellRequest,
     queueSpellRequest = queueSpellRequest,
     useSpell = useSpell,

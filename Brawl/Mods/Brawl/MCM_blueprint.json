@@ -153,7 +153,7 @@
                             "Name": "No Freeze On Bonus Actions During Pause",
                             "Type": "checkbox",
                             "Default": false,
-                            "Description": "If checked, bonus actions will not freeze your character during pause.",
+                            "Description": "If checked, bonus actions will not freeze your character during True Pause in Real-Time Mode.",
                             "Handles": {"DescriptionHandle": "h9171238bg39d1g467bg8aafg98324b7187db", "NameHandle": "h24fda523g1755g46ccg8092g4c22b8cf77b2"}
                         }
                     ]
@@ -162,6 +162,13 @@
                     "SectionName": "Swarm Mode Combat Features (Host)",
                     "Settings": [
                         {
+                            "Id": "players_go_first",
+                            "Name": "Players Go First",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, players will always go first in the turn order for Swarm Mode.",
+                            "Handles": {"DescriptionHandle": "hd7a07dc8gbff0g4199gac19g100ecccf3ea1", "NameHandle": "h787d8d9agfb49g47baga009g778b6c338a1e"}
+                        }, {
                             "Id": "swarm_turn_timeout",
                             "Name": "Enemy Turn Time Limit (Seconds)",
                             "Type": "slider_float",

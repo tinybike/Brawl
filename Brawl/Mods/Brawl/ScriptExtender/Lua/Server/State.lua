@@ -19,6 +19,7 @@ local Settings = {
     TurnBasedSwarmMode = true,
     LeaderboardEnabled = true,
     NoFreezeOnBonusActionsDuringPause = false,
+    PlayersGoFirst = false,
     SwarmTurnTimeout = 15.0,
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
@@ -40,6 +41,7 @@ if MCM then
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
     Settings.LeaderboardEnabled = MCM.Get("leaderboard_enabled")
     Settings.NoFreezeOnBonusActionsDuringPause = MCM.Get("no_freeze_on_bonus_actions_during_pause")
+    Settings.PlayersGoFirst = MCM.Get("players_go_first")
     Settings.SwarmTurnTimeout = MCM.Get("swarm_turn_timeout")
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
@@ -102,6 +104,7 @@ local Session = {
     QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     AutotriggeredSwarmModeCompanionAI = false,
+    MeanInitiativeRoll = nil,
 }
 
 -- Persistent state

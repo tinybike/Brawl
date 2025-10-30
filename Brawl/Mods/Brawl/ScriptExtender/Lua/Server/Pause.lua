@@ -257,11 +257,11 @@ local function queueCompanionAIActions()
                     if State.Settings.TurnBasedSwarmMode then
                         if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then
                             State.Session.QueuedCompanionAIAction[uuid] = true
-                            debugPrint("queue action (swarm)", player.displayName)
+                            debugPrint(player.displayName, "queue action (swarm)")
                             Swarm.swarmAction(brawler)
                         end
                     else
-                        debugPrint("queue action (ftb)", player.displayName, isInFTB(entity), not isLocked(entity))
+                        debugPrint(player.displayName, "queue action (ftb)", isInFTB(entity), not isLocked(entity))
                         if isInFTB(entity) and not isLocked(entity) then
                             AI.act(brawler)
                         end

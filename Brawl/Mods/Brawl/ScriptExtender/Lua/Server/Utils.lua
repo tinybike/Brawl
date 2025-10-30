@@ -361,22 +361,9 @@ end
 -- Thanks Focus
 local function hasLoseControlStatus(uuid)
     local entity = Ext.Entity.Get(uuid)
-    -- NB: not yet in SE release branch
     if entity and entity.StatusLoseControl ~= nil then
         return true
     end
-    -- if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
-    --     for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
-    --         local stats = Ext.Stats.Get(status.StatusId, nil, false)
-    --         if stats ~= nil then
-    --             for _, flag in ipairs(stats.StatusPropertyFlags) do
-    --                 if flag == "LoseControl" or flag == "LoseControlFriendly" then
-    --                     return true
-    --                 end
-    --             end
-    --         end
-    --     end
-    -- end
     return false
 end
 
@@ -396,6 +383,79 @@ local function isHostileTarget(uuid, targetUuid)
         debugPrint(M.Utils.getDisplayName(uuid), "isHostileTarget: what happened here?", uuid, targetUuid, M.Utils.getDisplayName(targetUuid))
     end
     return isHostile
+end
+
+local function getCombatEntity()
+    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+    if serverEnterRequestEntities and serverEnterRequestEntities[1] then
+        return serverEnterRequestEntities[1]
+    end
+end
+
+local function joinCombat(uuid)
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.ServerEnterRequest and combatEntity.ServerEnterRequest.EnterRequests then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and M.Osi.CanJoinCombat(uuid) == 1 and M.Osi.IsInCombat(uuid) == 0 then
+            combatEntity.ServerEnterRequest.EnterRequests[entity] = true
+        end
+    end
+end
+
+local function setPlayersSwarmGroup()
+    local players = State.Session.Players
+    if players then
+        for uuid, _ in pairs(players) do
+            Osi.RequestSetSwarmGroup(uuid, "PLAYER_SWARM_GROUP")
+        end
+    end
+end
+
+local function showTurnOrderGroups(groups)
+    for i, group in ipairs(groups) do
+        if group.Members then
+            local groupStr = ""
+            if group.IsPlayer then
+                groupStr = groupStr .. "    "
+            end
+            groupStr = groupStr .. tostring(i)
+            for j, member in ipairs(group.Members) do
+                if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                    if j > 1 then
+                        groupStr = groupStr .. " +"
+                    end
+                    groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
+                end
+            end
+            print(groupStr)
+        end
+    end
+end
+
+local function setPlayerTurnsActive()
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        print("********init***********")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        local groupsPlayers = {}
+        local groupsEnemies = {}
+        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
+            if info.IsPlayer then
+                table.insert(groupsPlayers, info)
+            else
+                table.insert(groupsEnemies, info)
+            end
+        end
+        local numPlayerGroups = #groupsPlayers
+        for i = 1, numPlayerGroups do
+            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
+        end
+        for i = 1, #groupsEnemies do
+            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
+        end
+        print("********after*********")
+        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+    end
 end
 
 local function getCurrentCombatRound()
@@ -504,6 +564,13 @@ local function createUuid()
     end)
 end
 
+local function getCurrentRegion()
+    local uuid = M.Osi.GetHostCharacter()
+    if uuid then
+        return M.Osi.GetRegion(uuid)
+    end
+end
+
 local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
@@ -575,6 +642,10 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    getCombatEntity = getCombatEntity,
+    showTurnOrderGroups = showTurnOrderGroups,
+    setPlayersSwarmGroup = setPlayersSwarmGroup,
+    setPlayerTurnsActive = setPlayerTurnsActive,
     getCurrentCombatRound = getCurrentCombatRound,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
@@ -583,6 +654,7 @@ return {
     isValidHostileTarget = isValidHostileTarget,
     checkDivineIntervention = checkDivineIntervention,
     getSpellNameBySlot = getSpellNameBySlot,
+    getCurrentRegion = getCurrentRegion,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
