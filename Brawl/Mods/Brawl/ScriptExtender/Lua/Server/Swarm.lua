@@ -567,7 +567,7 @@ local function checkAllPlayersFinishedTurns()
     return nil
 end
 
-function reorderByInitiativeRoll()
+local function reorderByInitiativeRoll()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         local newInitList = {}
