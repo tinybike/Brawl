@@ -346,6 +346,7 @@ local function terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
     if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
         return callback(uuid)
     end
+    -- NB: is this needed?
     setTurnComplete(uuid)
     callback(uuid)
 end
@@ -385,6 +386,15 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
     end)
 end
 
+local function requestedEndTurn(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    debugPrint("Requested end turn?", M.Utils.getDisplayName(uuid), entity.TurnBased.RequestedEndTurn)
+    if entity and entity.TurnBased then
+        return entity.TurnBased.RequestedEndTurn
+    end
+    return false
+end
+
 useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
@@ -415,10 +425,16 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count
         if numActions == 0 then
             return AI.pulseAction(brawler, true, function (request)
                 debugPrint(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
+                if requestedEndTurn(brawler.uuid) then
+                    return callback(brawler.uuid)
+                end
                 startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
             end, function (spellName)
                 debugPrint(brawler.displayName, "bonus action COMPLETED", spellName)
                 cancelActionSequenceFailsafeTimer(brawler.uuid)
+                if requestedEndTurn(brawler.uuid) then
+                    return callback(brawler.uuid)
+                end
                 Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                     useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
                 end)
@@ -430,16 +446,25 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count
         end
         AI.pulseAction(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
+            if requestedEndTurn(brawler.uuid) then
+                return callback(brawler.uuid)
+            end
             startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
         end, function (spellName)
             debugPrint(brawler.displayName, "action COMPLETED", spellName)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
+            if requestedEndTurn(brawler.uuid) then
+                return callback(brawler.uuid)
+            end
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                 useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
             end)
         end, function (err)
             debugPrint(brawler.displayName, "action FAILED", err)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
+            if requestedEndTurn(brawler.uuid) then
+                return callback(brawler.uuid)
+            end
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
             end
@@ -567,39 +592,41 @@ local function checkAllPlayersFinishedTurns()
     return nil
 end
 
+local function getNewInitiativeRolls(groups)
+    local newInitiativeRolls = {}
+    for _, info in ipairs(groups) do
+        if info.Members and info.Members[1] and info.Members[1].Entity and info.Initiative > -20 then
+            local newInit = getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid)
+            table.insert(newInitiativeRolls, newInit)
+        end
+    end
+    return newInitiativeRolls
+end
+
 local function reorderByInitiativeRoll()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        local newInitList = {}
-        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
-            if info.Members and info.Members[1] and info.Members[1].Entity and info.Initiative ~= -20 then
-                local newInit = getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid)
-                table.insert(newInitList, newInit)
-            end
-        end
-        local newGroups = {}
-        for i, newInit in ipairs(newInitList) do
-            newGroup = {}
-            newGroup.Initiative = newInit
+        local reorderedGroups = {}
+        for i, newInitiative in ipairs(getNewInitiativeRolls(combatEntity.TurnOrder.Groups)) do
             local group = combatEntity.TurnOrder.Groups[i]
-            newGroup.IsPlayer = group.IsPlayer
-            newGroup.Round = group.Round
-            newGroup.Team = group.Team
-            newGroup.Members = {}
-            for j, member in ipairs(group.Members) do
-                table.insert(newGroup.Members, {Entity = member.Entity, Initiative = member.Initiative})
+            local members = {}
+            for _, member in ipairs(group.Members) do
+                table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
             end
-            table.insert(newGroups, newGroup)
+            table.insert(reorderedGroups, {
+                Initiative = newInitiative,
+                IsPlayer = group.IsPlayer,
+                Round = group.Round,
+                Team = group.Team,
+                Members = members,
+            })
         end
-        table.sort(newGroups, function (a, b) return a.Initiative > b.Initiative end)
-        for i, newGroup in ipairs(newGroups) do
-            combatEntity.TurnOrder.Groups[i].Initiative = newGroup.Initiative
-            combatEntity.TurnOrder.Groups[i].IsPlayer = newGroup.IsPlayer
-            combatEntity.TurnOrder.Groups[i].Round = newGroup.Round
-            combatEntity.TurnOrder.Groups[i].Team = newGroup.Team
-            combatEntity.TurnOrder.Groups[i].Members = newGroup.Members
+        table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
+        for i, reorderedGroup in ipairs(reorderedGroups) do
+            combatEntity.TurnOrder.Groups[i] = reorderedGroup
         end
         combatEntity:Replicate("TurnOrder")
+        -- Utils.forceRefreshTopbar()
     end
 end
 
@@ -611,9 +638,7 @@ local function onCombatRoundStarted(round)
     -- State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
     if not State.Settings.PlayersGoFirst then
-        for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            debugPrint(M.Utils.getDisplayName(uuid), "initiative roll", getInitiativeRoll(uuid))
-        end
+        Utils.showAllInitiativeRolls()
         setPartyInitiativeRollToMean()
         bumpEnemyInitiativeRolls()
         reorderByInitiativeRoll()
@@ -658,7 +683,12 @@ end
 local function onTurnEnded(uuid)
     if uuid then
         cancelActionSequenceFailsafeTimer(uuid)
-        State.Session.ActionsInProgress[uuid] = {}
+        if State.Session.ActionsInProgress[uuid] and next(State.Session.ActionsInProgress[uuid]) then
+            debugPrint(M.Utils.getDisplayName(uuid), "leftover ActionsInProgress")
+            debugDump(State.Session.ActionsInProgress[uuid])
+            setTurnComplete(uuid)
+            State.Session.ActionsInProgress[uuid] = {}
+        end
         if M.Roster.getBrawlerByUuid(uuid) then
             if M.Osi.IsPartyMember(uuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true

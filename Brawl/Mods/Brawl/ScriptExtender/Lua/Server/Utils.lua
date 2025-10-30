@@ -402,12 +402,38 @@ local function joinCombat(uuid)
     end
 end
 
-local function setPlayersSwarmGroup()
+local function setPlayersSwarmGroup(swarmGroupLabel)
     local players = State.Session.Players
     if players then
         for uuid, _ in pairs(players) do
-            Osi.RequestSetSwarmGroup(uuid, "PLAYER_SWARM_GROUP")
+            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
         end
+    end
+end
+
+local function showAllInitiativeRolls()
+    debugPrint("***********Initiative rolls************")
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        debugPrint(M.Utils.getDisplayName(uuid), Swarm.getInitiativeRoll(uuid))
+    end
+    debugPrint("***************************************")
+end
+
+local function forceRefreshTopbar()
+    local players = State.Session.Players
+    if players then
+        local playerSwarmGroups = {}
+        for uuid, _ in pairs(players) do
+            playerSwarmGroups[uuid] = Osi.GetSwarmGroup(uuid) or ""
+        end
+        setPlayersSwarmGroup("REFRESH_TOPBAR")
+        Ext.OnNextTick(function ()
+            Ext.OnNextTick(function ()
+                for uuid, swarmGroupLabel in pairs(playerSwarmGroups) do
+                    Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
+                end
+            end)
+        end)
     end
 end
 
@@ -645,6 +671,8 @@ return {
     getCombatEntity = getCombatEntity,
     showTurnOrderGroups = showTurnOrderGroups,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
+    showAllInitiativeRolls = showAllInitiativeRolls,
+    forceRefreshTopbar = forceRefreshTopbar,
     setPlayerTurnsActive = setPlayerTurnsActive,
     getCurrentCombatRound = getCurrentCombatRound,
     hasStatus = hasStatus,
