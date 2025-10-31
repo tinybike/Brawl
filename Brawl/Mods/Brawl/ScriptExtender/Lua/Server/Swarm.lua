@@ -62,10 +62,12 @@ local function bumpEnemyInitiativeRoll(uuid)
 end
 
 local function bumpEnemyInitiativeRolls()
-    for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        if M.Utils.isPugnacious(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
-            debugPrint(M.Utils.getDisplayName(uuid), "initiative roll", getInitiativeRoll(uuid))
-            bumpEnemyInitiativeRoll(uuid)
+    if State.Session.MeanInitiativeRoll ~= -100 then
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            if M.Utils.isPugnacious(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
+                debugPrint(M.Utils.getDisplayName(uuid), "initiative roll", getInitiativeRoll(uuid))
+                bumpEnemyInitiativeRoll(uuid)
+            end
         end
     end
 end
@@ -141,7 +143,7 @@ local function setTurnComplete(uuid)
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
             State.Session.SwarmTurnComplete[uuid] = true
             if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
-                Ext.Timer.Cancel(uuid)
+                Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
                 State.Session.SwarmBrawlerIndexDelay[uuid] = nil
             end
         end
@@ -163,6 +165,36 @@ local function unsetTurnComplete(uuid)
     end
 end
 
+local function getEnemyList(isBeforePlayer)
+    if isBeforePlayer and State.Settings.PlayersGoFirst then
+        return {}
+    end
+    local enemyList = {}
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        local playerGroupFound = false
+        for i, group in ipairs(combatEntity.TurnOrder.Groups) do
+            if group.IsPlayer then
+                debugPrint("got to player group", i)
+                playerGroupFound = true
+            elseif group.Members and #group.Members > 0 and group.Initiative > -20 then
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                        if isBeforePlayer and not playerGroupFound then
+                            table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                        elseif not isBeforePlayer and playerGroupFound then
+                            table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    debugPrint("got enemy list", isBeforePlayer)
+    debugDump(enemyList)
+    return enemyList
+end
+
 local function resetChunkState()
     State.Session.ChunkInProgress = nil
     State.Session.CurrentChunkIndex = nil
@@ -175,15 +207,9 @@ end
 local function setAllEnemyTurnsComplete()
     debugPrint("setAllEnemyTurnsComplete")
     if State.Session.SwarmTurnActive then
-        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-        if level then
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if brawlersInLevel then
-                for brawlerUuid, _ in pairs(brawlersInLevel) do
-                    if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                        setTurnComplete(brawlerUuid)
-                    end
-                end
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                setTurnComplete(uuid)
             end
         end
     end
@@ -192,45 +218,45 @@ end
 
 local function unsetAllEnemyTurnsComplete()
     debugPrint("unsetAllEnemyTurnsComplete")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    unsetTurnComplete(brawlerUuid)
-                end
-            end
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            unsetTurnComplete(uuid)
         end
+    end
+    resetChunkState()
+end
+
+local function setEnemyTurnsComplete(enemyList)
+    debugPrint("setEnemyTurnsComplete")
+    if State.Session.SwarmTurnActive then
+        for _, uuid in ipairs(enemyList) do
+            setTurnComplete(uuid)
+        end
+    end
+    resetChunkState()
+end
+
+local function unsetEnemyTurnsComplete(enemyList)
+    debugPrint("unsetEnemyTurnsComplete")
+    for _, uuid in ipairs(enemyList) do
+        unsetTurnComplete(uuid)
     end
     resetChunkState()
 end
 
 local function allBrawlersCanAct()
     local brawlersCanAct = {}
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                brawlersCanAct[brawlerUuid] = M.Utils.canAct(brawlerUuid)
-            end
-        end
+    for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+        brawlersCanAct[uuid] = M.Utils.canAct(uuid)
     end
     return brawlersCanAct
 end
 
 local function checkSwarmTurnComplete()
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for uuid, brawler in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(uuid, 1) == 0 and not State.Session.SwarmTurnComplete[uuid] then
-                    debugPrint(brawler.displayName, "swarm turn not complete for", uuid, Osi.GetActionResourceValuePersonal(uuid, "ActionPoint", 0), Osi.GetActionResourceValuePersonal(uuid, "BonusActionPoint", 0))
-                    return false
-                end
-            end
+    for _, uuid in ipairs(State.Session.SwarmTurnEnemyList) do
+        if not State.Session.SwarmTurnComplete[uuid] then
+            debugPrint(M.Utils.getDisplayName(uuid), "swarm turn not complete", uuid)
+            return false
         end
     end
     return true
@@ -238,21 +264,13 @@ end
 
 local function resetSwarmTurnComplete()
     debugPrint("resetSwarmTurnComplete")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for uuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(uuid, 1) == 0 then
-                    debugPrint("setting turn complete for", uuid, M.Utils.getDisplayName(uuid))
-                    local entity = Ext.Entity.Get(uuid)
-                    if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
-                        setTurnComplete(uuid)
-                    end
-                    State.Session.SwarmTurnComplete[uuid] = false
-                end
-            end
+    for _, uuid in ipairs(State.Session.SwarmTurnEnemyList) do
+        -- debugPrint(M.Utils.getDisplayName(uuid), "resetSwarmTurnComplete", uuid)
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
+            setTurnComplete(uuid)
         end
+        State.Session.SwarmTurnComplete[uuid] = false
     end
 end
 
@@ -272,8 +290,10 @@ end
 local function completeSwarmTurn(uuid)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex or 1
-        debugPrint("completeSwarmTurn", uuid, chunkIndex, isChunkDone(chunkIndex), State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
-        if chunkIndex and isChunkDone(chunkIndex) then
+        debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", chunkIndex, State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
+        local chunkDone = isChunkDone(chunkIndex)
+        debugPrint("chunkDone?", chunkDone)
+        if chunkIndex and chunkDone then
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
                 if State.Session.CurrentChunkTimer then
@@ -286,7 +306,6 @@ local function completeSwarmTurn(uuid)
         setTurnComplete(uuid)
     end
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
-    -- debugDump(State.Session.SwarmTurnComplete)
     if checkSwarmTurnComplete() then
         resetSwarmTurnComplete()
     end
@@ -506,66 +525,64 @@ singleCharacterTurn = function (brawler, brawlerIndex)
     return true
 end
 
-local function startEnemyTurn()
+local function startEnemyTurn(enemyList)
     debugPrint("startEnemyTurn")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            State.Session.BrawlerChunks = {}
-            local chunkIndex, brawlersInChunk = 1, 0
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-                    State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
-                    State.Session.BrawlerChunks[chunkIndex][brawlerUuid] = brawler
-                    brawlersInChunk = brawlersInChunk + 1
-                    if brawlersInChunk >= State.Settings.SwarmChunkSize then
-                        chunkIndex = chunkIndex + 1
-                        brawlersInChunk = 0
-                    end
-                end
-            end
-            startChunk(1)
-            return chunkIndex
+    State.Session.BrawlerChunks = {}
+    local chunkIndex, brawlersInChunk = 1, 0
+    for _, uuid in ipairs(enemyList) do
+        debugPrint("chunk", chunkIndex, M.Utils.getDisplayName(uuid))
+        State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
+        State.Session.BrawlerChunks[chunkIndex][uuid] = M.Roster.getBrawlerByUuid(uuid)
+        brawlersInChunk = brawlersInChunk + 1
+        if brawlersInChunk >= State.Settings.SwarmChunkSize then
+            chunkIndex = chunkIndex + 1
+            brawlersInChunk = 0
         end
     end
+    debugPrint("chunked ok")
+    debugDump(State.Session.BrawlerChunks)
+    startChunk(1)
+    return chunkIndex
 end
 
 -- the FIRST enemy to go uses the built-in AI and takes its turn normally, this keeps the turn open
 -- all other enemies go at the same time, using the Brawl AI
 -- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
-local function startSwarmTurn()
-    debugPrint("startSwarmTurn")
-    local shouldFreezePlayers = {}
-    for uuid, _ in pairs(State.Session.Players) do
-        shouldFreezePlayers[uuid] = Utils.isToT() or M.Osi.IsInCombat(uuid) == 1
-    end
-    State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-    State.Session.CanActBeforeDelay = allBrawlersCanAct()
-    State.Session.SwarmTurnActive = true
-    Ext.Timer.WaitFor(1000, function () -- delay to allow new enemies to get scooped up
-        if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
-            State.Session.TBSMToTSkippedPrepRound = true
-            State.Session.SwarmTurnActive = false
-            return
-        end
-        local numChunks = startEnemyTurn()
-        if numChunks ~= nil then
-            if State.Session.SwarmTurnTimer ~= nil then
-                Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-                State.Session.SwarmTurnTimer = nil
+local function startSwarmTurn(enemyList, isBeforePlayer)
+    if enemyList and next(enemyList) then
+        debugPrint("startSwarmTurn", isBeforePlayer)
+        _D(enemyList)
+        State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
+        State.Session.CanActBeforeDelay = allBrawlersCanAct()
+        State.Session.SwarmTurnActive = true
+        State.Session.SwarmTurnEnemyList = enemyList
+        State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
+        -- Ext.Timer.WaitFor(1000, function () -- delay to allow new enemies to get scooped up
+            if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
+                State.Session.TBSMToTSkippedPrepRound = true
+                State.Session.SwarmTurnActive = false
+                return
             end
-            State.Session.SwarmTurnTimerCombatRound = M.Utils.getCurrentCombatRound()
-            State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
-                if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound then
-                    debugPrint("************************Swarm turn timer finished - setting all enemy turns complete...")
-                    setAllEnemyTurnsComplete()
-                    State.Session.SwarmTurnTimerCombatRound = nil
-                    State.Session.SwarmTurnActive = false
+            local numChunks = startEnemyTurn(enemyList)
+            debugPrint("numChunks", numChunks, isBeforePlayer, #enemyList)
+            if numChunks ~= nil then
+                if State.Session.SwarmTurnTimer ~= nil then
+                    Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+                    State.Session.SwarmTurnTimer = nil
                 end
-            end)
-        end
-    end)
+                State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
+                State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
+                    debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
+                    if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
+                        debugPrint("************************Swarm turn timer finished - setting enemy turns complete...")
+                        setEnemyTurnsComplete(enemyList)
+                        State.Session.SwarmTurnTimerCombatRound = nil
+                        State.Session.SwarmTurnActive = false
+                    end
+                end)
+            end
+        -- end)
+    end
 end
 
 local function checkAllPlayersFinishedTurns()
@@ -642,6 +659,7 @@ local function onCombatRoundStarted(round)
         setPartyInitiativeRollToMean()
         bumpEnemyInitiativeRolls()
         reorderByInitiativeRoll()
+        startSwarmTurn(getEnemyList(true), true)
     end
 end
 
@@ -670,13 +688,13 @@ local function onTurnStarted(uuid)
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
         -- NB: do we need this delay??
-        Ext.Timer.WaitFor(200, function ()
+        -- Ext.Timer.WaitFor(200, function ()
             Swarm.unsetTurnComplete(uuid)
             if State.Settings.AutotriggerSwarmModeCompanionAI and not State.Session.AutotriggeredSwarmModeCompanionAI then
                 State.Session.AutotriggeredSwarmModeCompanionAI = true
                 Pause.queueCompanionAIActions()
             end
-        end)
+        -- end)
     end
 end
 
@@ -692,12 +710,13 @@ local function onTurnEnded(uuid)
         if M.Roster.getBrawlerByUuid(uuid) then
             if M.Osi.IsPartyMember(uuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
-                -- check if any players turns are active instead...
                 if checkAllPlayersFinishedTurns() then
-                    unsetAllEnemyTurnsComplete()
-                    startSwarmTurn()
+                    local enemyList = getEnemyList(false)
+                    unsetEnemyTurnsComplete(enemyList)
+                    startSwarmTurn(enemyList, false)
                 end
             else
+                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded complete swarm turn")
                 completeSwarmTurn(uuid)
             end
         end

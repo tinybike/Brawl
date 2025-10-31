@@ -105,6 +105,7 @@ local Session = {
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     AutotriggeredSwarmModeCompanionAI = false,
     MeanInitiativeRoll = nil,
+    SwarmTurnIsBeforePlayer = nil,
 }
 
 -- Persistent state
