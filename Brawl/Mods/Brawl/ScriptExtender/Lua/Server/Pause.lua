@@ -246,12 +246,12 @@ local function startTruePause(entityUuid)
 end
 
 local function queueCompanionAIActions()
-    debugPrint("queueCompanionAIActions")
     if State.Settings.CompanionAIEnabled then
+        debugPrint("queueCompanionAIActions")
         local players = State.Session.Players
         if players then
             for uuid, player in pairs(players) do
-                local brawler = Roster.getBrawlerByUuid(uuid)
+                local brawler = M.Roster.getBrawlerByUuid(uuid)
                 if brawler and M.Utils.isAliveAndCanFight(uuid) and (not player.isControllingDirectly or State.Settings.FullAuto) and M.Utils.canAct(uuid) then
                     local entity = Ext.Entity.Get(uuid)
                     if State.Settings.TurnBasedSwarmMode then

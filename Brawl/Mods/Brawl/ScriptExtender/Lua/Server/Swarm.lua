@@ -7,6 +7,7 @@ local singleCharacterTurn
 local useRemainingActions
 
 local function getSwarmTurnTimeout()
+    print("timeout", math.floor(State.Settings.SwarmTurnTimeout*1000))
     return math.floor(State.Settings.SwarmTurnTimeout*1000)
 end
 
@@ -226,19 +227,17 @@ local function unsetAllEnemyTurnsComplete()
     resetChunkState()
 end
 
-local function setEnemyTurnsComplete(enemyList)
+local function setEnemyTurnsComplete(uuids)
     debugPrint("setEnemyTurnsComplete")
-    if State.Session.SwarmTurnActive then
-        for _, uuid in ipairs(enemyList) do
-            setTurnComplete(uuid)
-        end
+    for _, uuid in ipairs(uuids) do
+        setTurnComplete(uuid)
     end
     resetChunkState()
 end
 
-local function unsetEnemyTurnsComplete(enemyList)
+local function unsetEnemyTurnsComplete(uuids)
     debugPrint("unsetEnemyTurnsComplete")
-    for _, uuid in ipairs(enemyList) do
+    for _, uuid in ipairs(uuids) do
         unsetTurnComplete(uuid)
     end
     resetChunkState()
@@ -246,14 +245,14 @@ end
 
 local function allBrawlersCanAct()
     local brawlersCanAct = {}
-    for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
         brawlersCanAct[uuid] = M.Utils.canAct(uuid)
     end
     return brawlersCanAct
 end
 
-local function checkSwarmTurnComplete()
-    for _, uuid in ipairs(State.Session.SwarmTurnEnemyList) do
+local function checkSwarmTurnComplete(swarmActors)
+    for _, uuid in ipairs(swarmActors) do
         if not State.Session.SwarmTurnComplete[uuid] then
             debugPrint(M.Utils.getDisplayName(uuid), "swarm turn not complete", uuid)
             return false
@@ -262,16 +261,20 @@ local function checkSwarmTurnComplete()
     return true
 end
 
-local function resetSwarmTurnComplete()
-    debugPrint("resetSwarmTurnComplete")
-    for _, uuid in ipairs(State.Session.SwarmTurnEnemyList) do
-        -- debugPrint(M.Utils.getDisplayName(uuid), "resetSwarmTurnComplete", uuid)
+local function resetSwarmTurnComplete(swarmActors)
+    debugPrint("resetSwarmTurnComplete", #swarmActors)
+    for _, uuid in ipairs(swarmActors) do
+        debugPrint(M.Utils.getDisplayName(uuid), "resetSwarmTurnComplete", uuid)
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
             setTurnComplete(uuid)
         end
         State.Session.SwarmTurnComplete[uuid] = false
     end
+    cancelTimers()
+    State.Session.SwarmTurnTimerCombatRound = nil
+    State.Session.SwarmTurnActive = false
+    State.SwarmActors = nil
 end
 
 local function isChunkDone(chunkIndex)
@@ -287,7 +290,7 @@ local function isChunkDone(chunkIndex)
     return true
 end
 
-local function completeSwarmTurn(uuid)
+local function completeSwarmTurn(uuid, swarmActors)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex or 1
         debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", chunkIndex, State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
@@ -300,30 +303,31 @@ local function completeSwarmTurn(uuid)
                     Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
                     State.Session.CurrentChunkTimer = nil
                 end
-                startChunk(chunkIndex + 1)
+                startChunk(chunkIndex + 1, swarmActors)
             end
         end
         setTurnComplete(uuid)
     end
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
-    if checkSwarmTurnComplete() then
-        resetSwarmTurnComplete()
+    if checkSwarmTurnComplete(swarmActors) then
+        resetSwarmTurnComplete(swarmActors)
     end
 end
 
-local function forceCompleteChunk(chunkIndex)
+local function forceCompleteChunk(chunkIndex, swarmActors)
     for uuid in pairs(State.Session.BrawlerChunks[chunkIndex]) do
         if not State.Session.SwarmTurnComplete[uuid] then
-            completeSwarmTurn(uuid)
+            completeSwarmTurn(uuid, swarmActors)
         end
     end
 end
 
-startChunk = function (chunkIndex)
+startChunk = function (chunkIndex, swarmActors)
     debugPrint("startChunk", chunkIndex, State.Session.ChunkInProgress)
     if State.Session.ChunkInProgress ~= chunkIndex then
         State.Session.ChunkInProgress = chunkIndex
         local chunk = State.Session.BrawlerChunks[chunkIndex]
+        _D(chunk)
         if not chunk then
             State.Session.ChunkInProgress = nil
             return
@@ -337,15 +341,15 @@ startChunk = function (chunkIndex)
         for uuid, brawler in pairs(chunk) do
             State.Session.SwarmTurnComplete[uuid] = false
             if State.Session.SwarmTurnActive and State.Session.CanActBeforeDelay[uuid] ~= false then
-                singleCharacterTurn(brawler, idx)
+                singleCharacterTurn(brawler, idx, swarmActors)
                 idx = idx + 1
             end
         end
         State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(getSwarmTurnTimeout(), function ()
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
-                forceCompleteChunk(chunkIndex)
-                startChunk(chunkIndex + 1)
+                forceCompleteChunk(chunkIndex, swarmActors)
+                startChunk(chunkIndex + 1, swarmActors)
             end
         end)
     end
@@ -361,13 +365,13 @@ local function isControlledByDefaultAI(uuid)
     return false
 end
 
-local function terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+local function terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors, callback)
     if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-        return callback(uuid)
+        return callback(uuid, swarmActors)
     end
     -- NB: is this needed?
     setTurnComplete(uuid)
-    callback(uuid)
+    callback(uuid, swarmActors)
 end
 
 local function cancelActionSequenceFailsafeTimer(uuid)
@@ -377,7 +381,7 @@ local function cancelActionSequenceFailsafeTimer(uuid)
     end
 end
 
-local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
+local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, callback, count)
     count = count or 0
     local uuid = brawler.uuid
     debugPrint("startActionSequenceFailsafeTimer", M.Utils.getDisplayName(uuid), swarmTurnActiveInitial)
@@ -398,9 +402,9 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
         if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
             debugPrint("Action timed out", request.Spell.Prototype, request.RequestGuid, isRetry)
             if not isRetry then
-                return terminateActionSequence(uuid, swarmTurnActiveInitial, callback)
+                return terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
-            useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
+            useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
         end
     end)
 end
@@ -414,21 +418,20 @@ local function requestedEndTurn(uuid)
     return false
 end
 
-useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count)
+useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, callback, count)
     callback = callback or noop
     if brawler and brawler.uuid then
-        if State.Session.SwarmTurnActive then
-            if isControlledByDefaultAI(brawler.uuid) then
+        if swarmTurnActiveInitial then
+            if not State.Session.SwarmTurnActive then
+                debugPrint(brawler.displayName, "swarm turn global timed out")
+                return callback(brawler.uuid, swarmActors)
+            elseif isControlledByDefaultAI(brawler.uuid) then
                 debugPrint(brawler.displayName, "controlled by default AI, skipping")
-                return callback(brawler.uuid)
+                return callback(brawler.uuid, swarmActors)
             elseif State.Session.SwarmTurnComplete[brawler.uuid] then
                 debugPrint(brawler.displayName, "swarm turn already complete, skipping")
-                return callback(brawler.uuid)
+                return callback(brawler.uuid, swarmActors)
             end
-        end
-        if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
-            debugPrint(brawler.displayName, "swarm turn global timed out")
-            return callback(brawler.uuid)
         end
         count = count or 0
         local numActions = Resources.getActionPointsRemaining(brawler.uuid)
@@ -439,70 +442,70 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, callback, count
                 debugPrint(brawler.displayName, count, "counter limit reached, what happened here??")
             end
             setTurnComplete(brawler.uuid)
-            return callback(brawler.uuid)
+            return callback(brawler.uuid, swarmActors)
         end
         if numActions == 0 then
             return AI.pulseAction(brawler, true, function (request)
                 debugPrint(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
                 if requestedEndTurn(brawler.uuid) then
-                    return callback(brawler.uuid)
+                    return callback(brawler.uuid, swarmActors)
                 end
-                startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
+                startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, callback, count)
             end, function (spellName)
                 debugPrint(brawler.displayName, "bonus action COMPLETED", spellName)
                 cancelActionSequenceFailsafeTimer(brawler.uuid)
                 if requestedEndTurn(brawler.uuid) then
-                    return callback(brawler.uuid)
+                    return callback(brawler.uuid, swarmActors)
                 end
                 Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
-                    useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
+                    useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count)
                 end)
             end, function (err)
                 debugPrint(brawler.displayName, "bonus action FAILED", err)
                 cancelActionSequenceFailsafeTimer(brawler.uuid)
-                terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
+                terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end)
         end
         AI.pulseAction(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
             if requestedEndTurn(brawler.uuid) then
-                return callback(brawler.uuid)
+                return callback(brawler.uuid, swarmActors)
             end
-            startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, callback, count)
+            startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, callback, count)
         end, function (spellName)
             debugPrint(brawler.displayName, "action COMPLETED", spellName)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
             if requestedEndTurn(brawler.uuid) then
-                return callback(brawler.uuid)
+                return callback(brawler.uuid, swarmActors)
             end
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
-                useRemainingActions(brawler, swarmTurnActiveInitial, callback, count)
+                useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count)
             end)
         end, function (err)
             debugPrint(brawler.displayName, "action FAILED", err)
             cancelActionSequenceFailsafeTimer(brawler.uuid)
             if requestedEndTurn(brawler.uuid) then
-                return callback(brawler.uuid)
+                return callback(brawler.uuid, swarmActors)
             end
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
-                return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, callback)
+                return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
-            useRemainingActions(brawler, swarmTurnActiveInitial, callback, count + 1)
+            useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
         end)
     end
 end
 
-local function swarmAction(brawler)
+local function swarmAction(brawler, swarmActors)
     debugPrint(brawler.displayName, "swarmAction")
     if State.Session.SwarmTurnActive then
-        useRemainingActions(brawler, true, completeSwarmTurn)
+        useRemainingActions(brawler, true, swarmActors, completeSwarmTurn)
     elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
         useRemainingActions(brawler, false)
     end
 end
 
-singleCharacterTurn = function (brawler, brawlerIndex)
-    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid))
+singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
+    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid), brawlerIndex*25)
     debugPrint("remaining movement", Movement.getMovementDistanceAmount(Ext.Entity.Get(brawler.uuid)))
     local hostCharacterUuid = M.Osi.GetHostCharacter()
     if isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
@@ -520,16 +523,16 @@ singleCharacterTurn = function (brawler, brawlerIndex)
     State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*25, function ()
         State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
         debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*25)
-        swarmAction(brawler)
+        swarmAction(brawler, swarmActors)
     end)
     return true
 end
 
-local function startEnemyTurn(enemyList)
+local function startEnemyTurn(swarmActors)
     debugPrint("startEnemyTurn")
     State.Session.BrawlerChunks = {}
     local chunkIndex, brawlersInChunk = 1, 0
-    for _, uuid in ipairs(enemyList) do
+    for _, uuid in ipairs(swarmActors) do
         debugPrint("chunk", chunkIndex, M.Utils.getDisplayName(uuid))
         State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
         State.Session.BrawlerChunks[chunkIndex][uuid] = M.Roster.getBrawlerByUuid(uuid)
@@ -539,49 +542,46 @@ local function startEnemyTurn(enemyList)
             brawlersInChunk = 0
         end
     end
-    debugPrint("chunked ok")
-    debugDump(State.Session.BrawlerChunks)
-    startChunk(1)
+    startChunk(1, swarmActors)
     return chunkIndex
 end
 
 -- the FIRST enemy to go uses the built-in AI and takes its turn normally, this keeps the turn open
 -- all other enemies go at the same time, using the Brawl AI
 -- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
-local function startSwarmTurn(enemyList, isBeforePlayer)
-    if enemyList and next(enemyList) then
-        debugPrint("startSwarmTurn", isBeforePlayer)
-        _D(enemyList)
+local function startSwarmTurn(swarmActors, isBeforePlayer)
+    if swarmActors and next(swarmActors) then
+        debugPrint("startSwarmTurn", isBeforePlayer, #swarmActors)
+        _D(swarmActors)
+        if State.Session.SwarmTurnTimer ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
+            State.Session.SwarmTurnTimer = nil
+        end
         State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
         State.Session.CanActBeforeDelay = allBrawlersCanAct()
         State.Session.SwarmTurnActive = true
-        State.Session.SwarmTurnEnemyList = enemyList
+        State.Session.SwarmActors = swarmActors
         State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
-        -- Ext.Timer.WaitFor(1000, function () -- delay to allow new enemies to get scooped up
-            if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
-                State.Session.TBSMToTSkippedPrepRound = true
-                State.Session.SwarmTurnActive = false
-                return
-            end
-            local numChunks = startEnemyTurn(enemyList)
-            debugPrint("numChunks", numChunks, isBeforePlayer, #enemyList)
-            if numChunks ~= nil then
-                if State.Session.SwarmTurnTimer ~= nil then
-                    Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-                    State.Session.SwarmTurnTimer = nil
+        if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
+            State.Session.TBSMToTSkippedPrepRound = true
+            State.Session.SwarmTurnActive = false
+            return
+        end
+        local numChunks = startEnemyTurn(swarmActors)
+        debugPrint("numChunks", numChunks, isBeforePlayer)
+        if numChunks then
+            State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
+            State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
+                debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
+                if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
+                    debugPrint("************************Swarm turn timer finished - setting enemy turns complete...", isBeforePlayer)
+                    setEnemyTurnsComplete(swarmActors)
+                    State.Session.SwarmTurnTimerCombatRound = nil
+                    State.Session.SwarmTurnActive = false
+                    State.Session.SwarmActors = nil
                 end
-                State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
-                State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
-                    debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
-                    if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
-                        debugPrint("************************Swarm turn timer finished - setting enemy turns complete...")
-                        setEnemyTurnsComplete(enemyList)
-                        State.Session.SwarmTurnTimerCombatRound = nil
-                        State.Session.SwarmTurnActive = false
-                    end
-                end)
-            end
-        -- end)
+            end)
+        end
     end
 end
 
@@ -689,7 +689,7 @@ local function onTurnStarted(uuid)
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
         -- NB: do we need this delay??
         -- Ext.Timer.WaitFor(200, function ()
-            Swarm.unsetTurnComplete(uuid)
+            unsetTurnComplete(uuid)
             if State.Settings.AutotriggerSwarmModeCompanionAI and not State.Session.AutotriggeredSwarmModeCompanionAI then
                 State.Session.AutotriggeredSwarmModeCompanionAI = true
                 Pause.queueCompanionAIActions()
@@ -716,8 +716,9 @@ local function onTurnEnded(uuid)
                     startSwarmTurn(enemyList, false)
                 end
             else
-                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded complete swarm turn")
-                completeSwarmTurn(uuid)
+                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded complete swarm turn?")
+                -- NB: do we need this???
+                -- completeSwarmTurn(uuid, State.Session.SwarmActors)
             end
         end
     end
