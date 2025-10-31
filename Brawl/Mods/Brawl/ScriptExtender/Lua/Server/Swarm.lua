@@ -7,7 +7,6 @@ local singleCharacterTurn
 local useRemainingActions
 
 local function getSwarmTurnTimeout()
-    print("timeout", math.floor(State.Settings.SwarmTurnTimeout*1000))
     return math.floor(State.Settings.SwarmTurnTimeout*1000)
 end
 
@@ -37,7 +36,6 @@ end
 local function setInitiativeRoll(uuid, roll)
     local entity = Ext.Entity.Get(uuid)
     if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
-        debugPrint(M.Utils.getDisplayName(entity.Uuid.EntityUuid), "set initiative roll", entity.CombatParticipant.InitiativeRoll, "->", roll)
         entity.CombatParticipant.InitiativeRoll = roll
         if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
             entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
@@ -290,6 +288,15 @@ local function isChunkDone(chunkIndex)
     return true
 end
 
+local function isControlledByDefaultAI(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
+        debugPrint("entity ACTIVE, using default AI instead...", uuid, M.Utils.getDisplayName(uuid))
+        return true
+    end
+    return false
+end
+
 local function completeSwarmTurn(uuid, swarmActors)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex or 1
@@ -306,7 +313,9 @@ local function completeSwarmTurn(uuid, swarmActors)
                 startChunk(chunkIndex + 1, swarmActors)
             end
         end
-        setTurnComplete(uuid)
+        if not isControlledByDefaultAI(uuid) then
+            setTurnComplete(uuid)
+        end
     end
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
     if checkSwarmTurnComplete(swarmActors) then
@@ -355,16 +364,6 @@ startChunk = function (chunkIndex, swarmActors)
     end
 end
 
-local function isControlledByDefaultAI(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
-        debugPrint("entity ACTIVE, using default AI instead...", uuid, M.Utils.getDisplayName(uuid))
-        State.Session.SwarmTurnComplete[uuid] = true
-        return true
-    end
-    return false
-end
-
 local function terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors, callback)
     if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
         return callback(uuid, swarmActors)
@@ -384,8 +383,10 @@ end
 local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, callback, count)
     count = count or 0
     local uuid = brawler.uuid
-    debugPrint("startActionSequenceFailsafeTimer", M.Utils.getDisplayName(uuid), swarmTurnActiveInitial)
-    debugDump(request)
+    debugPrint("startActionSequenceFailsafeTimer", M.Utils.getDisplayName(uuid), request.Spell.Prootype, swarmTurnActiveInitial, count)
+    if swarmActors then
+        debugDump(swarmActors)
+    end
     local isRetry = false
     local currentCombatRound = M.Utils.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
@@ -427,6 +428,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
                 return callback(brawler.uuid, swarmActors)
             elseif isControlledByDefaultAI(brawler.uuid) then
                 debugPrint(brawler.displayName, "controlled by default AI, skipping")
+                State.Session.SwarmTurnComplete[brawler.uuid] = true
                 return callback(brawler.uuid, swarmActors)
             elseif State.Session.SwarmTurnComplete[brawler.uuid] then
                 debugPrint(brawler.displayName, "swarm turn already complete, skipping")
@@ -516,8 +518,13 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
-    if isControlledByDefaultAI(brawler.uuid) or State.Session.SwarmTurnComplete[brawler.uuid] then
-        debugPrint("controlled by default AI/swarm turn complete", brawler.displayName)
+    if isControlledByDefaultAI(brawler.uuid) then
+        debugPrint(brawler.displayName, "singleCharacterTurn, is controlled by default AI")
+        State.Session.SwarmTurnComplete[brawler.uuid] = true
+        return false
+    end
+    if State.Session.SwarmTurnComplete[brawler.uuid] then
+        debugPrint(brawler.displayName, "singleCharacterTurn, swarm turn already complete")
         return false
     end
     State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*25, function ()
@@ -612,9 +619,8 @@ end
 local function getNewInitiativeRolls(groups)
     local newInitiativeRolls = {}
     for _, info in ipairs(groups) do
-        if info.Members and info.Members[1] and info.Members[1].Entity and info.Initiative > -20 then
-            local newInit = getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid)
-            table.insert(newInitiativeRolls, newInit)
+        if info.Members and info.Members[1] and info.Members[1].Entity then --and info.Initiative > -20 then
+            table.insert(newInitiativeRolls, getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid))
         end
     end
     return newInitiativeRolls
@@ -639,15 +645,14 @@ local function reorderByInitiativeRoll()
             })
         end
         table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
-        for i, reorderedGroup in ipairs(reorderedGroups) do
-            combatEntity.TurnOrder.Groups[i] = reorderedGroup
-        end
+        combatEntity.TurnOrder.Groups = reorderedGroups
         combatEntity:Replicate("TurnOrder")
         -- Utils.forceRefreshTopbar()
     end
 end
 
 local function onCombatRoundStarted(round)
+    debugPrint("onCombatRoundStarted", round)
     cancelTimers()
     State.Session.SwarmTurnActive = false
     State.Session.SwarmTurnTimerCombatRound = nil
@@ -656,9 +661,13 @@ local function onCombatRoundStarted(round)
     unsetAllEnemyTurnsComplete()
     if not State.Settings.PlayersGoFirst then
         Utils.showAllInitiativeRolls()
+        debugPrint("*****onCombatRoundStarted original turn order")
+        Utils.showTurnOrderGroups()
         setPartyInitiativeRollToMean()
         bumpEnemyInitiativeRolls()
         reorderByInitiativeRoll()
+        debugPrint("*****onCombatRoundStarted updated turn order")
+        Utils.showTurnOrderGroups()
         startSwarmTurn(getEnemyList(true), true)
     end
 end
@@ -775,7 +784,7 @@ local function onServerInterruptUsed(entity, label, component)
                     if State.Session.ActionsInProgress[targetUuid] then
                         local brawler = M.Roster.getBrawlerByUuid(targetUuid)
                         if brawler then
-                            swarmAction(brawler)
+                            swarmAction(brawler, State.Session.SwarmActors)
                         end
                     end
                 end

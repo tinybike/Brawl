@@ -412,11 +412,11 @@ local function setPlayersSwarmGroup(swarmGroupLabel)
 end
 
 local function showAllInitiativeRolls()
-    debugPrint("***********Initiative rolls************")
+    print("***********Initiative rolls************")
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        debugPrint(M.Utils.getDisplayName(uuid), Swarm.getInitiativeRoll(uuid))
+        print(M.Utils.getDisplayName(uuid), Swarm.getInitiativeRoll(uuid))
     end
-    debugPrint("***************************************")
+    print("***************************************")
 end
 
 local function forceRefreshTopbar()
@@ -437,23 +437,29 @@ local function forceRefreshTopbar()
     end
 end
 
-local function showTurnOrderGroups(groups)
-    for i, group in ipairs(groups) do
-        if group.Members then
-            local groupStr = ""
-            if group.IsPlayer then
-                groupStr = groupStr .. "    "
-            end
-            groupStr = groupStr .. tostring(i)
-            for j, member in ipairs(group.Members) do
-                if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
-                    if j > 1 then
-                        groupStr = groupStr .. " +"
+local function showTurnOrderGroups()
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        for i, group in ipairs(combatEntity.TurnOrder.Groups) do
+            if group.Members and group.Initiative ~= -20 then
+                local groupStr = ""
+                groupStr = groupStr .. tostring(i) .. " " .. tostring(group.Initiative)
+                if #group.Members then
+                    for j, member in ipairs(group.Members) do
+                        if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                            if j > 1 then
+                                groupStr = groupStr .. " +"
+                            end
+                            groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
+                        end
                     end
-                    groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
                 end
+                if not group.IsPlayer then
+                    -- thank u hippo
+                    groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
+                end
+                print(groupStr)
             end
-            print(groupStr)
         end
     end
 end
@@ -462,7 +468,7 @@ local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         print("********init***********")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        showTurnOrderGroups()
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
@@ -480,7 +486,7 @@ local function setPlayerTurnsActive()
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
         print("********after*********")
-        showTurnOrderGroups(combatEntity.TurnOrder.Groups)
+        showTurnOrderGroups()
     end
 end
 
