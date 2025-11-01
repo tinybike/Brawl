@@ -57,6 +57,14 @@ local function removeActionInProgress(casterUuid, requestUuid)
     end
 end
 
+local function removeActionsInProgress(casterUuid)
+    if State.Session.ActionsInProgress[casterUuid] then
+        for _, actionInProgress in ipairs(State.Session.ActionsInProgress[casterUuid]) do
+            removeActionInProgress(casterUuid, actionInProgress.requestUuid)
+        end
+    end
+end
+
 local function playAttackSound(attackerUuid, defenderUuid, damageType)
     if damageType == "Slashing" then
         Osi.PlaySound(attackerUuid, "Action_Cast_Slash")
@@ -327,6 +335,7 @@ return {
     getActionInProgressByName = getActionInProgressByName,
     registerActionInProgress = registerActionInProgress,
     removeActionInProgress = removeActionInProgress,
+    removeActionsInProgress = removeActionsInProgress,
     handleExtraAttacks = handleExtraAttacks,
     submitSpellRequest = submitSpellRequest,
     queueSpellRequest = queueSpellRequest,

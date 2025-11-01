@@ -90,6 +90,7 @@ local function cancelTimers(swarmActors)
                         Ext.Timer.Cancel(failsafe.timer)
                         failsafe.timer = nil
                     end
+                    Actions.removeActionsInProgress(uuid)
                 end
             else
                 for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
@@ -98,6 +99,7 @@ local function cancelTimers(swarmActors)
                         failsafe.timer = nil
                     end
                 end
+                State.Session.ActionsInProgress = {}
             end
         end
     end
@@ -413,6 +415,7 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
         end
         if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
             debugPrint("Action timed out", request.Spell.Prototype, request.RequestGuid, isRetry)
+            Actions.removeActionInProgress(uuid, request.RequestGuid)
             if not isRetry then
                 return terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
@@ -449,7 +452,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
         count = count or 0
         local numActions = Resources.getActionPointsRemaining(brawler.uuid)
         local numBonusActions = Resources.getBonusActionPointsRemaining(brawler.uuid)
-        debugPrint(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, brawler.uuid, swarmTurnActiveInitial)
+        debugPrint(brawler.displayName, "useRemainingActions", count, numActions, numBonusActions, swarmTurnActiveInitial, swarmActors)
         if (numActions == 0 and numBonusActions == 0) or count > Constants.ACTION_ATTEMPT_LIMIT then
             if count > Constants.ACTION_ATTEMPT_LIMIT then
                 debugPrint(brawler.displayName, count, "counter limit reached, what happened here??")
@@ -478,6 +481,11 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
                 cancelActionSequenceFailsafeTimer(brawler.uuid)
                 terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end)
+        end
+        if State.Session.ActionsInProgress[brawler.uuid] then
+            print(brawler.displayName)
+            _D(State.Session.ActionsInProgress[brawler.uuid])
+            error("we have a current AIP, what is this????")
         end
         AI.pulseAction(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
@@ -570,7 +578,9 @@ end
 local function startSwarmTurn(swarmActors, isBeforePlayer)
     if swarmActors and next(swarmActors) then
         debugPrint("startSwarmTurn", isBeforePlayer, #swarmActors)
-        _D(swarmActors)
+        for _, uuid in ipairs(swarmActors) do
+            debugPrint(M.Utils.getDisplayName(uuid), uuid)
+        end
         if State.Session.SwarmTurnTimer ~= nil then
             Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
             State.Session.SwarmTurnTimer = nil

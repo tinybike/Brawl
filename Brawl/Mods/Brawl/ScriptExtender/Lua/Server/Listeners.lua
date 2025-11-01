@@ -602,22 +602,24 @@ local function onSpellCastFinishedEvent(cast, _, _)
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
             debugDump(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
+            local spellName = actionInProgress.spellName
+            local onCompleted = actionInProgress.onCompleted
+            local onFailed = actionInProgress.onFailed
+            Actions.removeActionInProgress(casterUuid, requestUuid)
             if outcome == "None" then
-                local spellName = actionInProgress.spellName
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 Utils.checkDivineIntervention(spellName, casterUuid)
-                debugPrint("onCompleted")
-                actionInProgress.onCompleted(spellName)
                 Resources.deductCastedSpell(casterUuid, spellName)
-                Actions.removeActionInProgress(casterUuid, requestUuid)
+                debugPrint("onCompleted")
+                onCompleted(spellName)
             else
-                debugPrint("onFailed")
                 if outcome == "CantSpendUseCosts" then
                     -- check for ActionResourceBlock boosts? why did this fail
                     debugDump(cast:GetAllComponents())
                 end
-                actionInProgress.onFailed(outcome)
+                debugPrint("onFailed")
+                onFailed(outcome)
             end
         end
     end
