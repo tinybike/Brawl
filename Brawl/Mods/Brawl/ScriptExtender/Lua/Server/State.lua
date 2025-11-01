@@ -104,7 +104,6 @@ local Session = {
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
-    AutotriggeredSwarmModeCompanionAI = false,
     MeanInitiativeRoll = nil,
     SwarmTurnIsBeforePlayer = nil,
 }

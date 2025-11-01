@@ -8,7 +8,6 @@ end
 
 local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
-    State.Session.AutotriggeredSwarmModeCompanionAI = false
     if State.Settings.TurnBasedSwarmMode then
         Leaderboard.initialize()
     end
@@ -109,7 +108,6 @@ end
 
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
-    State.Session.AutotriggeredSwarmModeCompanionAI = false
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
@@ -602,7 +600,7 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
-            _D(actionInProgress)
+            debugDump(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             if outcome == "None" then
                 local spellName = actionInProgress.spellName
@@ -617,7 +615,7 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 debugPrint("onFailed")
                 if outcome == "CantSpendUseCosts" then
                     -- check for ActionResourceBlock boosts? why did this fail
-                    _D(cast:GetAllComponents())
+                    debugDump(cast:GetAllComponents())
                 end
                 actionInProgress.onFailed(outcome)
             end

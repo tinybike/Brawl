@@ -245,29 +245,34 @@ local function startTruePause(entityUuid)
     end
 end
 
-local function queueCompanionAIActions()
-    if State.Settings.CompanionAIEnabled then
-        debugPrint("queueCompanionAIActions")
-        local players = State.Session.Players
-        if players then
-            for uuid, player in pairs(players) do
-                local brawler = M.Roster.getBrawlerByUuid(uuid)
-                if brawler and M.Utils.isAliveAndCanFight(uuid) and (not player.isControllingDirectly or State.Settings.FullAuto) and M.Utils.canAct(uuid) then
-                    local entity = Ext.Entity.Get(uuid)
-                    if State.Settings.TurnBasedSwarmMode then
-                        if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then
-                            State.Session.QueuedCompanionAIAction[uuid] = true
-                            debugPrint(player.displayName, "queue action (swarm)")
-                            Swarm.swarmAction(brawler)
-                        end
-                    else
-                        debugPrint(player.displayName, "queue action (ftb)", isInFTB(entity), not isLocked(entity))
-                        if isInFTB(entity) and not isLocked(entity) then
-                            AI.act(brawler)
-                        end
-                    end
+local function queueSingleCompanionAIActions(uuid)
+    if State.Settings.CompanionAIEnabled and State.Session.Players and State.Session.Players[uuid] then
+        debugPrint(M.Utils.getDisplayName(uuid), "queueSingleCompanionAIActions")
+        local player = State.Session.Players[uuid]
+        local brawler = M.Roster.getBrawlerByUuid(uuid)
+        if brawler and M.Utils.isAliveAndCanFight(uuid) and (not player.isControllingDirectly or State.Settings.FullAuto) and M.Utils.canAct(uuid) then
+            local entity = Ext.Entity.Get(uuid)
+            if State.Settings.TurnBasedSwarmMode then
+                if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn and not entity.TurnBased.RequestedEndTurn then
+                    State.Session.QueuedCompanionAIAction[uuid] = true
+                    debugPrint(player.displayName, "queue action (swarm)")
+                    Swarm.swarmAction(brawler)
+                end
+            else
+                debugPrint(player.displayName, "queue action (ftb)", isInFTB(entity), not isLocked(entity))
+                if isInFTB(entity) and not isLocked(entity) then
+                    AI.act(brawler)
                 end
             end
+        end
+    end
+end
+
+local function queueCompanionAIActions()
+    if State.Settings.CompanionAIEnabled and State.Session.Players then
+        debugPrint("queueCompanionAIActions")
+        for uuid, _ in pairs(State.Session.Players) do
+            queueSingleCompanionAIActions(uuid)
         end
     end
 end
@@ -301,6 +306,7 @@ return {
     cancelQueuedMovement = cancelQueuedMovement,
     enqueueMovement = enqueueMovement,
     startTruePause = startTruePause,
+    queueSingleCompanionAIActions = queueSingleCompanionAIActions,
     queueCompanionAIActions = queueCompanionAIActions,
     checkTruePauseParty = checkTruePauseParty,
     midActionLock = midActionLock,

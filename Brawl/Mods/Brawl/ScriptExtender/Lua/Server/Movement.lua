@@ -303,8 +303,11 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             debugPrint(M.Utils.getDisplayName(uuid), "dashing")
             return Actions.useSpellOnTarget(uuid, uuid, dashSpellName, true, function (request)
                 debugPrint(M.Utils.getDisplayName(uuid), "dash request submitted", dashSpellName)
-                -- NB: ok to use Session.SwarmActors here?
-                Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, State.Session.SwarmActors, onFailed)
+                local swarmActors
+                if swarmTurnActiveInitial then
+                    swarmActors = State.Session.SwarmActors
+                end
+                Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, swarmActors, onFailed)
             end, function (spellName)
                 debugPrint(M.Utils.getDisplayName(uuid), "dash ok", spellName)
                 Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
@@ -338,7 +341,11 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     debugPrint(M.Utils.getDisplayName(uuid), "teleport request submitted", teleportSpellName)
                     -- NB: need to do this for RT also for RIC?
                     if State.Session.TurnBasedSwarmMode then
-                        Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, State.Session.SwarmActors, onFailed)
+                        local swarmActors
+                        if swarmTurnActiveInitial then
+                            swarmActors = State.Session.SwarmActors
+                        end
+                        Swarm.startActionSequenceFailsafeTimer(M.Roster.getBrawlerByUuid(uuid), request, swarmTurnActiveInitial, swarmActors, onFailed)
                     end
                 end, function (spellName)
                     debugPrint(M.Utils.getDisplayName(uuid), "teleport ok", spellName)
