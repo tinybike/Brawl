@@ -399,7 +399,7 @@ end
 local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, callback, count)
     count = count or 0
     local uuid = brawler.uuid
-    debugPrint("startActionSequenceFailsafeTimer", M.Utils.getDisplayName(uuid), request.Spell.Prootype, swarmTurnActiveInitial, count)
+    debugPrint(brawler.displayName, "startActionSequenceFailsafeTimer", request.Spell.Prototype, swarmTurnActiveInitial, count)
     local isRetry = false
     local currentCombatRound = M.Utils.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
@@ -408,13 +408,13 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
     end
     State.Session.ActionSequenceFailsafeTimer[uuid] = {}
     State.Session.ActionSequenceFailsafeTimer[uuid].timer = Ext.Timer.WaitFor(Constants.ACTION_MAX_TIME, function ()
-        debugPrint("Failsafe timer expired for", M.Utils.getDisplayName(uuid), swarmTurnActiveInitial, request.Spell.Prototype)
+        debugPrint(brawler.displayName, "failsafe timer expired for", swarmTurnActiveInitial, request.Spell.Prototype)
         State.Session.ActionSequenceFailsafeTimer[uuid] = nil
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
             return callback(uuid)
         end
         if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
-            debugPrint("Action timed out", request.Spell.Prototype, request.RequestGuid, isRetry)
+            debugPrint(brawler.displayName, "action timed out", request.Spell.Prototype, isRetry)
             Actions.removeActionInProgress(uuid, request.RequestGuid)
             if not isRetry then
                 return terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors, callback)
@@ -482,7 +482,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
                 terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end)
         end
-        if State.Session.ActionsInProgress[brawler.uuid] then
+        if State.Session.ActionsInProgress[brawler.uuid] and next(State.Session.ActionsInProgress[brawler.uuid]) then
             print(brawler.displayName)
             _D(State.Session.ActionsInProgress[brawler.uuid])
             error("we have a current AIP, what is this????")

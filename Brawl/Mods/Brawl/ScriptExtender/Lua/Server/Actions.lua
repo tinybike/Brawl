@@ -58,7 +58,7 @@ local function removeActionInProgress(casterUuid, requestUuid)
 end
 
 local function removeActionsInProgress(casterUuid)
-    if State.Session.ActionsInProgress[casterUuid] then
+    if State.Session.ActionsInProgress[casterUuid] and next(State.Session.ActionsInProgress[casterUuid]) then
         for _, actionInProgress in ipairs(State.Session.ActionsInProgress[casterUuid]) do
             removeActionInProgress(casterUuid, actionInProgress.requestUuid)
         end
