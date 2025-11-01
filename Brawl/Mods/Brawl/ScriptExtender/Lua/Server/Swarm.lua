@@ -482,11 +482,11 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
                 terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end)
         end
-        if State.Session.ActionsInProgress[brawler.uuid] and next(State.Session.ActionsInProgress[brawler.uuid]) then
-            print(brawler.displayName)
-            _D(State.Session.ActionsInProgress[brawler.uuid])
-            error("we have a current AIP, what is this????")
-        end
+        -- if State.Session.ActionsInProgress[brawler.uuid] and next(State.Session.ActionsInProgress[brawler.uuid]) then
+        --     print(brawler.displayName)
+        --     _D(State.Session.ActionsInProgress[brawler.uuid])
+        --     error("we have a current AIP, what is this????")
+        -- end
         AI.pulseAction(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
             if requestedEndTurn(brawler.uuid) then
@@ -825,7 +825,6 @@ local function onServerInterruptDecision()
         end
     end
 end
-
 
 return {
     getInitiativeRoll = getInitiativeRoll,

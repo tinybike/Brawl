@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, AI = true}
+Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, AI = true, Movement = true}
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -410,6 +410,7 @@ Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
 Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
 Constants.ACTION_MAX_TIME = 3000
+Constants.MOVEMENT_MAX_TIME = 5000
 Constants.ACTION_ATTEMPT_LIMIT = 5
 
 return Constants

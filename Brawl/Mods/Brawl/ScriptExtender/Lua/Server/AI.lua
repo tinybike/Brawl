@@ -25,7 +25,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
     end
     if not actionToTake then
-        print("***No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
+        debugPrint("***No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
         return onFailed("no hostile actions found")
         -- TODO do we need this fallback...?
         -- if M.Osi.IsPlayer(brawler.uuid) == 1 or State.Settings.TurnBasedSwarmMode then
@@ -39,6 +39,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     end
     if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.Spells.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
+        debugPrint(brawler.displayName, "checkConditions failed, exlcuding", actionToTake, #excludedSpells)
         table.insert(excludedSpells, actionToTake)
         if #excludedSpells > Constants.MAX_SPELL_EXCLUSIONS then
             return onFailed("too many exclusions")
@@ -46,7 +47,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         return actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        -- print(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
+        debugPrint(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
         Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, false, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
             if not bonusActionOnly then

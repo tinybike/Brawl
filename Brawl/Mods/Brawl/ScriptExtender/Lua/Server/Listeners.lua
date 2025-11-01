@@ -832,17 +832,9 @@ local function onLeveledUp(character)
 end
 
 local function onEntityEvent(characterGuid, eventUuid)
-    if State.Session.ActiveMovements[eventUuid] and State.Session.ActiveMovements[eventUuid].moverUuid then
+    if State.Session.ActiveMovements[eventUuid] then
         debugPrint("EntityEvent", characterGuid, eventUuid)
-        local activeMovement = State.Session.ActiveMovements[eventUuid]
-        local characterUuid = M.Osi.GetUUID(characterGuid)
-        if characterUuid == activeMovement.moverUuid then
-            if activeMovement.onMovementCompleted and type(activeMovement.onMovementCompleted) == "function" then
-                debugPrint("movement completed callback")
-                activeMovement.onMovementCompleted()
-            end
-            State.Session.ActiveMovements[eventUuid] = nil
-        end
+        Movement.finishMovement(M.Osi.GetUUID(characterGuid), eventUuid, State.Session.ActiveMovements[eventUuid])
     end
 end
 
@@ -851,6 +843,7 @@ local function onReactionInterruptActionNeeded(characterGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
     end
+    Movement.pauseTimers()
 end
 
 local function onServerInterruptUsed(entity, label, component)
@@ -864,12 +857,14 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
     end
+    Movement.resumeTimers()
 end
 
 local function onServerInterruptDecision()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onServerInterruptDecision()
     end
+    Movement.resumeTimers()
 end
 
 local function stopListeners()

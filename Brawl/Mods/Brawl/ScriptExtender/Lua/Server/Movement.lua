@@ -105,27 +105,73 @@ local function findPathToPosition(uuid, position, callback)
     callback(nil, validPosition)
 end
 
-local function registerActiveMovement(moverUuid, onMovementCompleted)
+local function finishMovement(uuid, eventUuid, activeMovement)
+    if uuid and activeMovement and uuid == activeMovement.moverUuid then
+        debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
+        Ext.Timer.Cancel(activeMovement.timer)
+        activeMovement.onCompleted()
+        State.Session.ActiveMovements[eventUuid] = nil
+    end
+end
+
+local function getActiveMovement(moverUuid)
+    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+        for eventUuid, activeMovement in pairs(State.Session.ActiveMovements) do
+            if activeMovement.moverUuid == moverUuid then
+                return activeMovement
+            end
+        end
+    end
+end
+
+local function pauseTimers()
+    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+        for _, activeMovement in pairs(State.Session.ActiveMovements) do
+            Ext.Timer.Pause(activeMovement.timer)
+        end
+    end
+end
+
+local function resumeTimers()
+    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+        for _, activeMovement in pairs(State.Session.ActiveMovements) do
+            Ext.Timer.Resume(activeMovement.timer)
+        end
+    end
+end
+
+local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCompleted, onFailed)
     local eventUuid = Utils.createUuid()
-    State.Session.ActiveMovements[eventUuid] = {moverUuid = moverUuid, onMovementCompleted = onMovementCompleted}
+    State.Session.ActiveMovements[eventUuid] = {
+        moverUuid = moverUuid,
+        goalPosition = goalPosition,
+        goalTarget = goalTarget,
+        onCompleted = onCompleted or noop,
+        timer = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
+            debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
+            onFailed("movement timed out")
+        end),
+    }
+    debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
+    debugDump(State.Session.ActiveMovements[eventUuid])
     return eventUuid
 end
 
-local function moveToTargetUuid(uuid, targetUuid, override, callback)
-    debugPrint("moveToTargetUuid", uuid, targetUuid, override)
+local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFailed)
+    debugPrint(M.Utils.getDisplayName(uuid), "moveToTargetUuid", targetUuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
-    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
+    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, nil, targetUuid, onCompleted, onFailed))
     return true
 end
 
-local function moveToPosition(uuid, position, override, callback)
-    -- print("moveToPosition", uuid, override, position[1], position[2], position[3])
+local function moveToPosition(uuid, position, override, onCompleted, onFailed)
+    debugPrint(M.Utils.getDisplayName(uuid), "moveToPosition", position[1], position[2], position[3], override)
     if override then
         clearOsirisQueue(uuid)
     end
-    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, callback))
+    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, position, nil, onCompleted, onFailed))
     return true
 end
 
@@ -154,20 +200,18 @@ local function calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     local dy = yMover - yTarget
     local dz = zMover - zTarget
     local fracDistance = goalDistance / math.sqrt(dx*dx + dy*dy + dz*dz)
-    -- return M.Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 0, moverUuid, 1)
     return M.Osi.FindValidPosition(xTarget + dx*fracDistance, yTarget + dy*fracDistance, zTarget + dz*fracDistance, 2.0, moverUuid, 1)
 end
 
-local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance, callback)
+local function moveToDistanceFromTarget(moverUuid, targetUuid, goalDistance, onCompleted, onFailed)
     local x, y, z = calculateEnRouteCoords(moverUuid, targetUuid, goalDistance)
     if x ~= nil and y ~= nil and z ~= nil then
-        return moveToPosition(moverUuid, {x, y, z}, not State.Settings.TurnBasedSwarmMode, callback)
+        return moveToPosition(moverUuid, {x, y, z}, not State.Settings.TurnBasedSwarmMode, onCompleted, onFailed)
     end
     debugPrint(M.Utils.getDisplayName(moverUuid), "Failed to get en route coordinates", M.Utils.getDisplayName(targetUuid), x, y, z, goalDistance)
-    if callback ~= nil then
-        callback()
+    if onFailed then
+        onFailed("Failed to get en route coordinates")
     end
-    return false
 end
 
 local function holdPosition(entityUuid)
@@ -384,7 +428,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "best within range, moving to")
-                return moveToPosition(uuid, bestPos, override, onSuccess)
+                return moveToPosition(uuid, bestPos, override, onSuccess, onFailed)
             end
             -- 2) interpolation fallback if farDist < baseMove
             if farPos and nextPos and farDist < allowedDistance then
@@ -414,7 +458,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             -- 3) final fallback move
             debugPrint("final fallback move")
-            moveToPosition(uuid, farPos, override, onSuccess)
+            moveToPosition(uuid, farPos, override, onSuccess, onFailed)
         end)
         if path then
             path.CanUseLadders = true
@@ -455,6 +499,9 @@ return {
     getMovementDistanceAmount = getMovementDistanceAmount,
     getMovementDistanceMaxAmount = getMovementDistanceMaxAmount,
     getRemainingMovement = getRemainingMovement,
+    finishMovement = finishMovement,
+    pauseTimers = pauseTimers,
+    resumeTimers = resumeTimers,
     setMovementToMax = setMovementToMax,
     moveToTargetUuid = moveToTargetUuid,
     moveToPosition = moveToPosition,
