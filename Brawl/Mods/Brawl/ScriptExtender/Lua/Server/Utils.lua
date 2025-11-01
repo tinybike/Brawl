@@ -32,6 +32,16 @@ local function dumpAllEntityKeys(entity)
     end
 end
 
+local function dumpInventory(entity)
+    if entity and entity.InventoryOwner and entity.InventoryOwner.PrimaryInventory and entity.InventoryOwner.PrimaryInventory.InventoryContainer and entity.InventoryOwner.PrimaryInventory.InventoryContainer.Items then
+        for slot, item in pairs(entity.InventoryOwner.PrimaryInventory.InventoryContainer.Items) do
+            if item.Item and item.Item.Uuid and item.Item.Uuid.EntityUuid then
+                print(slot, M.Utils.getDisplayName(item.Item.Uuid.EntityUuid), item.Item.Uuid.EntityUuid)
+            end
+        end
+    end
+end
+
 local function dumpEntityToFile(entityUuid)
     Ext.IO.SaveFile(entityUuid .. ".json", Ext.DumpExport(Ext.Entity.Get(entityUuid):GetAllComponents()))
 end
@@ -280,6 +290,10 @@ end
 
 local function isToT()
     return Mods.ToT ~= nil and Mods.ToT.IsActive()
+end
+
+local function isBlinded(uuid)
+    return M.Osi.HasActiveStatusWithGroup(uuid, "SG_Blinded")
 end
 
 local function isSilenced(uuid)
@@ -638,6 +652,7 @@ return {
     debugPrint = debugPrint,
     debugDump = debugDump,
     dumpAllEntityKeys = dumpAllEntityKeys,
+    dumpInventory = dumpInventory,
     dumpEntityToFile = dumpEntityToFile,
     checkNearby = checkNearby,
     getDisplayName = getDisplayName,
@@ -663,6 +678,7 @@ return {
     getPointInFrontOf = getPointInFrontOf,
     clearOsirisQueue = clearOsirisQueue,
     isToT = isToT,
+    isBlinded = isBlinded,
     isSilenced = isSilenced,
     createDummyObject = createDummyObject,
     showNotification = showNotification,

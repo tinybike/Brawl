@@ -65,6 +65,7 @@ local Memoizable = {
         "getPointInFrontOf",
         "isCounterspell",
         "isSilenced",
+        "isBlinded",
         "isPlayerTurnEnded",
         "canAct",
         "canMove",

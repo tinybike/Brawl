@@ -320,7 +320,8 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     onFailed = onFailed or noop
     debugPrint(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local swarmTurnActiveInitial = State.Session.SwarmTurnActive
-    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+    -- if we're blinded, we need to be in melee range to do anything...
+    local spellRange = M.Utils.isBlinded(casterUuid) and Constants.MELEE_RANGE or M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
     -- if unit can’t move at all (sentinel foe etc)
     if not M.Utils.canMove(uuid) then
         if M.Osi.GetDistanceTo(uuid, targetUuid) - spellRange > 0 then

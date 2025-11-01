@@ -159,7 +159,7 @@ local function isSpellExcluded(spellName, excludedSpells)
 end
 
 -- NB need to allow healing, buffs, debuffs etc for companions too
-local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
+local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly)
     if spellName == nil or spell == nil then
         return false
     end
@@ -168,6 +168,10 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     end
     -- If we're silenced, we can't use spells that have a verbal component
     if isSilenced and spell.hasVerbalComponent then
+        return false
+    end
+    -- If we're already concentrating, don't use another concentration spell
+    if isConcentrating and spell.isConcentration then
         return false
     end
     -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
@@ -223,7 +227,7 @@ local function isNpcSpellUsable(spellName)
     return true
 end
 
-local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, excludedSpells, bonusActionOnly)
+local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly)
     if spellName == nil or spell == nil then
         return false
     end
@@ -231,6 +235,9 @@ local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilen
         return false
     end
     if isSilenced and spell.hasVerbalComponent then
+        return false
+    end
+    if isConcentrating and spell.isConcentration then
         return false
     end
     if spell.type == "Healing" and not spell.isDirectHeal then
@@ -264,7 +271,8 @@ end
 -- 4. Status effects/buffs (NYI)
 local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
     local weightedSpells = {}
-    local silenced = M.Utils.isSilenced(uuid)
+    local isSilenced = M.Utils.isSilenced(uuid)
+    local isConcentrating = M.Utils.isConcentrating(uuid)
     local hasLineOfSight = M.Osi.HasLineOfSight(uuid, targetUuid) == 1
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -276,8 +284,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                     break
                 end
             end
-            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
-                -- debugPrint("Companion get spell weight for", spellName, distanceToTarget, archetype, spell.type, numExtraAttacks)
+            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
@@ -295,7 +302,8 @@ end
 -- 3. Status effects/buffs/debuffs (NYI)
 local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, bonusActionOnly)
     local weightedSpells = {}
-    local silenced = M.Utils.isSilenced(uuid)
+    local isSilenced = M.Utils.isSilenced(uuid)
+    local isConcentrating = M.Utils.isConcentrating(uuid)
     local hasLineOfSight = M.Osi.HasLineOfSight(uuid, targetUuid) == 1
     for _, preparedSpell in pairs(preparedSpells) do
         local spellName = preparedSpell.OriginatorPrototype
@@ -307,7 +315,7 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpell
                     break
                 end
             end
-            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, silenced, excludedSpells, bonusActionOnly) then
+            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly) then
                 weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end

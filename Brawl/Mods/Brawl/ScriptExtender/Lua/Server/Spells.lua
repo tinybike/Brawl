@@ -241,6 +241,17 @@ local function checkForUnarmedDamage(spell)
     return false
 end
 
+local function checkForConcentration(spellFlags)
+    if not spellFlags or spellFlags == "" then
+        return false
+    end
+    for _, flag in ipairs(spellFlags) do
+        if flag == "IsConcentration" then
+            return true
+        end
+    end
+end
+
 local function checkForApplyStatus(spell, applyStatusType)
     if spell and spell[applyStatusType] then
         for j, spellSuccess in ipairs(spell[applyStatusType]) do
@@ -368,6 +379,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             isSafeAoE = isSafeAoESpell(spellName),
             applyStatusOnSuccess = checkForApplyStatus(spell, "SpellSuccess"),
             applyStatus = checkForApplyStatus(spell, "SpellProperties"),
+            isConcentration = checkForConcentration(spell.SpellFlags),
             isSelfOnly = hasCondition(spell.TargetConditions, "Self()"),
             isCharacterOnly = hasCondition(spell.TargetConditions, "Character()"),
             conditions = {
@@ -499,7 +511,6 @@ local function getAuras(entityUuid)
                 local stats = Ext.Stats.Get(spellName)
                 local spell = M.Spells.getSpellByName(spellName)
                 if Utils.startsWith(spellName, "Shout_AuraOf_") and stats.UseCosts == "" and spell.applyStatus and spell.applyStatus ~= "AI_HELPER_BUFF" then
-                    -- auras[spellName] = spell.applyStatus
                     table.insert(auras, spellName)
                 end
             end
