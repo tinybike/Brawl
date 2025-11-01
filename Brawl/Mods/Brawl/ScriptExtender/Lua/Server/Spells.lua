@@ -488,6 +488,26 @@ local function resetSpellData()
     end
 end
 
+local function getAuras(entityUuid)
+    local auras = {}
+    if entityUuid then
+        local entity = Ext.Entity.Get(entityUuid)
+        if entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+            local preparedSpells = entity.SpellBookPrepares.PreparedSpells
+            for _, preparedSpell in ipairs(preparedSpells) do
+                local spellName = preparedSpell.OriginatorPrototype
+                local stats = Ext.Stats.Get(spellName)
+                local spell = M.Spells.getSpellByName(spellName)
+                if Utils.startsWith(spellName, "Shout_AuraOf_") and stats.UseCosts == "" and spell.applyStatus and spell.applyStatus ~= "AI_HELPER_BUFF" then
+                    -- auras[spellName] = spell.applyStatus
+                    table.insert(auras, spellName)
+                end
+            end
+        end
+    end
+    return auras
+end
+
 local function getRageAbility(entityUuid)
     if entityUuid then
         local entity = Ext.Entity.Get(entityUuid)
@@ -515,6 +535,7 @@ return {
     isSingleSelect = isSingleSelect,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
+    getAuras = getAuras,
     getRageAbility = getRageAbility,
     getSpellByName = getSpellByName,
 }

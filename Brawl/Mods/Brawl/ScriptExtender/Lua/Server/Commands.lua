@@ -325,6 +325,9 @@ local function onActionButton(data, isController)
 end
 
 local function onAttackMyTarget(data)
+    if State.Settings.TurnBasedSwarmMode and Utils.getCombatEntity() then
+        return false
+    end
     if State.Session.Players and State.Session.Brawlers then
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         local level = M.Osi.GetRegion(player.uuid)
@@ -375,6 +378,9 @@ local function onCancelQueuedMovement(data)
 end
 
 local function onOnMe(data)
+    if State.Settings.TurnBasedSwarmMode and Utils.getCombatEntity() then
+        return false
+    end
     if State.Session.Players then
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
@@ -385,6 +391,9 @@ local function onOnMe(data)
 end
 
 local function onAttackMove(data)
+    if State.Settings.TurnBasedSwarmMode and Utils.getCombatEntity() then
+        return false
+    end
     if State.Session.Players then
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
@@ -394,6 +403,9 @@ local function onAttackMove(data)
 end
 
 local function onRequestHeal(data)
+    if State.Settings.TurnBasedSwarmMode and Utils.getCombatEntity() then
+        return false
+    end
     debugPrint("Requesting Heal")
     local userId = Utils.peerToUserId(data.UserID)
     if userId then

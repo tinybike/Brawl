@@ -27,15 +27,6 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     if not actionToTake then
         debugPrint("***No hostile actions available for", brawler.uuid, brawler.displayName, bonusActionOnly)
         return onFailed("no hostile actions found")
-        -- TODO do we need this fallback...?
-        -- if M.Osi.IsPlayer(brawler.uuid) == 1 or State.Settings.TurnBasedSwarmMode then
-        --     return onFailed()
-        -- end
-        -- actionToTake = selectRandomSpell(preparedSpells)
-        -- debugPrint(brawler.displayName, "backup ActionToTake", actionToTake, numUsableSpells)
-        -- if not actionToTake then
-        --     return onFailed()
-        -- end
     end
     if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.Spells.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
@@ -206,6 +197,10 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     -- Rage check for barbarians: if rage is available and we're not already raging, then we should use it
     if State.Settings.TurnBasedSwarmMode and Pick.shouldRage(brawler.uuid, brawler.rage) then
         return Actions.startRage(brawler.uuid, brawler.rage, onSubmitted, onCompleted, onFailed)
+    end
+    -- Aura check for Paladins: auras should always be on, if available
+    if Pick.shouldUseAuras(brawler.uuid, brawler.auras) then
+        return Actions.startAuras(brawler.uuid, brawler.auras, onSubmitted, onCompleted, onFailed)
     end
     -- Doesn't currently have an attack target, so let's find one
     if brawler.targetUuid == nil then

@@ -323,11 +323,32 @@ local function startRage(uuid, rage, onSubmitted, onCompleted, onFailed)
         if not Utils.startsWith(spellName, "Shout_Rage_Giant") then
             return onCompleted(spellName)
         end
-        -- NB: should this onSubmitted just be a noop?  can execute 2x
+        -- NB: this onSubmitted can execute 2x
         Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
             Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", true, onSubmitted, onCompleted, onFailed)
         end)
     end, onFailed)
+end
+
+local function startAuras(uuid, auras, onSubmitted, onCompleted, onFailed)
+    debugPrint(M.Utils.getDisplayName(uuid), "startAuras", #auras)
+    local function startAura(index)
+        if index > #auras then
+            return onCompleted(auras[#auras])
+        end
+        local aura = auras[index]
+        if not M.Pick.checkConditions({caster = uuid, target = uuid}, M.Spells.getSpellByName(aura)) then
+            debugPrint(M.Utils.getDisplayName(uuid), aura, "aura checkCondition failed, going to next aura...")
+            return startAura(index + 1)
+        end
+        Actions.useSpellOnTarget(uuid, uuid, aura, true, onSubmitted, function (spellName)
+            debugPrint(M.Utils.getDisplayName(uuid), spellName, "aura successfully activated")
+            Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
+                startAura(index + 1)
+            end)
+        end, onFailed)
+    end
+    startAura(1)
 end
 
 return {
@@ -342,4 +363,5 @@ return {
     useSpell = useSpell,
     useSpellOnTarget = useSpellOnTarget,
     startRage = startRage,
+    startAuras = startAuras,
 }

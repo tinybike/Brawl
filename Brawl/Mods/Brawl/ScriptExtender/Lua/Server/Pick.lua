@@ -595,6 +595,17 @@ local function shouldRage(uuid, rage)
     return rage and checkConditions({caster = uuid, target = uuid}, M.Spells.getSpellByName(rage))
 end
 
+local function shouldUseAuras(uuid, auras)
+    if auras and next(auras) then
+        for _, aura in ipairs(auras) do
+            if M.Pick.checkConditions({caster = uuid, target = uuid}, M.Spells.getSpellByName(aura)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 return {
     getResistanceWeight = getResistanceWeight,
     getSpellWeight = getSpellWeight,
@@ -610,4 +621,5 @@ return {
     getWeightedTargets = getWeightedTargets,
     decideOnTarget = decideOnTarget,
     shouldRage = shouldRage,
+    shouldUseAuras = shouldUseAuras,
 }

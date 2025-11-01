@@ -108,9 +108,12 @@ end
 local function finishMovement(uuid, eventUuid, activeMovement)
     if uuid and activeMovement and uuid == activeMovement.moverUuid then
         debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
-        Ext.Timer.Cancel(activeMovement.timer)
-        activeMovement.onCompleted()
+        if activeMovement.timer and activeMovement.timer.handle then
+            Ext.Timer.Cancel(activeMovement.timer.handle)
+            activeMovement.timer.paused = false
+        end
         State.Session.ActiveMovements[eventUuid] = nil
+        activeMovement.onCompleted()
     end
 end
 
@@ -127,7 +130,9 @@ end
 local function pauseTimers()
     if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
         for _, activeMovement in pairs(State.Session.ActiveMovements) do
-            Ext.Timer.Pause(activeMovement.timer)
+            if activeMovement and activeMovement.timer and activeMovement.timer.handle and not activeMovement.timer.paused then
+                Ext.Timer.Pause(activeMovement.timer.handle)
+            end
         end
     end
 end
@@ -135,7 +140,9 @@ end
 local function resumeTimers()
     if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
         for _, activeMovement in pairs(State.Session.ActiveMovements) do
-            Ext.Timer.Resume(activeMovement.timer)
+            if activeMovement and activeMovement.timer and activeMovement.timer.handle and activeMovement.timer.paused then
+                Ext.Timer.Resume(activeMovement.timer.handle)
+            end
         end
     end
 end
@@ -147,10 +154,13 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
         goalPosition = goalPosition,
         goalTarget = goalTarget,
         onCompleted = onCompleted or noop,
-        timer = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
-            debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
-            onFailed("movement timed out")
-        end),
+        timer = {
+            handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
+                debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
+                onFailed("movement timed out")
+            end),
+            paused = false,
+        },
     }
     debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
     debugDump(State.Session.ActiveMovements[eventUuid])
@@ -435,7 +445,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 local origFrac = (allowedDistance - farDist)/(nextDist - farDist)
                 local frac = origFrac
                 local valid = false
-                for attempt = 1, 10 do
+                for attempt = 1, Constants.MOVEMENT_INTERPOLATION_LIMIT do
                     local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
                     local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
                     local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
@@ -445,7 +455,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                         valid = true
                         break
                     end
-                    frac = origFrac*((10 - attempt)/10)
+                    frac = origFrac*((Constants.MOVEMENT_INTERPOLATION_LIMIT - attempt)/Constants.MOVEMENT_INTERPOLATION_LIMIT)
                 end
                 debugPrint(M.Utils.getDisplayName(uuid), "interpolation result")
                 debugDump(farPos)

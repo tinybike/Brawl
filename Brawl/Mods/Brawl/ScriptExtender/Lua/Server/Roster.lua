@@ -53,10 +53,11 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 archetype = State.getArchetype(entityUuid),
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
+                auras = Spells.getAuras(entityUuid),
             }
             if State.getArchetype(entityUuid) == "barbarian" then
-                print("barb archetype, setting rage")
                 brawler.rage = Spells.getRageAbility(entityUuid)
+                debugPrint(displayName, "barbarian archetype, setting rage", brawler.rage)
             end
             debugPrint(displayName, "Adding Brawler", entityUuid, brawler.actionInterval)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
