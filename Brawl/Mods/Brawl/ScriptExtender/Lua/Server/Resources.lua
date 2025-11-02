@@ -94,53 +94,56 @@ local function decreaseActionResource(uuid, resourceType, amount)
     entity:Replicate("ActionResources")
 end
 
-local function checkSpellCharge(casterUuid, spellName)
-    -- debugPrint("checking spell charge", casterUuid, spellName)
-    if spellName then
-        local entity = Ext.Entity.Get(casterUuid)
-        if entity and entity.SpellBook and entity.SpellBook.Spells then
-            for i, spell in ipairs(entity.SpellBook.Spells) do
-                -- NB: OriginatorPrototype or Prototype?
-                if spell.Id.Prototype == spellName then
-                    if spell.Charged == false then
-                        debugPrint("spell is not charged", spellName, casterUuid)
-                        return false
-                    end
-                end
+local function isSpellPrepared(uuid, spellName)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+        for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+            if preparedSpell.OriginatorPrototype == spellName then
+                return true
             end
-            return true
         end
     end
-    return false
+end
+
+local function isSpellOnCooldown(uuid, spellName)
+    if not spellName or not uuid then
+        return false
+    end
+    local entity = Ext.Entity.Get(uuid)
+    if not entity then
+        return false
+    end
+    if entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns then
+        for _, cooldown in ipairs(entity.SpellBookCooldowns.Cooldowns) do
+            if cooldown.SpellId.OriginatorPrototype ~= cooldown.SpellId.Prototype then
+                print(M.Utils.getDisplayName(uuid), "OriginatorPrototype and Prototype don't match, what is this?")
+                _D(cooldown)
+            end
+            if cooldown.SpellId and cooldown.SpellId.OriginatorPrototype == spellName then
+                debugPrint(M.Utils.getDisplayName(uuid), "spell on cooldown", spellName, uuid)
+                return false
+            end
+        end
+    end
+    return true
 end
 
 local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
-    local entity = Ext.Entity.Get(casterUuid)
-    local isSpellPrepared = false
-    if not entity or not entity.SpellBookPrepares or not entity.SpellBookPrepares.PreparedSpells then
-        return false
-    end
-    for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
-        if preparedSpell.OriginatorPrototype == spellName then
-            isSpellPrepared = true
-            break
-        end
-    end
-    if not isSpellPrepared then
+    if not M.Resources.isSpellPrepared(casterUuid, spellName) then
         debugPrint("Caster does not have spell", spellName, "prepared")
         return false
     end
     if variant ~= nil then
         spellName = variant
     end
-    local spell = Spells.getSpellByName(spellName)
+    local spell = M.Spells.getSpellByName(spellName)
     if not spell then
         debugPrint("Error: spell not found")
         return false
     end
     for costType, costValue in pairs(spell.costs) do
         if costType == "ShortRest" or costType == "LongRest" then
-            if costValue and not M.Resources.checkSpellCharge(casterUuid, spellName) then
+            if costValue and not M.Resources.isSpellOnCooldown(casterUuid, spellName) then
                 return false
             end
         elseif costType == "SpellSlot" or costType == "WarlockSpellSlot" then
@@ -161,60 +164,6 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     return true
 end
 
-local function deductCastedSpell(uuid, spellName)
-    local entity = Ext.Entity.Get(uuid)
-    local spell = Spells.getSpellByName(spellName)
-    if entity and spell then
-        for costType, costValue in pairs(spell.costs) do
-            if costType == "ShortRest" or costType == "LongRest" then
-                if costValue then
-                    if entity.SpellBook and entity.SpellBook.Spells then
-                        for _, spell in ipairs(entity.SpellBook.Spells) do
-                            if spell.Id.Prototype == spellName then
-                                spell.Charged = false
-                                debugPrint("setting Charged to false", spellName, M.Utils.getDisplayName(uuid))
-                                entity:Replicate("SpellBook")
-                                break
-                            end
-                        end
-                    end
-                end
-            -- elseif State.Settings.TurnBasedSwarmMode or (costType ~= "ActionPoint" and costType ~= "BonusActionPoint") then
-            --     if costType == "SpellSlot" then
-            --         if entity.ActionResources and entity.ActionResources.Resources then
-            --             local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
-            --             if spellSlots then
-            --                 for _, spellSlot in ipairs(spellSlots) do
-            --                     if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
-            --                         spellSlot.Amount = spellSlot.Amount - 1
-            --                         break
-            --                     end
-            --                 end
-            --             end
-            --         end
-            --     else
-            --         if not Constants.ACTION_RESOURCES[costType] then
-            --             debugPrint("unknown costType", costType)
-            --         elseif entity.ActionResources and entity.ActionResources.Resources then
-            --             local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
-            --             if resources then
-            --                 local resource = resources[1] -- NB: always index 1?
-            --                 if resource.Amount ~= nil then
-            --                     if resource.Amount >= costValue then
-            --                         resource.Amount = resource.Amount - costValue
-            --                     else
-            --                         resource.Amount = 0
-            --                     end
-            --                 end
-            --             end
-            --         end
-            --     end
-            end
-        end
-        entity:Replicate("ActionResources")
-    end
-end
-
 return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
@@ -227,7 +176,7 @@ return {
     restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
-    checkSpellCharge = checkSpellCharge,
+    isSpellPrepared = isSpellPrepared,
+    isSpellOnCooldown = isSpellOnCooldown,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
-    deductCastedSpell = deductCastedSpell,
 }

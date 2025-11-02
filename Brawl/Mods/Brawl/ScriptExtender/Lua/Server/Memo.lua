@@ -98,6 +98,8 @@ local Memoizable = {
         "checkConditions",
         "getResistanceWeight",
         "isNpcSpellUsable",
+        "isCompanionSpellAvailable",
+        "isEnemySpellAvailable",
         "getOffenseWeightedTarget",
         "getBalancedWeightedTarget",
         "getDefenseWeightedTarget",
@@ -114,7 +116,8 @@ local Memoizable = {
     Resources = {
         "getActionResourceInfo",
         "getActionResourceName",
-        "checkSpellCharge",
+        "isSpellPrepared",
+        "isSpellOnCooldown",
         "hasEnoughToCastSpell",
     },
     Movement = {

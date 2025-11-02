@@ -571,7 +571,6 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         Utils.checkDivineIntervention(spellName, casterUuid)
         -- debugPrint("onCompleted")
         actionInProgress.onCompleted(spellName)
-        Resources.deductCastedSpell(casterUuid, spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
     end
     if M.Utils.isCounterspell(spellName) then
@@ -610,7 +609,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 Utils.checkDivineIntervention(spellName, casterUuid)
-                Resources.deductCastedSpell(casterUuid, spellName)
                 debugPrint("onCompleted")
                 onCompleted(spellName)
             else

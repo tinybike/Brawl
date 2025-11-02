@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, AI = true, Movement = true}
+Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, AI = true, Movement = true, Pick = true, Resources = true}
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000

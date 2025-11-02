@@ -284,8 +284,8 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                     break
                 end
             end
-            if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+            if M.Pick.isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
+                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -315,8 +315,8 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpell
                     break
                 end
             end
-            if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+            if M.Pick.isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly) then
+                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -618,6 +618,8 @@ return {
     getResistanceWeight = getResistanceWeight,
     getSpellWeight = getSpellWeight,
     isNpcSpellUsable = isNpcSpellUsable,
+    isCompanionSpellAvailable = isCompanionSpellAvailable,
+    isEnemySpellAvailable = isEnemySpellAvailable,
     checkConditions = checkConditions,
     selectRandomSpell = selectRandomSpell,
     decideCompanionActionOnTarget = decideCompanionActionOnTarget,
