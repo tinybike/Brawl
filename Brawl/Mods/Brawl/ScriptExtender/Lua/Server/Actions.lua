@@ -178,7 +178,7 @@ local function buildTargets(casterUuid, spellName, targetUuid, targetingType, is
     table.insert(targets, buildTarget(targetUuid, targetingType))
     if isFriendlyTarget then
         local spell = M.Spells.getSpellByName(spellName)
-        local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+        local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), casterUuid)
         local level = M.Osi.GetRegion(casterUuid)
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel and spell.amountOfTargets and spell.amountOfTargets > 1 then
@@ -291,7 +291,7 @@ local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, var
     if upcastLevel ~= nil then
         spellName = spellName .. "_" .. tostring(upcastLevel)
     end
-    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), casterUuid)
     local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
     if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
         debugPrint("cast failed, out of range", M.Utils.getDisplayName(casterUuid), M.Utils.getDisplayName(targetUuid), distanceTo, spellRange, spellName)

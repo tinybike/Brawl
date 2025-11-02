@@ -33,13 +33,63 @@ local function dumpAllEntityKeys(entity)
 end
 
 local function dumpInventory(entity)
-    if entity and entity.InventoryOwner and entity.InventoryOwner.PrimaryInventory and entity.InventoryOwner.PrimaryInventory.InventoryContainer and entity.InventoryOwner.PrimaryInventory.InventoryContainer.Items then
-        for slot, item in pairs(entity.InventoryOwner.PrimaryInventory.InventoryContainer.Items) do
-            if item.Item and item.Item.Uuid and item.Item.Uuid.EntityUuid then
-                print(slot, M.Utils.getDisplayName(item.Item.Uuid.EntityUuid), item.Item.Uuid.EntityUuid)
+    if entity and entity.InventoryOwner and entity.InventoryOwner.Inventories then
+        _P(M.Utils.getDisplayName(entity.Uuid.EntityUuid), "has", #entity.InventoryOwner.Inventories, "INVENTORIES")
+        for i, inventory in ipairs(entity.InventoryOwner.Inventories) do
+            _P("INVENTORY", i, inventory.InventoryData.Type)
+            if inventory.InventoryContainer and inventory.InventoryContainer.Items then
+                for slot, item in pairs(inventory.InventoryContainer.Items) do
+                    if item.Item and item.Item.Uuid and item.Item.Uuid.EntityUuid then
+                        _P(slot, M.Utils.getDisplayName(item.Item.Uuid.EntityUuid), item.Item.Uuid.EntityUuid)
+                    end
+                end
             end
         end
     end
+end
+
+local function getEquipmentInventory(entity)
+    if entity and entity.InventoryOwner and entity.InventoryOwner.Inventories then
+        for i, inventory in ipairs(entity.InventoryOwner.Inventories) do
+            if inventory.InventoryData and inventory.InventoryData.Type == "Equipment" then
+                return inventory
+            end
+        end
+    end
+end
+
+local function getEquippedMeleeWeapon(uuid)
+    if uuid then
+        local inv = getEquipmentInventory(Ext.Entity.Get(uuid))
+        if inv and inv.InventoryContainer and inv.InventoryContainer.Items and inv.InventoryContainer.Items[Constants.MELEE_WEAPON_SLOT] then
+            return inv.InventoryContainer.Items[Constants.MELEE_WEAPON_SLOT].Item
+        end
+    end
+end
+
+local function getEquippedRangedWeapon(uuid)
+    if uuid then
+        local inv = getEquipmentInventory(Ext.Entity.Get(uuid))
+        if inv and inv.InventoryContainer and inv.InventoryContainer.Items and inv.InventoryContainer.Items[Constants.RANGED_WEAPON_SLOT] then
+            return inv.InventoryContainer.Items[Constants.RANGED_WEAPON_SLOT].Item
+        end
+    end
+end
+
+local function getMeleeWeaponRange(uuid)
+    local item = getEquippedMeleeWeapon(uuid)
+    if not item or not item.Weapon or not item.Weapon.WeaponRange then
+        return Constants.MELEE_RANGE
+    end
+    return item.Weapon.WeaponRange
+end
+
+local function getRangedWeaponRange(uuid)
+    local item = getEquippedRangedWeapon(uuid)
+    if not item or not item.Weapon or not item.Weapon.WeaponRange then
+        return Constants.RANGED_RANGE_MAX
+    end
+    return item.Weapon.WeaponRange
 end
 
 local function dumpEntityToFile(entityUuid)
@@ -173,11 +223,13 @@ local function isProjectileSpell(spellName)
     return M.Utils.split(spellName, "_")[1] == "Projectile"
 end
 
-local function convertSpellRangeToNumber(range)
-    if range == "RangedMainWeaponRange" or range == "ThrownObjectRange" then
-        return 18
+local function convertSpellRangeToNumber(range, uuid)
+    if range == "RangedMainWeaponRange" then
+        return M.Utils.getRangedWeaponRange(uuid)
+    elseif range == "ThrownObjectRange" then
+        return Constants.THROWN_RANGE_MAX
     elseif range == "MeleeMainWeaponRange" then
-        return 2
+        return M.Utils.getMeleeWeaponRange(uuid)
     else
         return tonumber(range)
     end
@@ -653,6 +705,11 @@ return {
     debugDump = debugDump,
     dumpAllEntityKeys = dumpAllEntityKeys,
     dumpInventory = dumpInventory,
+    getEquipmentInventory = getEquipmentInventory,
+    getEquippedMeleeWeapon = getEquippedMeleeWeapon,
+    getEquippedRangedWeapon = getEquippedRangedWeapon,
+    getMeleeWeaponRange = getMeleeWeaponRange,
+    getRangedWeaponRange = getRangedWeaponRange,
     dumpEntityToFile = dumpEntityToFile,
     checkNearby = checkNearby,
     getDisplayName = getDisplayName,

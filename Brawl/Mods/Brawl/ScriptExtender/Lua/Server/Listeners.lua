@@ -590,8 +590,8 @@ end
 
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
+    -- _D(cast:GetAllComponents())
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
-        -- debugDump(cast:GetAllComponents())
         -- debugDump(cast.SpellCastState)
         -- debugDump(cast.ServerSpellCastState)
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid

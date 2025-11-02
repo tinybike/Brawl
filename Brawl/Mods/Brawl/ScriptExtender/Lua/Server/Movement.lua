@@ -235,11 +235,12 @@ local function holdPosition(entityUuid)
     end
 end
 
+-- TODO make this a little smarter...
 local function repositionRelativeToTarget(brawlerUuid, targetUuid)
     local archetype = Osi.GetActiveArchetype(brawlerUuid)
     local distanceToTarget = M.Osi.GetDistanceTo(brawlerUuid, targetUuid)
     if archetype == "melee" then
-        if distanceToTarget > Constants.MELEE_RANGE then
+        if distanceToTarget > M.Utils.getMeleeWeaponRange(brawlerUuid) then
             Osi.FlushOsirisQueue(brawlerUuid)
             moveToTargetUuid(brawlerUuid, targetUuid, false)
         else
@@ -247,11 +248,11 @@ local function repositionRelativeToTarget(brawlerUuid, targetUuid)
         end
     else
         debugPrint("misc bucket reposition", brawlerUuid, M.Utils.getDisplayName(brawlerUuid))
-        if distanceToTarget <= Constants.MELEE_RANGE then
+        if distanceToTarget <= M.Utils.getMeleeWeaponRange(brawlerUuid) then
             holdPosition(brawlerUuid)
         elseif distanceToTarget < Constants.RANGED_RANGE_MIN then
             moveToDistanceFromTarget(brawlerUuid, targetUuid, Constants.RANGED_RANGE_SWEETSPOT)
-        elseif distanceToTarget < Constants.RANGED_RANGE_MAX then
+        elseif distanceToTarget < M.Utils.getRangedWeaponRange(brawlerUuid) then
             holdPosition(brawlerUuid)
         else
             moveToDistanceFromTarget(brawlerUuid, targetUuid, Constants.RANGED_RANGE_SWEETSPOT)
@@ -321,7 +322,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     debugPrint(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local swarmTurnActiveInitial = State.Session.SwarmTurnActive
     -- if we're blinded, we need to be in melee range to do anything...
-    local spellRange = M.Utils.isBlinded(casterUuid) and Constants.MELEE_RANGE or M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+    local spellRange = M.Utils.isBlinded(uuid) and M.Utils.getMeleeWeaponRange(uuid) or M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), uuid)
     -- if unit can’t move at all (sentinel foe etc)
     if not M.Utils.canMove(uuid) then
         if M.Osi.GetDistanceTo(uuid, targetUuid) - spellRange > 0 then

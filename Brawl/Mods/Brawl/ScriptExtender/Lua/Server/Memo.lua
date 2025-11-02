@@ -44,6 +44,8 @@ local Memoizable = {
     },
     Utils = {
         "getDisplayName",
+        "getMeleeWeaponRange",
+        "getRangedWeaponRange",
         "isAliveAndCanFight",
         "getNearby",
         "isDowned",

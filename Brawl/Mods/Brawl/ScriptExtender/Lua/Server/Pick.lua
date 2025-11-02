@@ -50,7 +50,7 @@ local function getHighestWeightSpell(weightedSpells)
 end
 
 -- should account for damage range
-local function getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spellType, numExtraAttacks, targetUuid)
+local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spellType, numExtraAttacks, targetUuid)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
@@ -100,21 +100,21 @@ local function getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight
     end
     if spell.targetRadius == "MeleeMainWeaponRange" then
         weight = weight + archetypeWeights.meleeWeapon
-        if distanceToTarget <= Constants.MELEE_RANGE then
+        if distanceToTarget <= M.Utils.getMeleeWeaponRange(uuid) then
             weight = weight + archetypeWeights.meleeWeaponInRange
         end
     else
         if spell.targetRadius == "RangedMainWeaponRange" then
             weight = weight + archetypeWeights.rangedWeapon
-            if distanceToTarget > Constants.RANGED_RANGE_MIN and distanceToTarget < Constants.RANGED_RANGE_MAX then
+            if distanceToTarget < M.Utils.getRangedWeaponRange(uuid) then
                 weight = weight + archetypeWeights.rangedWeaponInRange
             else
                 weight = weight + archetypeWeights.rangedWeaponOutOfRange
             end
-        -- NB: should the weights be different from ranged and thrown (e.g. tavern brawler spec)?
+        -- NB: should the weights be different from ranged and thrown (e.g. tavern brawler spec)? should we do a lookup for throwing range?
         elseif spell.targetRadius == "ThrownObjectRange" then
             weight = weight + archetypeWeights.rangedWeapon
-            if distanceToTarget > Constants.THROWN_RANGE_MIN and distanceToTarget < Constants.THROWN_RANGE_MAX then
+            if distanceToTarget < Constants.THROWN_RANGE_MAX then
                 weight = weight + archetypeWeights.rangedWeaponInRange
             else
                 weight = weight + archetypeWeights.rangedWeaponOutOfRange
@@ -210,7 +210,7 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     --  1. Is the target already within range? Then ok to use
     --  2. If the target is out-of-range, can we hit him without moving outside of the perimeter? Then ok to use
     if State.Settings.CompanionTactics == "Defense" then
-        local range = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName))
+        local range = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), uuid)
         if distanceToTarget > range and targetDistanceToParty > (range + State.Settings.DefensiveTacticsMaxDistance) then
             return false
         end
@@ -285,7 +285,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                 end
             end
             if isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -316,7 +316,7 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpell
                 end
             end
             if isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly) then
-                weightedSpells[spellName] = getSpellWeight(spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
             end
         end
     end
