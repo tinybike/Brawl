@@ -109,7 +109,7 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
         local brawlersInLevel = State.Session.Brawlers[level]
         if wasHealRequested then
             if brawlersInLevel then
-                local friendlyTargetUuid = M.Pick.whoNeedsHealing(brawler.uuid, level)
+                local friendlyTargetUuid, _ = M.Pick.whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and brawlersInLevel[friendlyTargetUuid] then
                     debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
                     return actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, nil, function (request)
@@ -120,7 +120,8 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
             end
         end
         if brawlersInLevel then
-            local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid, level))
+            local healingTargetUuid, healingNeeded = M.Pick.whoNeedsHealing(brawler.uuid, level)
+            local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel, bonusActionOnly, healingTargetUuid)
             debugDump(weightedTargets)
             local targetUuid = M.Pick.decideOnTarget(weightedTargets)
             if targetUuid then

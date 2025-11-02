@@ -162,14 +162,25 @@ local function getSpellTypeByName(name)
     end
 end
 
-local function calculateMean(value)
-    local numDice, numSides = tostring(value):match("(%d+)d(%d+)")
+local function calculateMean(value, level)
+    local str = tostring(value)
+    str = str:gsub("Level", tostring(level))
+    local numDice, numSides = str:match("(%d+)d(%d+)")
+    local mean = 0
     if numDice and numSides then
         numDice = tonumber(numDice)
         numSides = tonumber(numSides)
-        return numDice*(numSides + 1)/2
+        mean = numDice*(numSides + 1)/2
+        str = str:gsub("%d+d%d+", tostring(mean))
     end
-    return tonumber(value)
+    local func, err = load("return " .. str)
+    if func then
+        local ok, result = pcall(func)
+        if ok then
+            return result
+        end
+    end
+    return tonumber(str) or mean
 end
 
 local function getCantripDamage(level)
@@ -217,7 +228,7 @@ local function parseTooltipDamage(damageString, level)
             if isWeaponOrUnarmed(damageValue) then
                 isWeaponOrUnarmedDamage = true
             end
-            local meanVal = calculateMean(damageValue)
+            local meanVal = calculateMean(damageValue, level)
             if meanVal then
                 totalDamage = totalDamage + meanVal
             end
@@ -269,7 +280,7 @@ end
 
 -- NB: some weird stuff gets picked up by this, probably need a finer-grained classification
 -- (for example Teleportation_Revivify_Deva, Target_TAD_TransfuseHealth, Target_Regenerate all have RegainHitPoints functors -- what other examples are there...?)
-local function checkForDirectHeal(spell)
+local function checkForDirectHeal(spell, level)
     if spell and spell.SpellProperties then
         local spellName = spell.Name
         if spellName == "Teleportation_Revivify_Deva" or spellName == "Target_TAD_TransfuseHealth" or string.find(spellName, "Target_Regenerate", 1, true) == 1 then
@@ -282,14 +293,14 @@ local function checkForDirectHeal(spell)
                 if functors then
                     for _, functor in ipairs(functors) do
                         if functor.TypeId == "RegainHitPoints" then
-                            return true
+                            return true, calculateMean(functor.HitPoints.Code, level)
                         end
                     end
                 end
             end
         end
     end
-    return false
+    return false, nil
 end
 
 local function isAutoPathfinding(spell)
@@ -357,6 +368,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
                 costs[hitCost] = hitCostAmount
             end
         end
+        local directHeal, averageHealing = checkForDirectHeal(spell, hostLevel)
         local spellInfo = {
             level = spell.Level,
             areaRadius = spell.AreaRadius,
@@ -371,10 +383,11 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             amountOfTargets = spell.AmountOfTargets ~= "" and tonumber(spell.AmountOfTargets) or nil,
             hasVerbalComponent = hasVerbalComponent,
             averageDamage = averageDamage,
+            averageHealing = averageHealing,
             isWeaponOrUnarmedDamage = isWeaponOrUnarmedDamage,
             isUnarmedDamage = checkForUnarmedDamage(spell),
             triggersExtraAttack = extraAttackCheck(spell),
-            isDirectHeal = checkForDirectHeal(spell),
+            isDirectHeal = directHeal,
             isBonusAction = costs.BonusActionPoint ~= nil and costs.ActionPoint == nil,
             isSafeAoE = isSafeAoESpell(spellName),
             applyStatusOnSuccess = checkForApplyStatus(spell, "SpellSuccess"),

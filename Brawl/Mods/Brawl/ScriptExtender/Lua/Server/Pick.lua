@@ -62,8 +62,7 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
     -- If this spell has a damage type, favor vulnerable enemies
     -- (NB: this doesn't account for physical weapon damage, which is attached to the weapon itself -- todo)
     if State.Settings.TurnBasedSwarmMode and spell.damageType ~= nil and spell.damageType ~= "None" then
-        local resistanceWeight = M.Pick.getResistanceWeight(spell, targetUuid)
-        weight = weight + resistanceWeight
+        weight = weight + M.Pick.getResistanceWeight(spell, targetUuid)
     end
     -- Adjust by spell type (damage and healing spells are somewhat favored in general)
     weight = weight + getSpellTypeWeight(spellType)
@@ -85,10 +84,6 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
         end
         if spell.applyStatusOnSuccess then
             weight = weight + archetypeWeights.applyDebuff
-        end
-        -- If this spell is available at all, that means the target is resonating, so you probably want to go ahead and detonate it!
-        if spellName == "Target_KiResonation_Blast" then
-            weight = weight + 50
         end
     end
     if spell.isGapCloser then
@@ -188,6 +183,9 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
         return false
     end
     if bonusActionOnly and not spell.isBonusAction then
+        return false
+    end
+    if State.Settings.TurnBasedSwarmMode and spell.outOfCombatOnly then
         return false
     end
     if spell.isSelfOnly and distanceToTarget ~= 0.0 then
@@ -469,18 +467,20 @@ end
 
 local function whoNeedsHealing(uuid, level)
     local minTargetHpPct = 100.0
+    local targetHpNeeded = nil
     local friendlyTargetUuid = nil
     local brawlersInLevel = State.Session.Brawlers[level]
     for targetUuid, target in pairs(brawlersInLevel) do
         if M.Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = M.Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
+                targetHpNeeded = (1 - targetHpPct/100)*M.Osi.GetMaxHitpoints(targetUuid)
                 minTargetHpPct = targetHpPct
                 friendlyTargetUuid = targetUuid
             end
         end
     end
-    return friendlyTargetUuid
+    return friendlyTargetUuid, targetHpNeeded
 end
 
 -- Attacking targets: prioritize close targets with less remaining HP

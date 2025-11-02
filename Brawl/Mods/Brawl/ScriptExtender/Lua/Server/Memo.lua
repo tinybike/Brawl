@@ -19,6 +19,7 @@ local Memoizable = {
         "GetHitpointsPercentage",
         "GetHostCharacter",
         "GetLevel",
+        "GetMaxHitpoints",
         "GetPosition",
         "GetRegion",
         "GetRulesetModifierBool",
