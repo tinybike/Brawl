@@ -100,6 +100,7 @@ local Memoizable = {
         "isNpcSpellUsable",
         "isCompanionSpellAvailable",
         "isEnemySpellAvailable",
+        "getSpellWeight",
         "getOffenseWeightedTarget",
         "getBalancedWeightedTarget",
         "getDefenseWeightedTarget",
