@@ -288,7 +288,7 @@ end
 
 local function selectBonusActionDash(uuid)
     for _, bonusActionDash in ipairs(Constants.BONUS_ACTION_DASH) do
-        if Resources.hasEnoughToCastSpell(uuid, bonusActionDash) then
+        if M.Resources.hasEnoughToCastSpell(uuid, bonusActionDash) then
             return bonusActionDash
         end
     end
@@ -300,13 +300,17 @@ local function selectDash(uuid, bonusActionOnly)
         return bonusActionDash
     end
     if not bonusActionOnly then
-        return "Shout_Dash"
+        if M.Resources.hasEnoughToCastSpell(uuid, "Shout_Dash") then
+            return "Shout_Dash"
+        elseif M.Resources.hasEnoughToCastSpell(uuid, "Shout_Dash_NPC") then
+            return "Shout_Dash_NPC"
+        end
     end
 end
 
 local function selectTeleport(uuid)
     for _, teleport in ipairs(Constants.TELEPORTS) do
-        if Resources.hasEnoughToCastSpell(uuid, teleport) then
+        if M.Resources.hasEnoughToCastSpell(uuid, teleport) then
             return teleport
         end
     end
@@ -353,7 +357,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 dashSpellName = selectDash(uuid, bonusActionOnly)
             end
             if not dashSpellName then
-                debugPrint(M.Utils.getDisplayName(uuid), "no dash..")
+                debugPrint(M.Utils.getDisplayName(uuid), "no dash...")
                 return tryMove(getRemainingMovementByUuid(uuid), false, false)
             end
             debugPrint(M.Utils.getDisplayName(uuid), "dashing")
