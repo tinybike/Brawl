@@ -576,6 +576,12 @@ end
 -- all other enemies go at the same time, using the Brawl AI
 -- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
 local function startSwarmTurn(swarmActors, isBeforePlayer)
+    if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
+        debugPrint("skipping ToT prep round")
+        State.Session.TBSMToTSkippedPrepRound = true
+        State.Session.SwarmTurnActive = false
+        return
+    end
     if swarmActors and next(swarmActors) then
         debugPrint("startSwarmTurn", isBeforePlayer, #swarmActors)
         for _, uuid in ipairs(swarmActors) do
@@ -590,11 +596,6 @@ local function startSwarmTurn(swarmActors, isBeforePlayer)
         State.Session.SwarmTurnActive = true
         State.Session.SwarmActors = swarmActors
         State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
-        if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
-            State.Session.TBSMToTSkippedPrepRound = true
-            State.Session.SwarmTurnActive = false
-            return
-        end
         local numChunks = startEnemyTurn(swarmActors)
         debugPrint("numChunks", numChunks, isBeforePlayer)
         if numChunks then
@@ -689,8 +690,8 @@ local function onCombatRoundStarted(round)
         reorderByInitiativeRoll()
         debugPrint("*****onCombatRoundStarted updated turn order")
         Utils.showTurnOrderGroups()
-        startSwarmTurn(getEnemyList(true), true)
     end
+    startSwarmTurn(getEnemyList(true), true)
 end
 
 local function onCombatEnded()
@@ -827,6 +828,7 @@ local function onServerInterruptDecision()
 end
 
 return {
+    getEnemyList = getEnemyList,
     getInitiativeRoll = getInitiativeRoll,
     cancelTimers = cancelTimers,
     resumeTimers = resumeTimers,
