@@ -13,15 +13,16 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     local actionToTake = nil
     local spellTypes = {"Control", "Damage"}
     local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+    local damageAmountNeeded = M.Osi.GetHitpoints(target.uuid)
     if M.Osi.IsPlayer(brawler.uuid) == 1 then
         local allowAoE = M.Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
         local playerClosestToTarget = M.Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
         local targetDistanceToParty = M.Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
         -- debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
-        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, {"Damage"}, targetDistanceToParty, allowAoE, bonusActionOnly)
+        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, {"Damage"}, damageAmountNeeded, targetDistanceToParty, allowAoE, bonusActionOnly)
         debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
     else
-        actionToTake = Pick.decideActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, bonusActionOnly)
+        actionToTake = Pick.decideActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, damageAmountNeeded, bonusActionOnly)
         debugPrint(brawler.displayName, "Action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, brawler.archetype, bonusActionOnly)
     end
     if not actionToTake then
@@ -55,6 +56,7 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
     if not preparedSpells then
         return onFailed("no prepared spells")
     end
+    local healingAmountNeeded = M.Osi.GetMaxHitpoints(target.uuid) - M.Osi.GetHitpoints(target.uuid)
     -- todo: Utility/Buff spells
     debugPrint(brawler.displayName, "acting on friendly target", brawler.uuid, target.displayName, bonusActionOnly)
     local spellTypes = {"Healing"}
@@ -68,9 +70,9 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
     end
     local actionToTake = nil
     if M.Osi.IsPlayer(brawler.uuid) == 1 then
-        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, 0, true, bonusActionOnly)
+        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, healingAmountNeeded, 0, true, bonusActionOnly)
     else
-        actionToTake = Pick.decideActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, bonusActionOnly)
+        actionToTake = Pick.decideActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, healingAmountNeeded, bonusActionOnly)
     end
     debugPrint(brawler.displayName, "Action to take on friendly target", actionToTake, brawler.uuid, bonusActionOnly)
     if not actionToTake then
@@ -109,7 +111,7 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
         local brawlersInLevel = State.Session.Brawlers[level]
         if wasHealRequested then
             if brawlersInLevel then
-                local friendlyTargetUuid, _ = M.Pick.whoNeedsHealing(brawler.uuid, level)
+                local friendlyTargetUuid = M.Pick.whoNeedsHealing(brawler.uuid, level)
                 if friendlyTargetUuid and brawlersInLevel[friendlyTargetUuid] then
                     debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
                     return actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, nil, function (request)
@@ -120,14 +122,12 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
             end
         end
         if brawlersInLevel then
-            local healingTargetUuid, healingNeeded = M.Pick.whoNeedsHealing(brawler.uuid, level)
-            local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel, bonusActionOnly, healingTargetUuid)
+            local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid, level))
             debugDump(weightedTargets)
             local targetUuid = M.Pick.decideOnTarget(weightedTargets)
             if targetUuid then
                 local targetBrawler = brawlersInLevel[targetUuid]
                 if targetBrawler then
-                    local result
                     if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
                         return actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
                     else

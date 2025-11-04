@@ -97,6 +97,7 @@ local Memoizable = {
     },
     Pick = {
         "checkConditions",
+        "getHealingOrDamageAmountWeight",
         "getResistanceWeight",
         "isNpcSpellUsable",
         "isCompanionSpellAvailable",

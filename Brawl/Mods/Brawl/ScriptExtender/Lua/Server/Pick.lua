@@ -49,8 +49,15 @@ local function getHighestWeightSpell(weightedSpells)
     return selectedSpell
 end
 
--- should account for damage range
-local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spellType, numExtraAttacks, targetUuid)
+-- Weight peaks at healing or damage == needed, overflow discouraged (higher penalty value = steeper dropoff)
+local function getHealingOrDamageAmountWeight(averageAmount, amountNeeded, overflowPenalty)
+    if averageAmount <= amountNeeded then
+        return averageAmount
+    end
+    return amountNeeded*math.exp(-overflowPenalty*(averageAmount - amountNeeded)/amountNeeded)
+end
+
+local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spellType, amountNeeded, numExtraAttacks, targetUuid)
     -- Special target radius labels (NB: are there others besides these two?)
     -- Maybe should weight proportional to distance required to get there...?
     local archetypeWeights = Constants.ARCHETYPE_WEIGHTS[archetype]
@@ -70,7 +77,6 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
     if State.Settings.HogwildMode then
         weight = weight + spell.level*2
     end
-    -- NB: factor in amount of healing for healing spells also?
     if spellType == "Damage" then
         if spell.triggersExtraAttack and numExtraAttacks > 0 then
             weight = numExtraAttacks*archetypeWeights.triggersExtraAttack
@@ -78,13 +84,18 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
         if spell.isWeaponOrUnarmedDamage then
             weight = weight + archetypeWeights.weaponOrUnarmedDamage
         end
-        weight = weight + archetypeWeights.spellDamage*spell.averageDamage
+        debugPrint("amt damage weight", spellName, spell.averageDamage, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageDamage, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY))
+        weight = weight + archetypeWeights.spellDamage*M.Pick.getHealingOrDamageAmountWeight(spell.averageDamage, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY)
+        -- weight = weight + archetypeWeights.spellDamage*spell.averageDamage
         if spell.isSafeAoE and spell.areaRadius > 1 then
             weight = weight + 3*spell.areaRadius
         end
         if spell.applyStatusOnSuccess then
             weight = weight + archetypeWeights.applyDebuff
         end
+    elseif spellType == "Healing" then
+        debugPrint("amt healing weight", spellName, spell.averageHealing, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY))
+        weight = weight + archetypeWeights.healing*M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY)
     end
     if spell.isGapCloser then
         if distanceToTarget > Constants.GAP_CLOSER_DISTANCE then
@@ -267,7 +278,7 @@ end
 -- 3c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 3d. If primarily a melee (or other) class, favor melee attacks.
 -- 4. Status effects/buffs (NYI)
-local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
+local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, amountNeeded, numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
     local weightedSpells = {}
     local isSilenced = M.Utils.isSilenced(uuid)
     local isConcentrating = M.Utils.isConcentrating(uuid)
@@ -283,7 +294,7 @@ local function getCompanionWeightedSpells(uuid, targetUuid, preparedSpells, excl
                 end
             end
             if M.Pick.isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, distanceToTarget, targetDistanceToParty, allowAoE, bonusActionOnly) then
-                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, amountNeeded, numExtraAttacks, targetUuid)
             end
         end
     end
@@ -298,7 +309,7 @@ end
 -- 2c. If primarily a healer/melee class, favor melee abilities and attacks.
 -- 2d. If primarily a melee (or other) class, favor melee attacks.
 -- 3. Status effects/buffs/debuffs (NYI)
-local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, numExtraAttacks, bonusActionOnly)
+local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, archetype, spellTypes, amountNeeded, numExtraAttacks, bonusActionOnly)
     local weightedSpells = {}
     local isSilenced = M.Utils.isSilenced(uuid)
     local isConcentrating = M.Utils.isConcentrating(uuid)
@@ -314,24 +325,23 @@ local function getWeightedSpells(uuid, targetUuid, preparedSpells, excludedSpell
                 end
             end
             if M.Pick.isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilenced, isConcentrating, excludedSpells, bonusActionOnly) then
-                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, numExtraAttacks, targetUuid)
+                weightedSpells[spellName] = M.Pick.getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineOfSight, archetype, spell.type, amountNeeded, numExtraAttacks, targetUuid)
             end
         end
     end
     return weightedSpells
 end
 
-local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, targetDistanceToParty, allowAoE, bonusActionOnly)
-    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
-    debugPrint(brawler.displayName, "companion weighted spells", brawler.uuid, brawler.archetype, distanceToTarget, bonusActionOnly)
-    -- debugDump(Constants.ARCHETYPE_WEIGHTS[brawler.archetype])
+local function decideCompanionActionOnTarget(brawler, targetUuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, amountNeeded, targetDistanceToParty, allowAoE, bonusActionOnly)
+    local weightedSpells = getCompanionWeightedSpells(brawler.uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, brawler.archetype, spellTypes, amountNeeded, brawler.numExtraAttacks, targetDistanceToParty, allowAoE, bonusActionOnly)
+    debugPrint(brawler.displayName, "companion weighted spells", brawler.uuid, brawler.archetype, distanceToTarget, amountNeeded, bonusActionOnly)
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
 
-local function decideActionOnTarget(brawler, targetUuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, bonusActionOnly)
-    local weightedSpells = getWeightedSpells(brawler.uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, brawler.archetype, spellTypes, brawler.numExtraAttacks, bonusActionOnly)
-    debugPrint(brawler.displayName, "enemy weighted spells", brawler.uuid, brawler.archetype, distanceToTarget, bonusActionOnly)
+local function decideActionOnTarget(brawler, targetUuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, amountNeeded, bonusActionOnly)
+    local weightedSpells = getWeightedSpells(brawler.uuid, targetUuid, preparedSpells, excludedSpells, distanceToTarget, brawler.archetype, spellTypes, amountNeeded, brawler.numExtraAttacks, bonusActionOnly)
+    debugPrint(brawler.displayName, "enemy weighted spells", brawler.uuid, brawler.archetype, distanceToTarget, amountNeeded, bonusActionOnly)
     debugDump(weightedSpells)
     return getHighestWeightSpell(weightedSpells)
 end
@@ -467,26 +477,23 @@ end
 
 local function whoNeedsHealing(uuid, level)
     local minTargetHpPct = 100.0
-    local targetHpNeeded = nil
     local friendlyTargetUuid = nil
     local brawlersInLevel = State.Session.Brawlers[level]
     for targetUuid, target in pairs(brawlersInLevel) do
         if M.Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = M.Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then
-                targetHpNeeded = (1 - targetHpPct/100)*M.Osi.GetMaxHitpoints(targetUuid)
                 minTargetHpPct = targetHpPct
                 friendlyTargetUuid = targetUuid
             end
         end
     end
-    return friendlyTargetUuid, targetHpNeeded
+    return friendlyTargetUuid
 end
 
 -- Attacking targets: prioritize close targets with less remaining HP
 -- (Lowest weight = most desireable target)
 local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, healingNeeded)
-    -- print("GETTING WEIGHTED TARGETS -- is healing needed????????", healingNeeded)
     local weightedTargets = {}
     local isHealer = M.Utils.isHealerArchetype(brawler.archetype)
     local isMelee = nil
@@ -616,6 +623,7 @@ end
 
 return {
     getResistanceWeight = getResistanceWeight,
+    getHealingOrDamageAmountWeight = getHealingOrDamageAmountWeight,
     getSpellWeight = getSpellWeight,
     isNpcSpellUsable = isNpcSpellUsable,
     isCompanionSpellAvailable = isCompanionSpellAvailable,

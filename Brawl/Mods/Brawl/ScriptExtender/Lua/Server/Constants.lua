@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, AI = true, Movement = true, Pick = true, Resources = true}
+Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true}
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -169,6 +169,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = -10,
         unarmedDamage = 0,
         spellDamage = 3,
+        healing = 1,
         gapCloser = 0,
         applyDebuff = 5,
     },
@@ -184,6 +185,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = 5,
         unarmedDamage = 0,
         spellDamage = 0,
+        healing = 1,
         gapCloser = 0,
         applyDebuff = 5,
     },
@@ -199,6 +201,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = 3,
         unarmedDamage = 0,
         spellDamage = 1,
+        healing = 4,
         gapCloser = 2,
         applyDebuff = 1,
     },
@@ -214,6 +217,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = 0,
         unarmedDamage = 0,
         spellDamage = 2,
+        healing = 5,
         gapCloser = 0,
         applyDebuff = 0,
     },
@@ -229,6 +233,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = 10,
         unarmedDamage = 0,
         spellDamage = 0,
+        healing = 1,
         gapCloser = 10,
         applyDebuff = 1,
     },
@@ -244,6 +249,7 @@ Constants.ARCHETYPE_WEIGHTS = {
         weaponOrUnarmedDamage = 5,
         unarmedDamage = 0,
         spellDamage = 1,
+        healing = 1,
         gapCloser = 10,
         applyDebuff = 5,
     },
@@ -253,12 +259,13 @@ Constants.ARCHETYPE_WEIGHTS = {
         rangedWeaponOutOfRange = -5,
         meleeWeapon = 0,
         meleeWeaponInRange = 10,
-        isSpell = 0,
+        isSpell = -30,
         spellInRange = 5,
         triggersExtraAttack = 2,
         weaponOrUnarmedDamage = 0,
         unarmedDamage = 20,
         spellDamage = 1,
+        healing = 1,
         gapCloser = 10,
         applyDebuff = 5,
     },
@@ -268,12 +275,13 @@ Constants.ARCHETYPE_WEIGHTS = {
         rangedWeaponOutOfRange = -5,
         meleeWeapon = 5,
         meleeWeaponInRange = 10,
-        isSpell = -10,
+        isSpell = -100,
         spellInRange = 5,
         triggersExtraAttack = 10,
         weaponOrUnarmedDamage = 10,
         unarmedDamage = 0,
         spellDamage = 0,
+        healing = 1,
         gapCloser = 10,
         applyDebuff = 1,
     },
@@ -413,7 +421,9 @@ Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
 Constants.ACTION_MAX_TIME = 3000
 Constants.MOVEMENT_MAX_TIME = 5000
-Constants.ACTION_ATTEMPT_LIMIT = 5
+Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
+Constants.OVERFLOW_DAMAGE_PENALTY = 0.4
+Constants.OVERFLOW_HEALING_PENALTY = 0.6
 
 return Constants

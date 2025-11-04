@@ -162,35 +162,17 @@ local function getSpellTypeByName(name)
     end
 end
 
-local function calculateMean(value, level)
-    local str = tostring(value)
-    str = str:gsub("Level", tostring(level))
-    local numDice, numSides = str:match("(%d+)d(%d+)")
-    local mean = 0
-    if numDice and numSides then
-        numDice = tonumber(numDice)
-        numSides = tonumber(numSides)
-        mean = numDice*(numSides + 1)/2
-        str = str:gsub("%d+d%d+", tostring(mean))
-    end
-    local func, err = load("return " .. str)
-    if func then
-        local ok, result = pcall(func)
-        if ok then
-            return result
-        end
-    end
-    return tonumber(str) or mean
-end
-
-local function getCantripDamage(level)
+local function getCantripDamage(str, level)
+    local sides = tonumber(str)
+    local numDice
     if level >= 10 then
-        return 13.5  -- 3d8
+        numDice = 3
     elseif level >= 5 then
-        return 9     -- 2d8
+        numDice = 2
     else
-        return 4.5   -- 1d8
+        numDice = 1
     end
+    return tostring(numDice*(sides + 1)/2)
 end
 
 local function isWeaponOrUnarmed(value)
@@ -214,10 +196,31 @@ local function isWeaponOrUnarmed(value)
     return false
 end
 
+local function calculateMean(value, level)
+    local str = tostring(value):gsub("Level", tostring(level))
+    local numDice, numSides = str:match("(%d+)d(%d+)")
+    local mean = 0
+    if numDice and numSides then
+        numDice = tonumber(numDice)
+        numSides = tonumber(numSides)
+        mean = numDice*(numSides + 1)/2
+        str = str:gsub("%d+d%d+", tostring(mean))
+    end
+    local func, err = load("return " .. str)
+    if func then
+        local ok, result = pcall(func)
+        if ok then
+            return result
+        end
+    end
+    return tonumber(str) or mean
+end
+
 local function parseTooltipDamage(damageString, level)
-    damageString = damageString:gsub("LevelMapValue%((%w+)%)", function (variableName)
-        if variableName == "D8Cantrip" then
-            return tostring(getCantripDamage(level))
+    damageString = damageString:gsub("LevelMapValue%(([^)]+)%)", function (levelMapValueArg)
+        local cantripDieString = levelMapValueArg:match("D(%d+)Cantrip")
+        if cantripDieString then
+            return tostring(getCantripDamage(cantripDieString, level))
         end
     end)
     local isWeaponOrUnarmedDamage = false

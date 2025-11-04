@@ -273,6 +273,7 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
         Targets = targets,
         field_A8 = 1,
     }
+    -- debugDump(request)
     submitSpellRequest(request, insertAtFront)
     return request
 end

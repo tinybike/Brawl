@@ -56,15 +56,14 @@ local function bumpEnemyInitiativeRoll(uuid)
     local entity = Ext.Entity.Get(uuid)
     local initiativeRoll = getInitiativeRoll(uuid)
     local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
-    debugPrint("Enemy", M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
+    debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
     setInitiativeRoll(uuid, bumpedInitiativeRoll)
 end
 
 local function bumpEnemyInitiativeRolls()
     if State.Session.MeanInitiativeRoll ~= -100 then
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            if M.Utils.isPugnacious(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
-                debugPrint(M.Utils.getDisplayName(uuid), "initiative roll", getInitiativeRoll(uuid))
+            if not State.Session.Players[uuid] and M.Utils.isPugnacious(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
                 bumpEnemyInitiativeRoll(uuid)
             end
         end
@@ -151,15 +150,17 @@ local function setTurnComplete(uuid)
         entity.TurnBased.HadTurnInCombat = true
         entity.TurnBased.RequestedEndTurn = true
         entity.TurnBased.TurnActionsCompleted = true
+        entity.TurnBased.ActedThisRoundInCombat = true
         entity:Replicate("TurnBased")
-        if M.Osi.IsPartyMember(uuid, 1) == 0 then
-            State.Session.SwarmTurnComplete[uuid] = true
-            if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
-                Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
-                State.Session.SwarmBrawlerIndexDelay[uuid] = nil
-            end
+    end
+    if M.Osi.IsPartyMember(uuid, 1) == 0 then
+        State.Session.SwarmTurnComplete[uuid] = true
+        if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
+            State.Session.SwarmBrawlerIndexDelay[uuid] = nil
         end
     end
+    cancelTimers({uuid})
 end
 
 local function unsetTurnComplete(uuid)
@@ -169,6 +170,7 @@ local function unsetTurnComplete(uuid)
         entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
         entity.TurnBased.TurnActionsCompleted = false
+        entity.TurnBased.ActedThisRoundInCombat = false
         entity:Replicate("TurnBased")
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
             State.Session.SwarmTurnComplete[uuid] = false
@@ -279,10 +281,10 @@ local function resetSwarmTurnComplete(swarmActors)
     if swarmActors then
         for _, uuid in ipairs(swarmActors) do
             debugPrint(M.Utils.getDisplayName(uuid), "resetSwarmTurnComplete", uuid)
-            local entity = Ext.Entity.Get(uuid)
-            if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
-                setTurnComplete(uuid)
-            end
+            -- local entity = Ext.Entity.Get(uuid)
+            -- if entity and entity.TurnBased and not entity.TurnBased.HadTurnInCombat then
+            --     setTurnComplete(uuid)
+            -- end
             State.Session.SwarmTurnComplete[uuid] = false
         end
     end
@@ -331,7 +333,14 @@ local function completeSwarmTurn(uuid, swarmActors)
             end
         end
         if not isControlledByDefaultAI(uuid) then
-            setTurnComplete(uuid)
+            if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                State.Session.SwarmTurnComplete[uuid] = true
+                if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+                    Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
+                    State.Session.SwarmBrawlerIndexDelay[uuid] = nil
+                end
+            end
+            cancelTimers({uuid})
         end
     end
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
@@ -704,7 +713,7 @@ local function onCombatEnded()
 end
 
 local function onEnteredCombat(uuid)
-    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
+    if uuid and State.Session.Players and State.Session.Players[uuid] then
         debugPrint("initiative roll", getInitiativeRoll(uuid))
         if State.Session.ResurrectedPlayer[uuid] then
             State.Session.ResurrectedPlayer[uuid] = nil
@@ -762,7 +771,7 @@ local function onDied(uuid)
 end
 
 local function onResurrected(uuid)
-    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
+    if uuid and State.Session.Players and State.Session.Players[uuid] then
         State.Session.ResurrectedPlayer[uuid] = true
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
     end
@@ -770,7 +779,9 @@ end
 
 local function onCharacterJoinedParty(uuid)
     if uuid then
-        State.boostPlayerInitiative(uuid)
+        if State.Settings.PlayersGoFirst then
+            State.boostPlayerInitiative(uuid)
+        end
         State.recapPartyMembersMovementDistances()
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
     end
