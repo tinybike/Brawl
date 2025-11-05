@@ -97,7 +97,7 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
         debugPrint("amt healing weight", spellName, spell.averageHealing, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY))
         local healingWeight = archetypeWeights.healing*M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY)
         if not spell.isSpell then
-            healingWeight = archetypeWeights.healing*healingWeight
+            healingWeight = healingWeight + archetypeWeights.healing
         end
         weight = weight + healingWeight
     end

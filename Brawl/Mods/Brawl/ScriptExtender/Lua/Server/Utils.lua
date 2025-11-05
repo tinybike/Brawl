@@ -335,7 +335,9 @@ local function removeNegativeStatuses(uuid)
 end
 
 local function clearOsirisQueue(uuid)
-    -- print("clearOsirisQueue", uuid, M.Utils.getDisplayName(uuid))
+    print("clearOsirisQueue", uuid, M.Utils.getDisplayName(uuid))
+    Movement.clearActiveMovements(uuid)
+    Swarm.cancelActionSequenceFailsafeTimer(uuid)
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
 end

@@ -105,7 +105,7 @@ local function findPathToPosition(uuid, position, callback)
     callback(nil, validPosition)
 end
 
-local function finishMovement(uuid, eventUuid, activeMovement)
+local function finishMovement(uuid, eventUuid, activeMovement, override)
     if uuid and activeMovement and uuid == activeMovement.moverUuid then
         debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
         if activeMovement.timer and activeMovement.timer.handle then
@@ -113,15 +113,39 @@ local function finishMovement(uuid, eventUuid, activeMovement)
             activeMovement.timer.paused = false
         end
         State.Session.ActiveMovements[eventUuid] = nil
-        activeMovement.onCompleted()
+        if not override then
+            activeMovement.onCompleted()
+        end
     end
 end
 
 local function getActiveMovement(moverUuid)
     if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
-        for eventUuid, activeMovement in pairs(State.Session.ActiveMovements) do
+        for _, activeMovement in pairs(State.Session.ActiveMovements) do
             if activeMovement.moverUuid == moverUuid then
                 return activeMovement
+            end
+        end
+    end
+end
+
+local function getActiveMovements(moverUuid)
+    local activeMovements = {}
+    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+        for eventUuid, activeMovement in pairs(State.Session.ActiveMovements) do
+            if activeMovement.moverUuid == moverUuid then
+                activeMovements[eventUuid] = activeMovement
+            end
+        end
+    end
+    return activeMovements
+end
+
+local function clearActiveMovements(moverUuid)
+    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+        for eventUuid, activeMovement in pairs(State.Session.ActiveMovements) do
+            if activeMovement.moverUuid == moverUuid then
+                finishMovement(moverUuid, eventUuid, activeMovement, true)
             end
         end
     end
@@ -332,6 +356,7 @@ local function getEffectiveSpellRange(uuid, spellName)
     return M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), uuid)
 end
 
+-- NB: why does this sometimes enqueue multiple movements? trigger onFailed before that happens / clear out ActiveMovements between attempts
 local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
@@ -523,6 +548,9 @@ end
 return {
     playerMovementDistanceToSpeed = playerMovementDistanceToSpeed,
     enemyMovementDistanceToSpeed = enemyMovementDistanceToSpeed,
+    getActiveMovement = getActiveMovement,
+    getActiveMovements = getActiveMovements,
+    clearActiveMovements = clearActiveMovements,
     getMovementSpeed = getMovementSpeed,
     getMovementDistanceAmount = getMovementDistanceAmount,
     getMovementDistanceMaxAmount = getMovementDistanceMaxAmount,

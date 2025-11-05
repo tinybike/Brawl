@@ -104,6 +104,8 @@ local function allExitFTB()
                 end
             end
         end
+        Movement.resumeTimers()
+        Swarm.resumeTimers()
     end
 end
 
@@ -114,6 +116,8 @@ local function cancelQueuedMovement(uuid)
             State.Session.FTBLockedIn[uuid] = entity.TurnBased.RequestedEndTurn
         end
         State.Session.MovementQueue[uuid] = nil
+        Movement.resumeTimers()
+        Swarm.resumeTimers()
     end
 end
 
@@ -128,6 +132,8 @@ local function midActionLock(entity)
                 if target and (target.Position or target.Target) then
                     lock(entity)
                     State.Session.MovementQueue[entity.Uuid.EntityUuid] = nil
+                    Movement.pauseTimers()
+                    Swarm.pauseTimers()
                 end
             end
         end
@@ -186,7 +192,7 @@ local function startTruePause(entityUuid)
                     debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
                 end
                 if isFTBAllLockedIn() then
-                    debugPrint("all locked in, exiting") 
+                    debugPrint("all locked in, exiting")
                     allExitFTB()
                 end
             end
@@ -196,23 +202,30 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            if State.Session.RemainingMovement[entityUuid] ~= nil and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] then
-                if entityUuid and isInFTB(movingEntity) then
-                    if State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                        debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords)", entityUuid)
-                        debugDump(State.Session.LastClickPosition[entityUuid].position)
-                        lock(movingEntity)
-                        Movement.findPathToPosition(entityUuid, State.Session.LastClickPosition[entityUuid].position, function (err, validPosition)
-                            if err then
-                                return Utils.showNotification(entityUuid, err, 2)
-                            end
-                            debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
-                            State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
-                        end)
-                    end
+            debugPrint("moving entity", M.Utils.getDisplayName(entityUuid), Movement.getRemainingMovement(movingEntity), State.Session.RemainingMovement[entityUuid], isInFTB(movingEntity))
+            if State.Session.RemainingMovement[entityUuid] and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
+                local goalPosition
+                local activeMovement = Movement.getActiveMovement(entityUuid)
+                if activeMovement and activeMovement.goalPosition then
+                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from active movement)", entityUuid)
+                    goalPosition = activeMovement.goalPosition
+                elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
+                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from click)", entityUuid)
+                    goalPosition = State.Session.LastClickPosition[entityUuid].position
+                end
+                if goalPosition then
+                    debugDump(goalPosition)
+                    lock(movingEntity)
+                    Movement.findPathToPosition(entityUuid, goalPosition, function (err, validPosition)
+                        if err then
+                            return Utils.showNotification(entityUuid, err, 2)
+                        end
+                        debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
+                        State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
+                    end)
                 end
             end
-            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(entity)
+            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(movingEntity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
@@ -226,10 +239,8 @@ local function startTruePause(entityUuid)
                     debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
                     if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
                         if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
-                            local spellName = cast.SpellCastState.SpellId.OriginatorPrototype
-                            print("checking spell for bonus", spellName)
-                            _D(M.Spells.getSpellByName(spellName))
-                            if M.Spells.getSpellByName(spellName).isBonusAction then
+                            local spell = M.Spells.getSpellByName(cast.SpellCastState.SpellId.OriginatorPrototype)
+                            if spell and spell.isBonusAction then
                                 return
                             end
                         end

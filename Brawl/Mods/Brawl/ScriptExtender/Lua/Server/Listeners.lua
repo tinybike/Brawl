@@ -299,10 +299,10 @@ end
 
 -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
 local function onGainedControl(targetGuid)
-    debugPrint("GainedControl", targetGuid)
+    print("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
-        if targetUuid == M.Osi.GetHostCharacter() then
+        if targetUuid == Osi.GetHostCharacter() then
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local partyArchetypes = modVars.PartyArchetypes
             if partyArchetypes == nil then
