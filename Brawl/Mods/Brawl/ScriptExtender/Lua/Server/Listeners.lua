@@ -299,7 +299,7 @@ end
 
 -- NB: entity.ClientControl does NOT get reliably updated immediately when this fires
 local function onGainedControl(targetGuid)
-    print("GainedControl", targetGuid)
+    debugPrint("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
         if targetUuid == Osi.GetHostCharacter() then

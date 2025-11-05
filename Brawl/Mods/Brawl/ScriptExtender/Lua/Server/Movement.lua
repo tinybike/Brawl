@@ -181,7 +181,7 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
         timer = {
             handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
                 debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
-                onFailed("movement timed out")
+                if onFailed then onFailed("movement timed out") end
             end),
             paused = false,
         },
