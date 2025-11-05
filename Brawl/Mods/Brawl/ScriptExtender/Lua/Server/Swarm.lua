@@ -184,6 +184,7 @@ local function getEnemyList(isBeforePlayer)
         return {}
     end
     local enemyList = {}
+    local excludedEnemyList = {}
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         local playerGroupFound = false
@@ -194,10 +195,18 @@ local function getEnemyList(isBeforePlayer)
             elseif group.Members and #group.Members > 0 and group.Initiative > -20 then
                 for _, member in ipairs(group.Members) do
                     if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
-                        if isBeforePlayer and not playerGroupFound then
-                            table.insert(enemyList, member.Entity.Uuid.EntityUuid)
-                        elseif not isBeforePlayer and playerGroupFound then
-                            table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                        if isBeforePlayer then
+                            if playerGroupFound then
+                                table.insert(excludedEnemyList, member.Entity.Uuid.EntityUuid)
+                            else
+                                table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                            end
+                        else
+                            if playerGroupFound then
+                                table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                            else
+                                table.insert(excludedEnemyList, member.Entity.Uuid.EntityUuid)
+                            end
                         end
                     end
                 end
@@ -206,7 +215,7 @@ local function getEnemyList(isBeforePlayer)
     end
     debugPrint("got enemy list", isBeforePlayer)
     debugDump(enemyList)
-    return enemyList
+    return enemyList, excludedEnemyList
 end
 
 local function resetChunkState()
@@ -584,12 +593,15 @@ end
 -- the FIRST enemy to go uses the built-in AI and takes its turn normally, this keeps the turn open
 -- all other enemies go at the same time, using the Brawl AI
 -- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
-local function startSwarmTurn(swarmActors, isBeforePlayer)
+local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
     if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
         debugPrint("skipping ToT prep round")
         State.Session.TBSMToTSkippedPrepRound = true
         State.Session.SwarmTurnActive = false
         return
+    end
+    if nonSwarmActors and next(nonSwarmActors) then
+        unsetEnemyTurnsComplete(nonSwarmActors)
     end
     if swarmActors and next(swarmActors) then
         debugPrint("startSwarmTurn", isBeforePlayer, #swarmActors)
@@ -700,7 +712,8 @@ local function onCombatRoundStarted(round)
         debugPrint("*****onCombatRoundStarted updated turn order")
         Utils.showTurnOrderGroups()
     end
-    startSwarmTurn(getEnemyList(true), true)
+    local enemyList, excludedEnemyList = getEnemyList(true)
+    startSwarmTurn(enemyList, excludedEnemyList, true)
 end
 
 local function onCombatEnded()
@@ -748,9 +761,9 @@ local function onTurnEnded(uuid)
             if M.Osi.IsPartyMember(uuid, 1) == 1 then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
                 if checkAllPlayersFinishedTurns() then
-                    local enemyList = getEnemyList(false)
+                    local enemyList, excludedEnemyList = getEnemyList(false)
                     unsetEnemyTurnsComplete(enemyList)
-                    startSwarmTurn(enemyList, false)
+                    startSwarmTurn(enemyList, excludedEnemyList, false)
                 end
             else
                 debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded complete swarm turn?")
