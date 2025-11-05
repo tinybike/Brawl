@@ -342,6 +342,10 @@ local function isSingleSelect(spellName)
     return false
 end
 
+local function isShout(spellName)
+    return Utils.startsWith(spellName, "Shout_")
+end
+
 local function getSpellInfo(spellType, spellName, hostLevel)
     local spell = Ext.Stats.Get(spellName)
     if isSpellOfType(spell, spellType) then
@@ -560,6 +564,7 @@ end
 
 return {
     isSingleSelect = isSingleSelect,
+    isShout = isShout,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
     getAuras = getAuras,

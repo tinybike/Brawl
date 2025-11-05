@@ -1,6 +1,7 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true}
+Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = true, Pick = true, AI = true, Movement = true}
+-- Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -206,13 +207,13 @@ Constants.ARCHETYPE_WEIGHTS = {
         applyDebuff = 1,
     },
     healer = {
-        rangedWeapon = 3,
-        rangedWeaponInRange = 3,
-        rangedWeaponOutOfRange = 3,
-        meleeWeapon = -2,
-        meleeWeaponInRange = 4,
+        rangedWeapon = 2,
+        rangedWeaponInRange = 2,
+        rangedWeaponOutOfRange = 2,
+        meleeWeapon = 2,
+        meleeWeaponInRange = 3,
         isSpell = 0,
-        spellInRange = 8,
+        spellInRange = 5,
         triggersExtraAttack = 0,
         weaponOrUnarmedDamage = 0,
         unarmedDamage = 0,
@@ -419,8 +420,8 @@ Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
 Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
-Constants.ACTION_MAX_TIME = 3000
-Constants.MOVEMENT_MAX_TIME = 5000
+Constants.ACTION_MAX_TIME = 6000
+Constants.MOVEMENT_MAX_TIME = 8000
 Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
 Constants.OVERFLOW_DAMAGE_PENALTY = 0.4

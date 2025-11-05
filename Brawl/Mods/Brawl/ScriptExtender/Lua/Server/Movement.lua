@@ -320,13 +320,25 @@ local function getRemainingMovementByUuid(uuid)
     return getRemainingMovement(Ext.Entity.Get(uuid))
 end
 
+local function getEffectiveSpellRange(uuid, spellName)
+    -- if we're blinded, we need to be in melee range to do anything that isn't a shout
+    if M.Utils.isBlinded(uuid) and not M.Spells.isShout(spellName) then
+        local spell = M.Spells.getSpellByName(spellName)
+        if spell and spell.isWeaponOrUnarmedDamage and not spell.isUnarmedDamage then
+            return M.Utils.getMeleeWeaponRange(uuid)
+        end
+        return Constants.MELEE_RANGE
+    end
+    return M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), uuid)
+end
+
 local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
     debugPrint(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local swarmTurnActiveInitial = State.Session.SwarmTurnActive
-    -- if we're blinded, we need to be in melee range to do anything...
-    local spellRange = M.Utils.isBlinded(uuid) and M.Utils.getMeleeWeaponRange(uuid) or M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), uuid)
+    local spellRange = getEffectiveSpellRange(uuid, spellName)
+    debugPrint(M.Utils.getDisplayName(uuid), "got effective spell range", spellName, spellRange)
     -- if unit can’t move at all (sentinel foe etc)
     if not M.Utils.canMove(uuid) then
         if M.Osi.GetDistanceTo(uuid, targetUuid) - spellRange > 0 then

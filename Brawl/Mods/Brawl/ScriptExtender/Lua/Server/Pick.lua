@@ -94,8 +94,12 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
             weight = weight + archetypeWeights.applyDebuff
         end
     elseif spellType == "Healing" then
-        debugPrint("amt healing weight", spellName, spell.averageHealing, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY))
-        weight = weight + archetypeWeights.healing*M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY)
+        debugPrint("amt healing weight", spellName, spell.averageHealing, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY))
+        local healingWeight = archetypeWeights.healing*M.Pick.getHealingOrDamageAmountWeight(spell.averageHealing, amountNeeded, Constants.OVERFLOW_HEALING_PENALTY)
+        if not spell.isSpell then
+            healingWeight = archetypeWeights.healing*healingWeight
+        end
+        weight = weight + healingWeight
     end
     if spell.isGapCloser then
         if distanceToTarget > Constants.GAP_CLOSER_DISTANCE then
@@ -181,7 +185,7 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
         return false
     end
     -- Exclude AoE and zone-type damage spells for now (even in Hogwild Mode) so the companions don't blow each other up on accident
-    if (spell.areaRadius > 0 or M.Utils.isZoneSpell(spellName)) and not spell.isSafeAoE then
+    if spell.type ~= "Healing" and (spell.areaRadius > 0 or M.Utils.isZoneSpell(spellName)) and not spell.isSafeAoE then
         if not allowAoE and spell.type == "Damage" then
             return false
         end
@@ -199,7 +203,7 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     if State.Settings.TurnBasedSwarmMode and spell.outOfCombatOnly then
         return false
     end
-    if spell.isSelfOnly and distanceToTarget ~= 0.0 then
+    if spell.isSelfOnly and uuid ~= targetUuid then
         return false
     end
     if not State.Settings.HogwildMode then
@@ -211,9 +215,6 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
         if not M.Resources.hasEnoughToCastSpell(uuid, spellName) then
             return false
         end
-    end
-    if spellName == "Target_KiResonation_Blast" and M.Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
-        return false
     end
     -- For defense tactics:
     --  1. Is the target already within range? Then ok to use

@@ -38,13 +38,12 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         end
         return actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
+    brawler.targetUuid = targetUuid -- or in onSubmitted?
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         debugPrint(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
-        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, false, onSubmitted, function ()
+        local targetUuid = M.Spells.isShout(actionToTake) and brawler.uuid or target.uuid
+        Actions.useSpellOnTarget(brawler.uuid, targetUuid, actionToTake, false, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
-            if not bonusActionOnly then
-                brawler.targetUuid = targetUuid
-            end
             onCompleted()
         end, onFailed)
     end, onFailed)
@@ -78,10 +77,6 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
     if not actionToTake then
         debugPrint(brawler.displayName, "No friendly actions available for", brawler.uuid, bonusActionOnly)
         return onFailed("no friendly actions available")
-        -- if not bonusActionOnly then
-        --     return onFailed()
-        -- end
-        -- return onSubmitted()
     end
     if not Pick.checkConditions({caster = brawler.uuid, target = target.uuid}, M.Spells.getSpellByName(actionToTake)) then
         excludedSpells = excludedSpells or {}
@@ -92,7 +87,8 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
         return actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
-        Actions.useSpellOnTarget(brawler.uuid, target.uuid, actionToTake, true, onSubmitted, onCompleted, onFailed)
+        local targetUuid = M.Spells.isShout(actionToTake) and brawler.uuid or target.uuid
+        Actions.useSpellOnTarget(brawler.uuid, targetUuid, actionToTake, true, onSubmitted, onCompleted, onFailed)
     end, onFailed)
 end
 

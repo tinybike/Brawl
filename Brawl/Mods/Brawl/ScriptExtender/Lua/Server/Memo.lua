@@ -94,6 +94,7 @@ local Memoizable = {
         "getRageAbility",
         "getSpellByName",
         "isSingleSelect",
+        "isShout",
     },
     Pick = {
         "checkConditions",

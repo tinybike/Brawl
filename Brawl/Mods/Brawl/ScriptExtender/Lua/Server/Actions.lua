@@ -324,7 +324,7 @@ local function startRage(uuid, rage, onSubmitted, onCompleted, onFailed)
         if not Utils.startsWith(spellName, "Shout_Rage_Giant") then
             return onCompleted(spellName)
         end
-        -- NB: this onSubmitted can execute 2x
+        Swarm.cancelActionSequenceFailsafeTimer(uuid)
         Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
             Actions.useSpellOnTarget(uuid, uuid, "Shout_ElementalCleaver_Thunder", true, onSubmitted, onCompleted, onFailed)
         end)
@@ -344,6 +344,7 @@ local function startAuras(uuid, auras, onSubmitted, onCompleted, onFailed)
         end
         Actions.useSpellOnTarget(uuid, uuid, aura, true, onSubmitted, function (spellName)
             debugPrint(M.Utils.getDisplayName(uuid), spellName, "aura successfully activated")
+            Swarm.cancelActionSequenceFailsafeTimer(uuid)
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                 startAura(index + 1)
             end)
