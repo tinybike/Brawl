@@ -1,6 +1,5 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isToT = Utils.isToT
 local noop = Utils.noop
 local startChunk
 local singleCharacterTurn
@@ -316,10 +315,13 @@ local function isChunkDone(chunkIndex)
     return true
 end
 
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or (M.Utils.isToT() and M.Utils.contains(Constants.TOT_EXCLUDED_TIERS, M.Utils.getToTEnemyTier(uuid)))
+end
+
 local function isControlledByDefaultAI(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
-        debugPrint("entity ACTIVE, using default AI instead...", uuid, M.Utils.getDisplayName(uuid))
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
         return true
     end
     return false
@@ -341,7 +343,7 @@ local function completeSwarmTurn(uuid, swarmActors)
                 startChunk(chunkIndex + 1, swarmActors)
             end
         end
-        if not isControlledByDefaultAI(uuid) then
+        if not M.Swarm.isControlledByDefaultAI(uuid) then
             if M.Osi.IsPartyMember(uuid, 1) == 0 then
                 State.Session.SwarmTurnComplete[uuid] = true
                 if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
@@ -458,7 +460,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if not State.Session.SwarmTurnActive then
                 debugPrint(brawler.displayName, "swarm turn global timed out")
                 return callback(brawler.uuid, swarmActors)
-            elseif isControlledByDefaultAI(brawler.uuid) then
+            elseif M.Swarm.isControlledByDefaultAI(brawler.uuid) then
                 debugPrint(brawler.displayName, "controlled by default AI, skipping")
                 State.Session.SwarmTurnComplete[brawler.uuid] = true
                 return callback(brawler.uuid, swarmActors)
@@ -547,15 +549,15 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid), brawlerIndex*25)
     debugPrint("remaining movement", Movement.getMovementDistanceAmount(Ext.Entity.Get(brawler.uuid)))
     local hostCharacterUuid = M.Osi.GetHostCharacter()
-    if isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
+    if M.Utils.isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
         debugPrint("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
+    if State.Session.Players[brawler.uuid] or (M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
-    if isControlledByDefaultAI(brawler.uuid) then
+    if M.Swarm.isControlledByDefaultAI(brawler.uuid) then
         debugPrint(brawler.displayName, "singleCharacterTurn, is controlled by default AI")
         State.Session.SwarmTurnComplete[brawler.uuid] = true
         return false
@@ -594,7 +596,7 @@ end
 -- all other enemies go at the same time, using the Brawl AI
 -- possible for the first enemy's turn to end early, and then it bleeds over into the player turn, but unusual
 local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
-    if isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
+    if M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round ~= nil and not State.Session.TBSMToTSkippedPrepRound then
         debugPrint("skipping ToT prep round")
         State.Session.TBSMToTSkippedPrepRound = true
         State.Session.SwarmTurnActive = false
@@ -862,6 +864,8 @@ return {
     unsetTurnComplete = unsetTurnComplete,
     setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,
     unsetAllEnemyTurnsComplete = unsetAllEnemyTurnsComplete,
+    isExcludedFromSwarmAI = isExcludedFromSwarmAI,
+    isControlledByDefaultAI = isControlledByDefaultAI,
     completeSwarmTurn = completeSwarmTurn,
     startSwarmTurn = startSwarmTurn,
     startActionSequenceFailsafeTimer = startActionSequenceFailsafeTimer,

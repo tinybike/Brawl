@@ -2,7 +2,6 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local isPlayerControllingDirectly = State.isPlayerControllingDirectly
 local clearOsirisQueue = Utils.clearOsirisQueue
-local isToT = Utils.isToT
 local noop = Utils.noop
 
 local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)

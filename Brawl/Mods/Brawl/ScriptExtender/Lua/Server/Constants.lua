@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = false, Pause = true, Actions = false, Pick = false, AI = true, Movement = false, Listeners = true}
+Constants.DEBUG_LOGGING = {Swarm = true, Pause = false, Actions = false, Pick = true, AI = true, Movement = false, Listeners = false}
 -- Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
@@ -11,6 +11,7 @@ Constants.LEADERBOARD_UPDATE_TIMEOUT = 100
 Constants.COUNTDOWN_TURN_INTERVAL = 6000
 Constants.MOD_STATUS_MESSAGE_DURATION = 2000
 Constants.ENTER_COMBAT_RANGE = 20
+Constants.MAX_ENGAGEMENT_RANGE = 40
 Constants.TRACKING_DISTANCE_RT = 12
 Constants.TRACKING_DISTANCE_TBSM = 20
 Constants.NEARBY_RADIUS = 35
@@ -416,6 +417,7 @@ Constants.TELEPORTS = {
     "Target_UNI_MistyStep_NightWalkers",
     "Projectile_Jump",
 }
+Constants.TOT_EXCLUDED_TIERS = {"divine", "mythical"}
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
 Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"

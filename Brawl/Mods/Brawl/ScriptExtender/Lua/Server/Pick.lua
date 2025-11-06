@@ -1,6 +1,5 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isToT = Utils.isToT
 
 local function getSpellTypeWeight(spellType)
     if spellType == "Damage" then
@@ -51,6 +50,10 @@ end
 
 -- Weight peaks at healing or damage == needed, overflow discouraged (higher penalty value = steeper dropoff)
 local function getHealingOrDamageAmountWeight(averageAmount, amountNeeded, overflowPenalty)
+    if not averageAmount or not amountNeeded then
+        print("no amount found, what is this?", averageAmount, amountNeeded, overflowPenalty)
+        return 0
+    end
     if averageAmount <= amountNeeded then
         return averageAmount
     end
@@ -521,7 +524,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, he
         end
     end
     for potentialTargetUuid, _ in pairs(potentialTargets) do
-        if not isToT() or (Mods.ToT.PersistentVars.Scenario and potentialTargetUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper) then
+        if not M.Utils.isToT() or (Mods.ToT.PersistentVars.Scenario and potentialTargetUuid ~= Mods.ToT.PersistentVars.Scenario.CombatHelper) then
             debugPrint(brawler.displayName, "checking potential target", M.Utils.getDisplayName(potentialTargetUuid), potentialTargetUuid)
             local weightedTarget
             if (M.Utils.isAliveAndCanFight(potentialTargetUuid) or M.Utils.isDowned(potentialTargetUuid)) and (healingNeeded or M.Osi.IsAlly(brawler.uuid, potentialTargetUuid) == 0) then
@@ -545,13 +548,15 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, he
                     debugPrint(brawler.displayName, "distanceToTarget", distanceToTarget, canSeeTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid], isHealer, isMelee)
                     local ableToTarget = true
                     local isHostile = M.Utils.isHostileTarget(brawler.uuid, potentialTargetUuid)
-                    if not State.Settings.TurnBasedSwarmMode and (distanceToTarget > 30 or (isHostile and not canSeeTarget)) then
+                    if not State.Settings.TurnBasedSwarmMode and (distanceToTarget > Constants.MAX_ENGAGEMENT_RANGE or (isHostile and not canSeeTarget)) then
                         ableToTarget = false
                     end
-                    debugPrint(ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
-                    if isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+                    debugPrint(isHostile, ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
+                    if M.Utils.isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                         local hasPathToTarget = nil
-                        if (isHostile and M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid)) or (M.State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true, bonusActionOnly)) then
+                        local hasDirectHeal = M.State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true, bonusActionOnly)
+                        debugPrint(isHostile, M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid), hasDirectHeal)
+                        if (isHostile and M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid)) or hasDirectHeal then
                             if isMelee and isHostile then
                                 hasPathToTarget = M.Movement.findPathToTargetUuid(brawler.uuid, potentialTargetUuid)
                             end

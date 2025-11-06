@@ -18,7 +18,6 @@ M = require("Server/Memo.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isToT = Utils.isToT
 
 function stopPulseAction(brawler, remainInBrawl)
     debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)

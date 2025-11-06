@@ -56,7 +56,7 @@ end
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
-        if Utils.isToT() then
+        if M.Utils.isToT() then
             stopToTTimers()
         end
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do

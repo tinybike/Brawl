@@ -317,6 +317,28 @@ local function isCounterspell(spellName)
     return false
 end
 
+local function getToTEnemyTier(uuid)
+    if Mods.ToT.PersistentVars and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Enemies then
+        for _, enemyGroup in ipairs(Mods.ToT.PersistentVars.Scenario.Enemies) do
+            for _, enemy in ipairs(enemyGroup) do
+                if enemy.GUID == uuid then
+                    return enemy.Tier
+                end
+            end
+        end
+    end
+end
+
+local function isActiveCombatTurn(uuid)
+    if uuid then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased and entity.TurnBased.IsActiveCombatTurn then
+            return true
+        end
+    end
+    return false
+end
+
 local function removeNegativeStatuses(uuid)
     -- Osi.RemoveStatusesWithGroup(uuid, "SG_Charmed")
     -- Osi.RemoveStatusesWithGroup(uuid, "SG_Petrified")
@@ -678,6 +700,15 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
+local function contains(t, v)
+    for _, x in ipairs(t) do
+        if x == v then
+            return true
+        end
+    end
+    return false
+end
+
 local function startsWith(str, prefix)
     return str:sub(1, #prefix) == prefix
 end
@@ -767,7 +798,10 @@ return {
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
+    getToTEnemyTier = getToTEnemyTier,
+    isActiveCombatTurn = isActiveCombatTurn,
     getOriginatorPrototype = getOriginatorPrototype,
+    contains = contains,
     startsWith = startsWith,
     averageTime = averageTime,
     totalTime = totalTime,

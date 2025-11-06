@@ -1,6 +1,5 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isToT = Utils.isToT
 
 local function onCharacterMoveFailedUseJump(character)
     debugPrint("CharacterMoveFailedUseJump", character)
@@ -12,7 +11,7 @@ local function onCombatStarted(combatGuid)
         Leaderboard.initialize()
     end
     -- NB: clean this up / don't reassign "constant" values
-    if isToT() then
+    if Utils.isToT() then
         if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
             State.Session.TBSMToTSkippedPrepRound = false
         else
@@ -25,7 +24,7 @@ local function onCombatStarted(combatGuid)
     for playerUuid, _ in pairs(State.Session.Players) do
         Roster.addBrawler(playerUuid, true)
     end
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+    local level = Osi.GetRegion(Osi.GetHostCharacter())
     if level then
         if State.Settings.TurnBasedSwarmMode then
             local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
@@ -40,7 +39,7 @@ local function onCombatStarted(combatGuid)
                 end
             end
         else
-            if not isToT() then
+            if not Utils.isToT() then
                 startBrawlFizzler(level)
                 Ext.Timer.WaitFor(500, function ()
                     Roster.addNearbyToBrawlers(M.Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
@@ -111,7 +110,7 @@ local function onCombatRoundStarted(combatGuid, round)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
-        if isToT() then
+        if M.Utils.isToT() then
             startToTTimers()
         else
             onCombatStarted(combatGuid)
@@ -167,7 +166,7 @@ local function onEnteredForceTurnBased(entityGuid)
             if isHostCharacter then
                 stopPulseReposition(level)
                 stopBrawlFizzler(level)
-                if isToT() then
+                if M.Utils.isToT() then
                     stopToTTimers()
                 end
             end
@@ -227,7 +226,7 @@ local function onLeftForceTurnBased(entityGuid)
         if State.areAnyPlayersBrawling() then
             if isHostCharacter then
                 startBrawlFizzler(level)
-                if isToT() then
+                if M.Utils.isToT() then
                     startToTTimers()
                 end
             end
@@ -471,7 +470,7 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
     local attackerUuid = M.Osi.GetUUID(attackerGuid)
     local defenderUuid = M.Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and M.Osi.IsCharacter(attackerUuid) == 1 and M.Osi.IsCharacter(defenderUuid) == 1 then
-        if isToT() then
+        if M.Utils.isToT() then
             Roster.addBrawler(attackerUuid, true)
             Roster.addBrawler(defenderUuid, true)
         end

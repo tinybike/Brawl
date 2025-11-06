@@ -142,8 +142,6 @@ local function getArchetype(uuid)
             archetype = "melee_magic"
         elseif archetype:find("healer_melee") ~= nil then
             archetype = "healer_melee"
-        elseif archetype:find("monk") ~= nil then
-            archetype = "monk"
         else
             archetype = "melee"
         end
