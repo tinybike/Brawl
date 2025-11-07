@@ -61,6 +61,9 @@ local function setMovementToMax(entity)
 end
 
 local function getRemainingMovement(entity)
+    if not State.Settings.TurnBasedSwarmMode then
+        return Constants.UNCAPPED_MOVEMENT_DISTANCE
+    end
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
@@ -152,7 +155,7 @@ local function clearActiveMovements(moverUuid)
 end
 
 local function pauseTimers()
-    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+    if State.Settings.TurnBasedSwarmMode and State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
         for _, activeMovement in pairs(State.Session.ActiveMovements) do
             if activeMovement and activeMovement.timer and activeMovement.timer.handle and not activeMovement.timer.paused then
                 Ext.Timer.Pause(activeMovement.timer.handle)
@@ -162,7 +165,7 @@ local function pauseTimers()
 end
 
 local function resumeTimers()
-    if State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
+    if State.Settings.TurnBasedSwarmMode and State.Session.ActiveMovements and next(State.Session.ActiveMovements) then
         for _, activeMovement in pairs(State.Session.ActiveMovements) do
             if activeMovement and activeMovement.timer and activeMovement.timer.handle and activeMovement.timer.paused then
                 Ext.Timer.Resume(activeMovement.timer.handle)
@@ -177,25 +180,32 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
         moverUuid = moverUuid,
         goalPosition = goalPosition,
         goalTarget = goalTarget,
-        onCompleted = onCompleted or noop,
-        timer = {
+        onCompleted = onCompleted or _P,
+    }
+    if State.Settings.TurnBasedSwarmMode then
+        State.Session.ActiveMovements[eventUuid].timer = {
             handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
                 debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
                 if onFailed then onFailed("movement timed out") end
             end),
             paused = false,
-        },
-    }
+        }
+    end
     debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
     debugDump(State.Session.ActiveMovements[eventUuid])
     return eventUuid
 end
+
+-- Osi.CharacterMoveToPosition("1535feb9-7ff9-4132-be09-191ba3f8c2e1", -289.25, 17.518180847168, -263.75, "Sprint", "")
+-- Osi.CharacterMoveTo("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), "Sprint", "")
+-- Osi.Attack("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), 1)
 
 local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToTargetUuid", targetUuid, override)
     if override then
         clearOsirisQueue(uuid)
     end
+    debugPrint("character move to", uuid, targetUuid, getMovementSpeed(uuid))
     Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, nil, targetUuid, onCompleted, onFailed))
     return true
 end
@@ -204,8 +214,15 @@ local function moveToPosition(uuid, position, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToPosition", position[1], position[2], position[3], override)
     if override then
         clearOsirisQueue(uuid)
+        local ent = Ext.Entity.Get(uuid)
+        if ent and ent.ServerCharacter and ent.ServerCharacter.AiMovementMachine and ent.ServerCharacter.AiMovementMachine.CachedStates and ent.ServerCharacter.AiMovementMachine.CachedStates[4] and not ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished then
+            ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished = true
+        end
     end
+    debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid))
+    Osi.RequestPing(position[1], position[2], position[3], Osi.GetHostCharacter(), "")
     Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, position, nil, onCompleted, onFailed))
+    -- _D(Ext.Entity.Get(uuid).ServerCharacter.OsirisController.Tasks)
     return true
 end
 

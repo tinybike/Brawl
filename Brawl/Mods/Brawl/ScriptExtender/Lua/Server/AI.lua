@@ -169,9 +169,9 @@ local function checkForBrawlToJoin(brawler)
 end
 
 local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    onSubmitted = onSubmitted or noop
-    onCompleted = onCompleted or noop
-    onFailed = onFailed or noop
+    onSubmitted = onSubmitted or debugDump
+    onCompleted = onCompleted or debugPrint
+    onFailed = onFailed or debugPrint
     if not brawler or not brawler.uuid then
         return onFailed("brawler not found")
     end
@@ -229,9 +229,10 @@ end
 
 -- Brawlers doing dangerous stuff
 local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    onSubmitted = onSubmitted or noop
-    onCompleted = onCompleted or noop
-    onFailed = onFailed or noop
+    print("pulseAction", brawler.displayName)
+    onSubmitted = onSubmitted or debugDump
+    onCompleted = onCompleted or debugPrint
+    onFailed = onFailed or debugPrint
     -- If this brawler is dead or unable to fight, stop this pulse
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
         stopPulseAction(brawler)
