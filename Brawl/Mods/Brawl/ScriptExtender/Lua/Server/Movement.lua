@@ -109,7 +109,6 @@ local function findPathToPosition(uuid, position, callback)
 end
 
 local function finishMovement(uuid, eventUuid, activeMovement, override)
-    print("FINISHING MOVEMENT FUCK YOUUUUUUUUUUUUUUUUUU")
     if uuid and activeMovement and uuid == activeMovement.moverUuid then
         debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
         if activeMovement.timer and activeMovement.timer.handle then
@@ -118,7 +117,6 @@ local function finishMovement(uuid, eventUuid, activeMovement, override)
         end
         State.Session.ActiveMovements[eventUuid] = nil
         if not override then
-            print("completed fuck you")
             activeMovement.onCompleted()
         end
     end
@@ -195,10 +193,6 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
     -- debugDump(State.Session.ActiveMovements[eventUuid])
     return eventUuid
 end
-
--- Osi.CharacterMoveToPosition("1535feb9-7ff9-4132-be09-191ba3f8c2e1", -289.25, 17.518180847168, -263.75, "Sprint", "")
--- Osi.CharacterMoveTo("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), "Sprint", "")
--- Osi.Attack("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), 1)
 
 local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToTargetUuid", targetUuid, override)

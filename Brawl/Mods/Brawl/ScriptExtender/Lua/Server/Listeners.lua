@@ -571,9 +571,9 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         -- debugPrint("onCompleted")
         actionInProgress.onCompleted(spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
-        if not State.Settings.TurnBasedSwarmMode then
-            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
-        end
+        -- if not State.Settings.TurnBasedSwarmMode then
+        --     Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+        -- end
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -591,10 +591,8 @@ end
 
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
-    -- _D(cast:GetAllComponents())
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
-        _D(cast.SpellCastState)
-        _D(cast.ServerSpellCastState)
+        _D(cast:GetAllComponents())
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
@@ -878,6 +876,12 @@ end
 
 local function startListeners()
     debugPrint("Starting listeners...")
+    -- local handle = Ext.Events.Tick:Subscribe(function (e)
+    --     for _, castRequest in ipairs(Ext.System.ServerCastRequest.OsirisCastRequests) do
+    --         print("cast request")
+    --         _D(castRequest)
+    --     end
+    -- end)
     State.Session.Listeners.Tick = {}
     State.Session.Listeners.Tick.handle = Ext.Events.Tick:Subscribe(M.clear)
     State.Session.Listeners.Tick.stop = function ()
