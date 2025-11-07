@@ -142,7 +142,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
         return false
     end
     for costType, costValue in pairs(spell.costs) do
-        if M.Spells.isCooldown(costType) then
+        if costType == "LongRest" or costType == "ShortRest" then
             if costValue and not M.Resources.isSpellOnCooldown(casterUuid, spellName) then
                 return false
             end
@@ -179,13 +179,13 @@ local function deductCastedSpell(uuid, spellName, requestUuid)
     local spell = M.Spells.getSpellByName(spellName)
     if entity and spell then
         for costType, costValue in pairs(spell.costs) do
-            if M.Spells.isCooldown(costType) then
+            if costType == "LongRest" or costType == "ShortRest" then
                 local preparedSpell = getPreparedSpell(entity, spellName)
                 if preparedSpell and costValue and entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns then
                     preparedSpell.Prototype = spellName
                     entity.SpellBookCooldowns.Cooldowns[#entity.SpellBookCooldowns.Cooldowns + 1] = {
                         Cooldown = -1.0,
-                        CooldownType = costType,
+                        CooldownType = Ext.Stats.Get(spellName).Cooldown,
                         SpellId = preparedSpell,
                         field_29 = 3, -- ??
                         field_30 = requestUuid,

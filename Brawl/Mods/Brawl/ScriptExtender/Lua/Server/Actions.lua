@@ -213,7 +213,7 @@ end
 
 local function buildSpell(entity, spellName, stats)
     local originatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats)
-    if State.Settings.HogwildMode or not State.Settings.TurnBasedSwarmMode then
+    if State.Settings.HogwildMode then
         return {
             OriginatorPrototype = originatorPrototype,
             ProgressionSource = Constants.NULL_UUID,

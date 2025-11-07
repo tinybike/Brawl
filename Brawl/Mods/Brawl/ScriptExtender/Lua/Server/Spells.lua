@@ -99,8 +99,12 @@ local function isCooldown(cost)
 end
 
 local function parseSpellCosts(spell, costType)
-    local spellCosts = {}
     local costs = M.Utils.split(spell[costType], ";")
+    local spellCosts = {
+        ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
+        LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
+    }
+    -- local hitCost = nil -- divine smite only..?
     for _, cost in ipairs(costs) do
         local costTable = M.Utils.split(cost, ":")
         local costLabel = costTable[1]:match("^%s*(.-)%s*$")
@@ -113,7 +117,7 @@ local function parseSpellCosts(spell, costType)
             spellCosts[costLabel] = costAmount
         end
     end
-    spellCosts[spell.Cooldown] = true
+    -- costs[spell.Cooldown] = true
     return spellCosts
 end
 
@@ -371,7 +375,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
         local costs = parseSpellCosts(spell, "UseCosts")
         local hitCosts = parseSpellCosts(spell, "HitCosts")
         for hitCost, hitCostAmount in pairs(hitCosts) do
-            if M.Spells.isCooldown(hitCost) then
+            if hitCost == "LongRest" or hitCost == "ShortRest" then
                 costs[hitCost] = costs[hitCost] or hitCostAmount
             else
                 -- Exclude weird edge cases, e.g. Projectile_EnsnaringStrike_4, Projectile_Smite_Banishing_7, etc.

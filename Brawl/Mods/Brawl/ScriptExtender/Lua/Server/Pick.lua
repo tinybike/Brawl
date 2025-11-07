@@ -262,9 +262,6 @@ local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilen
     if bonusActionOnly and not spell.isBonusAction then
         return false
     end
-    if spellName == "Target_KiResonation_Blast" and M.Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
-        return false
-    end
     if State.Settings.TurnBasedSwarmMode or not State.Settings.HogwildMode then
         if not M.Resources.hasEnoughToCastSpell(uuid, spellName) then
             return false
