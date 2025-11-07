@@ -250,12 +250,9 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
         if State.Settings.HogwildMode then
-            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls"}
+            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls", "NoMovement"}
         else
-            castOptions = {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras"}
-        end
-        if State.Settings.TurnBasedSwarmMode then
-            table.insert(castOptions, "NoMovement")
+            castOptions = {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
         end
     end
     local targets = buildTargets(casterUuid, spellName, targetUuid, stats.SpellType, isFriendlyTarget)
@@ -273,8 +270,10 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
         Targets = targets,
         field_A8 = 1,
     }
-    -- debugDump(request)
+    _D(request)
     submitSpellRequest(request, insertAtFront)
+    -- need this for RT edge cases...?
+    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
     return request
 end
 

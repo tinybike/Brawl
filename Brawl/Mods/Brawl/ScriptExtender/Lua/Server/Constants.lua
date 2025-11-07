@@ -360,6 +360,7 @@ Constants.SPELL_REQUEST_FLAGS = {
     AvoidDangerousAuras = 0x80000,
     Unknown100000 = 0x100000,
 }
+Constants.COOLDOWNS = {"OncePerRest", "OncePerShortRest", "OncePerShortRestPerItem", "OncePerRestPerItem"}
 Constants.NO_ACTION_STATUSES = {
     "COMMAND_GROVEL",
     "COMMAND_HALT",

@@ -571,6 +571,9 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         -- debugPrint("onCompleted")
         actionInProgress.onCompleted(spellName)
         Actions.removeActionInProgress(casterUuid, requestUuid)
+        if not State.Settings.TurnBasedSwarmMode then
+            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+        end
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -590,15 +593,15 @@ end
 local function onSpellCastFinishedEvent(cast, _, _)
     -- _D(cast:GetAllComponents())
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
-        -- debugDump(cast.SpellCastState)
-        -- debugDump(cast.ServerSpellCastState)
+        _D(cast.SpellCastState)
+        _D(cast.ServerSpellCastState)
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
-            debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
-            debugDump(actionInProgress)
+            print("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
+            _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             local spellName = actionInProgress.spellName
             local onCompleted = actionInProgress.onCompleted
@@ -829,8 +832,9 @@ local function onLeveledUp(character)
 end
 
 local function onEntityEvent(characterGuid, eventUuid)
+    print("EntityEvent", characterGuid, eventUuid)
     if State.Session.ActiveMovements[eventUuid] then
-        debugPrint("EntityEvent", characterGuid, eventUuid)
+        print("Got active movement")
         Movement.finishMovement(M.Osi.GetUUID(characterGuid), eventUuid, State.Session.ActiveMovements[eventUuid])
     end
 end

@@ -89,13 +89,18 @@ local function extraAttackSpellCheck(spell)
     return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
 end
 
+local function isCooldown(cost)
+    for _, cooldown in ipairs(Constants.COOLDOWNS) do
+        if cost == cooldown then
+            return true
+        end
+    end
+    return false
+end
+
 local function parseSpellCosts(spell, costType)
+    local spellCosts = {}
     local costs = M.Utils.split(spell[costType], ";")
-    local spellCosts = {
-        ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
-        LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
-    }
-    -- local hitCost = nil -- divine smite only..?
     for _, cost in ipairs(costs) do
         local costTable = M.Utils.split(cost, ":")
         local costLabel = costTable[1]:match("^%s*(.-)%s*$")
@@ -108,6 +113,7 @@ local function parseSpellCosts(spell, costType)
             spellCosts[costLabel] = costAmount
         end
     end
+    spellCosts[spell.Cooldown] = true
     return spellCosts
 end
 
@@ -365,7 +371,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
         local costs = parseSpellCosts(spell, "UseCosts")
         local hitCosts = parseSpellCosts(spell, "HitCosts")
         for hitCost, hitCostAmount in pairs(hitCosts) do
-            if hitCost == "LongRest" or hitCost == "ShortRest" then
+            if M.Spells.isCooldown(hitCost) then
                 costs[hitCost] = costs[hitCost] or hitCostAmount
             else
                 -- Exclude weird edge cases, e.g. Projectile_EnsnaringStrike_4, Projectile_Smite_Banishing_7, etc.
@@ -565,6 +571,7 @@ end
 return {
     isSingleSelect = isSingleSelect,
     isShout = isShout,
+    isCooldown = isCooldown,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
     getAuras = getAuras,

@@ -104,6 +104,7 @@ local Memoizable = {
         "getSpellByName",
         "isSingleSelect",
         "isShout",
+        "isCooldown",
     },
     Pick = {
         "checkConditions",
