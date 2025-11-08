@@ -53,6 +53,7 @@ local function stopTruePause(entityUuid)
     end
 end
 
+-- NB: need to either disable the built-in AI or force-pause it during pause
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
@@ -63,6 +64,7 @@ local function allEnterFTB()
             if player and player[1] then
                 local uuid = M.Osi.GetUUID(player[1])
                 if uuid then
+                    Osi.SetCanJoinCombat(uuid, 0)
                     Osi.ForceTurnBasedMode(uuid, 1)
                 end
             end
@@ -80,27 +82,33 @@ local function allEnterFTB()
     end
 end
 
+-- NB: points timers should never be firing while paused, why is this happening?
 local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            if player and player[1] then
-                local uuid = M.Osi.GetUUID(player[1])
-                if uuid then
-                    unlock(Ext.Entity.Get(uuid))
-                    Osi.ForceTurnBasedMode(uuid, 0)
-                    stopTruePause(uuid)
-                end
-            end
+            local uuid = M.Osi.GetUUID(player[1])
+            unlock(Ext.Entity.Get(uuid))
+            Osi.ForceTurnBasedMode(uuid, 0)
+            Osi.SetCanJoinCombat(uuid, 1)
+            stopTruePause(uuid)
         end
-        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPlayer(brawlerUuid) == 0 then
-                    unlock(Ext.Entity.Get(brawlerUuid))
-                    Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                    stopTruePause(brawlerUuid)
+        local host = M.Osi.GetHostCharacter()
+        if host then
+            local level = M.Osi.GetRegion(host)
+            if level then
+                local brawlersInLevel = State.Session.Brawlers[level]
+                if brawlersInLevel then
+                    for brawlerUuid, _ in pairs(brawlersInLevel) do
+                        if M.Osi.IsPlayer(brawlerUuid) == 0 then
+                            unlock(Ext.Entity.Get(brawlerUuid))
+                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
+                            stopTruePause(brawlerUuid)
+                            Utils.joinCombat(brawlerUuid)
+                        end
+                    end
+                    Utils.setPlayersSwarmGroup()
+                    Utils.setPlayerTurnsActive()
                 end
             end
         end

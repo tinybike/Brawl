@@ -94,6 +94,83 @@ local function decreaseActionResource(uuid, resourceType, amount)
     entity:Replicate("ActionResources")
 end
 
+local function refillTimerComplete(brawler, resourceType)
+    if brawler and brawler.uuid and brawler.actionResources and brawler.actionResources[resourceType] then
+        local entity = Ext.Entity.Get(brawler.uuid)
+        if entity then
+            local uuid = brawler.uuid
+            local resource = Resources.getActionResource(entity, resourceType)
+            if resource then
+                local updatedAmount = math.min(resource.MaxAmount, resource.Amount + 1)
+                resource.Amount = updatedAmount
+                brawler.actionResources[resourceType].amount = updatedAmount
+                print("Timer complete", brawler.displayName, resourceType, updatedAmount)
+                entity:Replicate("ActionResources")
+            end
+        end
+    end
+end
+
+local function actionResourcesCallback(entity, _, _)
+    if not State.Settings.TurnBasedSwarmMode and entity and entity.Uuid and entity.Uuid.EntityUuid then
+        if Pause.isInFTB(entity) then
+            return restoreActionResource(entity, "Movement")
+        end
+        local uuid = entity.Uuid.EntityUuid
+        local brawler = Roster.getBrawlerByUuid(uuid)
+        if brawler then
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                local savedActionResource = brawler.actionResources[resourceType]
+                if savedActionResource and savedActionResource.amount then
+                    local resource = getActionResource(entity, resourceType)
+                    if resource and resource.Amount then
+                        -- was this a decrease? if so, create timer for refilling 1 point
+                        -- just compare to max amount? does that work for things like Haste?
+                        -- print("Resource comparison:", resource.Amount, savedActionResource.amount, resource.Amount < savedActionResource.amount, resource.MaxAmount)
+                        if resource.Amount < savedActionResource.amount then
+                            table.insert(savedActionResource.refillQueue, Ext.Timer.WaitFor(brawler.actionInterval, function ()
+                                refillTimerComplete(brawler, resourceType)
+                            end))
+                        end
+                        savedActionResource.amount = resource.Amount
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function pauseActionResourcesRefillTimers(brawler)
+    if brawler and brawler.actionResources then
+        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+            if brawler.actionResources[resourceType] then
+                local refillQueue = brawler.actionResources[resourceType].refillQueue
+                if refillQueue then
+                    for _, refillTimer in ipairs(refillQueue) do
+                        Ext.Timer.Pause(refillTimer)
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function resumeActionResourcesRefillTimers(brawler)
+    if brawler and brawler.actionResources then
+        for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+            if brawler.actionResources[resourceType] then
+                local refillQueue = brawler.actionResources[resourceType].refillQueue
+                if refillQueue then
+                    for _, refillTimer in ipairs(refillQueue) do
+                        print(brawler.displayName, "resume timer for", resourceType)
+                        Ext.Timer.Resume(refillTimer)
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function isSpellPrepared(uuid, spellName)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
@@ -237,6 +314,9 @@ return {
     restoreActionResource = restoreActionResource,
     restoreSpellSlots = restoreSpellSlots,
     decreaseActionResource = decreaseActionResource,
+    actionResourcesCallback = actionResourcesCallback,
+    pauseActionResourcesRefillTimers = pauseActionResourcesRefillTimers,
+    resumeActionResourcesRefillTimers = resumeActionResourcesRefillTimers,
     isSpellPrepared = isSpellPrepared,
     isSpellOnCooldown = isSpellOnCooldown,
     hasEnoughToCastSpell = hasEnoughToCastSpell,

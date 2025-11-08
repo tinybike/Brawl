@@ -1,7 +1,7 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = true, Pause = false, Actions = true, Pick = true, AI = true, Movement = true, Listeners = true, Resources = true}
--- Constants.DEBUG_LOGGING = false
+-- Constants.DEBUG_LOGGING = {Swarm = true, Pause = false, Actions = true, Pick = true, AI = true, Movement = true, Listeners = true, Resources = true}
+Constants.DEBUG_LOGGING = true
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -406,6 +406,7 @@ Constants.COUNTERSPELLS = {
     "Target_Counterspell_6",
     "Target_MOD_Dread_Counterspell",
 }
+Constants.PER_TURN_ACTION_RESOURCES = {"ActionPoint", "BonusActionPoint", "ReactionActionPoint"}
 Constants.BONUS_ACTION_DASH = {
     "Shout_Dash_CunningAction",
     "Shout_Dash_BonusAction",

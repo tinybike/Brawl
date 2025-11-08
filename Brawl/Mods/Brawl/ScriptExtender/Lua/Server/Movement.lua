@@ -56,6 +56,7 @@ local function setMovementToMax(entity)
         resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
         resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
         resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 1.0
+        resources[Constants.ACTION_RESOURCES.ReactionActionPoint][1].Amount = 1.0
         entity:Replicate("ActionResources")
     end
 end
@@ -550,14 +551,20 @@ local function setPlayerRunToSprint(entityUuid)
     end
 end
 
-local function resetPlayersMovementSpeed()
-    local players = State.Session.Players
-    for playerUuid, player in pairs(players) do
-        local entity = Ext.Entity.Get(playerUuid)
-        if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
+local function resetPlayerMovementSpeed(uuid)
+    local player = State.Session.Players[uuid]
+    if player and player.movementSpeedRun ~= nil then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.ServerCharacter then
             entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
             player.movementSpeedRun = nil
         end
+    end
+end
+
+local function resetPlayersMovementSpeed()
+    for uuid, _ in pairs(State.Session.Players) do
+        resetPlayerMovementSpeed(uuid)
     end
 end
 
@@ -592,6 +599,7 @@ return {
     holdPosition = holdPosition,
     repositionRelativeToTarget = repositionRelativeToTarget,
     setPlayerRunToSprint = setPlayerRunToSprint,
+    resetPlayerMovementSpeed = resetPlayerMovementSpeed,
     resetPlayersMovementSpeed = resetPlayersMovementSpeed,
     setMovementSpeedThresholds = setMovementSpeedThresholds,
     selectDash = selectDash,

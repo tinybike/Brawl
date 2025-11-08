@@ -495,10 +495,9 @@ local function joinCombat(uuid)
 end
 
 local function setPlayersSwarmGroup(swarmGroupLabel)
-    local players = State.Session.Players
-    if players then
-        for uuid, _ in pairs(players) do
-            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel or "PLAYER_SWARM_GROUP")
         end
     end
 end
@@ -556,6 +555,7 @@ local function showTurnOrderGroups()
     end
 end
 
+-- TODO clean this up, it's a mess
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
@@ -583,12 +583,9 @@ local function setPlayerTurnsActive()
 end
 
 local function getCurrentCombatRound()
-    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-    if serverEnterRequestEntities then
-        local combatEntity = serverEnterRequestEntities[1]
-        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
-            return combatEntity.TurnOrder.field_40
-        end
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+        return combatEntity.TurnOrder.field_40
     end
 end
 
@@ -783,6 +780,7 @@ return {
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
     getCombatEntity = getCombatEntity,
+    joinCombat = joinCombat,
     showTurnOrderGroups = showTurnOrderGroups,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,

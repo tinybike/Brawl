@@ -7,6 +7,7 @@ local Settings = {
     CompanionAIEnabled = true,
     TruePause = true,
     AutoPauseOnDowned = true,
+    AutoPauseOnCombatStart = false,
     ActionInterval = 6.0,
     InitiativeDie = 20,
     FullAuto = false,
@@ -103,6 +104,7 @@ local Session = {
     ChunkInProgress = nil,
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
+    TurnTimers = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     MeanInitiativeRoll = nil,
     SwarmTurnIsBeforePlayer = nil,
@@ -113,6 +115,29 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
+
+local function nextCombatRound()
+    local host = M.Osi.GetHostCharacter()
+    if host then
+        local level = M.Osi.GetRegion(host)
+        if level then
+            print("nextCombatRound")
+            Ext.ServerNet.BroadcastMessage("NextCombatRound", host)
+            for uuid, _ in pairs(Session.Brawlers[level]) do
+                local entity = Ext.Entity.Get(uuid)
+                if entity and entity.TurnBased then
+                    -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
+                    if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                        entity.TurnBased.HadTurnInCombat = true
+                        entity.TurnBased.TurnActionsCompleted = true
+                    end
+                    entity.TurnBased.RequestedEndTurn = true
+                    entity:Replicate("TurnBased")
+                end
+            end
+        end
+    end
+end
 
 local function getArchetype(uuid)
     local archetype
@@ -209,6 +234,20 @@ local function isPartyInRealTime()
     return true
 end
 
+local function getToTCombatHelper()
+    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario then
+        return Mods.ToT.PersistentVars.Scenario.CombatHelper
+    end
+end
+
+local function isToTCombatHelper(uuid)
+    return Utils.isToT() and Mods.ToT.PersistentVars.Scenario and uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper
+end
+
+local function disableDynamicCombatCamera()
+    Ext.ServerNet.BroadcastMessage("DisableDynamicCombatCamera", "")
+end
+
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
     if M.Utils.isSilenced(uuid) then
         return false
@@ -243,19 +282,21 @@ local function uncapMovementDistance(entityUuid)
     if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
         -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
-        local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity:Replicate("ActionResources")
+            movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
+            movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
+            modVars.MovementDistances = movementDistances
+            -- _D(movementDistances)
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity:Replicate("ActionResources")
-        movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
-        movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
-        modVars.MovementDistances = movementDistances
-        -- _D(movementDistances)
     end
 end
 
@@ -266,19 +307,21 @@ local function capMovementDistance(entityUuid)
         -- debugPrint("Cap movement distance", entityUuid)
         -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
+                entity:Replicate("ActionResources")
+            end
+            movementDistances[entityUuid] = nil
+            modVars.MovementDistances = movementDistances
+            -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
-            entity:Replicate("ActionResources")
-        end
-        movementDistances[entityUuid] = nil
-        modVars.MovementDistances = movementDistances
-        -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
@@ -513,12 +556,16 @@ local function endBrawls()
 end
 
 return {
+    nextCombatRound = nextCombatRound,
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
+    getToTCombatHelper = getToTCombatHelper,
+    isToTCombatHelper = isToTCombatHelper,
+    disableDynamicCombatCamera = disableDynamicCombatCamera,
     isPartyInRealTime = isPartyInRealTime,
     hasDirectHeal = hasDirectHeal,
     revertHitpoints = revertHitpoints,

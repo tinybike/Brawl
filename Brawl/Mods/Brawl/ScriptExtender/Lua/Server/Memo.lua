@@ -7,6 +7,7 @@ local Memoizable = {
         "CanSee",
         "CombatIsActive",
         "CombatGetGuidFor",
+        "CombatGetInvolvedPlayer",
         "FindValidPosition",
         "GetActionResourceValuePersonal",
         "GetActiveArchetype",
@@ -98,6 +99,7 @@ local Memoizable = {
         "getNumEnemiesRemaining",
         "isPartyInRealTime",
         "hasDirectHeal",
+        "isToTCombatHelper",
     },
     Spells = {
         "getRageAbility",
@@ -128,6 +130,8 @@ local Memoizable = {
         "getBrawlers",
     },
     Resources = {
+        "getActionResource",
+        "getActionResourceAmount",
         "getActionResourceInfo",
         "getActionResourceName",
         "isSpellPrepared",
@@ -170,6 +174,7 @@ local function memoize(fn, bucket)
 end
 
 M.Osi = Osi
+M.Utils = Utils
 
 M.memoizeAll = function ()
     for moduleName, fns in pairs(Memoizable) do
