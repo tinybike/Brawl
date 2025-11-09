@@ -476,11 +476,10 @@ local function getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct,
     return weightedTarget
 end
 
-local function whoNeedsHealing(uuid, level)
+local function whoNeedsHealing(uuid)
     local minTargetHpPct = 100.0
     local friendlyTargetUuid = nil
-    local brawlersInLevel = State.Session.Brawlers[level]
-    for targetUuid, target in pairs(brawlersInLevel) do
+    for targetUuid, target in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = M.Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then

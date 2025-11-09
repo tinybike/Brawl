@@ -251,6 +251,7 @@ local function setDirectlyControlledCharacterIndex()
             local assignedCharacters = child.DataContext.CurrentPlayer.AssignedCharacters
             for characterIndex, assignedCharacter in ipairs(assignedCharacters) do
                 if assignedCharacter.EntityUUID == directlyControlledCharacterUuid then
+                    print("directly controlled character index", characterIndex)
                     DirectlyControlledCharacterIndex = characterIndex
                 end
             end
@@ -746,11 +747,16 @@ end
 
 -- thank u focus
 local function directlyControlCharacterByIndex(characterIndex)
-    for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
-        if child.Name == "PlayerPortraits" then
-            local character = child.DataContext.CurrentPlayer.AssignedCharacters[characterIndex]
-            child.DataContext.SelectCharacter:Execute(character)
-            break
+    if characterIndex then
+        for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+            if child.Name == "PlayerPortraits" and child.DataContext and child.DataContext.CurrentPlayer and child.DataContext.CurrentPlayer.AssignedCharacters then
+                local character = child.DataContext.CurrentPlayer.AssignedCharacters[characterIndex]
+                if character then
+                    print("setting to character index", character, characterIndex)
+                    child.DataContext.SelectCharacter:Execute(character)
+                end
+                break
+            end
         end
     end
 end
@@ -771,7 +777,7 @@ local function onNetMessage(data)
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
     elseif data.Channel == "NextCombatRound" then
-        -- setDirectlyControlledCharacterIndex()
+        setDirectlyControlledCharacterIndex()
     elseif data.Channel == "CombatRoundStarted" then
         -- directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
     end

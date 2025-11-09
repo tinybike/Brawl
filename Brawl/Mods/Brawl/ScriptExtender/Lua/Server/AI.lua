@@ -1,8 +1,5 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
-local isPlayerControllingDirectly = State.isPlayerControllingDirectly
-local clearOsirisQueue = Utils.clearOsirisQueue
-local noop = Utils.noop
 
 local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
@@ -92,51 +89,43 @@ local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpe
 end
 
 local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    local level = M.Osi.GetRegion(brawler.uuid)
-    if level then
-        local brawlersSortedByDistance = M.Roster.getBrawlersSortedByDistance(brawler.uuid)
-        -- Healing
-        local isPlayer = M.Osi.IsPlayer(brawler.uuid) == 1
-        local wasHealRequested = false
+    local brawlers = M.Roster.getBrawlers()
+    if brawlers and next(brawlers) then
         local userId
-        if isPlayer then
+        local wasHealRequested = false
+        if M.Osi.IsPlayer(brawler.uuid) == 1 then
             userId = Osi.GetReservedUserID(brawler.uuid)
             wasHealRequested = State.Session.HealRequested[userId]
         end
-        local brawlersInLevel = State.Session.Brawlers[level]
         if wasHealRequested then
-            if brawlersInLevel then
-                local friendlyTargetUuid = M.Pick.whoNeedsHealing(brawler.uuid, level)
-                if friendlyTargetUuid and brawlersInLevel[friendlyTargetUuid] then
-                    debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
-                    return actOnFriendlyTarget(brawler, brawlersInLevel[friendlyTargetUuid], bonusActionOnly, nil, function (request)
-                        State.Session.HealRequested[userId] = false
-                        onSubmitted(request)
-                    end, onFailed)
+            local friendlyTargetUuid = M.Pick.whoNeedsHealing(brawler.uuid)
+            if friendlyTargetUuid and brawlers[friendlyTargetUuid] then
+                debugPrint(brawler.displayName, "actOnFriendlyTarget", brawler.uuid, friendlyTargetUuid, M.Utils.getDisplayName(friendlyTargetUuid), bonusActionOnly)
+                return actOnFriendlyTarget(brawler, brawlers[friendlyTargetUuid], bonusActionOnly, nil, function (request)
+                    State.Session.HealRequested[userId] = false
+                    onSubmitted(request)
+                end, onFailed)
+            end
+        end
+        local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlers, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid))
+        debugDump(weightedTargets)
+        local targetUuid = M.Pick.decideOnTarget(weightedTargets)
+        if targetUuid then
+            local targetBrawler = brawlers[targetUuid]
+            if targetBrawler then
+                if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
+                    return actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
+                else
+                    return actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
                 end
             end
         end
-        if brawlersInLevel then
-            local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlersInLevel, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid, level))
-            debugDump(weightedTargets)
-            local targetUuid = M.Pick.decideOnTarget(weightedTargets)
-            if targetUuid then
-                local targetBrawler = brawlersInLevel[targetUuid]
-                if targetBrawler then
-                    if M.Utils.isHostileTarget(brawler.uuid, targetUuid) then
-                        return actOnHostileTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
-                    else
-                        return actOnFriendlyTarget(brawler, targetBrawler, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
-                    end
-                end
-            end
-        end
-        if not bonusActionOnly then
-            debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
-            Movement.holdPosition(brawler.uuid)
-        end
-        return onFailed("can't find target")
     end
+    if not bonusActionOnly then
+        debugPrint(brawler.displayName, "can't find a target, holding position", brawler.uuid, bonusActionOnly)
+        Movement.holdPosition(brawler.uuid)
+    end
+    return onFailed("can't find target")
 end
 
 -- Enemies are pugnacious jerks and looking for a fight >:(
@@ -204,12 +193,13 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
         return findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     end
     -- We have a target and the target is alive
-    local brawlersInLevel = State.Session.Brawlers[M.Osi.GetRegion(brawler.uuid)]
-    if brawlersInLevel and brawlersInLevel[brawler.targetUuid] and M.Utils.isAliveAndCanFight(brawler.targetUuid) and M.Utils.isVisible(brawler.uuid, brawler.targetUuid) then
+    local brawlers = M.Roster.getBrawlers()
+    if brawlers[brawler.targetUuid] and M.Utils.isAliveAndCanFight(brawler.targetUuid) and M.Utils.isVisible(brawler.uuid, brawler.targetUuid) then
+        local target = brawlers[brawler.targetUuid]
         if not State.Settings.TurnBasedSwarmMode or M.Movement.findPathToTargetUuid(brawler.uuid, brawler.targetUuid) then
             if brawler.lockedOnTarget and M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) then
                 debugPrint(brawler.displayName, "Locked-on target, attacking", M.Utils.getDisplayName(brawler.targetUuid), bonusActionOnly)
-                return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
+                return actOnHostileTarget(brawler, target, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
             end
             if M.Utils.isPlayerOrAlly(brawler.uuid) and State.Settings.CompanionTactics == "Defense" then
                 debugPrint(brawler.displayName, "Find target (defense tactics)", brawler.uuid, bonusActionOnly)
@@ -217,7 +207,7 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
             end
             if M.Utils.isValidHostileTarget(brawler.uuid, brawler.targetUuid) and M.Osi.GetDistanceTo(brawler.uuid, brawler.targetUuid) <= M.Utils.getTrackingDistance() then
                 debugPrint(brawler.displayName, "Remaining on target, attacking", M.Utils.getDisplayName(brawler.targetUuid), bonusActionOnly)
-                return actOnHostileTarget(brawler, brawlersInLevel[brawler.targetUuid], bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
+                return actOnHostileTarget(brawler, target, bonusActionOnly, nil, onSubmitted, onCompleted, onFailed)
             end
         end
     end
@@ -241,7 +231,7 @@ local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, o
     if brawler.isPaused then
         return onFailed("paused")
     end
-    if isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
+    if State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
         return onFailed("player control")
     end
     -- Brawler is alive and able to fight: let's go!
@@ -252,51 +242,51 @@ local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, o
 end
 
 -- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
+-- NB: replace this entirely with in-combat listeners?
 local function pulseReposition(level)
     State.checkForDownedOrDeadPlayers()
-    local brawlersInLevel = State.Session.Brawlers[level]
-    if brawlersInLevel and not State.Settings.TurnBasedSwarmMode then
-        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+    if not State.Settings.TurnBasedSwarmMode then
+        local brawlers = M.Roster.getBrawlers()
+        for brawlerUuid, brawler in pairs(brawlers) do
             if not Constants.IS_TRAINING_DUMMY[brawlerUuid] then
-                if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Utils.canMove(brawlerUuid) then
-                    -- Enemy units are actively looking for a fight and will attack if you get too close to them
-                    if M.Utils.isPugnacious(brawlerUuid) then
-                        if brawler.isInBrawl and brawler.targetUuid ~= nil and M.Utils.isAliveAndCanFight(brawler.targetUuid) then
-                            local _, closestDistance = M.Osi.GetClosestAlivePlayer(brawlerUuid)
-                            if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
-                                debugPrint(brawler.displayName, "Too far away, removing brawler", brawlerUuid)
-                                Roster.removeBrawler(level, brawlerUuid)
-                            else
-                                debugPrint(brawler.displayName, "Repositioning", brawlerUuid, "->", brawler.targetUuid)
-                                -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                            end
-                        else
-                            -- debugPrint(brawler.displayName, "Checking for a brawl to join", brawlerUuid)
-                            checkForBrawlToJoin(brawler)
-                        end
-                    -- Player, ally, and neutral units are not actively looking for a fight
-                    -- - Companions and allies use the same logic
-                    -- - Neutrals just chilling
-                    elseif M.State.areAnyPlayersBrawling() and M.Utils.isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                        -- debugPrint(brawler.displayName, "Player or ally", brawlerUuid, M.Osi.GetHitpoints(brawlerUuid))
-                        if State.Session.Players[brawlerUuid] and (isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
-                            debugPrint(brawler.displayName, "Player is controlling directly: do not take action!")
-                            -- debugDump(brawler)
-                            stopPulseAction(brawler, true)
-                        else
-                            if not brawler.isInBrawl then
-                                if M.Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
-                                    debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
-                                    startPulseAction(brawler)
-                                end
-                            elseif M.Utils.isBrawlingWithValidTarget(brawler) and M.Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
-                                Movement.holdPosition(brawlerUuid)
-                                -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                            end
-                        end
-                    end
-                elseif M.Osi.IsDead(brawlerUuid) == 1 or M.Utils.isDowned(brawlerUuid) then
-                    clearOsirisQueue(brawlerUuid)
+                -- if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Utils.canMove(brawlerUuid) then
+                --     -- Enemy units are actively looking for a fight and will attack if you get too close to them
+                --     if M.Utils.isPugnacious(brawlerUuid) then
+                --         if brawler.isInBrawl and brawler.targetUuid ~= nil and M.Utils.isAliveAndCanFight(brawler.targetUuid) then
+                --             local _, closestDistance = M.Osi.GetClosestAlivePlayer(brawlerUuid)
+                --             if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
+                --                 debugPrint(brawler.displayName, "Too far away, removing brawler", brawlerUuid)
+                --                 Roster.removeBrawler(level, brawlerUuid)
+                --             else
+                --                 debugPrint(brawler.displayName, "Repositioning", brawlerUuid, "->", brawler.targetUuid)
+                --                 -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                --             end
+                --         else
+                --             -- debugPrint(brawler.displayName, "Checking for a brawl to join", brawlerUuid)
+                --             checkForBrawlToJoin(brawler)
+                --         end
+                --     -- Player, ally, and neutral units are not actively looking for a fight
+                --     -- - Companions and allies use the same logic
+                --     -- - Neutrals just chilling
+                --     elseif M.State.areAnyPlayersBrawling() and M.Utils.isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
+                --         if State.Session.Players[brawlerUuid] and (State.isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
+                --             debugPrint(brawler.displayName, "Player is controlling directly: do not take action!")
+                --             stopPulseAction(brawler, true)
+                --         else
+                --             if not brawler.isInBrawl then
+                --                 if M.Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
+                --                     debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
+                --                     startPulseAction(brawler)
+                --                 end
+                --             elseif M.Utils.isBrawlingWithValidTarget(brawler) and M.Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
+                --                 Movement.holdPosition(brawlerUuid)
+                --                 -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
+                --             end
+                --         end
+                --     end
+                -- else
+                if M.Osi.IsDead(brawlerUuid) == 1 or M.Utils.isDowned(brawlerUuid) then
+                    Utils.clearOsirisQueue(brawlerUuid)
                     Osi.LieOnGround(brawlerUuid)
                 end
             end

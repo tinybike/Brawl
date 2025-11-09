@@ -1,7 +1,7 @@
 local Constants = {}
 
--- Constants.DEBUG_LOGGING = {Swarm = true, Pause = false, Actions = true, Pick = true, AI = true, Movement = true, Listeners = true, Resources = true}
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = {Swarm = false, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false}
+-- Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -430,5 +430,10 @@ Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
 Constants.OVERFLOW_DAMAGE_PENALTY = 0.4
 Constants.OVERFLOW_HEALING_PENALTY = 0.6
+Constants.COMBAT_HELPER = {
+    templateId = "b4f5635b-2382-4fb2-ad0d-5be8b363e847",
+    handle = "h09f52fcdg7db3g44ddg91b1gb2b4d69ac32b",
+    faction = "4be9261a-e481-8d9d-3528-f36956a19b17",
+}
 
 return Constants

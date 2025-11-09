@@ -30,6 +30,7 @@ if MCM then
     Settings.CompanionAIEnabled = MCM.Get("companion_ai_enabled")
     Settings.TruePause = MCM.Get("true_pause")
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
+    Settings.AutoPauseOnCombatStart = MCM.Get("auto_pause_on_combat_start")
     Settings.ActionInterval = MCM.Get("action_interval")
     Settings.InitiativeDie = MCM.Get("initiative_die")
     Settings.FullAuto = MCM.Get("full_auto")
@@ -82,7 +83,6 @@ local Session = {
     StoryActionIDs = {},
     TagNameToUuid = {},
     ToTTimer = nil,
-    ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     ActiveMovements = {},
@@ -104,10 +104,11 @@ local Session = {
     ChunkInProgress = nil,
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
-    TurnTimers = {},
+    CombatRoundTimer = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     MeanInitiativeRoll = nil,
     SwarmTurnIsBeforePlayer = nil,
+    CombatHelper = nil,
 }
 
 -- Persistent state
@@ -115,29 +116,6 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "SpellRequirements", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "ModifiedHitpoints", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
-
-local function nextCombatRound()
-    local host = M.Osi.GetHostCharacter()
-    if host then
-        local level = M.Osi.GetRegion(host)
-        if level then
-            print("nextCombatRound")
-            Ext.ServerNet.BroadcastMessage("NextCombatRound", host)
-            for uuid, _ in pairs(Session.Brawlers[level]) do
-                local entity = Ext.Entity.Get(uuid)
-                if entity and entity.TurnBased then
-                    -- print(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
-                    if M.Osi.IsPartyMember(uuid, 1) == 0 then
-                        entity.TurnBased.HadTurnInCombat = true
-                        entity.TurnBased.TurnActionsCompleted = true
-                    end
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity:Replicate("TurnBased")
-                end
-            end
-        end
-    end
-end
 
 local function getArchetype(uuid)
     local archetype
@@ -556,7 +534,6 @@ local function endBrawls()
 end
 
 return {
-    nextCombatRound = nextCombatRound,
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     areAnyPlayersBrawling = areAnyPlayersBrawling,

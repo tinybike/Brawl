@@ -57,9 +57,8 @@ end
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
-        if M.Utils.isToT() then
-            stopToTTimers()
-        end
+        pauseCombatRoundTimers()
+        -- stopAllPulseActions(true)
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             if player and player[1] then
                 local uuid = M.Osi.GetUUID(player[1])
@@ -69,14 +68,12 @@ local function allEnterFTB()
                 end
             end
         end
-        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, _ in pairs(brawlersInLevel) do
-                if M.Osi.IsPlayer(brawlerUuid) == 0 then
-                    Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                    Pause.startTruePause(brawlerUuid)
-                end
+        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+            stopPulseAction(brawler, true)
+            brawler.isPaused = true
+            if M.Osi.IsPlayer(uuid) == 0 then
+                Osi.ForceTurnBasedMode(uuid, 1)
+                Pause.startTruePause(uuid)
             end
         end
     end
@@ -88,32 +85,25 @@ local function allExitFTB()
         debugPrint("allExitFTB")
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             local uuid = M.Osi.GetUUID(player[1])
-            unlock(Ext.Entity.Get(uuid))
-            Osi.ForceTurnBasedMode(uuid, 0)
-            Osi.SetCanJoinCombat(uuid, 1)
-            stopTruePause(uuid)
-        end
-        local host = M.Osi.GetHostCharacter()
-        if host then
-            local level = M.Osi.GetRegion(host)
-            if level then
-                local brawlersInLevel = State.Session.Brawlers[level]
-                if brawlersInLevel then
-                    for brawlerUuid, _ in pairs(brawlersInLevel) do
-                        if M.Osi.IsPlayer(brawlerUuid) == 0 then
-                            unlock(Ext.Entity.Get(brawlerUuid))
-                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                            stopTruePause(brawlerUuid)
-                            Utils.joinCombat(brawlerUuid)
-                        end
-                    end
-                    Utils.setPlayersSwarmGroup()
-                    Utils.setPlayerTurnsActive()
-                end
+            if uuid then
+                unlock(Ext.Entity.Get(uuid))
+                Osi.ForceTurnBasedMode(uuid, 0)
+                Osi.SetCanJoinCombat(uuid, 1)
+                stopTruePause(uuid)
             end
         end
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            if M.Osi.IsPlayer(uuid) == 0 then
+                unlock(Ext.Entity.Get(uuid))
+                Osi.ForceTurnBasedMode(uuid, 0)
+                stopTruePause(uuid)
+                Utils.joinCombat(uuid)
+            end
+        end
+        Utils.setPlayersSwarmGroup()
+        Utils.setPlayerTurnsActive()
+        resumeCombatRoundTimers()
         Movement.resumeTimers()
-        Swarm.resumeTimers()
     end
 end
 
@@ -210,19 +200,19 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            debugPrint("moving entity", M.Utils.getDisplayName(entityUuid), Movement.getRemainingMovement(movingEntity), State.Session.RemainingMovement[entityUuid], isInFTB(movingEntity))
+            -- debugPrint("moving entity", M.Utils.getDisplayName(entityUuid), Movement.getRemainingMovement(movingEntity), State.Session.RemainingMovement[entityUuid], isInFTB(movingEntity))
             if State.Session.RemainingMovement[entityUuid] and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
                 local goalPosition
                 local activeMovement = Movement.getActiveMovement(entityUuid)
                 if activeMovement and activeMovement.goalPosition then
-                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from active movement)", entityUuid)
+                    -- debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from active movement)", entityUuid)
                     goalPosition = activeMovement.goalPosition
                 elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from click)", entityUuid)
+                    -- debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from click)", entityUuid)
                     goalPosition = State.Session.LastClickPosition[entityUuid].position
                 end
                 if goalPosition then
-                    debugDump(goalPosition)
+                    -- debugDump(goalPosition)
                     lock(movingEntity)
                     Movement.findPathToPosition(entityUuid, goalPosition, function (err, validPosition)
                         if err then
@@ -241,7 +231,7 @@ local function startTruePause(entityUuid)
         end
         State.Session.SpellCastPrepareEndEvent[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
             if cast.SpellCastState and cast.SpellCastState.Caster then
-                debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
+                -- debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
                 local caster = cast.SpellCastState.Caster
                 if caster.Uuid.EntityUuid == entityUuid then
                     debugPrint("***************SpellCastPrepareEndEvent", entityUuid)

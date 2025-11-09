@@ -357,7 +357,7 @@ local function removeNegativeStatuses(uuid)
 end
 
 local function clearOsirisQueue(uuid)
-    print("clearOsirisQueue", uuid, getDisplayName(uuid))
+    -- debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
     if State.Settings.TurnBasedSwarmMode then
         Movement.clearActiveMovements(uuid)
         Swarm.cancelActionSequenceFailsafeTimer(uuid)
@@ -559,8 +559,8 @@ end
 local function setPlayerTurnsActive()
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        print("********init***********")
-        showTurnOrderGroups()
+        -- print("********init***********")
+        -- showTurnOrderGroups()
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, info in ipairs(combatEntity.TurnOrder.Groups) do
@@ -577,8 +577,8 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        print("********after*********")
-        showTurnOrderGroups()
+        -- print("********after*********")
+        -- showTurnOrderGroups()
     end
 end
 

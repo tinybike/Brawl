@@ -473,25 +473,6 @@ local function getAllSpellsOfType(spellType, hostLevel)
                 end
             else
                 allSpellsOfType[spellName] = getSpellInfo(spellType, spellName, hostLevel)
-                if spell.Requirements and #spell.Requirements ~= 0 then
-                    local requirements = removeDuplicates(spell.Requirements)
-                    local removeIndex = 0
-                    for i, req in ipairs(requirements) do
-                        if req.Requirement == "Combat" and req.Not == false then
-                            removeIndex = i
-                            local removedReq = {Requirement = req.Requirement, Param = req.Param, Not = req.Not, index = i}
-                            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-                            modVars.SpellRequirements = modVars.SpellRequirements or {}
-                            modVars.SpellRequirements[spellName] = removedReq
-                            break
-                        end
-                    end
-                    if removeIndex ~= 0 then
-                        table.remove(requirements, removeIndex)
-                    end
-                    spell.Requirements = requirements
-                    spell:Sync()
-                end
             end
         end
     end

@@ -442,7 +442,6 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         local goalPos = {gx, gy, gz}
         local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), goalPos, function (path)
             -- Osi.RequestPing(goalPos[1], goalPos[2], goalPos[3], Osi.GetHostCharacter(), "")
-            print("distance ok", path.Nodes[#path.Nodes].Distance, allowedDistance)
             if not path or not path.GoalFound or #path.Nodes == 0 then
                 -- if no path, try teleporting if we have one available
                 local teleportSpellName = selectTeleport(uuid)
@@ -497,8 +496,6 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     debugPrint(M.Utils.getDisplayName(uuid), "in spell range", px, py, pz, d)
                 end
             end
-            print("BESTPOS")
-            _D(bestPos)
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "best within range, moving to")
