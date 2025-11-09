@@ -42,7 +42,7 @@ function startPulseAction(brawler)
         brawler.isInBrawl = true
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseAction(brawler)
+            AI.pulseAction(brawler, false, _D, _D, _D)
         end, brawler.actionInterval)
     end
 end
@@ -83,10 +83,10 @@ function startPulseAddNearby(uuid)
     end
 end
 
-function stopPulseReposition(level)
-    debugPrint("stopPulseReposition", level)
-    if State.Session.PulseRepositionTimers[level] ~= nil then
-        Ext.Timer.Cancel(State.Session.PulseRepositionTimers[level])
+function stopPulseReposition()
+    debugPrint("stopPulseReposition")
+    for level, timer in pairs(State.Session.PulseRepositionTimers) do
+        Ext.Timer.Cancel(timer)
         State.Session.PulseRepositionTimers[level] = nil
     end
 end

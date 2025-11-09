@@ -590,8 +590,9 @@ end
 local function onSpellCastFinishedEvent(cast, _, _)
     -- _D(cast:GetAllComponents())
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
-        -- debugDump(cast.SpellCastState)
-        -- debugDump(cast.ServerSpellCastState)
+        -- _D(cast.SpellCastState)
+        -- _D(cast.ServerSpellCastState)
+        -- _D(cast:GetAllComponents())
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
@@ -622,10 +623,10 @@ local function onSpellCastFinishedEvent(cast, _, _)
     end
 end
 
--- local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
---     local casterUuid = M.Osi.GetUUID(casterGuid)
---     debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
--- end
+local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = M.Osi.GetUUID(casterGuid)
+    print(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+end
 
 local function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)
@@ -992,10 +993,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.CastSpellFailed = {
-    --     handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
+    State.Session.Listeners.CastSpellFailed = {
+        handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
+        stop = Ext.Osiris.UnregisterListener,
+    }
     State.Session.Listeners.SpellCastFinishedEvent = {
         handle = Ext.Entity.OnCreateDeferred("SpellCastFinishedEvent", onSpellCastFinishedEvent),
         stop = Ext.Entity.Unsubscribe,

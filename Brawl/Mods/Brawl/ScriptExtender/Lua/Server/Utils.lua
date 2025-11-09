@@ -371,7 +371,7 @@ local function isToT()
 end
 
 local function isBlinded(uuid)
-    return M.Osi.HasActiveStatusWithGroup(uuid, "SG_Blinded")
+    return M.Osi.HasActiveStatusWithGroup(uuid, "SG_Blinded") == 1
 end
 
 local function isSilenced(uuid)

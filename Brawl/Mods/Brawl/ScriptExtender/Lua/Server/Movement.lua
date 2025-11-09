@@ -219,8 +219,8 @@ local function moveToPosition(uuid, position, override, onCompleted, onFailed)
             ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished = true
         end
     end
-    debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid))
-    Osi.RequestPing(position[1], position[2], position[3], Osi.GetHostCharacter(), "")
+    -- debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid))
+    -- Osi.RequestPing(position[1], position[2], position[3], Osi.GetHostCharacter(), "")
     Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, position, nil, onCompleted, onFailed))
     -- _D(Ext.Entity.Get(uuid).ServerCharacter.OsirisController.Tasks)
     return true
@@ -445,6 +445,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         -- queue pathfinding
         local goalPos = {gx, gy, gz}
         local path = Ext.Level.BeginPathfinding(Ext.Entity.Get(uuid), goalPos, function (path)
+            -- Osi.RequestPing(goalPos[1], goalPos[2], goalPos[3], Osi.GetHostCharacter(), "")
             if not path or not path.GoalFound or #path.Nodes == 0 then
                 -- if no path, try teleporting if we have one available
                 local teleportSpellName = selectTeleport(uuid)
@@ -470,6 +471,10 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                         tryMove(getRemainingMovementByUuid(uuid), isDashAvailable, isBonusDashOnly)
                     end)
                 end, onFailed)
+            end
+            if path.Nodes[#path.Nodes].Distance <= allowedDistance then
+                debugPrint(M.Utils.getDisplayName(uuid), "goal within range, moving to")
+                return moveToPosition(uuid, path.Nodes[#path.Nodes].Position, override, onSuccess, onFailed)
             end
             -- scan for best in‑range node and fallback
             local bestPos, bestDist = nil, -1
