@@ -212,27 +212,25 @@ function startCombatRoundTimer(combatGuid)
         State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(turnDuration, nextCombatRound)
     else
         State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(turnDuration, function ()
-            if Mods.ToT.PersistentVars.Scenario then
-                if Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-                    debugPrint("ToT advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
-                    Mods.ToT.Scenario.ForwardCombat()
-                end
-                nextCombatRound()
-                -- if State.Session.ToTRoundAddNearbyTimer then
-                --     Ext.Timer.Cancel(State.Session.ToTRoundAddNearbyTimer)
-                --     State.Session.ToTRoundAddNearbyTimer = nil
-                -- end
-                -- State.Session.ToTRoundAddNearbyTimer = Ext.Timer.WaitFor(1500, function ()
-                --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
-                --         Roster.addNearbyToBrawlers(hostCharacter, 150)
-                --     end
-                -- end)
-                -- if Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-                --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
-                --         startToTTimers(combatGuid)
-                --     end
-                -- end
+            nextCombatRound()
+            if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+                debugPrint("ToT advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
+                Mods.ToT.Scenario.ForwardCombat()
             end
+            -- if State.Session.ToTRoundAddNearbyTimer then
+            --     Ext.Timer.Cancel(State.Session.ToTRoundAddNearbyTimer)
+            --     State.Session.ToTRoundAddNearbyTimer = nil
+            -- end
+            -- State.Session.ToTRoundAddNearbyTimer = Ext.Timer.WaitFor(1500, function ()
+            --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
+            --         Roster.addNearbyToBrawlers(hostCharacter, 150)
+            --     end
+            -- end)
+            -- if Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
+            --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
+            --         startToTTimers(combatGuid)
+            --     end
+            -- end
         end)
     end
 end

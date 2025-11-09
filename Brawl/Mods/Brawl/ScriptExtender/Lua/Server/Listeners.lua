@@ -34,15 +34,20 @@ end
 
 -- thank u hippo
 local function spawnCombatHelper(combatGuid)
-    local x, y, z = Osi.GetPosition(Osi.CombatGetInvolvedPlayer(combatGuid, 1))
-    local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
-    if not combatHelper then
-        error("couldn't create combat helper")
-        return
+    if not State.Session.CombatHelper then
+        local x, y, z = Osi.GetPosition(Osi.CombatGetInvolvedPlayer(combatGuid, 1))
+        local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
+        if not combatHelper then
+            error("couldn't create combat helper")
+            return
+        end
+        Osi.SetTag(combatHelper, "9787450d-f34d-43bd-be88-d2bac00bb8ee") -- AI_UNPREFERRED_TARGET
+        Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
+        State.Session.CombatHelper = combatHelper
+        Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
+        local host = M.Osi.GetHostCharacter()
+        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(host), combatHelper, host)
     end
-    Osi.SetTag(combatHelper, "9787450d-f34d-43bd-be88-d2bac00bb8ee") -- AI_UNPREFERRED_TARGET
-    Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
-    State.Session.CombatHelper = combatHelper
 end
 
 local function onCombatStarted(combatGuid)
@@ -63,7 +68,7 @@ local function onCombatStarted(combatGuid)
     end
     Roster.addCombatParticipantsToBrawlers()
     if not State.Settings.TurnBasedSwarmMode and not Utils.isToT() then
-        -- spawnCombatHelper(combatGuid)
+        spawnCombatHelper(combatGuid)
         if State.Settings.AutoPauseOnCombatStart then
             Pause.allEnterFTB()
         end
@@ -95,6 +100,7 @@ end
 local function onCombatRoundStarted(combatGuid, round)
     print("CombatRoundStarted", combatGuid, round)
     if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
+        print("not in FTB")
         Roster.addCombatParticipantsToBrawlers()
         if State.Settings.TurnBasedSwarmMode then
             Swarm.Listeners.onCombatRoundStarted(round)
@@ -119,6 +125,9 @@ local function onCombatRoundStarted(combatGuid, round)
             Utils.setPlayersSwarmGroup()
             Utils.setPlayerTurnsActive()
         end
+    else
+        print("in FTB")
+        Osi.PauseCombat(combatGuid)
     end
 end
 

@@ -311,7 +311,7 @@ local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, var
         return onFailed("cast failed, out of range" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. tostring(distanceTo) .. " " .. tostring(spellRange) .. " " .. spellName)
     end
     if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
-        local spell = not Spells.getSpellByName(spellName)
+        local spell = Spells.getSpellByName(spellName)
         if spell and not spell.isAutoPathfinding then
             return onFailed("cast failed, no line of sight" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. spellName)
         end

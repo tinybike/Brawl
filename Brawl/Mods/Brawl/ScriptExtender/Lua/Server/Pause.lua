@@ -92,7 +92,11 @@ local function allExitFTB()
                 stopTruePause(uuid)
             end
         end
-        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        local combatGuid
+        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+            if not combatGuid then
+                combatGuid = brawler.combatGuid
+            end
             if M.Osi.IsPlayer(uuid) == 0 then
                 unlock(Ext.Entity.Get(uuid))
                 Osi.ForceTurnBasedMode(uuid, 0)
@@ -100,9 +104,10 @@ local function allExitFTB()
                 Utils.joinCombat(uuid)
             end
         end
+        Osi.ResumeCombat(combatGuid)
         Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()
-        resumeCombatRoundTimers()
+        resumeCombatRoundTimer(combatGuid)
         Movement.resumeTimers()
     end
 end
