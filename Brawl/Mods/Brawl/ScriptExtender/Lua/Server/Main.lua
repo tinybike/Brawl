@@ -42,7 +42,7 @@ function startPulseAction(brawler)
         brawler.isInBrawl = true
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseAction(brawler, false, _D, _D, _D)
+            AI.pulseAction(brawler)
         end, brawler.actionInterval)
     end
 end

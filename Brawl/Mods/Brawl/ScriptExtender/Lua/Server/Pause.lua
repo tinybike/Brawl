@@ -202,15 +202,13 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            debugPrint("moving entity", M.Utils.getDisplayName(entityUuid), Movement.getRemainingMovement(movingEntity), State.Session.RemainingMovement[entityUuid], isInFTB(movingEntity))
-            if State.Session.RemainingMovement[entityUuid] and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
+            if State.Session.RemainingMovement[entityUuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
+                debugPrint("moving entity", M.Utils.getDisplayName(entityUuid))
                 local goalPosition
                 local activeMovement = Movement.getActiveMovement(entityUuid)
                 if activeMovement and activeMovement.goalPosition then
-                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from active movement)", entityUuid)
                     goalPosition = activeMovement.goalPosition
                 elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                    debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from click)", entityUuid)
                     goalPosition = State.Session.LastClickPosition[entityUuid].position
                 end
                 if goalPosition then
@@ -218,14 +216,14 @@ local function startTruePause(entityUuid)
                     lock(movingEntity)
                     Movement.findPathToPosition(entityUuid, goalPosition, function (err, validPosition)
                         if err then
-                            return Utils.showNotification(entityUuid, err, 2)
+                            return Utils.showNotification(entityUuid, err)
                         end
                         debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
                         State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
                     end)
                 end
             end
-            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(movingEntity)
+            State.Session.RemainingMovement[entityUuid] = Movement.getMovementDistanceAmount(entity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])

@@ -358,7 +358,7 @@ local function onClickPosition(data)
             elseif clickPosition.position and State.Session.AwaitingTarget[playerUuid] then
                 M.Movement.findPathToPosition(playerUuid, clickPosition.position, function (err, validPosition)
                     if err then
-                        return Utils.showNotification(playerUuid, err, 2)
+                        return Utils.showNotification(playerUuid, err)
                     end
                     setAwaitingTarget(playerUuid, false)
                     allCompanionsDisableLockedOnTarget()

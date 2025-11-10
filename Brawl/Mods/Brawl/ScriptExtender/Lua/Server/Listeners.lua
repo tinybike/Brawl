@@ -323,12 +323,16 @@ local function onGainedControl(targetGuid)
                 MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
             end
         end
-        Utils.clearOsirisQueue(targetUuid)
+        if not State.Settings.FullAuto then
+            Utils.clearOsirisQueue(targetUuid)
+        end
         local targetUserId = Osi.GetReservedUserID(targetUuid)
         local players = State.Session.Players
         if players[targetUuid] ~= nil and targetUserId ~= nil then
             players[targetUuid].isControllingDirectly = true
-            startPulseAddNearby(targetUuid)
+            if not State.Settings.TurnBasedSwarmMode then
+                startPulseAddNearby(targetUuid)
+            end
             local level = M.Osi.GetRegion(targetUuid)
             local brawlersInLevel = State.Session.Brawlers[level]
             for playerUuid, player in pairs(players) do
@@ -625,7 +629,7 @@ end
 
 local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    print(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
 local function onDialogStarted(dialog, dialogInstanceId)
@@ -993,10 +997,10 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("CastedSpell", 5, "after", onCastedSpell),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.CastSpellFailed = {
-        handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
-        stop = Ext.Osiris.UnregisterListener,
-    }
+    -- State.Session.Listeners.CastSpellFailed = {
+    --     handle = Ext.Osiris.RegisterListener("CastSpellFailed", 5, "after", onCastSpellFailed),
+    --     stop = Ext.Osiris.UnregisterListener,
+    -- }
     State.Session.Listeners.SpellCastFinishedEvent = {
         handle = Ext.Entity.OnCreateDeferred("SpellCastFinishedEvent", onSpellCastFinishedEvent),
         stop = Ext.Entity.Unsubscribe,

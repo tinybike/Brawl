@@ -396,7 +396,10 @@ local function createDummyObject(position)
 end
 
 local function showNotification(uuid, text, duration)
-    Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+    if State.isPlayerControllingDirectly(uuid) then
+        duration = duration or math.ceil(Constants.MOD_STATUS_MESSAGE_DURATION / 1000)
+        Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+    end
 end
 
 local function applyAttackMoveTargetVfx(targetUuid)
