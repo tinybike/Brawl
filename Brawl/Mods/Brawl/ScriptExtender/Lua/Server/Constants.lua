@@ -39,6 +39,17 @@ Constants.ABILITIES = {
     Wisdom = 6,
     Charisma = 7,
 }
+-- stats cooldowns => SpellBookCooldowns cooldowns
+Constants.COOLDOWN_TYPES = {
+    None = "Default",
+    OncePerTurn = "OncePerTurn",
+    OncePerCombat = "OncePerCombat",
+    OncePerRest = "UntilRest",
+    OncePerTurnNoRealtime = "OncePerTurnNoRealtime",
+    OncePerShortRest = "UntilShortRest",
+    OncePerRestPerItem = "UntilPerRestPerItem",
+    OncePerShortRestPerItem = "OncePerShortRestPerItem",
+}
 Constants.ACTION_RESOURCES = {
     ActionPoint = "734cbcfb-8922-4b6d-8330-b2a7e4c14b6a",
     ArcaneRecoveryPoint = "74737a08-7a77-457b-9740-ae363be2b80f",

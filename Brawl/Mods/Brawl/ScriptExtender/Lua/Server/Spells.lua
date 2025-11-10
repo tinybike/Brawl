@@ -94,6 +94,7 @@ local function parseSpellCosts(spell, costType)
     local spellCosts = {
         ShortRest = spell.Cooldown == "OncePerShortRest" or spell.Cooldown == "OncePerShortRestPerItem",
         LongRest = spell.Cooldown == "OncePerRest" or spell.Cooldown == "OncePerRestPerItem",
+        Combat = spell.Cooldown == "OncePerCombat",
     }
     -- local hitCost = nil -- divine smite only..?
     for _, cost in ipairs(costs) do

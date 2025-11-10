@@ -563,18 +563,22 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    -- debugPrint(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
     if actionInProgress then
+        debugPrint(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
         -- debugPrint("actionInProgress")
         -- debugDump(actionInProgress)
         local requestUuid = actionInProgress.requestUuid
         -- debugPrint("Spell cast succeeded! (CastedSpell)")
         Swarm.resumeTimers() -- for interrupts, does this need to be here?
         Utils.checkDivineIntervention(spellName, casterUuid)
-        -- debugPrint("onCompleted")
-        actionInProgress.onCompleted(spellName)
+        debugPrint("onCompleted onCastedSpell")
+        local onCompleted = actionInProgress.onCompleted
         Actions.removeActionInProgress(casterUuid, requestUuid)
+        if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
+            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+        end
+        onCompleted(spellName)
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -614,6 +618,9 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 Utils.checkDivineIntervention(spellName, casterUuid)
                 debugPrint("onCompleted")
+                if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
+                    Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+                end
                 onCompleted(spellName)
             else
                 if outcome == "CantSpendUseCosts" then

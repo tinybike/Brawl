@@ -203,9 +203,13 @@ local function startTruePause(entityUuid)
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
             if State.Session.RemainingMovement[entityUuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
-                debugPrint("moving entity", M.Utils.getDisplayName(entityUuid))
+                debugPrint(M.Utils.getDisplayName(entityUuid), "movement while paused")
                 local goalPosition
                 local activeMovement = Movement.getActiveMovement(entityUuid)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "ActiveMovement")
+                debugDump(activeMovement)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "LastClickPosition")
+                debugDump(State.Session.LastClickPosition[entityUuid])
                 if activeMovement and activeMovement.goalPosition then
                     goalPosition = activeMovement.goalPosition
                 elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
