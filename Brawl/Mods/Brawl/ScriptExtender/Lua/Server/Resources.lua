@@ -197,6 +197,7 @@ local function deductCastedSpell(uuid, spellName, requestUuid)
                         field_29 = 3, -- ??
                         field_30 = requestUuid,
                     }
+                    entity:Replicate("SpellBookCooldowns")
                 end
             elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
                 if costType == "SpellSlot" or costType == "WarlockSpellSlot" then

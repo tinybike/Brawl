@@ -240,7 +240,7 @@ local function startTruePause(entityUuid)
                 if caster.Uuid.EntityUuid == entityUuid then
                     debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
                     if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
-                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
+                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
                             local spell = M.Spells.getSpellByName(cast.SpellCastState.SpellId.OriginatorPrototype)
                             if spell and spell.isBonusAction then
                                 return
