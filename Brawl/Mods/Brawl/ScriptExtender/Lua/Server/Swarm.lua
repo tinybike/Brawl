@@ -51,7 +51,7 @@ local function setPartyInitiativeRollToMean()
     end
 end
 
-local function bumpEnemyInitiativeRoll(uuid)
+local function bumpNpcInitiativeRoll(uuid)
     local entity = Ext.Entity.Get(uuid)
     local initiativeRoll = getInitiativeRoll(uuid)
     local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
@@ -59,11 +59,11 @@ local function bumpEnemyInitiativeRoll(uuid)
     setInitiativeRoll(uuid, bumpedInitiativeRoll)
 end
 
-local function bumpEnemyInitiativeRolls()
+local function bumpNpcInitiativeRolls()
     if State.Session.MeanInitiativeRoll ~= -100 then
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            if not State.Session.Players[uuid] and M.Utils.isPugnacious(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
-                bumpEnemyInitiativeRoll(uuid)
+            if not State.Session.Players[uuid] and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
+                bumpNpcInitiativeRoll(uuid)
             end
         end
     end
@@ -146,10 +146,12 @@ local function setTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.TurnBased then
         debugPrint(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
-        entity.TurnBased.HadTurnInCombat = true
         entity.TurnBased.RequestedEndTurn = true
-        entity.TurnBased.TurnActionsCompleted = true
-        entity.TurnBased.ActedThisRoundInCombat = true
+        if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            entity.TurnBased.HadTurnInCombat = true
+            entity.TurnBased.TurnActionsCompleted = true
+            entity.TurnBased.ActedThisRoundInCombat = true
+        end
         entity:Replicate("TurnBased")
     end
     if M.Osi.IsPartyMember(uuid, 1) == 0 then
@@ -166,8 +168,8 @@ local function unsetTurnComplete(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.TurnBased then
         debugPrint(M.Utils.getDisplayName(uuid), "Unsetting turn complete", uuid)
-        entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.RequestedEndTurn = false
+        entity.TurnBased.HadTurnInCombat = false
         entity.TurnBased.TurnActionsCompleted = false
         entity.TurnBased.ActedThisRoundInCombat = false
         entity:Replicate("TurnBased")
@@ -709,7 +711,7 @@ local function onCombatRoundStarted(round)
         debugPrint("*****onCombatRoundStarted original turn order")
         Utils.showTurnOrderGroups()
         setPartyInitiativeRollToMean()
-        bumpEnemyInitiativeRolls()
+        bumpNpcInitiativeRolls()
         reorderByInitiativeRoll()
         debugPrint("*****onCombatRoundStarted updated turn order")
         Utils.showTurnOrderGroups()
