@@ -571,7 +571,6 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         local requestUuid = actionInProgress.requestUuid
         -- debugPrint("Spell cast succeeded! (CastedSpell)")
         Swarm.resumeTimers() -- for interrupts, does this need to be here?
-        Utils.checkDivineIntervention(spellName, casterUuid)
         debugPrint("onCompleted onCastedSpell")
         local onCompleted = actionInProgress.onCompleted
         Actions.removeActionInProgress(casterUuid, requestUuid)
@@ -579,6 +578,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
         end
         onCompleted(spellName)
+        Utils.checkDivineIntervention(spellName, casterUuid)
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -616,12 +616,12 @@ local function onSpellCastFinishedEvent(cast, _, _)
             if outcome == "None" then
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
-                Utils.checkDivineIntervention(spellName, casterUuid)
                 debugPrint("onCompleted")
                 if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
                     Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
                 end
                 onCompleted(spellName)
+                Utils.checkDivineIntervention(spellName, casterUuid)
             else
                 if outcome == "CantSpendUseCosts" then
                     -- check for ActionResourceBlock boosts? why did this fail

@@ -183,7 +183,7 @@ local function deductCastedSpell(uuid, spellName, requestUuid)
                 local preparedSpell = getPreparedSpell(entity, spellName)
                 local stats = Ext.Stats.Get(spellName)
                 if preparedSpell and costValue and entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns and stats.Cooldown then
-                    print("deductCastedSpell cooldown for", M.Utils.getDisplayName(uuid), spellName, costType, costValue)
+                    debugPrint("deductCastedSpell cooldown for", M.Utils.getDisplayName(uuid), spellName, costType, costValue)
                     entity.SpellBookCooldowns.Cooldowns[#entity.SpellBookCooldowns.Cooldowns + 1] = {
                         Cooldown = -1.0,
                         CooldownType = Constants.COOLDOWN_TYPES[stats.Cooldown],

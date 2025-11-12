@@ -531,7 +531,7 @@ local function getAuras(entityUuid)
                 local spellName = preparedSpell.OriginatorPrototype
                 local stats = Ext.Stats.Get(spellName)
                 local spell = M.Spells.getSpellByName(spellName)
-                if Utils.startsWith(spellName, "Shout_AuraOf_") and stats.UseCosts == "" and spell.applyStatus and spell.applyStatus ~= "AI_HELPER_BUFF" then
+                if spell and Utils.startsWith(spellName, "Shout_AuraOf_") and stats.UseCosts == "" and spell.applyStatus and spell.applyStatus ~= "AI_HELPER_BUFF" then
                     table.insert(auras, spellName)
                 end
             end
