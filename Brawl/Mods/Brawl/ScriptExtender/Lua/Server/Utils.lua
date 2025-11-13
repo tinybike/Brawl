@@ -384,6 +384,36 @@ local function isSilenced(uuid)
     return false
 end
 
+local function isHarmful(spellFlags)
+    if spellFlags then
+        for _, spellFlag in ipairs(spellFlags) do
+            if spellFlag == "IsHarmful" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function hasBeneficialStatus(entityUuid, statusLabel)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+            if status.StatusId == statusLabel and status.SourceSpell and status.SourceSpell.OriginatorPrototype then
+                local stats = Ext.Stats.Get(status.SourceSpell.OriginatorPrototype)
+                if stats then
+                    if stats.VerbalIntent == "Buff" or stats.VerbalIntent == "Healing" then
+                        return true
+                    elseif not isHarmful(stats.SpellFlags) then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function createDummyObject(position)
     local dummyUuid = Osi.CreateAt(Constants.INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
     local dummyEntity = Ext.Entity.Get(dummyUuid)
@@ -775,6 +805,7 @@ return {
     isToT = isToT,
     isBlinded = isBlinded,
     isSilenced = isSilenced,
+    hasBeneficialStatus = hasBeneficialStatus,
     createDummyObject = createDummyObject,
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,

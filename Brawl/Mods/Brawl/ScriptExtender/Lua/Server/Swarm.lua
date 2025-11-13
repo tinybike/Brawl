@@ -5,9 +5,41 @@ local startChunk
 local singleCharacterTurn
 local useRemainingActions
 
-local function getSwarmTurnTimeout()
-    return math.floor(State.Settings.SwarmTurnTimeout*1000)
+local function isToTExcludedEnemyTier(uuid)
+    return (M.Utils.isToT() and State.Settings.ExcludeEnemyTiers and M.Utils.contains(State.Settings.ExcludeEnemyTiers, M.Utils.getToTEnemyTier(uuid)))
 end
+
+-- NB: make this a setting? should boss enemies in the campaign, e.g. Grym, Ketheric, etc also be excluded, not just dragons? is Ansur just "dragon" or a special type?
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
+        return true
+    end
+    return false
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
+end
+
+-- local function getSwarmTurnTimeout(numChunks, swarmActors)
+--     return numChunks*math.floor(State.Settings.SwarmTurnTimeout*1000)
+-- end
 
 local function getInitiativeRoll(uuid)
     local entity = Ext.Entity.Get(uuid)
@@ -317,18 +349,6 @@ local function isChunkDone(chunkIndex)
     return true
 end
 
-local function isExcludedFromSwarmAI(uuid)
-    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or (M.Utils.isToT() and M.Utils.contains(Constants.TOT_EXCLUDED_TIERS, M.Utils.getToTEnemyTier(uuid)))
-end
-
-local function isControlledByDefaultAI(uuid)
-    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
-        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
-        return true
-    end
-    return false
-end
-
 local function completeSwarmTurn(uuid, swarmActors)
     if State.Session.SwarmTurnActive then
         local chunkIndex = State.Session.CurrentChunkIndex or 1
@@ -392,7 +412,8 @@ startChunk = function (chunkIndex, swarmActors)
                 idx = idx + 1
             end
         end
-        State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(getSwarmTurnTimeout(), function ()
+        State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(getChunkTimeout(swarmActors), function ()
+            debugPrint("chunk timer expired", State.Session.ChunkInProgress, chunkIndex)
             if State.Session.ChunkInProgress == chunkIndex then
                 State.Session.ChunkInProgress = nil
                 forceCompleteChunk(chunkIndex, swarmActors)
@@ -591,7 +612,7 @@ local function startEnemyTurn(swarmActors)
         end
     end
     startChunk(1, swarmActors)
-    return chunkIndex
+    -- return chunkIndex
 end
 
 -- the FIRST enemy to go uses the built-in AI and takes its turn normally, this keeps the turn open
@@ -621,21 +642,23 @@ local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
         State.Session.SwarmTurnActive = true
         State.Session.SwarmActors = swarmActors
         State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
-        local numChunks = startEnemyTurn(swarmActors)
-        debugPrint("numChunks", numChunks, isBeforePlayer)
-        if numChunks then
-            State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
-            State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
-                debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
-                if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
-                    debugPrint("************************Swarm turn timer finished - setting enemy turns complete...", isBeforePlayer)
-                    setEnemyTurnsComplete(swarmActors)
-                    State.Session.SwarmTurnTimerCombatRound = nil
-                    State.Session.SwarmTurnActive = false
-                    State.Session.SwarmActors = nil
-                end
-            end)
-        end
+        startEnemyTurn(swarmActors)
+        -- NB: do we need any of this? why aren't the individual chunk timeouts sufficient? when would this trigger?
+        -- local numChunks = startEnemyTurn(swarmActors)
+        -- debugPrint("numChunks", numChunks, isBeforePlayer)
+        -- if numChunks then
+        --     State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
+        --     State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
+        --         debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
+        --         if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
+        --             print("************************Swarm turn timer finished - setting enemy turns complete...", isBeforePlayer)
+        --             setEnemyTurnsComplete(swarmActors)
+        --             State.Session.SwarmTurnTimerCombatRound = nil
+        --             State.Session.SwarmTurnActive = false
+        --             State.Session.SwarmActors = nil
+        --         end
+        --     end)
+        -- end
     end
 end
 

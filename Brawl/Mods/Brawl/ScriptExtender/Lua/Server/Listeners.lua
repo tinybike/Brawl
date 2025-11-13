@@ -578,7 +578,6 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
         end
         onCompleted(spellName)
-        Utils.checkDivineIntervention(spellName, casterUuid)
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -592,6 +591,7 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             end
         end
     end
+    Utils.checkDivineIntervention(spellName, casterUuid)
 end
 
 -- thank u Norb and Mazzle
@@ -621,7 +621,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
                     Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
                 end
                 onCompleted(spellName)
-                Utils.checkDivineIntervention(spellName, casterUuid)
             else
                 if outcome == "CantSpendUseCosts" then
                     -- check for ActionResourceBlock boosts? why did this fail
