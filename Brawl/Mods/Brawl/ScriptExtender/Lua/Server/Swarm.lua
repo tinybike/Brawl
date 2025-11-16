@@ -576,7 +576,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
+    if State.Session.Players[brawler.uuid] or M.State.isToTCombatHelper(brawler.uuid) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
@@ -823,7 +823,7 @@ local function onCharacterJoinedParty(uuid)
             State.boostPlayerInitiative(uuid)
         end
         State.recapPartyMembersMovementDistances()
-        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
+        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
     end
 end
 

@@ -371,6 +371,7 @@ Constants.SPELL_REQUEST_FLAGS = {
     AvoidDangerousAuras = 0x80000,
     Unknown100000 = 0x100000,
 }
+Constants.COOLDOWNS = {"OncePerRest", "OncePerShortRest", "OncePerShortRestPerItem", "OncePerRestPerItem"}
 Constants.NO_ACTION_STATUSES = {
     "COMMAND_GROVEL",
     "COMMAND_HALT",
@@ -416,6 +417,7 @@ Constants.COUNTERSPELLS = {
     "Target_Counterspell_6",
     "Target_MOD_Dread_Counterspell",
 }
+Constants.PER_TURN_ACTION_RESOURCES = {"ActionPoint", "BonusActionPoint", "ReactionActionPoint"}
 Constants.BONUS_ACTION_DASH = {
     "Shout_Dash_CunningAction",
     "Shout_Dash_BonusAction",
@@ -440,5 +442,10 @@ Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
 Constants.OVERFLOW_DAMAGE_PENALTY = 0.4
 Constants.OVERFLOW_HEALING_PENALTY = 0.6
+Constants.COMBAT_HELPER = {
+    templateId = "b4f5635b-2382-4fb2-ad0d-5be8b363e847",
+    handle = "h09f52fcdg7db3g44ddg91b1gb2b4d69ac32b",
+    faction = "4be9261a-e481-8d9d-3528-f36956a19b17",
+}
 
 return Constants

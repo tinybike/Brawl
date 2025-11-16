@@ -552,6 +552,7 @@ local function onMCMTurnBasedSwarmMode(value)
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
+        State.disableDynamicCombatCamera()
         disableMod()
         enableMod()
     end

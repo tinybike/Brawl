@@ -89,6 +89,15 @@ local function extraAttackSpellCheck(spell)
     return hasStringInSpellRoll(spell, "WeaponAttack") or hasStringInSpellRoll(spell, "UnarmedAttack") or hasStringInSpellRoll(spell, "ThrowAttack") or spellId(spell, "Target_CommandersStrike") or spellId(spell, "Target_Bufotoxin_Frog_Summon") or spellId(spell, "Projectile_ArrowOfSmokepowder")
 end
 
+local function isCooldown(cost)
+    for _, cooldown in ipairs(Constants.COOLDOWNS) do
+        if cost == cooldown then
+            return true
+        end
+    end
+    return false
+end
+
 local function parseSpellCosts(spell, costType)
     local costs = M.Utils.split(spell[costType], ";")
     local spellCosts = {
@@ -109,6 +118,7 @@ local function parseSpellCosts(spell, costType)
             spellCosts[costLabel] = costAmount
         end
     end
+    -- costs[spell.Cooldown] = true
     return spellCosts
 end
 
@@ -464,25 +474,6 @@ local function getAllSpellsOfType(spellType, hostLevel)
                 end
             else
                 allSpellsOfType[spellName] = getSpellInfo(spellType, spellName, hostLevel)
-                if spell.Requirements and #spell.Requirements ~= 0 then
-                    local requirements = removeDuplicates(spell.Requirements)
-                    local removeIndex = 0
-                    for i, req in ipairs(requirements) do
-                        if req.Requirement == "Combat" and req.Not == false then
-                            removeIndex = i
-                            local removedReq = {Requirement = req.Requirement, Param = req.Param, Not = req.Not, index = i}
-                            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-                            modVars.SpellRequirements = modVars.SpellRequirements or {}
-                            modVars.SpellRequirements[spellName] = removedReq
-                            break
-                        end
-                    end
-                    if removeIndex ~= 0 then
-                        table.remove(requirements, removeIndex)
-                    end
-                    spell.Requirements = requirements
-                    spell:Sync()
-                end
             end
         end
     end
@@ -566,6 +557,7 @@ end
 return {
     isSingleSelect = isSingleSelect,
     isShout = isShout,
+    isCooldown = isCooldown,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
     getAuras = getAuras,

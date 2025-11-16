@@ -120,6 +120,13 @@
                             "Description": "If checked, the game will automatically pause when the character the player is controlling goes down",
                             "Handles": {"DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c", "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"}
                         }, {
+                            "Id": "auto_pause_on_combat_start",
+                            "Name": "Automatic Pause On Combat Start",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, the game will automatically pause when combat starts",
+                            "Handles": {"DescriptionHandle": "h54ba96a6g334eg46dfg8c27g7f6a788ddbfe", "NameHandle": "h6413ceb1g2d0ag4866gb462g07f60d942b4f"}
+                        }, {
                             "Id": "action_interval",
                             "Name": "AI Turn Length",
                             "Type": "slider_float",
