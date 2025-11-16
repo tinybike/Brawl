@@ -25,6 +25,7 @@ local Settings = {
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
     ExcludeEnemyTiers = nil,
+    RealTimeRemainInCombat = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -49,6 +50,7 @@ if MCM then
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
     Settings.ExcludeEnemyTiers = MCM.Get("exclude_enemy_tiers")
+    -- Settings.RealTimeRemainInCombat = MCM.Get("real_time_remain_in_combat")
 end
 
 -- Session state
@@ -166,6 +168,10 @@ local function checkForDownedOrDeadPlayers()
     end
 end
 
+local function isInCombat(uuid)
+    return M.Osi.IsInCombat(uuid) == 1
+end
+
 local function areAnyPlayersBrawling()
     if Session.Players then
         for playerUuid, player in pairs(Session.Players) do
@@ -260,7 +266,7 @@ local function uncapMovementDistance(entityUuid)
     end
     local movementDistances = modVars.MovementDistances
     if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
-        -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
+        debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
         if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
             local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
@@ -538,6 +544,7 @@ end
 return {
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
+    isInCombat = isInCombat,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,

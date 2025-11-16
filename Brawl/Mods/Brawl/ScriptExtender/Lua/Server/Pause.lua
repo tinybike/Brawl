@@ -104,7 +104,9 @@ local function allExitFTB()
                 Utils.joinCombat(uuid)
             end
         end
-        Osi.ResumeCombat(combatGuid)
+        if combatGuid then
+            Osi.ResumeCombat(combatGuid)
+        end
         Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()
         resumeCombatRoundTimer(combatGuid)
@@ -205,32 +207,34 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            if State.Session.RemainingMovement[entityUuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
-                debugPrint(M.Utils.getDisplayName(entityUuid), "movement while paused")
-                local goalPosition
-                local activeMovement = Movement.getActiveMovement(entityUuid)
-                debugPrint(M.Utils.getDisplayName(entityUuid), "ActiveMovement")
-                debugDump(activeMovement)
-                debugPrint(M.Utils.getDisplayName(entityUuid), "LastClickPosition")
-                debugDump(State.Session.LastClickPosition[entityUuid])
-                if activeMovement and activeMovement.goalPosition then
-                    goalPosition = activeMovement.goalPosition
-                elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                    goalPosition = State.Session.LastClickPosition[entityUuid].position
+            if movingEntity.Uuid and movingEntity.Uuid.EntityUuid then
+                local uuid = movingEntity.Uuid.EntityUuid
+                debugPrint(M.Utils.getDisplayName(uuid), "movement while paused", State.Session.RemainingMovement[uuid], Movement.getMovementDistanceAmount(movingEntity), State.Session.RemainingMovement[uuid], isInFTB(movingEntity))
+                if State.Session.RemainingMovement[uuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[uuid] and isInFTB(movingEntity) then
+                    local activeMovement = Movement.getActiveMovement(uuid)
+                    debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")
+                    debugDump(activeMovement)
+                    debugPrint(M.Utils.getDisplayName(uuid), "LastClickPosition")
+                    debugDump(State.Session.LastClickPosition[uuid])
+                    local goalPosition
+                    if activeMovement and activeMovement.goalPosition then
+                        goalPosition = activeMovement.goalPosition
+                    elseif State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
+                        goalPosition = State.Session.LastClickPosition[uuid].position
+                    end
+                    if goalPosition then
+                        lock(movingEntity)
+                        Movement.findPathToPosition(uuid, goalPosition, function (err, validPosition)
+                            if err then
+                                return Utils.showNotification(uuid, err)
+                            end
+                            debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
+                            State.Session.MovementQueue[uuid] = {validPosition[1], validPosition[2], validPosition[3]}
+                        end)
+                    end
                 end
-                if goalPosition then
-                    -- debugDump(goalPosition)
-                    lock(movingEntity)
-                    Movement.findPathToPosition(entityUuid, goalPosition, function (err, validPosition)
-                        if err then
-                            return Utils.showNotification(entityUuid, err)
-                        end
-                        debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
-                        State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
-                    end)
-                end
+                State.Session.RemainingMovement[uuid] = Movement.getMovementDistanceAmount(movingEntity)
             end
-            State.Session.RemainingMovement[entityUuid] = Movement.getMovementDistanceAmount(entity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])

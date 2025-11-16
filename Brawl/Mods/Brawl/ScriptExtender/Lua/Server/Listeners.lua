@@ -20,7 +20,7 @@ local function onStarted(level)
         State.recapPartyMembersMovementDistances()
     else
         State.disableDynamicCombatCamera()
-        State.uncapPartyMembersMovementDistances()
+        -- State.uncapPartyMembersMovementDistances()
         Pause.checkTruePauseParty()
     end
     Leaderboard.initialize()
@@ -68,7 +68,7 @@ local function onCombatStarted(combatGuid)
     end
     Roster.addCombatParticipantsToBrawlers()
     if not State.Settings.TurnBasedSwarmMode and not Utils.isToT() then
-        spawnCombatHelper(combatGuid)
+        -- spawnCombatHelper(combatGuid)
         if State.Settings.AutoPauseOnCombatStart then
             Pause.allEnterFTB()
         end
@@ -209,7 +209,9 @@ local function onEnteredForceTurnBased(entityGuid)
                 if isHostCharacter then
                     stopPulseReposition(level)
                     stopBrawlFizzler(level)
-                    pauseCombatRoundTimers(brawler.combatGuid)
+                    if brawler and brawler.combatGuid then
+                        pauseCombatRoundTimers(brawler.combatGuid)
+                    end
                 end
             end
             if M.Utils.isAliveAndCanFight(entityUuid) then
@@ -414,7 +416,9 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 Swarm.Listeners.onCharacterJoinedParty(uuid)
             else
-                State.uncapPartyMembersMovementDistances()
+                if not State.Settings.RealTimeRemainInCombat then
+                    State.uncapPartyMembersMovementDistances()
+                end
                 -- Pause.checkTruePauseParty()
             end
         end

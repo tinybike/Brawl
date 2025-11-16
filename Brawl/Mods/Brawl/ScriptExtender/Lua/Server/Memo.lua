@@ -95,6 +95,7 @@ local Memoizable = {
         "isControlledByDefaultAI",
     },
     State = {
+        "isInCombat",
         "areAnyPlayersBrawling",
         "getNumEnemiesRemaining",
         "isPartyInRealTime",
