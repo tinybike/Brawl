@@ -169,6 +169,7 @@ local function memoize(fn, bucket)
 end
 
 M.Osi = Osi
+M.Utils = Utils
 
 M.memoizeAll = function ()
     for moduleName, fns in pairs(Memoizable) do

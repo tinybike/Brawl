@@ -366,6 +366,19 @@ local function clearOsirisQueue(uuid)
     Osi.FlushOsirisQueue(uuid)
 end
 
+local function contains(t, v)
+    for _, x in ipairs(t) do
+        if x == v then
+            return true
+        end
+    end
+    return false
+end
+
+local function startsWith(str, prefix)
+    return str:sub(1, #prefix) == prefix
+end
+
 local function isToT()
     return Mods.ToT ~= nil and Mods.ToT.IsActive()
 end
@@ -412,6 +425,27 @@ local function hasBeneficialStatus(entityUuid, statusLabel)
         end
     end
     return false
+end
+
+local function changeHagHairStat(uuid, oldStat, newStat)
+    if startsWith(oldStat, "HAG_HAIR_") and startsWith(newStat, "HAG_HAIR_") then
+        local entity = Ext.Entity.Get(uuid)
+        local numOldStats = 0
+        if entity and entity.StatusContainer and entity.StatusContainer.Statuses then
+            for _, status in pairs(entity.StatusContainer.Statuses) do
+                if status == oldStat then
+                    numOldStats = numOldStats + 1
+                end
+            end
+        end
+        print(M.Utils.getDisplayName(uuid), "changeHagHairStat", oldStat, newStat, numOldStats)
+        if numOldStats > 0 then
+            Osi.RemoveStatus(uuid, oldStat)
+            for i = 1, numOldStats do
+                Osi.ApplyStatus(uuid, newStat, -1)
+            end
+        end
+    end
 end
 
 local function createDummyObject(position)
@@ -735,19 +769,6 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
-local function contains(t, v)
-    for _, x in ipairs(t) do
-        if x == v then
-            return true
-        end
-    end
-    return false
-end
-
-local function startsWith(str, prefix)
-    return str:sub(1, #prefix) == prefix
-end
-
 local function timeIt(fn, ...)
     local t0 = Ext.Utils.MonotonicTime()
     fn(...)
@@ -806,6 +827,7 @@ return {
     isBlinded = isBlinded,
     isSilenced = isSilenced,
     hasBeneficialStatus = hasBeneficialStatus,
+    changeHagHairStat = changeHagHairStat,
     createDummyObject = createDummyObject,
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
