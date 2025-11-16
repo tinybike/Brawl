@@ -102,4 +102,6 @@
     <content contentuid="hb00484a5g8cb3g44efg82f7ga70e3bb5c28f" version="1">The maximum number of enemies that can act at the same time.  Users with less powerful computers may need to decrease this value.  The default value is 20.  Warning: values above 30 may cause the game to slow or crash during large encounters!</content>
     <content contentuid="hf6e63658g1ccfg4abdgab30g7ee2f50b9a70" version="1">Automatically Trigger Swarm Mode Companion AI</content>
     <content contentuid="hc0055a4eg3a8eg4736g89d3gdc6b9f0bf36f" version="1">If checked, and Companion AI is enabled, your companions will automatically act using Brawl's AI at the beginning of your team's turn.  If not checked, the companion AI can be triggered using the Queue Companion AI Action hotkey (LCtrl+C by default).</content>
+    <content contentuid="hf76b56ddga5e1g4be3gb8ecg609570a29828" version="1">Exclude Enemy Tiers (Trials of Tav)</content>
+    <content contentuid="h3f63d446g7bdbg4319gb303g5d46c7e1931b" version="1">If set, Trials of Tav enemies at or above this tier will be excluded from the Swarm AI's control.  This setting has no effect outside of Trials of Tav.</content>
 </contentList>

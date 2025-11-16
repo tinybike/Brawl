@@ -205,15 +205,17 @@ local function startTruePause(entityUuid)
             State.Session.ActionResourcesListeners[entityUuid] = nil
         end
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            -- debugPrint("moving entity", M.Utils.getDisplayName(entityUuid), Movement.getRemainingMovement(movingEntity), State.Session.RemainingMovement[entityUuid], isInFTB(movingEntity))
-            if State.Session.RemainingMovement[entityUuid] and Movement.getRemainingMovement(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
+            if State.Session.RemainingMovement[entityUuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[entityUuid] and isInFTB(movingEntity) then
+                debugPrint(M.Utils.getDisplayName(entityUuid), "movement while paused")
                 local goalPosition
                 local activeMovement = Movement.getActiveMovement(entityUuid)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "ActiveMovement")
+                debugDump(activeMovement)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "LastClickPosition")
+                debugDump(State.Session.LastClickPosition[entityUuid])
                 if activeMovement and activeMovement.goalPosition then
-                    -- debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from active movement)", entityUuid)
                     goalPosition = activeMovement.goalPosition
                 elseif State.Session.LastClickPosition[entityUuid] and State.Session.LastClickPosition[entityUuid].position then
-                    -- debugPrint("******************MOVEMENT LOCK enqueue movement (raw coords from click)", entityUuid)
                     goalPosition = State.Session.LastClickPosition[entityUuid].position
                 end
                 if goalPosition then
@@ -221,14 +223,14 @@ local function startTruePause(entityUuid)
                     lock(movingEntity)
                     Movement.findPathToPosition(entityUuid, goalPosition, function (err, validPosition)
                         if err then
-                            return Utils.showNotification(entityUuid, err, 2)
+                            return Utils.showNotification(entityUuid, err)
                         end
                         debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
                         State.Session.MovementQueue[entityUuid] = {validPosition[1], validPosition[2], validPosition[3]}
                     end)
                 end
             end
-            State.Session.RemainingMovement[entityUuid] = Movement.getRemainingMovement(movingEntity)
+            State.Session.RemainingMovement[entityUuid] = Movement.getMovementDistanceAmount(entity)
         end, entity)
         if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
             Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
@@ -241,7 +243,7 @@ local function startTruePause(entityUuid)
                 if caster.Uuid.EntityUuid == entityUuid then
                     debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
                     if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
-                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
+                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
                             local spell = M.Spells.getSpellByName(cast.SpellCastState.SpellId.OriginatorPrototype)
                             if spell and spell.isBonusAction then
                                 return

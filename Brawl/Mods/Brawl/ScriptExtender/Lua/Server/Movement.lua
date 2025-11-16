@@ -209,15 +209,14 @@ local function moveToPosition(uuid, position, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToPosition", position[1], position[2], position[3], override)
     if override then
         clearOsirisQueue(uuid)
-        -- local ent = Ext.Entity.Get(uuid)
-        -- if ent and ent.ServerCharacter and ent.ServerCharacter.AiMovementMachine and ent.ServerCharacter.AiMovementMachine.CachedStates and ent.ServerCharacter.AiMovementMachine.CachedStates[4] and not ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished then
-        --     ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished = true
-        -- end
+        local ent = Ext.Entity.Get(uuid)
+        if ent and ent.ServerCharacter and ent.ServerCharacter.AiMovementMachine and ent.ServerCharacter.AiMovementMachine.CachedStates and ent.ServerCharacter.AiMovementMachine.CachedStates[4] and not ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished then
+            ent.ServerCharacter.AiMovementMachine.CachedStates[4].Finished = true
+        end
     end
-    local eventUuid = registerActiveMovement(uuid, position, nil, onCompleted, onFailed)
-    debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid), eventUuid)
+    -- debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid))
     -- Osi.RequestPing(position[1], position[2], position[3], Osi.GetHostCharacter(), "")
-    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), eventUuid)
+    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, position, nil, onCompleted, onFailed))
     -- _D(Ext.Entity.Get(uuid).ServerCharacter.OsirisController.Tasks)
     return true
 end

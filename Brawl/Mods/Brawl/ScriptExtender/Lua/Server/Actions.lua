@@ -213,7 +213,7 @@ end
 
 local function buildSpell(entity, spellName, stats)
     local originatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats)
-    if State.Settings.HogwildMode then
+    if State.Settings.HogwildMode or not State.Settings.TurnBasedSwarmMode then
         return {
             OriginatorPrototype = originatorPrototype,
             ProgressionSource = Constants.NULL_UUID,
@@ -251,15 +251,27 @@ local function submitSpellRequest(request, insertAtFront)
     debugPrint(M.Utils.getDisplayName(request.Caster.Uuid.EntityUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
 end
 
+local function getCastOptions()
+    if State.Settings.TurnBasedSwarmMode then
+        if State.Settings.HogwildMode then
+            return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks", "NoMovement"}
+        else
+            return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
+        end
+    else
+        if State.Settings.HogwildMode then
+            return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
+        else
+            return {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
+        end
+    end
+end
+
 -- thank u focus and mazzle
 local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
-        if State.Settings.HogwildMode then
-            castOptions = {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreSpellRolls", "NoMovement"}
-        else
-            castOptions = {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
-        end
+        castOptions = getCastOptions()
     end
     local targets = buildTargets(casterUuid, spellName, targetUuid, stats.SpellType, isFriendlyTarget)
     local casterEntity = Ext.Entity.Get(casterUuid)
@@ -305,22 +317,30 @@ local function useSpell(casterUuid, targetUuid, spellName, isFriendlyTarget, var
     if upcastLevel ~= nil then
         spellName = spellName .. "_" .. tostring(upcastLevel)
     end
-    local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), casterUuid)
-    local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
-    if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
-        return onFailed("cast failed, out of range" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. tostring(distanceTo) .. " " .. tostring(spellRange) .. " " .. spellName)
-    end
-    if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
-        local spell = Spells.getSpellByName(spellName)
-        if spell and not spell.isAutoPathfinding then
-            return onFailed("cast failed, no line of sight" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. spellName)
+    if State.Settings.TurnBasedSwarmMode then
+        local spellRange = M.Utils.convertSpellRangeToNumber(M.Utils.getSpellRange(spellName), casterUuid)
+        local distanceTo = M.Osi.GetDistanceTo(casterUuid, targetUuid)
+        if distanceTo ~= nil and math.floor(distanceTo) > spellRange then
+            local err = "cast failed, out of range" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. tostring(distanceTo) .. " " .. tostring(spellRange) .. " " .. spellName
+            debugPrint(err)
+            return onFailed(err)
+        end
+        if spellRange > 2 and M.Osi.HasLineOfSight(casterUuid, targetUuid) == 0 then
+            local spell = Spells.getSpellByName(spellName)
+            if spell and not spell.isAutoPathfinding then
+                local err = "cast failed, no line of sight" .. M.Utils.getDisplayName(casterUuid) .. " " .. M.Utils.getDisplayName(targetUuid) .. " " .. spellName
+                debugPrint(err)
+                return onFailed(err)
+            end
         end
     end
     local requestUuid = Utils.createUuid()
     registerActionInProgress(casterUuid, spellName, requestUuid, onCompleted, onFailed)
     local request = queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget)
     if not request then
-        return onFailed("spell construction error")
+        local err = "spell construction error"
+        debugPrint(err)
+        return onFailed(err)
     end
     onSubmitted(request)
 end

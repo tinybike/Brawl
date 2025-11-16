@@ -374,12 +374,16 @@ local function onGainedControl(targetGuid)
                 MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
             end
         end
-        Utils.clearOsirisQueue(targetUuid)
+        if not State.Settings.FullAuto then
+            Utils.clearOsirisQueue(targetUuid)
+        end
         local targetUserId = Osi.GetReservedUserID(targetUuid)
         local players = State.Session.Players
         if players[targetUuid] ~= nil and targetUserId ~= nil then
             players[targetUuid].isControllingDirectly = true
-            startPulseAddNearby(targetUuid)
+            if not State.Settings.TurnBasedSwarmMode then
+                startPulseAddNearby(targetUuid)
+            end
             local level = M.Osi.GetRegion(targetUuid)
             local brawlersInLevel = State.Session.Brawlers[level]
             for playerUuid, player in pairs(players) do
@@ -610,21 +614,21 @@ end
 
 local function onCastedSpell(casterGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
-    -- debugPrint(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
     local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
     if actionInProgress then
+        debugPrint(M.Utils.getDisplayName(casterUuid), "CastedSpell", casterGuid, spellName, spellType, spellElement, storyActionID)
         -- debugPrint("actionInProgress")
         -- debugDump(actionInProgress)
         local requestUuid = actionInProgress.requestUuid
         -- debugPrint("Spell cast succeeded! (CastedSpell)")
         Swarm.resumeTimers() -- for interrupts, does this need to be here?
-        Utils.checkDivineIntervention(spellName, casterUuid)
-        -- debugPrint("onCompleted")
-        actionInProgress.onCompleted(spellName)
+        debugPrint("onCompleted onCastedSpell")
+        local onCompleted = actionInProgress.onCompleted
         Actions.removeActionInProgress(casterUuid, requestUuid)
-        -- if not State.Settings.TurnBasedSwarmMode then
-        --     Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
-        -- end
+        if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
+            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+        end
+        onCompleted(spellName)
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
@@ -638,11 +642,14 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
             end
         end
     end
+    Utils.checkDivineIntervention(spellName, casterUuid)
 end
 
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
+        -- _D(cast.SpellCastState)
+        -- _D(cast.ServerSpellCastState)
         -- _D(cast:GetAllComponents())
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
@@ -659,8 +666,10 @@ local function onSpellCastFinishedEvent(cast, _, _)
             if outcome == "None" then
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
-                Utils.checkDivineIntervention(spellName, casterUuid)
                 debugPrint("onCompleted")
+                if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
+                    Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+                end
                 onCompleted(spellName)
             else
                 if outcome == "CantSpendUseCosts" then
@@ -674,10 +683,10 @@ local function onSpellCastFinishedEvent(cast, _, _)
     end
 end
 
--- local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
---     local casterUuid = M.Osi.GetUUID(casterGuid)
---     debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
--- end
+local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
+    local casterUuid = M.Osi.GetUUID(casterGuid)
+    debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+end
 
 local function onDialogStarted(dialog, dialogInstanceId)
     debugPrint("DialogStarted", dialog, dialogInstanceId)

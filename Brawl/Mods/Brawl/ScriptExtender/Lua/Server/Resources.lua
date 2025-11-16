@@ -251,6 +251,65 @@ local function getPreparedSpell(entity, spellName)
     end
 end
 
+local function deductCastedSpell(uuid, spellName, requestUuid)
+    local entity = Ext.Entity.Get(uuid)
+    local spell = M.Spells.getSpellByName(spellName)
+    if entity and spell then
+        for costType, costValue in pairs(spell.costs) do
+            if costType == "LongRest" or costType == "ShortRest" then
+                local preparedSpell = getPreparedSpell(entity, spellName)
+                local stats = Ext.Stats.Get(spellName)
+                if preparedSpell and costValue and entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns and stats.Cooldown then
+                    debugPrint("deductCastedSpell cooldown for", M.Utils.getDisplayName(uuid), spellName, costType, costValue)
+                    entity.SpellBookCooldowns.Cooldowns[#entity.SpellBookCooldowns.Cooldowns + 1] = {
+                        Cooldown = -1.0,
+                        CooldownType = Constants.COOLDOWN_TYPES[stats.Cooldown],
+                        SpellId = {
+                            OriginatorPrototype = preparedSpell.OriginatorPrototype,
+                            ProgressionSource = preparedSpell.ProgressionSource,
+                            Source = preparedSpell.Source,
+                            SourceType = preparedSpell.SourceType,
+                            Prototype = spellName,
+                        },
+                        field_29 = 3, -- ??
+                        field_30 = requestUuid,
+                    }
+                    entity:Replicate("SpellBookCooldowns")
+                end
+            elseif costType ~= "ActionPoint" and costType ~= "BonusActionPoint" then
+                if costType == "SpellSlot" or costType == "WarlockSpellSlot" then
+                    if entity.ActionResources and entity.ActionResources.Resources then
+                        local spellSlots = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
+                        if spellSlots then
+                            for _, spellSlot in ipairs(spellSlots) do
+                                if spellSlot.Level >= costValue and spellSlot.Amount > 0 then
+                                    spellSlot.Amount = spellSlot.Amount - 1
+                                    break
+                                end
+                            end
+                        end
+                    end
+                else
+                    if entity.ActionResources and entity.ActionResources.Resources and Constants.ACTION_RESOURCES[costType] then
+                        local resources = entity.ActionResources.Resources[Constants.ACTION_RESOURCES[costType]]
+                        if resources then
+                            local resource = resources[1] -- NB: always index 1?
+                            if resource.Amount ~= nil then
+                                if resource.Amount >= costValue then
+                                    resource.Amount = resource.Amount - costValue
+                                else
+                                    resource.Amount = 0
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        entity:Replicate("ActionResources")
+    end
+end
+
 return {
     getActionResource = getActionResource,
     getActionResourceMaxAmount = getActionResourceMaxAmount,
@@ -269,4 +328,5 @@ return {
     isSpellPrepared = isSpellPrepared,
     isSpellOnCooldown = isSpellOnCooldown,
     hasEnoughToCastSpell = hasEnoughToCastSpell,
+    deductCastedSpell = deductCastedSpell,
 }

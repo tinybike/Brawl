@@ -204,6 +204,14 @@
                             "Default": false,
                             "Description": "If checked, and Companion AI is enabled, your companions will automatically act using Brawl's AI at the beginning of your team's turn.  If not checked, the companion AI can be triggered using the Queue Companion AI Action hotkey (LCtrl+C by default).",
                             "Handles": {"DescriptionHandle": "hc0055a4eg3a8eg4736g89d3gdc6b9f0bf36f", "NameHandle": "hf6e63658g1ccfg4abdgab30g7ee2f50b9a70"}
+                        }, {
+                            "Id": "exclude_enemy_tiers",
+                            "Name": "Exclude Enemy Tiers (Trials of Tav)",
+                            "Type": "enum",
+                            "Default": "mythical",
+                            "Options": {"Choices": ["", "mid", "high", "ultra", "epic", "legendary", "mythical", "divine"]},
+                            "Description": "If set, Trials of Tav enemies at or above this tier will be excluded from the Swarm AI's control.  This setting has no effect outside of Trials of Tav.",
+                            "Handles": {"DescriptionHandle": "h3f63d446g7bdbg4319gb303g5d46c7e1931b", "NameHandle": "hf76b56ddga5e1g4be3gb8ecg609570a29828"}
                         }
                     ]
                 }

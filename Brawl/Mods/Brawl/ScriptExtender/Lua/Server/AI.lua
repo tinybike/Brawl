@@ -219,7 +219,7 @@ end
 
 -- Brawlers doing dangerous stuff
 local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    print("pulseAction", brawler.displayName)
+    debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
     onSubmitted = onSubmitted or debugDump
     onCompleted = onCompleted or debugPrint
     onFailed = onFailed or debugPrint

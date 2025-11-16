@@ -358,7 +358,7 @@ local function onClickPosition(data)
             elseif clickPosition.position and State.Session.AwaitingTarget[playerUuid] then
                 M.Movement.findPathToPosition(playerUuid, clickPosition.position, function (err, validPosition)
                     if err then
-                        return Utils.showNotification(playerUuid, err, 2)
+                        return Utils.showNotification(playerUuid, err)
                     end
                     setAwaitingTarget(playerUuid, false)
                     allCompanionsDisableLockedOnTarget()
@@ -613,5 +613,6 @@ return {
         swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
         swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
         autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,
+        exclude_enemy_tiers = function (v) State.Settings.ExcludeEnemyTiers = (v ~= "") and v or nil end,
     },
 }

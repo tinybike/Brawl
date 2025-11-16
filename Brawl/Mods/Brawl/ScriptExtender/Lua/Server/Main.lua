@@ -89,10 +89,10 @@ function startPulseAddNearby(uuid)
     end
 end
 
-function stopPulseReposition(level)
-    debugPrint("stopPulseReposition", level)
-    if State.Session.PulseRepositionTimers[level] ~= nil then
-        Ext.Timer.Cancel(State.Session.PulseRepositionTimers[level])
+function stopPulseReposition()
+    debugPrint("stopPulseReposition")
+    for level, timer in pairs(State.Session.PulseRepositionTimers) do
+        Ext.Timer.Cancel(timer)
         State.Session.PulseRepositionTimers[level] = nil
     end
 end

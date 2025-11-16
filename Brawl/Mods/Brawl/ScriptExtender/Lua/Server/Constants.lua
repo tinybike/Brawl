@@ -1,7 +1,7 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {Swarm = false, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false}
--- Constants.DEBUG_LOGGING = false
+-- Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false}
+Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -38,6 +38,17 @@ Constants.ABILITIES = {
     Intelligence = 5,
     Wisdom = 6,
     Charisma = 7,
+}
+-- stats cooldowns => SpellBookCooldowns cooldowns
+Constants.COOLDOWN_TYPES = {
+    None = "Default",
+    OncePerTurn = "OncePerTurn",
+    OncePerCombat = "OncePerCombat",
+    OncePerRest = "UntilRest",
+    OncePerTurnNoRealtime = "OncePerTurnNoRealtime",
+    OncePerShortRest = "UntilShortRest",
+    OncePerRestPerItem = "UntilPerRestPerItem",
+    OncePerShortRestPerItem = "OncePerShortRestPerItem",
 }
 Constants.ACTION_RESOURCES = {
     ActionPoint = "734cbcfb-8922-4b6d-8330-b2a7e4c14b6a",
@@ -395,7 +406,7 @@ Constants.LEADERBOARD_EXCLUDED_HEALS = {
     "ShortResting",
     "TimelessBody",
 }
-Constants.MAX_SPELL_EXCLUSIONS = 3
+Constants.MAX_SPELL_EXCLUSIONS = 1
 Constants.COUNTERSPELLS = {
     "Target_Counterspell",
     "Target_MAG_CounterSpell",
@@ -420,6 +431,7 @@ Constants.TELEPORTS = {
     "Projectile_Jump",
 }
 Constants.TOT_EXCLUDED_TIERS = {"divine", "mythical"}
+Constants.EXCLUDED_ENEMY_TIMEOUT = 5000
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
 Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"

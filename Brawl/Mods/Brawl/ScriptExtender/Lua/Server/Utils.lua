@@ -357,13 +357,26 @@ local function removeNegativeStatuses(uuid)
 end
 
 local function clearOsirisQueue(uuid)
-    -- debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
+    debugPrint("clearOsirisQueue", uuid, getDisplayName(uuid))
     if State.Settings.TurnBasedSwarmMode then
         Movement.clearActiveMovements(uuid)
         Swarm.cancelActionSequenceFailsafeTimer(uuid)
     end
     Osi.PurgeOsirisQueue(uuid, 1)
     Osi.FlushOsirisQueue(uuid)
+end
+
+local function contains(t, v)
+    for _, x in ipairs(t) do
+        if x == v then
+            return true
+        end
+    end
+    return false
+end
+
+local function startsWith(str, prefix)
+    return str:sub(1, #prefix) == prefix
 end
 
 local function isToT()
@@ -384,6 +397,57 @@ local function isSilenced(uuid)
     return false
 end
 
+local function isHarmful(spellFlags)
+    if spellFlags then
+        for _, spellFlag in ipairs(spellFlags) do
+            if spellFlag == "IsHarmful" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function hasBeneficialStatus(entityUuid, statusLabel)
+    local entity = Ext.Entity.Get(entityUuid)
+    if entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+            if status.StatusId == statusLabel and status.SourceSpell and status.SourceSpell.OriginatorPrototype then
+                local stats = Ext.Stats.Get(status.SourceSpell.OriginatorPrototype)
+                if stats then
+                    if stats.VerbalIntent == "Buff" or stats.VerbalIntent == "Healing" then
+                        return true
+                    elseif not isHarmful(stats.SpellFlags) then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function changeHagHairStat(uuid, oldStat, newStat)
+    if startsWith(oldStat, "HAG_HAIR_") and startsWith(newStat, "HAG_HAIR_") then
+        local entity = Ext.Entity.Get(uuid)
+        local numOldStats = 0
+        if entity and entity.StatusContainer and entity.StatusContainer.Statuses then
+            for _, status in pairs(entity.StatusContainer.Statuses) do
+                if status == oldStat then
+                    numOldStats = numOldStats + 1
+                end
+            end
+        end
+        print(M.Utils.getDisplayName(uuid), "changeHagHairStat", oldStat, newStat, numOldStats)
+        if numOldStats > 0 then
+            Osi.RemoveStatus(uuid, oldStat)
+            for i = 1, numOldStats do
+                Osi.ApplyStatus(uuid, newStat, -1)
+            end
+        end
+    end
+end
+
 local function createDummyObject(position)
     local dummyUuid = Osi.CreateAt(Constants.INVISIBLE_TEMPLATE_UUID, position[1], position[2], position[3], 0, 0, "")
     local dummyEntity = Ext.Entity.Get(dummyUuid)
@@ -396,7 +460,10 @@ local function createDummyObject(position)
 end
 
 local function showNotification(uuid, text, duration)
-    Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+    if State.isPlayerControllingDirectly(uuid) then
+        duration = duration or math.ceil(Constants.MOD_STATUS_MESSAGE_DURATION / 1000)
+        Ext.ServerNet.PostMessageToClient(uuid, "Notification", Ext.Json.Stringify({text = text, duration = duration}))
+    end
 end
 
 local function applyAttackMoveTargetVfx(targetUuid)
@@ -699,19 +766,6 @@ local function getOriginatorPrototype(spellName, stats)
     return stats.RootSpellID
 end
 
-local function contains(t, v)
-    for _, x in ipairs(t) do
-        if x == v then
-            return true
-        end
-    end
-    return false
-end
-
-local function startsWith(str, prefix)
-    return str:sub(1, #prefix) == prefix
-end
-
 local function timeIt(fn, ...)
     local t0 = Ext.Utils.MonotonicTime()
     fn(...)
@@ -769,6 +823,8 @@ return {
     isToT = isToT,
     isBlinded = isBlinded,
     isSilenced = isSilenced,
+    hasBeneficialStatus = hasBeneficialStatus,
+    changeHagHairStat = changeHagHairStat,
     createDummyObject = createDummyObject,
     showNotification = showNotification,
     applyAttackMoveTargetVfx = applyAttackMoveTargetVfx,
