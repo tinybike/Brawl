@@ -427,6 +427,18 @@ local function hasBeneficialStatus(entityUuid, statusLabel)
     return false
 end
 
+-- thank u hippo0o
+local function remove(uuid)
+    Osi.PROC_RemoveAllPolymorphs(uuid)
+    Osi.PROC_RemoveAllDialogEntriesForSpeaker(uuid)
+    Osi.SetOnStage(uuid, 0)
+    Osi.SetHasDialog(uuid, 0)
+    Osi.RequestDelete(uuid)
+    Osi.RequestDeleteTemporary(uuid)
+    Osi.UnloadItem(uuid)
+    Osi.Die(uuid, 2, Constants.NULL_UUID, 0, 1)
+end
+
 local function changeHagHairStat(uuid, oldStat, newStat)
     if startsWith(oldStat, "HAG_HAIR_") and startsWith(newStat, "HAG_HAIR_") then
         local entity = Ext.Entity.Get(uuid)
@@ -824,6 +836,7 @@ return {
     isBlinded = isBlinded,
     isSilenced = isSilenced,
     hasBeneficialStatus = hasBeneficialStatus,
+    remove = remove,
     changeHagHairStat = changeHagHairStat,
     createDummyObject = createDummyObject,
     showNotification = showNotification,

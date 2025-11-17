@@ -207,6 +207,9 @@ function nextCombatRound()
 end
 
 function startCombatRoundTimer(combatGuid)
+    -- if not State.isInCombat() then
+    --     Osi.PauseCombat(combatGuid)
+    -- end
     local turnDuration = State.Settings.ActionInterval*1000
     if not Utils.isToT() then
         State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(turnDuration, nextCombatRound)

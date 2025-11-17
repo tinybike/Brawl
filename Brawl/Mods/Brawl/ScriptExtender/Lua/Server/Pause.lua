@@ -57,6 +57,9 @@ end
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
+        if State.Session.CombatHelper then
+            Osi.PauseCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
+        end
         pauseCombatRoundTimers()
         -- stopAllPulseActions(true)
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
@@ -104,12 +107,14 @@ local function allExitFTB()
                 Utils.joinCombat(uuid)
             end
         end
-        if combatGuid then
-            Osi.ResumeCombat(combatGuid)
+        if State.Session.CombatHelper then
+            Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
         end
         Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()
-        resumeCombatRoundTimer(combatGuid)
+        if combatGuid then
+            resumeCombatRoundTimer(combatGuid)
+        end
         Movement.resumeTimers()
     end
 end
@@ -193,11 +198,11 @@ local function startTruePause(entityUuid)
             -- print("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
             if caster and caster.TurnBased then
                 State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
-                if State.Session.FTBLockedIn[entityUuid] then
-                    debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
-                end
+                -- if State.Session.FTBLockedIn[entityUuid] then
+                --     debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
+                -- end
                 if isFTBAllLockedIn() then
-                    debugPrint("all locked in, exiting")
+                    -- debugPrint("all locked in, exiting")
                     allExitFTB()
                 end
             end
@@ -209,7 +214,7 @@ local function startTruePause(entityUuid)
         State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
             if movingEntity.Uuid and movingEntity.Uuid.EntityUuid then
                 local uuid = movingEntity.Uuid.EntityUuid
-                debugPrint(M.Utils.getDisplayName(uuid), "movement while paused", State.Session.RemainingMovement[uuid], Movement.getMovementDistanceAmount(movingEntity), State.Session.RemainingMovement[uuid], isInFTB(movingEntity))
+                -- debugPrint(M.Utils.getDisplayName(uuid), "movement while paused", State.Session.RemainingMovement[uuid], Movement.getMovementDistanceAmount(movingEntity), State.Session.RemainingMovement[uuid], isInFTB(movingEntity))
                 if State.Session.RemainingMovement[uuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[uuid] and isInFTB(movingEntity) then
                     local activeMovement = Movement.getActiveMovement(uuid)
                     debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")

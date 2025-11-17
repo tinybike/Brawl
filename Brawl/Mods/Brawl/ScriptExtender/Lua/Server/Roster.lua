@@ -198,6 +198,9 @@ local function endBrawl(level)
         end
         debugDump(brawlersInLevel)
     end
+    if State.Session.CombatHelper then
+        Utils.remove(State.Session.CombatHelper)
+    end
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
@@ -292,7 +295,7 @@ end
 
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = M.State.getNumEnemiesRemaining(level)
-    debugPrint("Number of enemies remaining:", numEnemiesRemaining)
+    print("Number of enemies remaining:", numEnemiesRemaining)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
     end

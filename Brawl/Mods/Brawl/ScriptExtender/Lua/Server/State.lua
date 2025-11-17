@@ -169,7 +169,7 @@ local function checkForDownedOrDeadPlayers()
 end
 
 local function isInCombat(uuid)
-    return M.Osi.IsInCombat(uuid) == 1
+    return M.Osi.IsInCombat(uuid or M.Osi.GetHostCharacter()) == 1
 end
 
 local function areAnyPlayersBrawling()

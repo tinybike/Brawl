@@ -68,7 +68,7 @@ local function onCombatStarted(combatGuid)
     end
     Roster.addCombatParticipantsToBrawlers()
     if not State.Settings.TurnBasedSwarmMode and not Utils.isToT() then
-        -- spawnCombatHelper(combatGuid)
+        spawnCombatHelper(combatGuid)
         if State.Settings.AutoPauseOnCombatStart then
             Pause.allEnterFTB()
         end
@@ -106,6 +106,17 @@ local function onCombatRoundStarted(combatGuid, round)
             Swarm.Listeners.onCombatRoundStarted(round)
         else
             Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
+            for uuid, _ in pairs(M.Roster.getBrawlers()) do
+                if M.Utils.isPugnacious(uuid) then
+                    local enemyFaction = Osi.GetFaction(uuid)
+                    print("got hostile faction", enemyFaction, M.Utils.getDisplayName(uuid))
+                    Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, enemyFaction, State.Session.CombatHelper, uuid)
+                    Ext.Timer.WaitFor(1000, function ()
+                        Osi.EndTurn(State.Session.CombatHelper)
+                    end)
+                    break
+                end
+            end
             startCombatRoundTimer(combatGuid)
             -- if M.Utils.isToT() then
             --     startToTTimers(combatGuid)
@@ -181,9 +192,8 @@ end
 -- end
 
 local function onEnteredForceTurnBased(entityGuid)
-    debugPrint("EnteredForceTurnBased", entityGuid)
     if not State.Settings.TurnBasedSwarmMode then
-        print("EnteredForceTurnBased", entityGuid)
+        debugPrint("EnteredForceTurnBased", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         local level = M.Osi.GetRegion(entityGuid)
         if level and entityUuid then
@@ -235,9 +245,8 @@ local function onEnteredForceTurnBased(entityGuid)
 end
 
 local function onLeftForceTurnBased(entityGuid)
-    debugPrint("LeftForceTurnBased", entityGuid)
     if not State.Settings.TurnBasedSwarmMode then
-        print("LeftForceTurnBased", entityGuid)
+        debugPrint("LeftForceTurnBased", entityGuid)
         local entityUuid = M.Osi.GetUUID(entityGuid)
         local level = M.Osi.GetRegion(entityGuid)
         if level and entityUuid then
@@ -309,9 +318,22 @@ local function onLeftForceTurnBased(entityGuid)
 end
 
 local function onTurnStarted(entityGuid)
-    debugPrint("TurnStarted", entityGuid)
+    print("TurnStarted", entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
+    else
+        -- if M.Osi.GetUUID(entityGuid) == State.Session.CombatHelper then
+        --     local combatGuid = M.Osi.GetCombatGuidFor(entityGuid)
+        --     if combatGuid then
+        --         print("got guid, pausing combat...", combatGuid, entityGuid)
+        --         Osi.PauseCombat(combatGuid)
+        --         Ext.Timer.WaitFor(1000, function ()
+        --             print("resming")
+        --             Osi.ResumeCombat(combatGuid)
+        --             Osi.EndTurn(State.Session.CombatHelper)
+        --         end)
+        --     end
+        -- end 
     end
 end
 
