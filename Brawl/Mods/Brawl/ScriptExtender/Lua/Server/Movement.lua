@@ -56,6 +56,7 @@ local function setMovementToMax(entity)
         resources[Constants.ACTION_RESOURCES.Movement][1].Amount = resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount
         resources[Constants.ACTION_RESOURCES.ActionPoint][1].Amount = 1.0
         resources[Constants.ACTION_RESOURCES.BonusActionPoint][1].Amount = 1.0
+        resources[Constants.ACTION_RESOURCES.ReactionActionPoint][1].Amount = 1.0
         entity:Replicate("ActionResources")
     end
 end
@@ -182,23 +183,17 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
         goalTarget = goalTarget,
         onCompleted = onCompleted or _P,
     }
-    if State.Settings.TurnBasedSwarmMode then
-        State.Session.ActiveMovements[eventUuid].timer = {
-            handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
-                debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
-                if onFailed then onFailed("movement timed out") end
-            end),
-            paused = false,
-        }
-    end
-    debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
-    debugDump(State.Session.ActiveMovements[eventUuid])
+    State.Session.ActiveMovements[eventUuid].timer = {
+        handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
+            debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
+            if onFailed then onFailed("movement timed out") end
+        end),
+        paused = false,
+    }
+    -- debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
+    -- debugDump(State.Session.ActiveMovements[eventUuid])
     return eventUuid
 end
-
--- Osi.CharacterMoveToPosition("1535feb9-7ff9-4132-be09-191ba3f8c2e1", -289.25, 17.518180847168, -263.75, "Sprint", "")
--- Osi.CharacterMoveTo("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), "Sprint", "")
--- Osi.Attack("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), 1)
 
 local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToTargetUuid", targetUuid, override)
@@ -552,14 +547,20 @@ local function setPlayerRunToSprint(entityUuid)
     end
 end
 
-local function resetPlayersMovementSpeed()
-    local players = State.Session.Players
-    for playerUuid, player in pairs(players) do
-        local entity = Ext.Entity.Get(playerUuid)
-        if player.movementSpeedRun ~= nil and entity and entity.ServerCharacter then
+local function resetPlayerMovementSpeed(uuid)
+    local player = State.Session.Players[uuid]
+    if player and player.movementSpeedRun ~= nil then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.ServerCharacter then
             entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
             player.movementSpeedRun = nil
         end
+    end
+end
+
+local function resetPlayersMovementSpeed()
+    for uuid, _ in pairs(State.Session.Players) do
+        resetPlayerMovementSpeed(uuid)
     end
 end
 
@@ -594,6 +595,7 @@ return {
     holdPosition = holdPosition,
     repositionRelativeToTarget = repositionRelativeToTarget,
     setPlayerRunToSprint = setPlayerRunToSprint,
+    resetPlayerMovementSpeed = resetPlayerMovementSpeed,
     resetPlayersMovementSpeed = resetPlayersMovementSpeed,
     setMovementSpeedThresholds = setMovementSpeedThresholds,
     selectDash = selectDash,

@@ -7,6 +7,7 @@ local Settings = {
     CompanionAIEnabled = true,
     TruePause = true,
     AutoPauseOnDowned = true,
+    AutoPauseOnCombatStart = false,
     ActionInterval = 6.0,
     InitiativeDie = 20,
     FullAuto = false,
@@ -24,12 +25,14 @@ local Settings = {
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
     ExcludeEnemyTiers = nil,
+    RealTimeRemainInCombat = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
     Settings.CompanionAIEnabled = MCM.Get("companion_ai_enabled")
     Settings.TruePause = MCM.Get("true_pause")
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
+    Settings.AutoPauseOnCombatStart = MCM.Get("auto_pause_on_combat_start")
     Settings.ActionInterval = MCM.Get("action_interval")
     Settings.InitiativeDie = MCM.Get("initiative_die")
     Settings.FullAuto = MCM.Get("full_auto")
@@ -47,6 +50,7 @@ if MCM then
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
     Settings.ExcludeEnemyTiers = MCM.Get("exclude_enemy_tiers")
+    -- Settings.RealTimeRemainInCombat = MCM.Get("real_time_remain_in_combat")
 end
 
 -- Session state
@@ -83,7 +87,6 @@ local Session = {
     StoryActionIDs = {},
     TagNameToUuid = {},
     ToTTimer = nil,
-    ToTRoundTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     ActiveMovements = {},
@@ -105,9 +108,11 @@ local Session = {
     ChunkInProgress = nil,
     CurrentChunkTimer = nil,
     QueuedCompanionAIAction = {},
+    CombatRoundTimer = {},
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     MeanInitiativeRoll = nil,
     SwarmTurnIsBeforePlayer = nil,
+    CombatHelper = nil,
 }
 
 -- Persistent state
@@ -163,6 +168,10 @@ local function checkForDownedOrDeadPlayers()
     end
 end
 
+local function isInCombat(uuid)
+    return M.Osi.IsInCombat(uuid or M.Osi.GetHostCharacter()) == 1
+end
+
 local function areAnyPlayersBrawling()
     if Session.Players then
         for playerUuid, player in pairs(Session.Players) do
@@ -211,6 +220,20 @@ local function isPartyInRealTime()
     return true
 end
 
+local function getToTCombatHelper()
+    if Utils.isToT() and Mods.ToT.PersistentVars.Scenario then
+        return Mods.ToT.PersistentVars.Scenario.CombatHelper
+    end
+end
+
+local function isToTCombatHelper(uuid)
+    return Utils.isToT() and Mods.ToT.PersistentVars.Scenario and uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper
+end
+
+local function disableDynamicCombatCamera()
+    Ext.ServerNet.BroadcastMessage("DisableDynamicCombatCamera", "")
+end
+
 local function hasDirectHeal(uuid, preparedSpells, excludeSelfOnly, bonusActionOnly)
     if M.Utils.isSilenced(uuid) then
         return false
@@ -243,21 +266,23 @@ local function uncapMovementDistance(entityUuid)
     end
     local movementDistances = modVars.MovementDistances
     if M.Osi.IsCharacter(entityUuid) == 1 and M.Osi.IsDead(entityUuid) == 0 and movementDistances[entityUuid] == nil then
-        -- debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
+        debugPrint("Uncap movement distance", entityUuid, Constants.UNCAPPED_MOVEMENT_DISTANCE)
         local entity = Ext.Entity.Get(entityUuid)
-        local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            local originalMaxAmount = Movement.getMovementDistanceMaxAmount(entity)
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
+            entity:Replicate("ActionResources")
+            movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
+            movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
+            modVars.MovementDistances = movementDistances
+            -- _D(movementDistances)
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = Constants.UNCAPPED_MOVEMENT_DISTANCE
-        entity:Replicate("ActionResources")
-        movementDistances = Ext.Vars.GetModVariables(ModuleUUID).MovementDistances
-        movementDistances[entityUuid].originalMaxAmount = originalMaxAmount
-        modVars.MovementDistances = movementDistances
-        -- _D(movementDistances)
     end
 end
 
@@ -268,19 +293,21 @@ local function capMovementDistance(entityUuid)
         -- debugPrint("Cap movement distance", entityUuid)
         -- debugDump(movementDistances[entityUuid])
         local entity = Ext.Entity.Get(entityUuid)
-        if movementDistances[entityUuid] == nil then
-            movementDistances[entityUuid] = {}
+        if entity and entity.ActionResources and entity.ActionResources.Resources and entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement] then
+            if movementDistances[entityUuid] == nil then
+                movementDistances[entityUuid] = {}
+            end
+            movementDistances[entityUuid].updating = true
+            modVars.MovementDistances = movementDistances
+            if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
+                entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
+                entity:Replicate("ActionResources")
+            end
+            movementDistances[entityUuid] = nil
+            modVars.MovementDistances = movementDistances
+            -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
         end
-        movementDistances[entityUuid].updating = true
-        modVars.MovementDistances = movementDistances
-        if movementDistances[entityUuid] and movementDistances[entityUuid].originalMaxAmount then
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].MaxAmount = movementDistances[entityUuid].originalMaxAmount
-            entity.ActionResources.Resources[Constants.ACTION_RESOURCES.Movement][1].Amount = movementDistances[entityUuid].originalMaxAmount
-            entity:Replicate("ActionResources")
-        end
-        movementDistances[entityUuid] = nil
-        modVars.MovementDistances = movementDistances
-        -- debugPrint("Capped distance:", entityUuid, M.Utils.getDisplayName(entityUuid), Movement.getMovementDistanceMaxAmount(entity))
     end
 end
 
@@ -517,10 +544,14 @@ end
 return {
     getArchetype = getArchetype,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
+    isInCombat = isInCombat,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
     getNumEnemiesRemaining = getNumEnemiesRemaining,
     isPlayerControllingDirectly = isPlayerControllingDirectly,
     getPlayerByUserId = getPlayerByUserId,
+    getToTCombatHelper = getToTCombatHelper,
+    isToTCombatHelper = isToTCombatHelper,
+    disableDynamicCombatCamera = disableDynamicCombatCamera,
     isPartyInRealTime = isPartyInRealTime,
     hasDirectHeal = hasDirectHeal,
     revertHitpoints = revertHitpoints,

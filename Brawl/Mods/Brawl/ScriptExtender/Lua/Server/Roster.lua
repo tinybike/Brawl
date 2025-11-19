@@ -55,6 +55,18 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
                 auras = Spells.getAuras(entityUuid),
             }
+            local entity = Ext.Entity.Get(entityUuid)
+            local existingBrawler = State.Session.Brawlers[level][entityUuid]
+            if existingBrawler and existingBrawler.actionResources then
+                brawler.actionResources = existingBrawler.actionResources
+            else
+                -- does this work for entities that get pulled out of the brawl and then re-entered?
+                brawler.actionResources = {}
+                for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                    brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
+                end
+                brawler.actionResources.listener = Ext.Entity.Subscribe("ActionResources", Resources.actionResourcesCallback, entity)
+            end
             if State.getArchetype(entityUuid) == "barbarian" then
                 brawler.rage = Spells.getRageAbility(entityUuid)
                 debugPrint(displayName, "barbarian archetype, setting rage", brawler.rage)
@@ -64,15 +76,9 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
             State.modifyHitpoints(entityUuid)
-            -- If in turn-based swarm mode, then during the player's turn, SetCanJoinCombat=1 for everyone
-            -- and during the enemy turn SetCanJoinCombat=0 for everyone.
-            -- There are no circumstances where the settings should be different for players vs enemies, BUT
-            -- the trigger to change the setting should be the players' turns start/enemy turns starting.
-            -- Players must be LOCKED during enemy turns to avoid RT combat!
-            -- All players should be set to have identical initiatives for this.
-            -- Pause/True Pause should NOT do anything in this mode.
+            Osi.SetCanJoinCombat(entityUuid, 1)
             if State.Settings.TurnBasedSwarmMode then
-                Osi.SetCanJoinCombat(entityUuid, 1)
+                -- Osi.SetCanJoinCombat(entityUuid, 1)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     State.Session.SwarmTurnComplete[entityUuid] = false
@@ -87,13 +93,13 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             else
                 if Osi.IsPlayer(entityUuid) == 0 then
                     -- brawler.originalCanJoinCombat = M.Osi.CanJoinCombat(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
+                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                     -- thank u lunisole/ghostboats
                     Osi.PROC_SelfHealing_Disable(entityUuid)
                 elseif State.Session.Players[entityUuid] then
                     -- brawler.originalCanJoinCombat = 1
-                    Movement.setPlayerRunToSprint(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
+                    -- Movement.setPlayerRunToSprint(entityUuid)
+                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
@@ -134,6 +140,21 @@ local function removeBrawler(level, entityUuid)
             end
         end
         if brawlersInLevel[entityUuid] then
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                local actionResources = brawlersInLevel[entityUuid].actionResources
+                if actionResources then
+                    if actionResources[resourceType] then
+                        if actionResources[resourceType].refillQueue then
+                            for _, actionResourceTimer in ipairs(actionResources[resourceType].refillQueue) do
+                                Ext.Timer.Cancel(actionResourceTimer)
+                            end
+                        end
+                    end
+                    if actionResources.listener then
+                        Ext.Entity.Unsubscribe(actionResources.listener)
+                    end
+                end
+            end
             stopPulseAction(brawlersInLevel[entityUuid])
             brawlersInLevel[entityUuid] = nil
         end
@@ -158,6 +179,16 @@ local function removeBrawler(level, entityUuid)
     end
 end
 
+local function addCombatParticipantsToBrawlers()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+        for _, participant in ipairs(combatEntity.CombatState.Participants) do
+            debugPrint(M.Utils.getDisplayName(participant.Uuid.EntityUuid), "adding to brawlers")
+            addBrawler(participant.Uuid.EntityUuid, true)
+        end
+    end
+end
+
 local function endBrawl(level)
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
@@ -166,6 +197,9 @@ local function endBrawl(level)
             removeBrawler(level, brawlerUuid)
         end
         debugDump(brawlersInLevel)
+    end
+    if State.Session.CombatHelper then
+        Utils.remove(State.Session.CombatHelper)
     end
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
@@ -261,7 +295,7 @@ end
 
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = M.State.getNumEnemiesRemaining(level)
-    debugPrint("Number of enemies remaining:", numEnemiesRemaining)
+    print("Number of enemies remaining:", numEnemiesRemaining)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
     end
@@ -301,6 +335,7 @@ return {
     rollForInitiative = rollForInitiative,
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
+    addCombatParticipantsToBrawlers = addCombatParticipantsToBrawlers,
     endBrawl = endBrawl,
     getBrawlersSortedByDistance = getBrawlersSortedByDistance,
     addNearbyToBrawlers = addNearbyToBrawlers,
