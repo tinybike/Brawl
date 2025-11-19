@@ -9,6 +9,33 @@ local function isToTExcludedEnemyTier(uuid)
     return (M.Utils.isToT() and State.Settings.ExcludeEnemyTiers and M.Utils.contains(State.Settings.ExcludeEnemyTiers, M.Utils.getToTEnemyTier(uuid)))
 end
 
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
+        return true
+    end
+    return false
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
+end
+
 -- NB: make this a setting? should boss enemies in the campaign, e.g. Grym, Ketheric, etc also be excluded, not just dragons? is Ansur just "dragon" or a special type?
 local function isExcludedFromSwarmAI(uuid)
     return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
@@ -643,22 +670,6 @@ local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
         State.Session.SwarmActors = swarmActors
         State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
         startEnemyTurn(swarmActors)
-        -- NB: do we need any of this? why aren't the individual chunk timeouts sufficient? when would this trigger?
-        -- local numChunks = startEnemyTurn(swarmActors)
-        -- debugPrint("numChunks", numChunks, isBeforePlayer)
-        -- if numChunks then
-        --     State.Session.SwarmTurnTimerCombatRound = Utils.getCurrentCombatRound()
-        --     State.Session.SwarmTurnTimer = Ext.Timer.WaitFor(numChunks*getSwarmTurnTimeout(), function ()
-        --         debugPrint("timer elapsed global swarm", M.Utils.getCurrentCombatRound(), State.Session.SwarmTurnTimerCombatRound, isBeforePlayer, State.Session.SwarmTurnIsBeforePlayer)
-        --         if M.Utils.getCurrentCombatRound() == State.Session.SwarmTurnTimerCombatRound and isBeforePlayer == State.Session.SwarmTurnIsBeforePlayer then
-        --             print("************************Swarm turn timer finished - setting enemy turns complete...", isBeforePlayer)
-        --             setEnemyTurnsComplete(swarmActors)
-        --             State.Session.SwarmTurnTimerCombatRound = nil
-        --             State.Session.SwarmTurnActive = false
-        --             State.Session.SwarmActors = nil
-        --         end
-        --     end)
-        -- end
     end
 end
 
@@ -689,7 +700,7 @@ end
 local function getNewInitiativeRolls(groups)
     local newInitiativeRolls = {}
     for _, info in ipairs(groups) do
-        if info.Members and info.Members[1] and info.Members[1].Entity then --and info.Initiative > -20 then
+        if info.Members and info.Members[1] and info.Members[1].Entity then
             table.insert(newInitiativeRolls, getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid))
         end
     end
