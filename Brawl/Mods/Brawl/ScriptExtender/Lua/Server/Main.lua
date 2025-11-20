@@ -191,18 +191,21 @@ function cancelCombatRoundTimers()
     end
 end
 
+-- NB: is the wrapping timer getting paused correctly during pause?
 function nextCombatRound()
     print("nextCombatRound")
     Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
-    for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.TurnBased then
-            if M.Osi.IsPartyMember(uuid, 1) == 0 then
-                entity.TurnBased.HadTurnInCombat = true
-                entity.TurnBased.TurnActionsCompleted = true
+    if not Pause.isPartyInFTB() then
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.TurnBased then
+                if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                    entity.TurnBased.HadTurnInCombat = true
+                    entity.TurnBased.TurnActionsCompleted = true
+                end
+                entity.TurnBased.RequestedEndTurn = true
+                entity:Replicate("TurnBased")
             end
-            entity.TurnBased.RequestedEndTurn = true
-            entity:Replicate("TurnBased")
         end
     end
 end

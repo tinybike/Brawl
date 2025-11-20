@@ -155,15 +155,11 @@ local function isInFTB(entity)
 end
 
 local function isFTBAllLockedIn()
-    -- debugDump(State.Session.FTBLockedIn)
     for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
         if player and player[1] then
             local uuid = M.Osi.GetUUID(player[1])
-            if uuid then
-                -- debugPrint("checking ftb for", uuid, Osi.IsInForceTurnBasedMode(uuid))
-                if not State.Session.FTBLockedIn[uuid] and M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
-                    return false
-                end
+            if uuid and not State.Session.FTBLockedIn[uuid] and M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+                return false
             end
         end
     end
@@ -172,6 +168,81 @@ end
 
 local function isActionFinalized(entity)
     return entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast and entity.SpellCastIsCasting.Cast.SpellCastState
+end
+
+local function startTurnBasedListener(entityUuid)
+    if State.Session.TurnBasedListeners[entityUuid] ~= nil then
+        Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
+        State.Session.TurnBasedListeners[entityUuid] = nil
+    end
+    State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
+        -- NB: requested end turn isn't the only thing that can change here...
+        if caster and caster.TurnBased then
+            State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
+            if isFTBAllLockedIn() then
+                allExitFTB()
+            end
+        end
+    end, Ext.Entity.Get(entityUuid))
+end
+
+local function startTranslateChangedEventListener(entityUuid)
+    if State.Session.TranslateChangedEventListeners[entityUuid] ~= nil then
+        Ext.Entity.Unsubscribe(State.Session.TranslateChangedEventListeners[entityUuid])
+        State.Session.TranslateChangedEventListeners[entityUuid] = nil
+    end
+    -- NB: need to account for already-in-motion NPCs also
+    State.Session.TranslateChangedEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("TranslateChangedEvent", function (movingEntity, _, _)
+        if movingEntity.Uuid and movingEntity.Uuid.EntityUuid and isInFTB(movingEntity) then
+            local uuid = movingEntity.Uuid.EntityUuid
+            debugPrint(M.Utils.getDisplayName(uuid), "movement while paused")
+            local activeMovement = Movement.getActiveMovement(uuid)
+            debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")
+            debugDump(activeMovement)
+            debugPrint(M.Utils.getDisplayName(uuid), "LastClickPosition")
+            debugDump(State.Session.LastClickPosition[uuid])
+            local goalPosition
+            if activeMovement and activeMovement.goalPosition then
+                goalPosition = activeMovement.goalPosition
+            elseif State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
+                goalPosition = State.Session.LastClickPosition[uuid].position
+            end
+            if goalPosition then
+                lock(movingEntity)
+                Movement.findPathToPosition(uuid, goalPosition, function (err, validPosition)
+                    if err then
+                        return Utils.showNotification(uuid, err)
+                    end
+                    debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
+                    State.Session.MovementQueue[uuid] = {validPosition[1], validPosition[2], validPosition[3]}
+                end)
+            end
+        end
+    end, Ext.Entity.Get(entityUuid))
+end
+
+local function startSpellCastPrepareEndEventListener(entityUuid)
+    if State.Session.SpellCastPrepareEndEventListeners[entityUuid] ~= nil then
+        Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEventListeners[entityUuid])
+        State.Session.SpellCastPrepareEndEventListeners[entityUuid] = nil
+    end
+    State.Session.SpellCastPrepareEndEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
+        if cast.SpellCastState and cast.SpellCastState.Caster then
+            local caster = cast.SpellCastState.Caster
+            if caster.Uuid.EntityUuid == entityUuid then
+                debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
+                if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
+                    if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
+                        local spell = M.Spells.getSpellByName(cast.SpellCastState.SpellId.OriginatorPrototype)
+                        if spell and spell.isBonusAction then
+                            return
+                        end
+                    end
+                    midActionLock(caster)
+                end
+            end
+        end
+    end)
 end
 
 -- NB: sometimes ClientControl isn't a valid marker and we end up with 2 characters both marked as directly controlled, so things like cancel queue movement break
@@ -187,82 +258,20 @@ local function startTruePause(entityUuid)
     -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
     if M.Utils.isAliveAndCanFight(entityUuid) then
         debugPrint("startTruePause", entityUuid, M.Utils.getDisplayName(entityUuid))
+        -- NB: this doesn't always stop NPCs dead in their tracks, why not?
         Utils.clearOsirisQueue(entityUuid)
-        local entity = Ext.Entity.Get(entityUuid)
-        if State.Session.TurnBasedListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
-            State.Session.TurnBasedListeners[entityUuid] = nil
-        end
-        State.Session.TurnBasedListeners[entityUuid] = Ext.Entity.Subscribe("TurnBased", function (caster, _, _)
-            -- requested end turn isn't the only thing that can change here
-            -- print("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
-            if caster and caster.TurnBased then
-                State.Session.FTBLockedIn[entityUuid] = caster.TurnBased.RequestedEndTurn
-                -- if State.Session.FTBLockedIn[entityUuid] then
-                --     debugPrint("TurnBased", entityUuid, State.Session.FTBLockedIn[entityUuid], caster.TurnBased.RequestedEndTurn)
-                -- end
-                if isFTBAllLockedIn() then
-                    -- debugPrint("all locked in, exiting")
-                    allExitFTB()
-                end
-            end
-        end, entity)
-        if State.Session.TranslateChangedEventListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.TranslateChangedEventListeners[entityUuid])
-            State.Session.TranslateChangedEventListeners[entityUuid] = nil
-        end
-        State.Session.TranslateChangedEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("TranslateChangedEvent", function (movingEntity, _, _)
-            if movingEntity.Uuid and movingEntity.Uuid.EntityUuid and isInFTB(movingEntity) then
-                local uuid = movingEntity.Uuid.EntityUuid
-                debugPrint(M.Utils.getDisplayName(uuid), "movement while paused")
-                local activeMovement = Movement.getActiveMovement(uuid)
-                debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")
-                debugDump(activeMovement)
-                debugPrint(M.Utils.getDisplayName(uuid), "LastClickPosition")
-                debugDump(State.Session.LastClickPosition[uuid])
-                local goalPosition
-                if activeMovement and activeMovement.goalPosition then
-                    goalPosition = activeMovement.goalPosition
-                elseif State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
-                    goalPosition = State.Session.LastClickPosition[uuid].position
-                end
-                if goalPosition then
-                    lock(movingEntity)
-                    Movement.findPathToPosition(uuid, goalPosition, function (err, validPosition)
-                        if err then
-                            return Utils.showNotification(uuid, err)
-                        end
-                        debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
-                        State.Session.MovementQueue[uuid] = {validPosition[1], validPosition[2], validPosition[3]}
-                    end)
-                end
-            end
-        end, entity)
-        if State.Session.SpellCastPrepareEndEventListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEventListeners[entityUuid])
-            State.Session.SpellCastPrepareEndEventListeners[entityUuid] = nil
-        end
-        State.Session.SpellCastPrepareEndEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
-            if cast.SpellCastState and cast.SpellCastState.Caster then
-                -- debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
-                local caster = cast.SpellCastState.Caster
-                if caster.Uuid.EntityUuid == entityUuid then
-                    debugPrint("***************SpellCastPrepareEndEvent", entityUuid)
-                    if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
-                        if State.Settings.NoFreezeOnBonusActionsDuringPause and cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
-                            local spell = M.Spells.getSpellByName(cast.SpellCastState.SpellId.OriginatorPrototype)
-                            if spell and spell.isBonusAction then
-                                return
-                            end
-                        end
-                        midActionLock(caster)
-                    end
-                end
-            end
-        end)
-        -- Enqueue actions/movements for non-party NPCs
-        if Osi.IsPartyMember(entityUuid, 1) == 0 and Utils.canAct(entityUuid) and not isLocked(entity) then
-            AI.act(M.Roster.getBrawlerByUuid(entityUuid))
+        startTurnBasedListener(entityUuid)
+        startTranslateChangedEventListener(entityUuid)
+        startSpellCastPrepareEndEventListener(entityUuid)
+        if Osi.IsPartyMember(entityUuid, 1) == 0 and Utils.canAct(entityUuid) and not isLocked(Ext.Entity.Get(entityUuid)) then
+            debugPrint("AI acting automatically for NPC", M.Utils.getDisplayName(entityUuid))
+            AI.act(M.Roster.getBrawlerByUuid(entityUuid), false, function (request)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "submitted", request.Spell.Prototype)
+            end, function (spellName)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "completed", spellName)
+            end, function (err)
+                debugPrint(M.Utils.getDisplayName(entityUuid), "failed", err)
+            end)
         end
     end
 end
@@ -299,6 +308,17 @@ local function queueCompanionAIActions()
     end
 end
 
+local function isPartyInFTB()
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            if M.Osi.IsInForceTurnBasedMode(uuid) == 1 then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function checkTruePauseParty()
     debugPrint("checkTruePauseParty")
     local players = State.Session.Players
@@ -330,6 +350,7 @@ return {
     startTruePause = startTruePause,
     queueSingleCompanionAIActions = queueSingleCompanionAIActions,
     queueCompanionAIActions = queueCompanionAIActions,
+    isPartyInFTB = isPartyInFTB,
     checkTruePauseParty = checkTruePauseParty,
     midActionLock = midActionLock,
     lock = lock,
