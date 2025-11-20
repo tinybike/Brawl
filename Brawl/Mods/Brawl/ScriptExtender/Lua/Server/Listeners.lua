@@ -20,7 +20,9 @@ local function onStarted(level)
         State.recapPartyMembersMovementDistances()
     else
         State.disableDynamicCombatCamera()
-        -- State.uncapPartyMembersMovementDistances()
+        -- if not State.Settings.RealTimeRemainInCombat then
+            State.uncapPartyMembersMovementDistances()
+        -- end
         Pause.checkTruePauseParty()
     end
     Leaderboard.initialize()
@@ -438,9 +440,9 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 Swarm.Listeners.onCharacterJoinedParty(uuid)
             else
-                if not State.Settings.RealTimeRemainInCombat then
+                -- if not State.Settings.RealTimeRemainInCombat then
                     State.uncapPartyMembersMovementDistances()
-                end
+                -- end
                 -- Pause.checkTruePauseParty()
             end
         end

@@ -16,9 +16,9 @@ local function unlock(entity)
         State.Session.FTBLockedIn[uuid] = false
         if State.Session.MovementQueue[uuid] then
             debugPrint("unloading movement queue for", uuid)
-            if State.Session.ActionResourcesListeners[uuid] ~= nil then
-                Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[uuid])
-                State.Session.ActionResourcesListeners[uuid] = nil
+            if State.Session.TranslateChangedEventListeners[uuid] ~= nil then
+                Ext.Entity.Unsubscribe(State.Session.TranslateChangedEventListeners[uuid])
+                State.Session.TranslateChangedEventListeners[uuid] = nil
             end
             local moveTo = State.Session.MovementQueue[uuid]
             debugDump(moveTo)
@@ -39,17 +39,17 @@ local function lock(entity)
 end
 
 local function stopTruePause(entityUuid)
-    if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-        Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-        State.Session.ActionResourcesListeners[entityUuid] = nil
+    if State.Session.TranslateChangedEventListeners[entityUuid] ~= nil then
+        Ext.Entity.Unsubscribe(State.Session.TranslateChangedEventListeners[entityUuid])
+        State.Session.TranslateChangedEventListeners[entityUuid] = nil
     end
     if State.Session.TurnBasedListeners[entityUuid] ~= nil then
         Ext.Entity.Unsubscribe(State.Session.TurnBasedListeners[entityUuid])
         State.Session.TurnBasedListeners[entityUuid] = nil
     end
-    if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
-        Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
-        State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
+    if State.Session.SpellCastPrepareEndEventListeners[entityUuid] ~= nil then
+        Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEventListeners[entityUuid])
+        State.Session.SpellCastPrepareEndEventListeners[entityUuid] = nil
     end
 end
 
@@ -207,45 +207,42 @@ local function startTruePause(entityUuid)
                 end
             end
         end, entity)
-        if State.Session.ActionResourcesListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.ActionResourcesListeners[entityUuid])
-            State.Session.ActionResourcesListeners[entityUuid] = nil
+        if State.Session.TranslateChangedEventListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(State.Session.TranslateChangedEventListeners[entityUuid])
+            State.Session.TranslateChangedEventListeners[entityUuid] = nil
         end
-        State.Session.ActionResourcesListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (movingEntity, _, _)
-            if movingEntity.Uuid and movingEntity.Uuid.EntityUuid then
+        State.Session.TranslateChangedEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("TranslateChangedEvent", function (movingEntity, _, _)
+            if movingEntity.Uuid and movingEntity.Uuid.EntityUuid and isInFTB(movingEntity) then
                 local uuid = movingEntity.Uuid.EntityUuid
-                -- debugPrint(M.Utils.getDisplayName(uuid), "movement while paused", State.Session.RemainingMovement[uuid], Movement.getMovementDistanceAmount(movingEntity), State.Session.RemainingMovement[uuid], isInFTB(movingEntity))
-                if State.Session.RemainingMovement[uuid] and Movement.getMovementDistanceAmount(movingEntity) < State.Session.RemainingMovement[uuid] and isInFTB(movingEntity) then
-                    local activeMovement = Movement.getActiveMovement(uuid)
-                    debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")
-                    debugDump(activeMovement)
-                    debugPrint(M.Utils.getDisplayName(uuid), "LastClickPosition")
-                    debugDump(State.Session.LastClickPosition[uuid])
-                    local goalPosition
-                    if activeMovement and activeMovement.goalPosition then
-                        goalPosition = activeMovement.goalPosition
-                    elseif State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
-                        goalPosition = State.Session.LastClickPosition[uuid].position
-                    end
-                    if goalPosition then
-                        lock(movingEntity)
-                        Movement.findPathToPosition(uuid, goalPosition, function (err, validPosition)
-                            if err then
-                                return Utils.showNotification(uuid, err)
-                            end
-                            debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
-                            State.Session.MovementQueue[uuid] = {validPosition[1], validPosition[2], validPosition[3]}
-                        end)
-                    end
+                debugPrint(M.Utils.getDisplayName(uuid), "movement while paused")
+                local activeMovement = Movement.getActiveMovement(uuid)
+                debugPrint(M.Utils.getDisplayName(uuid), "ActiveMovement")
+                debugDump(activeMovement)
+                debugPrint(M.Utils.getDisplayName(uuid), "LastClickPosition")
+                debugDump(State.Session.LastClickPosition[uuid])
+                local goalPosition
+                if activeMovement and activeMovement.goalPosition then
+                    goalPosition = activeMovement.goalPosition
+                elseif State.Session.LastClickPosition[uuid] and State.Session.LastClickPosition[uuid].position then
+                    goalPosition = State.Session.LastClickPosition[uuid].position
                 end
-                State.Session.RemainingMovement[uuid] = Movement.getMovementDistanceAmount(movingEntity)
+                if goalPosition then
+                    lock(movingEntity)
+                    Movement.findPathToPosition(uuid, goalPosition, function (err, validPosition)
+                        if err then
+                            return Utils.showNotification(uuid, err)
+                        end
+                        debugPrint("found path (valid)", validPosition[1], validPosition[2], validPosition[3])
+                        State.Session.MovementQueue[uuid] = {validPosition[1], validPosition[2], validPosition[3]}
+                    end)
+                end
             end
         end, entity)
-        if State.Session.SpellCastPrepareEndEvent[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEvent[entityUuid])
-            State.Session.SpellCastPrepareEndEvent[entityUuid] = nil
+        if State.Session.SpellCastPrepareEndEventListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(State.Session.SpellCastPrepareEndEventListeners[entityUuid])
+            State.Session.SpellCastPrepareEndEventListeners[entityUuid] = nil
         end
-        State.Session.SpellCastPrepareEndEvent[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
+        State.Session.SpellCastPrepareEndEventListeners[entityUuid] = Ext.Entity.OnCreateDeferred("SpellCastPrepareEndEvent", function (cast, _, _)
             if cast.SpellCastState and cast.SpellCastState.Caster then
                 -- debugPrint("SpellCastPrepareEndEvent", M.Utils.getDisplayName(cast.SpellCastState.Caster.Uuid.EntityUuid))
                 local caster = cast.SpellCastState.Caster
