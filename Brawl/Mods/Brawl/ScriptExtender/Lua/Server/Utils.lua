@@ -556,6 +556,17 @@ local function isHostileTarget(uuid, targetUuid)
     return isHostile
 end
 
+local function getFTBEntity()
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.FTBParticipant then
+                return entity.FTBParticipant.field_18
+            end
+        end
+    end
+end
+
 local function getCombatEntity()
     local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
     if serverEnterRequestEntities and serverEnterRequestEntities[1] then
@@ -848,6 +859,7 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    getFTBEntity = getFTBEntity,
     getCombatEntity = getCombatEntity,
     joinCombat = joinCombat,
     showTurnOrderGroups = showTurnOrderGroups,
