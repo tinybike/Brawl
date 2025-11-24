@@ -35,7 +35,7 @@ local function onCharacterMoveFailedUseJump(character)
 end
 
 -- thank u hippo
-local function spawnCombatHelper(combatGuid)
+function spawnCombatHelper(combatGuid)
     if not State.Session.CombatHelper then
         local x, y, z = Osi.GetPosition(Osi.CombatGetInvolvedPlayer(combatGuid, 1))
         local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
@@ -79,8 +79,8 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    -- Printer:Start()
-    -- SpellPrinter:Start()
+    Printer:Start()
+    SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -963,12 +963,6 @@ end
 
 local function startListeners()
     debugPrint("Starting listeners...")
-    -- local handle = Ext.Events.Tick:Subscribe(function (e)
-    --     for _, castRequest in ipairs(Ext.System.ServerCastRequest.OsirisCastRequests) do
-    --         print("cast request")
-    --         _D(castRequest)
-    --     end
-    -- end)
     State.Session.Listeners.Tick = {}
     State.Session.Listeners.Tick.handle = Ext.Events.Tick:Subscribe(M.clear)
     State.Session.Listeners.Tick.stop = function ()

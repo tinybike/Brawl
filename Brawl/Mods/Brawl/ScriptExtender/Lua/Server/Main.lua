@@ -15,7 +15,7 @@ Commands = require("Server/Commands.lua")
 Listeners = require("Server/Listeners.lua")
 Swarm = require("Server/Swarm.lua")
 M = require("Server/Memo.lua")
--- ECSPrinter = require("Server/ECSPrinter.lua")
+ECSPrinter = require("Server/ECSPrinter.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
@@ -188,6 +188,25 @@ function cancelCombatRoundTimers()
             Ext.Timer.Cancel(timer)
             State.Session.CombatRoundTimer[combatGuid] = nil
         end
+    end
+end
+
+-- esv::turn::RoundEndedEventOneFrameComponent:  Created
+-- eoc::TurnOrderComponent:  Replicated
+function incrementCombatRoundCounter()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.CombatState and combatEntity.CombatState.MyGuid then
+        local nextRound = combatEntity.TurnOrder.field_40 + 1
+        combatEntity.TurnOrder.field_40 = nextRound
+        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+            group.Round = nextRound
+        end
+        for _, group in ipairs(combatEntity.TurnOrder.Groups2) do
+            group.Round = nextRound
+        end
+        combatEntity:Replicate("TurnOrder")
+        Osi.DB_CMB_RoundCounter:Delete(combatEntity.CombatState.MyGuid, nextRound - 1)
+        Osi.DB_CMB_RoundCounter(combatEntity.CombatState.MyGuid, nextRound)
     end
 end
 
