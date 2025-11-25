@@ -542,7 +542,6 @@ local function onMCMTurnBasedSwarmMode(value)
         stopAllPulseAddNearbyTimers()
         stopAllPulseRepositionTimers()
         stopAllPulseActionTimers()
-        stopAllBrawlFizzlers()
         State.endBrawls()
         if State.Settings.PlayersGoFirst then
             State.boostPlayerInitiatives()

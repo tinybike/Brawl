@@ -15,7 +15,7 @@ Commands = require("Server/Commands.lua")
 Listeners = require("Server/Listeners.lua")
 Swarm = require("Server/Swarm.lua")
 M = require("Server/Memo.lua")
-ECSPrinter = require("Server/ECSPrinter.lua")
+-- ECSPrinter = require("Server/ECSPrinter.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
@@ -51,25 +51,6 @@ function startPulseAction(brawler)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
             AI.pulseAction(brawler)
         end, brawler.actionInterval)
-    end
-end
-
-function stopBrawlFizzler(level)
-    if State.Session.BrawlFizzler[level] ~= nil then
-        debugPrint("stopping brawl fizz")
-        Ext.Timer.Cancel(State.Session.BrawlFizzler[level])
-        State.Session.BrawlFizzler[level] = nil
-    end
-end
-
-function startBrawlFizzler(level)
-    stopBrawlFizzler(level)
-    if not State.Settings.TurnBasedSwarmMode then
-        -- debugPrint("Starting BrawlFizzler", level)
-        -- State.Session.BrawlFizzler[level] = Ext.Timer.WaitFor(Constants.BRAWL_FIZZLER_TIMEOUT, function ()
-        --     debugPrint("Brawl fizzled", Constants.BRAWL_FIZZLER_TIMEOUT)
-        --     Roster.endBrawl(level)
-        -- end)
     end
 end
 
@@ -129,18 +110,10 @@ function stopAllPulseActionTimers()
     end
 end
 
-function stopAllBrawlFizzlers()
-    local brawlFizzler = State.Session.BrawlFizzler
-    for level, timer in pairs(brawlFizzler) do
-        Ext.Timer.Cancel(timer)
-    end
-end
-
 function cleanupAll()
     stopAllPulseAddNearbyTimers()
     stopAllPulseRepositionTimers()
     stopAllPulseActionTimers()
-    stopAllBrawlFizzlers()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
     State.recapPartyMembersMovementDistances()
@@ -191,30 +164,14 @@ function cancelCombatRoundTimers()
     end
 end
 
--- esv::turn::RoundEndedEventOneFrameComponent:  Created
--- eoc::TurnOrderComponent:  Replicated
-function incrementCombatRoundCounter()
-    local combatEntity = Utils.getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.CombatState and combatEntity.CombatState.MyGuid then
-        local nextRound = combatEntity.TurnOrder.field_40 + 1
-        combatEntity.TurnOrder.field_40 = nextRound
-        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
-            group.Round = nextRound
-        end
-        for _, group in ipairs(combatEntity.TurnOrder.Groups2) do
-            group.Round = nextRound
-        end
-        combatEntity:Replicate("TurnOrder")
-        Osi.DB_CMB_RoundCounter:Delete(combatEntity.CombatState.MyGuid, nextRound - 1)
-        Osi.DB_CMB_RoundCounter(combatEntity.CombatState.MyGuid, nextRound)
-    end
-end
-
 -- NB: is the wrapping timer getting paused correctly during pause?
 function nextCombatRound()
     print("nextCombatRound")
-    Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
-    if not Pause.isPartyInFTB() then
+    State.Session.IsNextCombatRoundQueued = false
+    if State.areAnyPlayersTargeting() then
+        State.Session.IsNextCombatRoundQueued = true
+    elseif not Pause.isPartyInFTB() then
+        Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
             local entity = Ext.Entity.Get(uuid)
             if entity and entity.TurnBased then
@@ -243,73 +200,9 @@ function startCombatRoundTimer(combatGuid)
                 debugPrint("ToT advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)
                 Mods.ToT.Scenario.ForwardCombat()
             end
-            -- if State.Session.ToTRoundAddNearbyTimer then
-            --     Ext.Timer.Cancel(State.Session.ToTRoundAddNearbyTimer)
-            --     State.Session.ToTRoundAddNearbyTimer = nil
-            -- end
-            -- State.Session.ToTRoundAddNearbyTimer = Ext.Timer.WaitFor(1500, function ()
-            --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
-            --         Roster.addNearbyToBrawlers(hostCharacter, 150)
-            --     end
-            -- end)
-            -- if Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
-            --     if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
-            --         startToTTimers(combatGuid)
-            --     end
-            -- end
         end)
     end
 end
-
--- function pauseToTTimers()
---     if State.Session.ToTTimer then
---         Ext.Timer.Pause(State.Session.ToTTimer)
---     end
---     if State.Session.ToTRoundAddNearbyTimer then
---         Ext.Timer.Pause(State.Session.ToTRoundAddNearbyTimer)
---     end
--- end
-
--- function resumeToTTimers()
---     if State.Session.ToTTimer then
---         Ext.Timer.Resume(State.Session.ToTTimer)
---     end
---     if State.Session.ToTRoundAddNearbyTimer then
---         Ext.Timer.Resume(State.Session.ToTRoundAddNearbyTimer)
---     end
--- end
-
--- function stopToTTimers()
---     cancelCombatRoundTimers()
---     if State.Session.ToTTimer then
---         Ext.Timer.Cancel(State.Session.ToTTimer)
---         State.Session.ToTTimer = nil
---     end
---     if State.Session.ToTRoundAddNearbyTimer then
---         Ext.Timer.Cancel(State.Session.ToTRoundAddNearbyTimer)
---         State.Session.ToTRoundAddNearbyTimer = nil
---     end
--- end
-
--- function startToTTimers(combatGuid)
---     debugPrint("startToTTimers")
---     stopToTTimers()
---     if not Mods.ToT.Player.InCamp() then
---         startCombatRoundTimer(combatGuid)
---         -- if Mods.ToT.PersistentVars.Scenario then
---         --     local isPrepRound = (Mods.ToT.PersistentVars.Scenario.Round == 0) and (next(Mods.ToT.PersistentVars.Scenario.SpawnedEnemies) == nil)
---         --     if isPrepRound then
---         --         local hostCharacter = M.Osi.GetHostCharacter()
---         --         local turnDuration = State.Settings.ActionInterval*1000
---         --         State.Session.ToTTimer = Ext.Timer.WaitFor(0, function ()
---         --             if Osi.IsInForceTurnBasedMode(hostCharacter) == 0 then
---         --                 Roster.addNearbyToBrawlers(hostCharacter, 150)
---         --             end
---         --         end, turnDuration + math.floor(turnDuration*0.25))
---         --     end
---         -- end
---     end
--- end
 
 local function onGameStateChanged(e)
     if e and e.ToState == "UnloadLevel" then

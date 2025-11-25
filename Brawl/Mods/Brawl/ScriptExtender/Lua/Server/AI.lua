@@ -147,11 +147,6 @@ local function checkForBrawlToJoin(brawler)
                 end
             end
         end
-        -- local level = M.Osi.GetRegion(brawler.uuid)
-        -- if level and State.Session.BrawlFizzler[level] == nil then
-        --     debugPrint("check for brawl to join: start fizz")
-        --     startBrawlFizzler(level)
-        -- end
         debugPrint("check for", brawler.uuid, brawler.displayName)
         startPulseAction(brawler)
     end

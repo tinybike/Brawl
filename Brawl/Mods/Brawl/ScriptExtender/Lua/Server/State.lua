@@ -63,12 +63,13 @@ local Session = {
     PulseAddNearbyTimers = {},
     PulseRepositionTimers = {},
     PulseActionTimers = {},
-    BrawlFizzler = {},
     IsAttackingOrBeingAttackedByPlayer = {},
     ClosestEnemyBrawlers = {},
     PlayerMarkedTarget = {},
     PlayerCurrentTarget = {},
     ActionsInProgress = {},
+    PlayerTargetingSpellCast = {},
+    IsNextCombatRoundQueued = false,
     MovementQueue = {},
     PartyMembersMovementResourceListeners = {},
     PartyMembersHitpointsListeners = {},
@@ -154,6 +155,14 @@ local function getArchetype(uuid)
         end
     end
     return archetype
+end
+
+local function areAnyPlayersTargeting()
+    for uuid, _ in pairs(Session.Players) do
+        if Session.PlayerTargetingSpellCast[uuid] then
+            return true
+        end
+    end
 end
 
 local function checkForDownedOrDeadPlayers()
@@ -543,6 +552,7 @@ end
 
 return {
     getArchetype = getArchetype,
+    areAnyPlayersTargeting = areAnyPlayersTargeting,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     isInCombat = isInCombat,
     areAnyPlayersBrawling = areAnyPlayersBrawling,

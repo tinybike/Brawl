@@ -107,9 +107,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                     if State.Session.PulseActionTimers[entityUuid] == nil then
                         startPulseAction(brawler)
                     end
-                    if State.Session.BrawlFizzler[level] == nil then
-                        startBrawlFizzler(level)
-                    end
                 else
                     -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
@@ -210,7 +207,6 @@ local function endBrawl(level)
         Swarm.cancelTimers()
     end
     -- stopPulseReposition(level)
-    stopBrawlFizzler(level)
 end
 
 local function getBrawlerByUuid(uuid)

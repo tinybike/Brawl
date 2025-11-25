@@ -79,8 +79,8 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    Printer:Start()
-    SpellPrinter:Start()
+    -- Printer:Start()
+    -- SpellPrinter:Start()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -220,7 +220,6 @@ local function onEnteredForceTurnBased(entityGuid)
                 stopPulseAddNearby(entityUuid)
                 if isHostCharacter then
                     stopPulseReposition(level)
-                    stopBrawlFizzler(level)
                     if brawler and brawler.combatGuid then
                         pauseCombatRoundTimers(brawler.combatGuid)
                     end
@@ -279,7 +278,6 @@ local function onLeftForceTurnBased(entityGuid)
                 -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
                 if State.areAnyPlayersBrawling() then
                     if isHostCharacter then
-                        startBrawlFizzler(level)
                         resumeCombatRoundTimers(brawler.combatGuid)
                     end
                     for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
@@ -591,6 +589,25 @@ local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID
     State.Session.ExtraAttacksRemaining[defenderUuid] = nil
 end
 
+local function onSpellSyncTargeting(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast.SpellCastState and cast.SpellCastState.Caster and cast.SpellCastState.Caster.Uuid.EntityUuid then
+        local uuid = cast.SpellCastState.Caster.Uuid.EntityUuid
+        print("SpellSyncTargeting CREATE", M.Utils.getDisplayName(uuid))
+        State.Session.PlayerTargetingSpellCast[uuid] = true
+    end
+end
+
+local function onDestroySpellSyncTargeting(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast.SpellCastState and cast.SpellCastState.Caster and cast.SpellCastState.Caster.Uuid.EntityUuid then
+        local uuid = cast.SpellCastState.Caster.Uuid.EntityUuid
+        print("SpellSyncTargeting DESTROY", M.Utils.getDisplayName(uuid))
+        State.Session.PlayerTargetingSpellCast[uuid] = nil
+        if State.Session.IsNextCombatRoundQueued then
+            nextCombatRound()
+        end
+    end
+end
+
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
@@ -721,7 +738,6 @@ local function onDialogStarted(dialog, dialogInstanceId)
     local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         stopPulseReposition(level)
-        stopBrawlFizzler(level)
         local brawlersInLevel = State.Session.Brawlers[level]
         if brawlersInLevel then
             for brawlerUuid, brawler in pairs(brawlersInLevel) do
@@ -1064,6 +1080,14 @@ local function startListeners()
     State.Session.Listeners.AttackedBy = {
         handle = Ext.Osiris.RegisterListener("AttackedBy", 7, "after", onAttackedBy),
         stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.SpellSyncTargeting = {
+        handle = Ext.Entity.OnCreateDeferred("SpellSyncTargeting", onSpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.DestroySpellSyncTargeting = {
+        handle = Ext.Entity.OnDestroy("SpellSyncTargeting", onDestroySpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UsingSpellOnTarget = {
         handle = Ext.Osiris.RegisterListener("UsingSpellOnTarget", 6, "after", onUsingSpellOnTarget),

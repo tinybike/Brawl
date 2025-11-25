@@ -123,6 +123,7 @@ if MCM then
     }
 end
 local DirectlyControlledCharacter = nil
+local DirectlyControlledCharacterIndex = 1
 local AwaitingTarget = false
 local IsControllerButtonPressed = {
     A = false,
@@ -256,65 +257,6 @@ local function setDirectlyControlledCharacterIndex()
                 end
             end
             break
-        end
-    end
-end
-
-local function safeGetProperty(obj, propName)
-    local success, result = pcall(function() return obj[propName] end)
-    if success then
-        return result
-    else
-        return nil
-    end
-end
-
-local function findNodeByName(node, targetName, visited)
-    visited = visited or {}
-    if visited[node] then
-        return nil
-    end
-    visited[node] = true
-    if node:GetProperty("Name") == targetName then
-        return node
-    end
-    local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
-    for i = 1, childrenCount do
-        local childNode = node:Child(i)
-        if childNode then
-            local foundNode = findNodeByName(childNode, targetName, visited)
-            if foundNode then
-                return foundNode
-            end
-        end
-    end
-    local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
-    for i = 1, visualChildrenCount do
-        local visualChildNode = node:VisualChild(i)
-        if visualChildNode then
-            local foundNode = findNodeByName(visualChildNode, targetName, visited)
-            if foundNode then
-                return foundNode
-            end
-        end
-    end
-    return nil
-end
-
--- thank u celerev
--- TurnModeInfo ui::UIWidget TurnModeInfo.xaml
-local function getEnvironmentalTurnCard()
-    local turnModeInfo = findNodeByName(Ext.UI.GetRoot():Child(1):Child(1), "TurnModeInfo")
-    if turnModeInfo and turnModeInfo:Child(1) and turnModeInfo:Child(1).Participants then
-        local participants = turnModeInfo:Child(1).Participants
-        for _, participant in ipairs(participants) do
-            -- _D(participant:GetAllProperties())
-            -- _D(participant.CurrentCombatant:GetAllProperties())
-            -- _D(participant.CurrentCombatant.EntityHandle:GetAllProperties())
-            if participant.IsEnvironment then
-                -- participant.CurrentCombatant.ActedThisRound = true
-                return participant
-            end
         end
     end
 end
@@ -838,7 +780,7 @@ local function onNetMessage(data)
     elseif data.Channel == "NextCombatRound" then
         setDirectlyControlledCharacterIndex()
     elseif data.Channel == "CombatRoundStarted" then
-        -- directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
+        directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
     end
 end
 
