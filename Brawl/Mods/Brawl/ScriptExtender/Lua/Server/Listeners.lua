@@ -109,6 +109,7 @@ local function onCombatRoundStarted(combatGuid, round)
         else
             Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
             for uuid, _ in pairs(M.Roster.getBrawlers()) do
+                -- NB: handle case where multiple hostile factions too
                 if M.Utils.isPugnacious(uuid) then
                     local enemyFaction = Osi.GetFaction(uuid)
                     print("got hostile faction", enemyFaction, M.Utils.getDisplayName(uuid))
