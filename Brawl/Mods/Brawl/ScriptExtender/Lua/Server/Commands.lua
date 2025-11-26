@@ -550,9 +550,7 @@ local function onMCMTurnBasedSwarmMode(value)
         Swarm.resetChunkState()
     else
         State.removeBoostPlayerInitiatives()
-        -- if not State.Settings.RealTimeRemainInCombat then
-            State.uncapPartyMembersMovementDistances()
-        -- end
+        State.uncapPartyMembersMovementDistances()
         State.disableDynamicCombatCamera()
         disableMod()
         enableMod()

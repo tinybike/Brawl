@@ -292,7 +292,7 @@ local function queueSingleCompanionAIActions(uuid)
             else
                 debugPrint(player.displayName, "queue action (ftb)", isInFTB(entity), not isLocked(entity))
                 if isInFTB(entity) and not isLocked(entity) then
-                    AI.act(brawler)
+                    AI.act(brawler, false, _D, _D, _D)
                 end
             end
         end

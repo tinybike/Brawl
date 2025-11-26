@@ -715,6 +715,7 @@ local function reorderByInitiativeRoll()
             local group = combatEntity.TurnOrder.Groups[i]
             local members = {}
             for _, member in ipairs(group.Members) do
+                -- NB: should this be newInitiative, vs member.Initiative...?
                 table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
             end
             table.insert(reorderedGroups, {

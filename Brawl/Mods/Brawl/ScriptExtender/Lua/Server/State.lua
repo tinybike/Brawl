@@ -25,7 +25,6 @@ local Settings = {
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
     ExcludeEnemyTiers = nil,
-    RealTimeRemainInCombat = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -50,7 +49,6 @@ if MCM then
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
     Settings.ExcludeEnemyTiers = MCM.Get("exclude_enemy_tiers")
-    -- Settings.RealTimeRemainInCombat = MCM.Get("real_time_remain_in_combat")
 end
 
 -- Session state
@@ -196,7 +194,7 @@ end
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if M.Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl then
+        if M.Utils.isPugnacious(brawlerUuid) and brawler.isInBrawl and M.Osi.IsInCombat(brawlerUuid) == 1 then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end

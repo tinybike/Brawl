@@ -197,6 +197,7 @@ local function endBrawl(level)
     end
     if State.Session.CombatHelper then
         Utils.remove(State.Session.CombatHelper)
+        State.Session.CombatHelper = nil
     end
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}

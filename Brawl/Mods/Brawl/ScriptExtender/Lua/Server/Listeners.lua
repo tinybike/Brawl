@@ -20,9 +20,7 @@ local function onStarted(level)
         State.recapPartyMembersMovementDistances()
     else
         State.disableDynamicCombatCamera()
-        -- if not State.Settings.RealTimeRemainInCombat then
-            State.uncapPartyMembersMovementDistances()
-        -- end
+        State.uncapPartyMembersMovementDistances()
         Pause.checkTruePauseParty()
     end
     Leaderboard.initialize()
@@ -35,9 +33,10 @@ local function onCharacterMoveFailedUseJump(character)
 end
 
 -- thank u hippo
-function spawnCombatHelper(combatGuid)
+local function spawnCombatHelper(combatGuid)
     if not State.Session.CombatHelper then
-        local x, y, z = Osi.GetPosition(Osi.CombatGetInvolvedPlayer(combatGuid, 1))
+        local playerUuid = Osi.CombatGetInvolvedPlayer(combatGuid, 1) or M.Osi.GetHostCharacter()
+        local x, y, z = Osi.GetPosition(playerUuid)
         local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
         if not combatHelper then
             error("couldn't create combat helper")
@@ -47,8 +46,7 @@ function spawnCombatHelper(combatGuid)
         Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
         State.Session.CombatHelper = combatHelper
         Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
-        local host = M.Osi.GetHostCharacter()
-        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(host), combatHelper, host)
+        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
     end
 end
 
@@ -101,25 +99,34 @@ end
 
 local function onCombatRoundStarted(combatGuid, round)
     print("CombatRoundStarted", combatGuid, round)
-    if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
-        print("not in FTB")
+    if not Pause.isPartyInFTB() then
         Roster.addCombatParticipantsToBrawlers()
         if State.Settings.TurnBasedSwarmMode then
             Swarm.Listeners.onCombatRoundStarted(round)
         else
             Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
+            if not State.Session.CombatHelper then
+                print("ERROR No combat helper found, what happened?")
+                spawnCombatHelper(combatGuid)
+            end
+            local enemyFactions = {}
             for uuid, _ in pairs(M.Roster.getBrawlers()) do
-                -- NB: handle case where multiple hostile factions too
                 if M.Utils.isPugnacious(uuid) then
-                    local enemyFaction = Osi.GetFaction(uuid)
-                    print("got hostile faction", enemyFaction, M.Utils.getDisplayName(uuid))
-                    Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, enemyFaction, State.Session.CombatHelper, uuid)
-                    Ext.Timer.WaitFor(1000, function ()
-                        Osi.EndTurn(State.Session.CombatHelper)
-                    end)
-                    break
+                    local faction = Osi.GetFaction(uuid)
+                    if faction and not enemyFactions[faction] then
+                        enemyFactions[faction] = uuid
+                    end
                 end
             end
+            for faction, enemyUuid in pairs(enemyFactions) do
+                print("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
+                Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, faction, State.Session.CombatHelper, enemyUuid)
+            end
+            Ext.Timer.WaitFor(1000, function ()
+                if State.Session.CombatHelper then
+                    Osi.EndTurn(State.Session.CombatHelper)
+                end
+            end)
             startCombatRoundTimer(combatGuid)
             -- if M.Utils.isToT() then
             --     startToTTimers(combatGuid)
@@ -439,9 +446,7 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 Swarm.Listeners.onCharacterJoinedParty(uuid)
             else
-                -- if not State.Settings.RealTimeRemainInCombat then
-                    State.uncapPartyMembersMovementDistances()
-                -- end
+                State.uncapPartyMembersMovementDistances()
                 -- Pause.checkTruePauseParty()
             end
         end

@@ -645,19 +645,61 @@ local function showTurnOrderGroups()
     end
 end
 
--- TODO clean this up, it's a mess
+local function reorderMembersByControl(members, group, isControlling)
+    for _, member in ipairs(group.Members) do
+        if State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) == isControlling then
+            table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+        end
+    end
+    return members
+end
+
 local function setPlayerTurnsActive()
+    print("set player turns active")
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        -- print("********init***********")
-        -- showTurnOrderGroups()
+        print("********init***********")
+        showTurnOrderGroups()
+        -- local reorderedGroups = {}
+        -- local function reorderGroups(groups, isPlayer)
+        --     for _, group in ipairs(groups) do
+        --         if group.IsPlayer == isPlayer then
+        --             local members = {}
+        --             for _, member in ipairs(group.Members) do
+        --                 table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+        --             end
+        --             table.insert(reorderedGroups, {
+        --                 Initiative = group.Initiative,
+        --                 IsPlayer = group.IsPlayer,
+        --                 Round = group.Round,
+        --                 Team = group.Team,
+        --                 Members = members,
+        --             })
+        --         end
+        --     end
+        -- end
+        -- reorderGroups(combatEntity.TurnOrder.Groups, true)
+        -- reorderGroups(combatEntity.TurnOrder.Groups, false)
+        -- combatEntity.TurnOrder.Groups = reorderedGroups
+        -- combatEntity:Replicate("TurnOrder")
         local groupsPlayers = {}
         local groupsEnemies = {}
-        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
-            if info.IsPlayer then
-                table.insert(groupsPlayers, info)
+        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+            if group.IsPlayer then
+                -- table.insert(groupsPlayers, group)
+                -- NB: if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first, so the selection doesn't jerk the screen around
+                -- (then reorder every time GainedControl happens)
+                local members = reorderMembersByControl({}, group, true)
+                members = reorderMembersByControl(members, group, false)
+                table.insert(groupsPlayers, {
+                    Initiative = group.Initiative,
+                    IsPlayer = group.IsPlayer,
+                    Round = group.Round,
+                    Team = group.Team,
+                    Members = members,
+                })
             else
-                table.insert(groupsEnemies, info)
+                table.insert(groupsEnemies, group)
             end
         end
         local numPlayerGroups = #groupsPlayers
@@ -667,8 +709,8 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        -- print("********after*********")
-        -- showTurnOrderGroups()
+        print("********after*********")
+        showTurnOrderGroups()
     end
 end
 
