@@ -648,7 +648,11 @@ end
 local function reorderMembersByControl(members, group, isControlling)
     for _, member in ipairs(group.Members) do
         if State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) == isControlling then
-            table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+            local initiative = member.Initiative
+            if isControlling then
+                initiative = initiative + 1000
+            end
+            table.insert(members, {Entity = member.Entity, Initiative = initiative})
         end
     end
     return members
@@ -687,6 +691,9 @@ local function setPlayerTurnsActive()
         for _, group in ipairs(combatEntity.TurnOrder.Groups) do
             if group.IsPlayer then
                 -- table.insert(groupsPlayers, group)
+                -- step 1: put all the players in a single group
+                -- step 2: reassign initiatives properly so the changes actually "stick"
+                -- (split groups by initiative as needed)
                 -- NB: if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first, so the selection doesn't jerk the screen around
                 -- (then reorder every time GainedControl happens)
                 local members = reorderMembersByControl({}, group, true)
@@ -709,6 +716,7 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
+        combatEntity:Replicate("TurnOrder")
         print("********after*********")
         showTurnOrderGroups()
     end
