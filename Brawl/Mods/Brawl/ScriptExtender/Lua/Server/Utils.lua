@@ -645,66 +645,46 @@ local function showTurnOrderGroups()
     end
 end
 
-local function reorderMembersByControl(members, group, isControlling)
-    for _, member in ipairs(group.Members) do
-        if State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) == isControlling then
-            local initiative = member.Initiative
-            if isControlling then
-                initiative = initiative + 1000
-            end
-            table.insert(members, {Entity = member.Entity, Initiative = initiative})
-        end
-    end
-    return members
-end
-
+-- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
     print("set player turns active")
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         print("********init***********")
         showTurnOrderGroups()
-        -- local reorderedGroups = {}
-        -- local function reorderGroups(groups, isPlayer)
-        --     for _, group in ipairs(groups) do
-        --         if group.IsPlayer == isPlayer then
-        --             local members = {}
-        --             for _, member in ipairs(group.Members) do
-        --                 table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
-        --             end
-        --             table.insert(reorderedGroups, {
-        --                 Initiative = group.Initiative,
-        --                 IsPlayer = group.IsPlayer,
-        --                 Round = group.Round,
-        --                 Team = group.Team,
-        --                 Members = members,
-        --             })
-        --         end
-        --     end
-        -- end
-        -- reorderGroups(combatEntity.TurnOrder.Groups, true)
-        -- reorderGroups(combatEntity.TurnOrder.Groups, false)
-        -- combatEntity.TurnOrder.Groups = reorderedGroups
-        -- combatEntity:Replicate("TurnOrder")
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, group in ipairs(combatEntity.TurnOrder.Groups) do
             if group.IsPlayer then
-                -- table.insert(groupsPlayers, group)
-                -- step 1: put all the players in a single group
-                -- step 2: reassign initiatives properly so the changes actually "stick"
-                -- (split groups by initiative as needed)
-                -- NB: if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first, so the selection doesn't jerk the screen around
+                -- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
+                -- so the re-selection on round start doesn't jerk the screen around
                 -- (then reorder every time GainedControl happens)
-                local members = reorderMembersByControl({}, group, true)
-                members = reorderMembersByControl(members, group, false)
-                table.insert(groupsPlayers, {
-                    Initiative = group.Initiative,
-                    IsPlayer = group.IsPlayer,
-                    Round = group.Round,
-                    Team = group.Team,
-                    Members = members,
-                })
+                -- split into single-member groups
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
+                        -- NB: don't just add 1000, do this in a smarter way
+                        newInitiative = member.Initiative + 1000
+                        Swarm.setInitiativeRoll(member.Entity.Uuid.EntityUuid, newInitiative)
+                        table.insert(groupsPlayers, {
+                            Initiative = newInitiative,
+                            IsPlayer = group.IsPlayer,
+                            Round = group.Round,
+                            Team = group.Team,
+                            Members = {{Entity = member.Entity, Initiative = newInitiative}},
+                        })
+                    end
+                end
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and not State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
+                        table.insert(groupsPlayers, {
+                            Initiative = group.Initiative,
+                            IsPlayer = group.IsPlayer,
+                            Round = group.Round,
+                            Team = group.Team,
+                            Members = {{Entity = member.Entity, Initiative = member.Initiative}},
+                        })
+                    end
+                end
             else
                 table.insert(groupsEnemies, group)
             end
@@ -716,9 +696,21 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
+        local turnOrderListener
+        turnOrderListener = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
+            if entity and entity.CombatState and entity.CombatState.MyGuid then
+                Ext.Entity.Unsubscribe(turnOrderListener)
+                local refresherCombatHelper = spawnCombatHelper(entity.CombatState.MyGuid, true)
+                local boostChangedEventListener
+                boostChangedEventListener = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
+                    Ext.Entity.Unsubscribe(boostChangedEventListener)
+                    Utils.remove(refresherCombatHelper)
+                    print("********after*********")
+                    showTurnOrderGroups()
+                end, Ext.Entity.Get(refresherCombatHelper))
+            end
+        end, combatEntity)
         combatEntity:Replicate("TurnOrder")
-        print("********after*********")
-        showTurnOrderGroups()
     end
 end
 

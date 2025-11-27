@@ -164,6 +164,27 @@ function cancelCombatRoundTimers()
     end
 end
 
+-- thank u hippo
+function spawnCombatHelper(combatGuid, isRefreshOnly)
+    if not State.Session.CombatHelper or isRefreshOnly then
+        local playerUuid = Osi.CombatGetInvolvedPlayer(combatGuid, 1) or M.Osi.GetHostCharacter()
+        local x, y, z = Osi.GetPosition(playerUuid)
+        local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
+        if not combatHelper then
+            error("couldn't create combat helper")
+            return
+        end
+        Osi.SetTag(combatHelper, "9787450d-f34d-43bd-be88-d2bac00bb8ee") -- AI_UNPREFERRED_TARGET
+        Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
+        if not isRefreshOnly then
+            State.Session.CombatHelper = combatHelper
+        end
+        Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
+        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
+        return combatHelper
+    end
+end
+
 -- NB: is the wrapping timer getting paused correctly during pause?
 function nextCombatRound()
     print("nextCombatRound")

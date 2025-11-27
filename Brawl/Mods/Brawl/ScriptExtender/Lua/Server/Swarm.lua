@@ -893,6 +893,7 @@ end
 return {
     getEnemyList = getEnemyList,
     getInitiativeRoll = getInitiativeRoll,
+    setInitiativeRoll = setInitiativeRoll,
     cancelTimers = cancelTimers,
     resumeTimers = resumeTimers,
     pauseTimers = pauseTimers,

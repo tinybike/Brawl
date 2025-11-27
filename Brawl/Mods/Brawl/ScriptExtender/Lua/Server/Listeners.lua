@@ -32,24 +32,6 @@ local function onCharacterMoveFailedUseJump(character)
     print("CharacterMoveFailedUseJump", character)
 end
 
--- thank u hippo
-local function spawnCombatHelper(combatGuid)
-    if not State.Session.CombatHelper then
-        local playerUuid = Osi.CombatGetInvolvedPlayer(combatGuid, 1) or M.Osi.GetHostCharacter()
-        local x, y, z = Osi.GetPosition(playerUuid)
-        local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
-        if not combatHelper then
-            error("couldn't create combat helper")
-            return
-        end
-        Osi.SetTag(combatHelper, "9787450d-f34d-43bd-be88-d2bac00bb8ee") -- AI_UNPREFERRED_TARGET
-        Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
-        State.Session.CombatHelper = combatHelper
-        Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
-        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
-    end
-end
-
 local function onCombatStarted(combatGuid)
     print("CombatStarted", combatGuid)
     if State.Settings.TurnBasedSwarmMode then
