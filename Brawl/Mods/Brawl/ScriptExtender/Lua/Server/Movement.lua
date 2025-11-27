@@ -196,10 +196,6 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
     return eventUuid
 end
 
--- Osi.CharacterMoveToPosition("1535feb9-7ff9-4132-be09-191ba3f8c2e1", -289.25, 17.518180847168, -263.75, "Sprint", "")
--- Osi.CharacterMoveTo("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), "Sprint", "")
--- Osi.Attack("1535feb9-7ff9-4132-be09-191ba3f8c2e1", GetHostCharacter(), 1)
-
 local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFailed)
     debugPrint(M.Utils.getDisplayName(uuid), "moveToTargetUuid", targetUuid, override)
     if override then

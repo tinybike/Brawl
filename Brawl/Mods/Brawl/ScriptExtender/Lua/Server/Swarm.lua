@@ -96,45 +96,45 @@ local function bumpNpcInitiativeRolls()
     end
 end
 
+local function cancelActionTimers(swarmActors)
+    debugPrint("cancelActionTimers", swarmActors)
+    if swarmActors then debugDump(swarmActors) end
+    if State.Settings.TurnBasedSwarmMode and State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
+        if swarmActors then
+            for _, uuid in ipairs(swarmActors) do
+                local failsafe = State.Session.ActionSequenceFailsafeTimer[uuid]
+                if failsafe and failsafe.timer then
+                    Ext.Timer.Cancel(failsafe.timer)
+                    failsafe.timer = nil
+                end
+                Actions.removeActionsInProgress(uuid)
+            end
+        else
+            for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                if failsafe.timer then
+                    Ext.Timer.Cancel(failsafe.timer)
+                    failsafe.timer = nil
+                end
+            end
+            State.Session.ActionsInProgress = {}
+        end
+    end
+end
+
 local function cancelTimers(swarmActors)
     debugPrint("cancelTimers", swarmActors)
+    if swarmActors then debugDump(swarmActors) end
     if State.Settings.TurnBasedSwarmMode then
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-            State.Session.SwarmTurnTimer = nil
-        end
         if State.Session.CurrentChunkTimer ~= nil then
             Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
             State.Session.CurrentChunkTimer = nil
         end
-        if State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
-            if swarmActors then
-                for _, uuid in ipairs(swarmActors) do
-                    local failsafe = State.Session.ActionSequenceFailsafeTimer[uuid]
-                    if failsafe and failsafe.timer then
-                        Ext.Timer.Cancel(failsafe.timer)
-                        failsafe.timer = nil
-                    end
-                    Actions.removeActionsInProgress(uuid)
-                end
-            else
-                for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
-                    if failsafe.timer then
-                        Ext.Timer.Cancel(failsafe.timer)
-                        failsafe.timer = nil
-                    end
-                end
-                State.Session.ActionsInProgress = {}
-            end
-        end
+        cancelActionTimers(swarmActors)
     end
 end
 
 local function resumeTimers()
     if State.Settings.TurnBasedSwarmMode then
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Resume(State.Session.SwarmTurnTimer)
-        end
         if State.Session.CurrentChunkTimer ~= nil then
             Ext.Timer.Resume(State.Session.CurrentChunkTimer)
         end
@@ -150,9 +150,6 @@ end
 
 local function pauseTimers()
     if State.Settings.TurnBasedSwarmMode then
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Pause(State.Session.SwarmTurnTimer)
-        end
         if State.Session.CurrentChunkTimer ~= nil then
             Ext.Timer.Pause(State.Session.CurrentChunkTimer)
         end
@@ -188,7 +185,7 @@ local function setTurnComplete(uuid)
             State.Session.SwarmBrawlerIndexDelay[uuid] = nil
         end
     end
-    cancelTimers({uuid})
+    cancelActionTimers({uuid})
 end
 
 local function unsetTurnComplete(uuid)
@@ -242,7 +239,14 @@ local function getEnemyList(isBeforePlayer)
         end
     end
     debugPrint("got enemy list", isBeforePlayer)
-    debugDump(enemyList)
+    for i, uuid in ipairs(enemyList) do
+        debugPrint(i, uuid, M.Utils.getDisplayName(uuid))
+    end
+    debugPrint("got excluded enemy list", isBeforePlayer)
+    for i, uuid in ipairs(excludedEnemyList) do
+        debugPrint(i, uuid, M.Utils.getDisplayName(uuid))
+    end
+    -- debugDump(enemyList)
     return enemyList, excludedEnemyList
 end
 
@@ -326,7 +330,6 @@ local function resetSwarmTurnComplete(swarmActors)
         end
     end
     cancelTimers(swarmActors)
-    State.Session.SwarmTurnTimerCombatRound = nil
     State.Session.SwarmTurnActive = false
     State.SwarmActors = nil
 end
@@ -357,6 +360,7 @@ local function completeSwarmTurn(uuid, swarmActors)
                     Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
                     State.Session.CurrentChunkTimer = nil
                 end
+                debugPrint("completeSwarmTurn advance to next chunk", chunkIndex + 1, #swarmActors)
                 startChunk(chunkIndex + 1, swarmActors)
             end
         end
@@ -368,7 +372,7 @@ local function completeSwarmTurn(uuid, swarmActors)
                     State.Session.SwarmBrawlerIndexDelay[uuid] = nil
                 end
             end
-            cancelTimers({uuid})
+            cancelActionTimers({uuid})
         end
     end
     debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", uuid)
@@ -393,7 +397,7 @@ startChunk = function (chunkIndex, swarmActors)
             State.Session.ChunkInProgress = nil
             return
         end
-        debugPrint("startChunk", chunkIndex, State.Session.ChunkInProgress, #chunk)
+        debugPrint("startChunk", chunkIndex, State.Session.ChunkInProgress)
         State.Session.CurrentChunkIndex = chunkIndex
         if State.Session.CurrentChunkTimer then
             Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
@@ -584,7 +588,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint(brawler.displayName, "singleCharacterTurn, swarm turn already complete")
         return false
     end
-    State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*25, function ()
+    State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*200, function ()
         State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
         debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*25)
         swarmAction(brawler, swarmActors)
@@ -627,10 +631,6 @@ local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
         debugPrint("startSwarmTurn", isBeforePlayer, #swarmActors)
         for _, uuid in ipairs(swarmActors) do
             debugPrint(M.Utils.getDisplayName(uuid), uuid)
-        end
-        if State.Session.SwarmTurnTimer ~= nil then
-            Ext.Timer.Cancel(State.Session.SwarmTurnTimer)
-            State.Session.SwarmTurnTimer = nil
         end
         State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
         State.Session.CanActBeforeDelay = allBrawlersCanAct()
@@ -704,7 +704,6 @@ local function onCombatRoundStarted(round)
     debugPrint("onCombatRoundStarted", round)
     cancelTimers()
     State.Session.SwarmTurnActive = false
-    State.Session.SwarmTurnTimerCombatRound = nil
     State.Session.QueuedCompanionAIAction = {}
     -- State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
@@ -749,7 +748,7 @@ local function onTurnStarted(uuid)
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
         unsetTurnComplete(uuid)
         if State.Settings.AutotriggerSwarmModeCompanionAI then
-            cancelTimers({uuid})
+            cancelActionTimers({uuid})
             Pause.queueSingleCompanionAIActions(uuid)
         end
     end
