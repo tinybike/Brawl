@@ -597,10 +597,11 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     end
     State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*200, function ()
         State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
-        if State.Session.SwarmTurnActive then
-            debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
-            swarmAction(brawler, swarmActors)
+        if not State.Session.SwarmTurnActive then
+            return onTurnEnded(brawler.uuid)
         end
+        debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
+        swarmAction(brawler, swarmActors)
     end)
     return true
 end
@@ -768,21 +769,17 @@ local function onTurnEnded(uuid)
         cancelActionSequenceFailsafeTimer(uuid)
         if State.Session.ActionsInProgress[uuid] and next(State.Session.ActionsInProgress[uuid]) then
             debugPrint(M.Utils.getDisplayName(uuid), "leftover ActionsInProgress", #State.Session.ActionsInProgress[uuid])
-            setTurnComplete(uuid)
+            if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                setTurnComplete(uuid)
+            end
             State.Session.ActionsInProgress[uuid] = {}
         end
-        if M.Roster.getBrawlerByUuid(uuid) then
-            if M.Osi.IsPartyMember(uuid, 1) == 1 then
-                State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
-                if checkAllPlayersFinishedTurns() then
-                    local enemyList, excludedEnemyList = getEnemyList(false)
-                    unsetEnemyTurnsComplete(enemyList)
-                    startSwarmTurn(enemyList, excludedEnemyList, false)
-                end
-            else
-                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded complete swarm turn?")
-                -- NB: do we need this???
-                -- completeSwarmTurn(uuid, State.Session.SwarmActors)
+        if M.Roster.getBrawlerByUuid(uuid) and M.Osi.IsPartyMember(uuid, 1) == 1 then
+            State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
+            if checkAllPlayersFinishedTurns() then
+                local enemyList, excludedEnemyList = getEnemyList(false)
+                unsetEnemyTurnsComplete(enemyList)
+                startSwarmTurn(enemyList, excludedEnemyList, false)
             end
         end
     end
