@@ -579,8 +579,16 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, he
                                 end
                             end
                             debugPrint(brawler.displayName, "weighted target", M.Utils.getDisplayName(potentialTargetUuid), weightedTarget)
-                            if State.Settings.TurnBasedSwarmMode and weightedTarget ~= nil and M.Utils.isConcentrating(potentialTargetUuid) then
-                                weightedTarget = weightedTarget / Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                            if State.Settings.TurnBasedSwarmMode and weightedTarget ~= nil then
+                                if M.Utils.isConcentrating(potentialTargetUuid) then
+                                    weightedTarget = weightedTarget / Constants.AI_TARGET_CONCENTRATION_WEIGHT_FACTOR
+                                end
+                                if M.Osi.IsTagged(potentialTargetUuid, Constants.AI_UNPREFERRED_TARGET) == 1 then
+                                    weightedTarget = weightedTarget * Constants.AI_UNPREFERRED_TARGET_WEIGHT_MULTIPLIER
+                                end
+                                if M.Osi.IsTagged(potentialTargetUuid, Constants.AI_PREFERRED_TARGET) == 1 then
+                                    weightedTarget = weightedTarget * Constants.AI_PREFERRED_TARGET_WEIGHT_MULTIPLIER
+                                end
                             end
                         end
                     end
