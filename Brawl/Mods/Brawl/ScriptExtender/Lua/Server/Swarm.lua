@@ -259,6 +259,13 @@ local function resetChunkState()
     end
 end
 
+local function setAllPlayerTurnsComplete()
+    debugPrint("setAllPlayerTurnsComplete")
+    for uuid, _ in pairs(State.Session.Players) do
+        setTurnComplete(uuid)
+    end
+end
+
 local function setAllEnemyTurnsComplete()
     debugPrint("setAllEnemyTurnsComplete")
     if State.Session.SwarmTurnActive then
@@ -590,8 +597,10 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     end
     State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*200, function ()
         State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
-        debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*25)
-        swarmAction(brawler, swarmActors)
+        if State.Session.SwarmTurnActive then
+            debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
+            swarmAction(brawler, swarmActors)
+        end
     end)
     return true
 end
@@ -746,7 +755,7 @@ local function onTurnStarted(uuid)
     debugPrint("ON TURN STARTED**********************************", M.Utils.getDisplayName(uuid))
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
-        unsetTurnComplete(uuid)
+        -- unsetTurnComplete(uuid)
         if State.Settings.AutotriggerSwarmModeCompanionAI then
             cancelActionTimers({uuid})
             Pause.queueSingleCompanionAIActions(uuid)
@@ -865,6 +874,7 @@ return {
     resetChunkState = resetChunkState,
     setTurnComplete = setTurnComplete,
     unsetTurnComplete = unsetTurnComplete,
+    setAllPlayerTurnsComplete = setAllPlayerTurnsComplete,
     setAllEnemyTurnsComplete = setAllEnemyTurnsComplete,
     unsetAllEnemyTurnsComplete = unsetAllEnemyTurnsComplete,
     isExcludedFromSwarmAI = isExcludedFromSwarmAI,
