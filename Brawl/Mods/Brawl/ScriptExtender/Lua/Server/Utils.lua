@@ -427,6 +427,18 @@ local function hasBeneficialStatus(entityUuid, statusLabel)
     return false
 end
 
+-- thank u hippo0o
+local function remove(uuid)
+    Osi.PROC_RemoveAllPolymorphs(uuid)
+    Osi.PROC_RemoveAllDialogEntriesForSpeaker(uuid)
+    Osi.SetOnStage(uuid, 0)
+    Osi.SetHasDialog(uuid, 0)
+    Osi.RequestDelete(uuid)
+    Osi.RequestDeleteTemporary(uuid)
+    Osi.UnloadItem(uuid)
+    Osi.Die(uuid, 2, Constants.NULL_UUID, 0, 1)
+end
+
 local function changeHagHairStat(uuid, oldStat, newStat)
     if startsWith(oldStat, "HAG_HAIR_") and startsWith(newStat, "HAG_HAIR_") then
         local entity = Ext.Entity.Get(uuid)
@@ -544,6 +556,17 @@ local function isHostileTarget(uuid, targetUuid)
     return isHostile
 end
 
+local function getFTBEntity()
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.FTBParticipant then
+                return entity.FTBParticipant.field_18
+            end
+        end
+    end
+end
+
 local function getCombatEntity()
     local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
     if serverEnterRequestEntities and serverEnterRequestEntities[1] then
@@ -562,10 +585,9 @@ local function joinCombat(uuid)
 end
 
 local function setPlayersSwarmGroup(swarmGroupLabel)
-    local players = State.Session.Players
-    if players then
-        for uuid, _ in pairs(players) do
-            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel or "PLAYER_SWARM_GROUP")
         end
     end
 end
@@ -623,18 +645,48 @@ local function showTurnOrderGroups()
     end
 end
 
+-- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
+    print("set player turns active")
     local combatEntity = getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         print("********init***********")
         showTurnOrderGroups()
         local groupsPlayers = {}
         local groupsEnemies = {}
-        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
-            if info.IsPlayer then
-                table.insert(groupsPlayers, info)
+        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+            if group.IsPlayer then
+                -- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
+                -- so the re-selection on round start doesn't jerk the screen around
+                -- (then reorder every time GainedControl happens)
+                -- split into single-member groups
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
+                        -- NB: don't just add 1000, do this in a smarter way
+                        newInitiative = member.Initiative + 1000
+                        Swarm.setInitiativeRoll(member.Entity.Uuid.EntityUuid, newInitiative)
+                        table.insert(groupsPlayers, {
+                            Initiative = newInitiative,
+                            IsPlayer = group.IsPlayer,
+                            Round = group.Round,
+                            Team = group.Team,
+                            Members = {{Entity = member.Entity, Initiative = newInitiative}},
+                        })
+                    end
+                end
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and not State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
+                        table.insert(groupsPlayers, {
+                            Initiative = group.Initiative,
+                            IsPlayer = group.IsPlayer,
+                            Round = group.Round,
+                            Team = group.Team,
+                            Members = {{Entity = member.Entity, Initiative = member.Initiative}},
+                        })
+                    end
+                end
             else
-                table.insert(groupsEnemies, info)
+                table.insert(groupsEnemies, group)
             end
         end
         local numPlayerGroups = #groupsPlayers
@@ -644,18 +696,28 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        print("********after*********")
-        showTurnOrderGroups()
+        local turnOrderListener
+        turnOrderListener = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
+            if entity and entity.CombatState and entity.CombatState.MyGuid then
+                Ext.Entity.Unsubscribe(turnOrderListener)
+                local refresherCombatHelper = spawnCombatHelper(entity.CombatState.MyGuid, true)
+                local boostChangedEventListener
+                boostChangedEventListener = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
+                    Ext.Entity.Unsubscribe(boostChangedEventListener)
+                    Utils.remove(refresherCombatHelper)
+                    print("********after*********")
+                    showTurnOrderGroups()
+                end, Ext.Entity.Get(refresherCombatHelper))
+            end
+        end, combatEntity)
+        combatEntity:Replicate("TurnOrder")
     end
 end
 
 local function getCurrentCombatRound()
-    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-    if serverEnterRequestEntities then
-        local combatEntity = serverEnterRequestEntities[1]
-        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
-            return combatEntity.TurnOrder.field_40
-        end
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+        return combatEntity.TurnOrder.field_40
     end
 end
 
@@ -827,6 +889,7 @@ return {
     isBlinded = isBlinded,
     isSilenced = isSilenced,
     hasBeneficialStatus = hasBeneficialStatus,
+    remove = remove,
     changeHagHairStat = changeHagHairStat,
     createDummyObject = createDummyObject,
     showNotification = showNotification,
@@ -838,7 +901,9 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    getFTBEntity = getFTBEntity,
     getCombatEntity = getCombatEntity,
+    joinCombat = joinCombat,
     showTurnOrderGroups = showTurnOrderGroups,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,

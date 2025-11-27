@@ -123,6 +123,7 @@ if MCM then
     }
 end
 local DirectlyControlledCharacter = nil
+local DirectlyControlledCharacterIndex = 1
 local AwaitingTarget = false
 local IsControllerButtonPressed = {
     A = false,
@@ -242,6 +243,22 @@ end
 local function isInFTB(uuid)
     local entity = Ext.Entity.Get(uuid)
     return entity.FTBParticipant and entity.FTBParticipant.field_18 ~= nil
+end
+
+local function setDirectlyControlledCharacterIndex()
+    local directlyControlledCharacterUuid = getDirectlyControlledCharacter()
+    for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+        if child.Name == "PlayerPortraits" then
+            local assignedCharacters = child.DataContext.CurrentPlayer.AssignedCharacters
+            for characterIndex, assignedCharacter in ipairs(assignedCharacters) do
+                if assignedCharacter.EntityUUID == directlyControlledCharacterUuid then
+                    print("directly controlled character index", characterIndex)
+                    DirectlyControlledCharacterIndex = characterIndex
+                end
+            end
+            break
+        end
+    end
 end
 
 local function getPositionInfo()
@@ -724,6 +741,27 @@ local function updateLeaderboard(data)
     end
 end
 
+local function disableDynamicCombatCamera()
+    local globalSwitches = Ext.Utils.GetGlobalSwitches()
+    globalSwitches.GameCameraEnableDynamicCombatCamera = false
+end
+
+-- thank u focus
+local function directlyControlCharacterByIndex(characterIndex)
+    if characterIndex then
+        for _, child in ipairs(Ext.UI:GetRoot():Find("ContentRoot").Children) do
+            if child.Name == "PlayerPortraits" and child.DataContext and child.DataContext.CurrentPlayer and child.DataContext.CurrentPlayer.AssignedCharacters then
+                local character = child.DataContext.CurrentPlayer.AssignedCharacters[characterIndex]
+                if character then
+                    print("setting to character index", character, characterIndex)
+                    child.DataContext.SelectCharacter:Execute(character)
+                end
+                break
+            end
+        end
+    end
+end
+
 local function onNetMessage(data)
     if data.Channel == "GainedControl" then
         DirectlyControlledCharacter = data.Payload
@@ -737,6 +775,12 @@ local function onNetMessage(data)
         if LeaderboardWindow then
             updateLeaderboard(Ext.Json.Parse(data.Payload))
         end
+    elseif data.Channel == "DisableDynamicCombatCamera" then
+        disableDynamicCombatCamera()
+    elseif data.Channel == "NextCombatRound" then
+        setDirectlyControlledCharacterIndex()
+    elseif data.Channel == "CombatRoundStarted" then
+        directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
     end
 end
 
