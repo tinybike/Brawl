@@ -5,8 +5,27 @@ local startChunk
 local singleCharacterTurn
 local useRemainingActions
 
-local function isToTExcludedEnemyTier(uuid)
-    return (M.Utils.isToT() and State.Settings.ExcludeEnemyTiers and M.Utils.contains(State.Settings.ExcludeEnemyTiers, M.Utils.getToTEnemyTier(uuid)))
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    return M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid)
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
 end
 
 local function isExcludedFromSwarmAI(uuid)

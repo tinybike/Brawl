@@ -430,7 +430,7 @@ Constants.TELEPORTS = {
     "Target_UNI_MistyStep_NightWalkers",
     "Projectile_Jump",
 }
-Constants.TOT_EXCLUDED_TIERS = {"divine", "mythical"}
+Constants.TOT_ENEMY_TIERS = {"low", "mid", "high", "ultra", "epic", "legendary", "mythical", "divine", "avatar"}
 Constants.EXCLUDED_ENEMY_TIMEOUT = 5000
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
 Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
