@@ -5,20 +5,12 @@ local startChunk
 local singleCharacterTurn
 local useRemainingActions
 
-local function isToTExcludedEnemyTier(uuid)
-    return (M.Utils.isToT() and State.Settings.ExcludeEnemyTiers and M.Utils.contains(State.Settings.ExcludeEnemyTiers, M.Utils.getToTEnemyTier(uuid)))
-end
-
 local function isExcludedFromSwarmAI(uuid)
-    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isToTExcludedEnemyTier(uuid)
 end
 
 local function isControlledByDefaultAI(uuid)
-    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
-        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
-        return true
-    end
-    return false
+    return M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid)
 end
 
 local function getNumExcluded(swarmActors)

@@ -322,11 +322,21 @@ local function getToTEnemyTier(uuid)
         for _, enemyGroup in ipairs(Mods.ToT.PersistentVars.Scenario.Enemies) do
             for _, enemy in ipairs(enemyGroup) do
                 if enemy.GUID == uuid then
-                    return enemy.Tier
+                    return M.Utils.getTierIndex(enemy.Tier)
                 end
             end
         end
     end
+end
+
+local function isToTExcludedEnemyTier(uuid)
+    if M.Utils.isToT() and State.Session.ExcludeEnemyTierIndex ~= nil then
+        local enemyTier = getToTEnemyTier(uuid)
+        if enemyTier and enemyTier >= State.Session.ExcludeEnemyTierIndex then
+            return true
+        end
+    end
+    return false
 end
 
 local function isActiveCombatTurn(uuid)
@@ -687,6 +697,16 @@ local function getAbility(entity, ability)
     end
 end
 
+local function getTierIndex(enemyTier)
+    if enemyTier then
+        for i, tier in ipairs(Constants.TOT_ENEMY_TIERS) do
+            if enemyTier == tier then
+                return i
+            end
+        end
+    end
+end
+
 local function isConcentrating(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity then
@@ -722,8 +742,6 @@ local function checkDivineIntervention(spellName, casterUuid)
         for uuid, _ in pairs(State.Session.Players) do
             if M.Osi.GetDistanceTo(uuid, casterUuid) <= areaRadius then
                 removeNegativeStatuses(uuid)
-                Resources.restoreAllActionResources(uuid)
-                -- Resources.restoreSpellSlots(uuid)
             end
         end
     end
@@ -848,6 +866,7 @@ return {
     hasStatus = hasStatus,
     hasPassive = hasPassive,
     getAbility = getAbility,
+    getTierIndex = getTierIndex,
     isConcentrating = isConcentrating,
     isValidHostileTarget = isValidHostileTarget,
     checkDivineIntervention = checkDivineIntervention,
@@ -857,6 +876,7 @@ return {
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
     getToTEnemyTier = getToTEnemyTier,
+    isToTExcludedEnemyTier = isToTExcludedEnemyTier,
     isActiveCombatTurn = isActiveCombatTurn,
     getOriginatorPrototype = getOriginatorPrototype,
     contains = contains,

@@ -566,6 +566,11 @@ local function onMCMPlayersGoFirst(value)
     end
 end
 
+local function onMCMExcludeEnemyTiers(excludeEnemyTier)
+    State.Settings.ExcludeEnemyTiers = (excludeEnemyTier ~= "") and excludeEnemyTier or nil
+    State.Session.ExcludeEnemyTierIndex = M.Utils.getTierIndex(excludeEnemyTier)
+end
+
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
@@ -612,6 +617,6 @@ return {
         swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
         swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
         autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,
-        exclude_enemy_tiers = function (v) State.Settings.ExcludeEnemyTiers = (v ~= "") and v or nil end,
+        exclude_enemy_tiers = onMCMExcludeEnemyTiers,
     },
 }

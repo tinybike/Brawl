@@ -106,6 +106,7 @@ local Session = {
     MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS.EASY,
     MeanInitiativeRoll = nil,
     SwarmTurnIsBeforePlayer = nil,
+    ExcludeEnemyTierIndex = Utils.getTierIndex(Settings.ExcludeEnemyTiers),
 }
 
 -- Persistent state
