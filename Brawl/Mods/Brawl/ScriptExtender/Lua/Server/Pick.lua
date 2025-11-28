@@ -262,9 +262,6 @@ local function isEnemySpellAvailable(uuid, targetUuid, spellName, spell, isSilen
     if bonusActionOnly and not spell.isBonusAction then
         return false
     end
-    if spellName == "Target_KiResonation_Blast" and M.Osi.HasActiveStatus(targetUuid, "KI_RESONATION") == 0 then
-        return false
-    end
     if State.Settings.TurnBasedSwarmMode or not State.Settings.HogwildMode then
         if not M.Resources.hasEnoughToCastSpell(uuid, spellName) then
             return false
@@ -479,11 +476,10 @@ local function getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct,
     return weightedTarget
 end
 
-local function whoNeedsHealing(uuid, level)
+local function whoNeedsHealing(uuid)
     local minTargetHpPct = 100.0
     local friendlyTargetUuid = nil
-    local brawlersInLevel = State.Session.Brawlers[level]
-    for targetUuid, target in pairs(brawlersInLevel) do
+    for targetUuid, target in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsAlly(uuid, targetUuid) == 1 then
             local targetHpPct = M.Osi.GetHitpointsPercentage(targetUuid)
             if targetHpPct ~= nil and targetHpPct > 0 and targetHpPct < minTargetHpPct then

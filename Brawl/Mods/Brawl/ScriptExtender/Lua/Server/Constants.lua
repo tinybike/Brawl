@@ -1,7 +1,7 @@
 local Constants = {}
 
--- Constants.DEBUG_LOGGING = {Swarm = true, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false}
-Constants.DEBUG_LOGGING = false
+Constants.DEBUG_LOGGING = {Swarm = false, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false}
+-- Constants.DEBUG_LOGGING = false
 Constants.REPOSITION_INTERVAL = 2500
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -371,6 +371,7 @@ Constants.SPELL_REQUEST_FLAGS = {
     AvoidDangerousAuras = 0x80000,
     Unknown100000 = 0x100000,
 }
+Constants.COOLDOWNS = {"OncePerRest", "OncePerShortRest", "OncePerShortRestPerItem", "OncePerRestPerItem"}
 Constants.NO_ACTION_STATUSES = {
     "COMMAND_GROVEL",
     "COMMAND_HALT",
@@ -416,6 +417,7 @@ Constants.COUNTERSPELLS = {
     "Target_Counterspell_6",
     "Target_MOD_Dread_Counterspell",
 }
+Constants.PER_TURN_ACTION_RESOURCES = {"ActionPoint", "BonusActionPoint", "ReactionActionPoint"}
 Constants.BONUS_ACTION_DASH = {
     "Shout_Dash_CunningAction",
     "Shout_Dash_BonusAction",
@@ -444,5 +446,10 @@ Constants.AI_UNPREFERRED_TARGET = "9787450d-f34d-43bd-be88-d2bac00bb8ee"
 Constants.AI_PREFERRED_TARGET = "64bc9da1-9262-475a-a397-157600b7debd"
 Constants.AI_UNPREFERRED_TARGET_WEIGHT_MULTIPLIER = 2
 Constants.AI_PREFERRED_TARGET_WEIGHT_MULTIPLIER = 0.5
+Constants.COMBAT_HELPER = {
+    templateId = "b4f5635b-2382-4fb2-ad0d-5be8b363e847",
+    handle = "h09f52fcdg7db3g44ddg91b1gb2b4d69ac32b",
+    faction = "4be9261a-e481-8d9d-3528-f36956a19b17",
+}
 
 return Constants

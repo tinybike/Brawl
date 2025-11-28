@@ -28,6 +28,92 @@ local function getChunkTimeout(swarmActors)
     return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
 end
 
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
+        return true
+    end
+    return false
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
+end
+
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
+        return true
+    end
+    return false
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
+end
+
+-- NB: make this a setting? should boss enemies in the campaign, e.g. Grym, Ketheric, etc also be excluded, not just dragons? is Ansur just "dragon" or a special type?
+local function isExcludedFromSwarmAI(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or isToTExcludedEnemyTier(uuid)
+end
+
+local function isControlledByDefaultAI(uuid)
+    if M.Swarm.isExcludedFromSwarmAI(uuid) or M.Utils.isActiveCombatTurn(uuid) then
+        debugPrint(M.Utils.getDisplayName(uuid), "entity using default AI", M.Swarm.isExcludedFromSwarmAI(uuid), M.Utils.isActiveCombatTurn(uuid))
+        return true
+    end
+    return false
+end
+
+local function getNumExcluded(swarmActors)
+    local numExcluded = 0
+    for _, uuid in ipairs(swarmActors) do
+        if M.Swarm.isExcludedFromSwarmAI(uuid) then
+            numExcluded = numExcluded + 1
+            debugPrint(M.Utils.getDisplayName(uuid), "excluded from swarm AI", numExcluded)
+        end
+    end
+    return numExcluded
+end
+
+local function getChunkTimeout(swarmActors)
+    return math.floor(State.Settings.SwarmTurnTimeout*1000) + getNumExcluded(swarmActors)*Constants.EXCLUDED_ENEMY_TIMEOUT
+end
+
+-- local function getSwarmTurnTimeout(numChunks, swarmActors)
+--     return numChunks*math.floor(State.Settings.SwarmTurnTimeout*1000)
+-- end
+
 local function getInitiativeRoll(uuid)
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.CombatParticipant then
@@ -574,7 +660,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
+    if State.Session.Players[brawler.uuid] or M.State.isToTCombatHelper(brawler.uuid) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
@@ -685,6 +771,7 @@ local function reorderByInitiativeRoll()
             local group = combatEntity.TurnOrder.Groups[i]
             local members = {}
             for _, member in ipairs(group.Members) do
+                -- NB: should this be newInitiative, vs member.Initiative...?
                 table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
             end
             table.insert(reorderedGroups, {
@@ -799,7 +886,7 @@ local function onCharacterJoinedParty(uuid)
             State.boostPlayerInitiative(uuid)
         end
         State.recapPartyMembersMovementDistances()
-        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
+        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
     end
 end
 
@@ -857,6 +944,7 @@ end
 return {
     getEnemyList = getEnemyList,
     getInitiativeRoll = getInitiativeRoll,
+    setInitiativeRoll = setInitiativeRoll,
     cancelTimers = cancelTimers,
     resumeTimers = resumeTimers,
     pauseTimers = pauseTimers,
