@@ -20,22 +20,16 @@ local function stopAllPulseActions(remainInBrawl)
 end
 
 local function pulseAction(brawler)
-    debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
-    -- If this brawler is dead or unable to fight, stop this pulse
-    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
-        stopPulseAction(brawler)
-        return onFailed("can't fight")
+    if brawler and brawler.uuid then
+        -- debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
+        if not Utils.canAct(brawler.uuid) or brawler.isPaused or State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
+            return stopPulseAction(brawler)
+        end
+        if not State.Settings.TurnBasedSwarmMode then
+            Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
+        end
+        AI.act(brawler)
     end
-    if brawler.isPaused then
-        return onFailed("paused")
-    end
-    if State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
-        return onFailed("player control")
-    end
-    if not State.Settings.TurnBasedSwarmMode then
-        Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
-    end
-    return AI.act(brawler)
 end
 
 -- NB: get rid of this...?

@@ -153,9 +153,9 @@ local function checkForBrawlToJoin(brawler)
 end
 
 local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    onSubmitted = onSubmitted or debugDump
-    onCompleted = onCompleted or debugPrint
-    onFailed = onFailed or debugPrint
+    onSubmitted = onSubmitted or Utils.noop
+    onCompleted = onCompleted or Utils.noop
+    onFailed = onFailed or Utils.noop
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
         return onFailed("can't act or brawler not found")
     end
