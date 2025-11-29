@@ -156,8 +156,8 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or debugDump
     onCompleted = onCompleted or debugPrint
     onFailed = onFailed or debugPrint
-    if not brawler or not brawler.uuid then
-        return onFailed("brawler not found")
+    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
+        return onFailed("can't act or brawler not found")
     end
     -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
     --     should this generally be handled by the healing logic, instead of special-casing it here?
@@ -212,93 +212,9 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     return findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
 end
 
--- Brawlers doing dangerous stuff
-local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-    debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
-    onSubmitted = onSubmitted or debugDump
-    onCompleted = onCompleted or debugPrint
-    onFailed = onFailed or debugPrint
-    -- If this brawler is dead or unable to fight, stop this pulse
-    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
-        RT.Timers.stopPulseAction(brawler)
-        return onFailed("can't fight")
-    end
-    if brawler.isPaused then
-        return onFailed("paused")
-    end
-    if State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
-        return onFailed("player control")
-    end
-    -- Brawler is alive and able to fight: let's go!
-    if not State.Settings.TurnBasedSwarmMode then
-        Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
-    end
-    return act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
-end
-
--- Reposition the NPC relative to the player.  This is the only place that NPCs should enter the brawl.
--- NB: replace this entirely with in-combat listeners?
-local function pulseReposition(level)
-    State.checkForDownedOrDeadPlayers()
-    if not State.Settings.TurnBasedSwarmMode then
-        local brawlers = M.Roster.getBrawlers()
-        for brawlerUuid, brawler in pairs(brawlers) do
-            if not Constants.IS_TRAINING_DUMMY[brawlerUuid] then
-                -- if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Utils.canMove(brawlerUuid) then
-                --     -- Enemy units are actively looking for a fight and will attack if you get too close to them
-                --     if M.Utils.isPugnacious(brawlerUuid) then
-                --         if brawler.isInBrawl and brawler.targetUuid ~= nil and M.Utils.isAliveAndCanFight(brawler.targetUuid) then
-                --             local _, closestDistance = M.Osi.GetClosestAlivePlayer(brawlerUuid)
-                --             if closestDistance > 2*Constants.ENTER_COMBAT_RANGE then
-                --                 debugPrint(brawler.displayName, "Too far away, removing brawler", brawlerUuid)
-                --                 Roster.removeBrawler(level, brawlerUuid)
-                --             else
-                --                 debugPrint(brawler.displayName, "Repositioning", brawlerUuid, "->", brawler.targetUuid)
-                --                 -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                --             end
-                --         else
-                --             -- debugPrint(brawler.displayName, "Checking for a brawl to join", brawlerUuid)
-                --             checkForBrawlToJoin(brawler)
-                --         end
-                --     -- Player, ally, and neutral units are not actively looking for a fight
-                --     -- - Companions and allies use the same logic
-                --     -- - Neutrals just chilling
-                --     elseif M.State.areAnyPlayersBrawling() and M.Utils.isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
-                --         if State.Session.Players[brawlerUuid] and (State.isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
-                --             debugPrint(brawler.displayName, "Player is controlling directly: do not take action!")
-                --             RT.Timers.stopPulseAction(brawler, true)
-                --         else
-                --             if not brawler.isInBrawl then
-                --                 if M.Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
-                --                     debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
-                --                     RT.Timers.startPulseAction(brawler)
-                --                 end
-                --             elseif M.Utils.isBrawlingWithValidTarget(brawler) and M.Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
-                --                 Movement.holdPosition(brawlerUuid)
-                --                 -- Movement.repositionRelativeToTarget(brawlerUuid, brawler.targetUuid)
-                --             end
-                --         end
-                --     end
-                -- else
-                if M.Osi.IsDead(brawlerUuid) == 1 or M.Utils.isDowned(brawlerUuid) then
-                    Utils.clearOsirisQueue(brawlerUuid)
-                    Osi.LieOnGround(brawlerUuid)
-                end
-            end
-        end
-    end
-end
-
-local function pulseAddNearby(uuid)
-    Roster.addNearbyEnemiesToBrawlers(uuid, 30)
-end
-
 return {
     actOnHostileTarget = actOnHostileTarget,
     actOnFriendlyTarget = actOnFriendlyTarget,
     findTarget = findTarget,
     act = act,
-    pulseAction = pulseAction,
-    pulseReposition = pulseReposition,
-    pulseAddNearby = pulseAddNearby,
 }

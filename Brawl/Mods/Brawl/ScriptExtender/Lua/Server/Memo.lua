@@ -81,7 +81,6 @@ local Memoizable = {
         "isHostileTarget",
         "isValidHostileTarget",
         "getSpellNameBySlot",
-        "getCurrentCombatRound",
         "hasStatus",
         "hasPassive",
         "getAbility",
@@ -91,6 +90,9 @@ local Memoizable = {
         "getCurrentRegion",
         "contains",
         "startsWith",
+    },
+    TurnOrder = {
+        "getCurrentCombatRound",
     },
     Swarm = {
         "isExcludedFromSwarmAI",

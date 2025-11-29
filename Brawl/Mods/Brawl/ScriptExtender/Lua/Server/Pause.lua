@@ -104,14 +104,14 @@ local function allExitFTB()
                 unlock(Ext.Entity.Get(uuid))
                 Osi.ForceTurnBasedMode(uuid, 0)
                 stopTruePause(uuid)
-                Utils.joinCombat(uuid)
+                RT.joinCombat(uuid)
             end
         end
         if State.Session.CombatHelper then
             Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
         end
-        Utils.setPlayersSwarmGroup()
-        Utils.setPlayerTurnsActive()
+        TurnOrder.setPlayersSwarmGroup()
+        TurnOrder.setPlayerTurnsActive()
         if combatGuid then
             RT.Timers.resumeCombatRoundTimer(combatGuid)
         end

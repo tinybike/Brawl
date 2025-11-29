@@ -442,7 +442,7 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
     local uuid = brawler.uuid
     debugPrint(brawler.displayName, "startActionSequenceFailsafeTimer", request.Spell.Prototype, swarmTurnActiveInitial, count)
     local isRetry = false
-    local currentCombatRound = M.Utils.getCurrentCombatRound()
+    local currentCombatRound = M.TurnOrder.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
         cancelActionSequenceFailsafeTimer(uuid)
         isRetry = true
@@ -454,7 +454,7 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
             return callback(uuid)
         end
-        if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
+        if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.TurnOrder.getCurrentCombatRound() then
             debugPrint(brawler.displayName, "action timed out", request.Spell.Prototype, isRetry)
             Actions.removeActionInProgress(uuid, request.RequestGuid)
             if not isRetry then
@@ -502,7 +502,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             return callback(brawler.uuid, swarmActors)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function (request)
+            return AI.act(brawler, true, function (request)
                 debugPrint(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
                 if requestedEndTurn(brawler.uuid) then
                     return callback(brawler.uuid, swarmActors)
@@ -528,7 +528,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
         --     _D(State.Session.ActionsInProgress[brawler.uuid])
         --     error("we have a current AIP, what is this????")
         -- end
-        AI.pulseAction(brawler, false, function (request)
+        AI.act(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
             if requestedEndTurn(brawler.uuid) then
                 return callback(brawler.uuid, swarmActors)

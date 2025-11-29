@@ -19,6 +19,40 @@ local function stopAllPulseActions(remainInBrawl)
     end
 end
 
+local function pulseAction(brawler)
+    debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
+    -- If this brawler is dead or unable to fight, stop this pulse
+    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
+        stopPulseAction(brawler)
+        return onFailed("can't fight")
+    end
+    if brawler.isPaused then
+        return onFailed("paused")
+    end
+    if State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
+        return onFailed("player control")
+    end
+    if not State.Settings.TurnBasedSwarmMode then
+        Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
+    end
+    return AI.act(brawler)
+end
+
+-- NB: get rid of this...?
+local function pulseReposition(level)
+    State.checkForDownedOrDeadPlayers()
+    if not State.Settings.TurnBasedSwarmMode then
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            if not Constants.IS_TRAINING_DUMMY[uuid] then
+                if M.Osi.IsDead(uuid) == 1 or M.Utils.isDowned(uuid) then
+                    Utils.clearOsirisQueue(uuid)
+                    Osi.LieOnGround(uuid)
+                end
+            end
+        end
+    end
+end
+
 local function startPulseAction(brawler)
     if M.Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
@@ -30,7 +64,7 @@ local function startPulseAction(brawler)
         brawler.isInBrawl = true
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseAction(brawler)
+            pulseAction(brawler)
         end, brawler.actionInterval)
     end
 end
@@ -47,7 +81,7 @@ local function startPulseAddNearby(uuid)
     debugPrint("startPulseAddNearby", uuid, Utils.getDisplayName(uuid))
     if State.Session.PulseAddNearbyTimers[uuid] == nil then
         State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseAddNearby(uuid)
+            Roster.addNearbyEnemiesToBrawlers(uuid, 30)
         end, 7500)
     end
 end
@@ -60,12 +94,11 @@ local function stopPulseReposition()
     end
 end
 
--- Reposition if needed every REPOSITION_INTERVAL ms
 local function startPulseReposition(level)
     if State.Session.PulseRepositionTimers[level] == nil then
         debugPrint("startPulseReposition", level)
         State.Session.PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
-            AI.pulseReposition(level)
+            pulseReposition(level)
         end, Constants.REPOSITION_INTERVAL)
     end
 end
@@ -138,6 +171,16 @@ local function cancelCombatRoundTimers()
     end
 end
 
+local function joinCombat(uuid)
+    local combatEntity = getCombatEntity()
+    if combatEntity and combatEntity.ServerEnterRequest and combatEntity.ServerEnterRequest.EnterRequests then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and M.Osi.CanJoinCombat(uuid) == 1 and M.Osi.IsInCombat(uuid) == 0 then
+            combatEntity.ServerEnterRequest.EnterRequests[entity] = true
+        end
+    end
+end
+
 -- NB: is the wrapping timer getting paused correctly during pause?
 local function nextCombatRound()
     print("nextCombatRound")
@@ -186,7 +229,7 @@ end
 
 local function onCombatStarted(combatGuid)
     if not Utils.isToT() then
-        Utils.spawnCombatHelper(combatGuid)
+        TurnOrder.spawnCombatHelper(combatGuid)
         if State.Settings.AutoPauseOnCombatStart then
             Pause.allEnterFTB()
         end
@@ -201,7 +244,7 @@ local function onCombatRoundStarted(combatGuid, round)
     Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
     if not State.Session.CombatHelper then
         print("ERROR No combat helper found, what happened?")
-        Utils.spawnCombatHelper(combatGuid)
+        TurnOrder.spawnCombatHelper(combatGuid)
     end
     for faction, enemyUuid in pairs(Utils.getEnemyFactions()) do
         print("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
@@ -229,8 +272,8 @@ local function onCombatRoundStarted(combatGuid, round)
     -- else
     --     onCombatStarted(combatGuid)
     -- end
-    Utils.setPlayersSwarmGroup()
-    Utils.setPlayerTurnsActive()
+    TurnOrder.setPlayersSwarmGroup()
+    TurnOrder.setPlayerTurnsActive()
 end
 
 local function onCombatEnded(combatGuid)
@@ -320,7 +363,7 @@ local function onLeftForceTurnBased(entityUuid)
             local brawler = Roster.getBrawlerByUuid(entityUuid)
             if brawler then
                 Resources.resumeActionResourcesRefillTimers(brawler)
-                Utils.joinCombat(entityUuid)
+                joinCombat(entityUuid)
             end
             if State.Session.Players and State.Session.Players[entityUuid] then
                 if State.Session.Players[entityUuid].isFreshSummon then
@@ -446,12 +489,14 @@ local function onPROC_Subregion_Entered(uuid)
         debugPrint("PROC_Subregion_Entered", M.Utils.getDisplayName(uuid))
         local level = M.Osi.GetRegion(uuid)
         if level and uuid and State.Session.Players and State.Session.Players[uuid] then
-            AI.pulseReposition(level)
+            pulseReposition(level)
         end
     end
 end
 
 return {
+    joinCombat = joinCombat,
+    nextCombatRound = nextCombatRound,
     Timers = {
         stopPulseAction = stopPulseAction,
         stopAllPulseActions = stopAllPulseActions,
