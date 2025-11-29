@@ -566,6 +566,40 @@ local function isHostileTarget(uuid, targetUuid)
     return isHostile
 end
 
+-- thank u hippo
+local function spawnCombatHelper(combatGuid, isRefreshOnly)
+    if not State.Session.CombatHelper or isRefreshOnly then
+        local playerUuid = Osi.CombatGetInvolvedPlayer(combatGuid, 1) or M.Osi.GetHostCharacter()
+        local x, y, z = Osi.GetPosition(playerUuid)
+        local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
+        if not combatHelper then
+            error("couldn't create combat helper")
+            return
+        end
+        Osi.SetTag(combatHelper, "9787450d-f34d-43bd-be88-d2bac00bb8ee") -- AI_UNPREFERRED_TARGET
+        Osi.SetFaction(combatHelper, Constants.COMBAT_HELPER.faction)
+        if not isRefreshOnly then
+            State.Session.CombatHelper = combatHelper
+        end
+        Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
+        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
+        return combatHelper
+    end
+end
+
+local function getEnemyFactions()
+    local enemyFactions = {}
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Utils.isPugnacious(uuid) then
+            local faction = Osi.GetFaction(uuid)
+            if faction and not enemyFactions[faction] then
+                enemyFactions[faction] = uuid
+            end
+        end
+    end
+    return enemyFactions
+end
+
 local function getFTBEntity()
     if State.Session.Players then
         for uuid, _ in pairs(State.Session.Players) do
@@ -919,6 +953,8 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    spawnCombatHelper = spawnCombatHelper,
+    getEnemyFactions = getEnemyFactions,
     getFTBEntity = getFTBEntity,
     getCombatEntity = getCombatEntity,
     joinCombat = joinCombat,

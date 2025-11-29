@@ -105,12 +105,12 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                     if State.Session.PulseActionTimers[entityUuid] == nil then
-                        startPulseAction(brawler)
+                        RT.Timers.startPulseAction(brawler)
                     end
                 else
                     -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
-                    stopPulseAction(brawler)
+                    RT.Timers.stopPulseAction(brawler)
                     Osi.ForceTurnBasedMode(entityUuid, 1)
                     if not State.Session.Players[entityUuid] then
                         brawler.isPaused = true
@@ -152,7 +152,7 @@ local function removeBrawler(level, entityUuid)
                     end
                 end
             end
-            stopPulseAction(brawlersInLevel[entityUuid])
+            RT.Timers.stopPulseAction(brawlersInLevel[entityUuid])
             brawlersInLevel[entityUuid] = nil
         end
         Osi.SetCanJoinCombat(entityUuid, 1)
@@ -207,7 +207,7 @@ local function endBrawl(level)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.cancelTimers()
     end
-    -- stopPulseReposition(level)
+    -- RT.Timers.stopPulseReposition(level)
 end
 
 local function getBrawlerByUuid(uuid)
@@ -303,7 +303,7 @@ local function initBrawlers(level)
     local players = State.Session.Players
     for playerUuid, player in pairs(players) do
         if not State.Settings.TurnBasedSwarmMode and player.isControllingDirectly then
-            startPulseAddNearby(playerUuid)
+            RT.Timers.startPulseAddNearby(playerUuid)
         end
         if Osi.IsInCombat(playerUuid) == 1 then
             Listeners.onCombatStarted(M.Osi.CombatGetGuidFor(playerUuid))
@@ -311,7 +311,7 @@ local function initBrawlers(level)
         end
     end
     if not State.Settings.TurnBasedSwarmMode then
-        startPulseReposition(level)
+        RT.Timers.startPulseReposition(level)
     end
 end
 

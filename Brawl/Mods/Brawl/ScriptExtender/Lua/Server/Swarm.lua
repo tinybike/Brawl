@@ -789,6 +789,18 @@ local function reorderByInitiativeRoll()
     end
 end
 
+local function onStarted()
+    if State.Settings.PlayersGoFirst then
+        State.boostPlayerInitiatives()
+    end
+    State.recapPartyMembersMovementDistances()
+end
+
+local function onCombatStarted()
+    -- NB: do this for RT mode too??
+    Leaderboard.initialize()
+end
+
 local function onCombatRoundStarted(round)
     debugPrint("onCombatRoundStarted", round)
     cancelTimers()
@@ -965,6 +977,8 @@ return {
     useRemainingActions = useRemainingActions,
     swarmAction = swarmAction,
     Listeners = {
+        onStarted = onStarted,
+        onCombatStarted = onCombatStarted,
         onCombatRoundStarted = onCombatRoundStarted,
         onCombatEnded = onCombatEnded,
         onEnteredCombat = onEnteredCombat,

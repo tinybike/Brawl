@@ -148,7 +148,7 @@ local function checkForBrawlToJoin(brawler)
             end
         end
         debugPrint("check for", brawler.uuid, brawler.displayName)
-        startPulseAction(brawler)
+        RT.Timers.startPulseAction(brawler)
     end
 end
 
@@ -220,7 +220,7 @@ local function pulseAction(brawler, bonusActionOnly, onSubmitted, onCompleted, o
     onFailed = onFailed or debugPrint
     -- If this brawler is dead or unable to fight, stop this pulse
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
-        stopPulseAction(brawler)
+        RT.Timers.stopPulseAction(brawler)
         return onFailed("can't fight")
     end
     if brawler.isPaused then
@@ -266,12 +266,12 @@ local function pulseReposition(level)
                 --     elseif M.State.areAnyPlayersBrawling() and M.Utils.isPlayerOrAlly(brawlerUuid) and not brawler.isPaused then
                 --         if State.Session.Players[brawlerUuid] and (State.isPlayerControllingDirectly(brawlerUuid) and not State.Settings.FullAuto) then
                 --             debugPrint(brawler.displayName, "Player is controlling directly: do not take action!")
-                --             stopPulseAction(brawler, true)
+                --             RT.Timers.stopPulseAction(brawler, true)
                 --         else
                 --             if not brawler.isInBrawl then
                 --                 if M.Osi.IsPlayer(brawlerUuid) == 0 or State.Settings.CompanionAIEnabled then
                 --                     debugPrint(brawler.displayName, "Not in brawl, starting pulse action for")
-                --                     startPulseAction(brawler)
+                --                     RT.Timers.startPulseAction(brawler)
                 --                 end
                 --             elseif M.Utils.isBrawlingWithValidTarget(brawler) and M.Osi.IsPlayer(brawlerUuid) == 1 and State.Settings.CompanionAIEnabled then
                 --                 Movement.holdPosition(brawlerUuid)

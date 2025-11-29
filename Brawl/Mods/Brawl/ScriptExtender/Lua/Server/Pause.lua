@@ -60,8 +60,8 @@ local function allEnterFTB()
         if State.Session.CombatHelper then
             Osi.PauseCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
         end
-        pauseCombatRoundTimers()
-        -- stopAllPulseActions(true)
+        RT.Timers.pauseCombatRoundTimers()
+        -- RT.Timers.stopAllPulseActions(true)
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             if player and player[1] then
                 local uuid = M.Osi.GetUUID(player[1])
@@ -72,7 +72,7 @@ local function allEnterFTB()
             end
         end
         for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-            stopPulseAction(brawler, true)
+            RT.Timers.stopPulseAction(brawler, true)
             brawler.isPaused = true
             if M.Osi.IsPlayer(uuid) == 0 then
                 Osi.ForceTurnBasedMode(uuid, 1)
