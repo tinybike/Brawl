@@ -113,7 +113,7 @@ local function allExitFTB()
         Utils.setPlayersSwarmGroup()
         Utils.setPlayerTurnsActive()
         if combatGuid then
-            resumeCombatRoundTimer(combatGuid)
+            RT.Timers.resumeCombatRoundTimer(combatGuid)
         end
         Movement.resumeTimers()
     end
