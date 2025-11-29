@@ -166,7 +166,7 @@ local function cancelCombatRoundTimers()
 end
 
 local function joinCombat(uuid)
-    local combatEntity = getCombatEntity()
+    local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.ServerEnterRequest and combatEntity.ServerEnterRequest.EnterRequests then
         local entity = Ext.Entity.Get(uuid)
         if entity and M.Osi.CanJoinCombat(uuid) == 1 and M.Osi.IsInCombat(uuid) == 0 then

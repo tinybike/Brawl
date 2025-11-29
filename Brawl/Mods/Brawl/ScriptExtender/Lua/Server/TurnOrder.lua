@@ -1,6 +1,79 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
+local function getInitiativeRoll(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.CombatParticipant then
+        return entity.CombatParticipant.InitiativeRoll
+    end
+end
+
+local function calculateMeanInitiativeRoll()
+    local totalInitiativeRoll = 0
+    local numInitiativeRolls = 0
+    for uuid, player in pairs(State.Session.Players) do
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
+            totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
+            numInitiativeRolls = numInitiativeRolls + 1
+        end
+    end
+    return math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
+end
+
+local function calculateActionInterval(initiative)
+    local r = Constants.ACTION_INTERVAL_RESCALING
+    local scale = 1 + r - 4*r*initiative/(2*initiative + State.Settings.InitiativeDie + 1)
+    return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
+end
+
+-- NB: is there a way to look up the initative die instead of defining it in the mod...?
+local function rollForInitiative(uuid)
+    local initiative = math.random(1, State.Settings.InitiativeDie)
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.Stats and entity.Stats.InitiativeBonus ~= nil then
+        initiative = initiative + entity.Stats.InitiativeBonus
+    end
+    return initiative
+end
+
+local function setInitiativeRoll(uuid, roll)
+    local entity = Ext.Entity.Get(uuid)
+    if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
+        entity.CombatParticipant.InitiativeRoll = roll
+        if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+            entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
+            entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+        end
+        entity:Replicate("CombatParticipant")
+    end
+end
+
+local function setPartyInitiativeRollToMean()
+    State.Session.MeanInitiativeRoll = calculateMeanInitiativeRoll()
+    for uuid, player in pairs(State.Session.Players) do
+        setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+    end
+end
+
+local function bumpNpcInitiativeRoll(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    local initiativeRoll = getInitiativeRoll(uuid)
+    local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
+    debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
+    setInitiativeRoll(uuid, bumpedInitiativeRoll)
+end
+
+local function bumpNpcInitiativeRolls()
+    if State.Session.MeanInitiativeRoll ~= -100 then
+        for uuid, _ in pairs(M.Roster.getBrawlers()) do
+            if not State.Session.Players[uuid] and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
+                bumpNpcInitiativeRoll(uuid)
+            end
+        end
+    end
+end
+
 local function setPlayersSwarmGroup(swarmGroupLabel)
     if State.Session.Players then
         for uuid, _ in pairs(State.Session.Players) do
@@ -12,13 +85,13 @@ end
 local function showAllInitiativeRolls()
     print("***********Initiative rolls************")
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        print(M.Utils.getDisplayName(uuid), Swarm.getInitiativeRoll(uuid))
+        print(M.Utils.getDisplayName(uuid), getInitiativeRoll(uuid))
     end
     print("***************************************")
 end
 
 local function showTurnOrderGroups()
-    local combatEntity = getCombatEntity()
+    local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         for i, group in ipairs(combatEntity.TurnOrder.Groups) do
             if group.Members and group.Initiative ~= -20 then
@@ -45,7 +118,7 @@ local function showTurnOrderGroups()
 end
 
 local function getCurrentCombatRound()
-    local combatEntity = getCombatEntity()
+    local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
         return combatEntity.TurnOrder.field_40
     end
@@ -72,6 +145,41 @@ local function spawnCombatHelper(combatGuid, isRefreshOnly)
     end
 end
 
+local function getNewInitiativeRolls(groups)
+    local newInitiativeRolls = {}
+    for _, info in ipairs(groups) do
+        if info.Members and info.Members[1] and info.Members[1].Entity then
+            table.insert(newInitiativeRolls, getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid))
+        end
+    end
+    return newInitiativeRolls
+end
+
+local function reorderByInitiativeRoll()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        local reorderedGroups = {}
+        for i, newInitiative in ipairs(getNewInitiativeRolls(combatEntity.TurnOrder.Groups)) do
+            local group = combatEntity.TurnOrder.Groups[i]
+            local members = {}
+            for _, member in ipairs(group.Members) do
+                -- NB: should this be newInitiative, vs member.Initiative...?
+                table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+            end
+            table.insert(reorderedGroups, {
+                Initiative = newInitiative,
+                IsPlayer = group.IsPlayer,
+                Round = group.Round,
+                Team = group.Team,
+                Members = members,
+            })
+        end
+        table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
+        combatEntity.TurnOrder.Groups = reorderedGroups
+        combatEntity:Replicate("TurnOrder")
+    end
+end
+
 -- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
     print("set player turns active")
@@ -91,7 +199,7 @@ local function setPlayerTurnsActive()
                     if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
                         -- NB: don't just add 1000, do this in a smarter way
                         newInitiative = member.Initiative + 1000
-                        Swarm.setInitiativeRoll(member.Entity.Uuid.EntityUuid, newInitiative)
+                        setInitiativeRoll(member.Entity.Uuid.EntityUuid, newInitiative)
                         table.insert(groupsPlayers, {
                             Initiative = newInitiative,
                             IsPlayer = group.IsPlayer,
@@ -142,10 +250,20 @@ local function setPlayerTurnsActive()
 end
 
 return {
+    getInitiativeRoll = getInitiativeRoll,
+    calculateMeanInitiativeRoll = calculateMeanInitiativeRoll,
+    calculateActionInterval = calculateActionInterval,
+    rollForInitiative = rollForInitiative,
+    setInitiativeRoll = setInitiativeRoll,
+    setPartyInitiativeRollToMean = setPartyInitiativeRollToMean,
+    bumpNpcInitiativeRoll = bumpNpcInitiativeRoll,
+    bumpNpcInitiativeRolls = bumpNpcInitiativeRolls,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,
     showTurnOrderGroups = showTurnOrderGroups,
     getCurrentCombatRound = getCurrentCombatRound,
     spawnCombatHelper = spawnCombatHelper,
+    getNewInitiativeRolls = getNewInitiativeRolls,
+    reorderByInitiativeRoll = reorderByInitiativeRoll,
     setPlayerTurnsActive = setPlayerTurnsActive,
 }
