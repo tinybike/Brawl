@@ -37,7 +37,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         end
         return actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     end
-    brawler.targetUuid = targetUuid -- or in onSubmitted?
+    brawler.targetUuid = target.uuid -- or in onSubmitted?
     Movement.moveIntoPositionForSpell(brawler.uuid, target.uuid, actionToTake, bonusActionOnly, function ()
         debugPrint(brawler.displayName, "movement completed (hostile)", target.displayName, actionToTake)
         local targetUuid = M.Spells.isShout(actionToTake) and brawler.uuid or target.uuid
