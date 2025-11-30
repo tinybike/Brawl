@@ -1,6 +1,10 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
+local function getCombatRoundDuration()
+    return State.Settings.ActionInterval*1000
+end
+
 local function stopPulseAction(brawler, remainInBrawl)
     if brawler and brawler.uuid then
         debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
@@ -124,6 +128,7 @@ local function stopAllPulseActionTimers()
 end
 
 local function pauseCombatRoundTimer(combatGuid)
+    State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] then
         Ext.Timer.Pause(State.Session.CombatRoundTimer[combatGuid])
     end
@@ -136,6 +141,7 @@ local function resumeCombatRoundTimer(combatGuid)
 end
 
 local function cancelCombatRoundTimer(combatGuid)
+    State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] then
         Ext.Timer.Cancel(State.Session.CombatRoundTimer[combatGuid])
         State.Session.CombatRoundTimer[combatGuid] = nil
@@ -143,6 +149,7 @@ local function cancelCombatRoundTimer(combatGuid)
 end
 
 local function pauseCombatRoundTimers()
+    State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and next(State.Session.CombatRoundTimer) then
         for combatGuid, timer in pairs(State.Session.CombatRoundTimer) do
             Ext.Timer.Pause(timer)
@@ -159,6 +166,7 @@ local function resumeCombatRoundTimers()
 end
 
 local function cancelCombatRoundTimers()
+    State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and next(State.Session.CombatRoundTimer) then
         for combatGuid, timer in pairs(State.Session.CombatRoundTimer) do
             Ext.Timer.Cancel(timer)
@@ -203,11 +211,11 @@ local function startCombatRoundTimer(combatGuid)
     -- if not State.isInCombat() then
     --     Osi.PauseCombat(combatGuid)
     -- end
-    local turnDuration = State.Settings.ActionInterval*1000
+    cancelCombatRoundTimer(combatGuid)
     if not Utils.isToT() then
-        State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(turnDuration, nextCombatRound)
+        State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(getCombatRoundDuration(), nextCombatRound)
     else
-        State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(turnDuration, function ()
+        State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(getCombatRoundDuration(), function ()
             nextCombatRound()
             if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round < #Mods.ToT.PersistentVars.Scenario.Timeline then
                 debugPrint("ToT advancing scenario", Mods.ToT.PersistentVars.Scenario.Round, #Mods.ToT.PersistentVars.Scenario.Timeline)

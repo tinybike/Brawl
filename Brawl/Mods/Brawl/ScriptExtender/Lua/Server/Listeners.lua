@@ -230,12 +230,12 @@ local function onGainedControl(targetGuid)
                     end
                 end
             end
-            if not State.Settings.TurnBasedSwarmMode then
-                RT.Listeners.onGainedControl(targetUuid)
-            end
             if not State.Settings.FullAuto then
                 Utils.clearOsirisQueue(targetUuid)
                 RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
+            end
+            if not State.Settings.TurnBasedSwarmMode then
+                RT.Listeners.onGainedControl(targetUuid)
             end
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
