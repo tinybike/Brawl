@@ -95,8 +95,11 @@ local function onCombatRoundStarted(combatGuid, round)
     end
 end
 
+-- NB: move all of the endBrawl stuff to here
 local function onCombatEnded(combatGuid)
     print("CombatEnded", combatGuid)
+    State.Session.StoryActionIDs = {}
+    State.Session.MeanInitiativeRoll = nil
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatEnded()
     else
@@ -109,9 +112,16 @@ local function onEnteredCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
         Roster.addBrawler(uuid, true)
-        if State.Settings.TurnBasedSwarmMode then
-            Swarm.Listeners.onEnteredCombat(uuid)
-        else
+        if State.Session.Players and State.Session.Players[uuid] then
+            debugPrint("initiative roll", TurnOrder.getInitiativeRoll(uuid))
+            if State.Session.ResurrectedPlayer[uuid] then
+                State.Session.ResurrectedPlayer[uuid] = nil
+                TurnOrder.setInitiativeRoll(uuid, TurnOrder.rollForInitiative(uuid))
+                debugPrint("updated initiative roll for resurrected player", TurnOrder.getInitiativeRoll(uuid))
+                TurnOrder.setPartyInitiativeRollToMean()
+            end
+        end
+        if not State.Settings.TurnBasedSwarmMode then
             RT.Listeners.onEnteredCombat(uuid)
         end
     end
@@ -210,31 +220,23 @@ local function onGainedControl(targetGuid)
                 MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
             end
         end
-        if not State.Settings.FullAuto then
-            Utils.clearOsirisQueue(targetUuid)
-        end
-        local targetUserId = Osi.GetReservedUserID(targetUuid)
-        local players = State.Session.Players
-        if players[targetUuid] ~= nil and targetUserId ~= nil then
-            players[targetUuid].isControllingDirectly = true
-            if not State.Settings.TurnBasedSwarmMode then
-                RT.Timers.startPulseAddNearby(targetUuid)
-            end
-            local level = M.Osi.GetRegion(targetUuid)
-            local brawlersInLevel = State.Session.Brawlers[level]
-            for playerUuid, player in pairs(players) do
-                if player.userId == targetUserId and playerUuid ~= targetUuid then
-                    player.isControllingDirectly = false
-                    if not State.Settings.TurnBasedSwarmMode and level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
-                        RT.Timers.stopPulseAddNearby(playerUuid)
-                        RT.Timers.startPulseAction(brawlersInLevel[playerUuid])
+        if State.Session.Players[targetUuid] then
+            local targetUserId = Osi.GetReservedUserID(targetUuid)
+            if targetUserId then
+                State.Session.Players[targetUuid].isControllingDirectly = true
+                for playerUuid, player in pairs(State.Session.Players) do
+                    if player.userId == targetUserId and playerUuid ~= targetUuid then
+                        player.isControllingDirectly = false
                     end
                 end
             end
-            if level and brawlersInLevel and brawlersInLevel[targetUuid] and not State.Settings.FullAuto then
-                RT.Timers.stopPulseAction(brawlersInLevel[targetUuid], true)
+            if not State.Settings.TurnBasedSwarmMode then
+                RT.Listeners.onGainedControl(targetUuid)
             end
-            -- debugDump(players)
+            if not State.Settings.FullAuto then
+                Utils.clearOsirisQueue(targetUuid)
+                RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
+            end
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end

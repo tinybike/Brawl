@@ -180,6 +180,38 @@ local function reorderByInitiativeRoll()
     end
 end
 
+local function bumpDirectlyControlledInitiativeRolls()
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll + 1)
+        else
+            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+        end
+    end
+end
+
+-- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
+-- so the re-selection on round start doesn't jerk the screen around
+-- (then reorder every time GainedControl happens)
+-- split into single-member groups
+local function reorderPlayersByControl(reorderedGroups, group, isDirectlyControlled)
+    for _, member in ipairs(group.Members) do
+        if member.Entity and member.Entity and member.Entity.Uuid then
+            local uuid = member.Entity.Uuid.EntityUuid
+            if uuid and State.isPlayerControllingDirectly(uuid) == isDirectlyControlled then
+                local initiative = getInitiativeRoll(uuid)
+                table.insert(reorderedGroups, {
+                    Initiative = initiative,
+                    IsPlayer = group.IsPlayer,
+                    Round = group.Round,
+                    Team = group.Team,
+                    Members = {{Entity = member.Entity, Initiative = initiative}},
+                })
+            end
+        end
+    end
+end
+
 -- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
     print("set player turns active")
@@ -191,35 +223,8 @@ local function setPlayerTurnsActive()
         local groupsEnemies = {}
         for _, group in ipairs(combatEntity.TurnOrder.Groups) do
             if group.IsPlayer then
-                -- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
-                -- so the re-selection on round start doesn't jerk the screen around
-                -- (then reorder every time GainedControl happens)
-                -- split into single-member groups
-                for _, member in ipairs(group.Members) do
-                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
-                        -- NB: don't just add 1000, do this in a smarter way
-                        newInitiative = member.Initiative + 1000
-                        setInitiativeRoll(member.Entity.Uuid.EntityUuid, newInitiative)
-                        table.insert(groupsPlayers, {
-                            Initiative = newInitiative,
-                            IsPlayer = group.IsPlayer,
-                            Round = group.Round,
-                            Team = group.Team,
-                            Members = {{Entity = member.Entity, Initiative = newInitiative}},
-                        })
-                    end
-                end
-                for _, member in ipairs(group.Members) do
-                    if member.Entity and member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and not State.isPlayerControllingDirectly(member.Entity.Uuid.EntityUuid) then
-                        table.insert(groupsPlayers, {
-                            Initiative = group.Initiative,
-                            IsPlayer = group.IsPlayer,
-                            Round = group.Round,
-                            Team = group.Team,
-                            Members = {{Entity = member.Entity, Initiative = member.Initiative}},
-                        })
-                    end
-                end
+                reorderPlayersByControl(groupsPlayers, group, true)
+                reorderPlayersByControl(groupsPlayers, group, false)
             else
                 table.insert(groupsEnemies, group)
             end
@@ -251,19 +256,17 @@ end
 
 return {
     getInitiativeRoll = getInitiativeRoll,
-    calculateMeanInitiativeRoll = calculateMeanInitiativeRoll,
     calculateActionInterval = calculateActionInterval,
     rollForInitiative = rollForInitiative,
     setInitiativeRoll = setInitiativeRoll,
     setPartyInitiativeRollToMean = setPartyInitiativeRollToMean,
-    bumpNpcInitiativeRoll = bumpNpcInitiativeRoll,
     bumpNpcInitiativeRolls = bumpNpcInitiativeRolls,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,
     showTurnOrderGroups = showTurnOrderGroups,
     getCurrentCombatRound = getCurrentCombatRound,
     spawnCombatHelper = spawnCombatHelper,
-    getNewInitiativeRolls = getNewInitiativeRolls,
     reorderByInitiativeRoll = reorderByInitiativeRoll,
+    bumpDirectlyControlledInitiativeRolls = bumpDirectlyControlledInitiativeRolls,
     setPlayerTurnsActive = setPlayerTurnsActive,
 }

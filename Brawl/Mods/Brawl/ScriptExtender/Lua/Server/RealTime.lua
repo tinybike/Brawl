@@ -2,14 +2,16 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
 local function stopPulseAction(brawler, remainInBrawl)
-    debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
-    if not remainInBrawl then
-        brawler.isInBrawl = false
-    end
-    if State.Session.PulseActionTimers[brawler.uuid] ~= nil then
-        debugPrint("stop pulse action", brawler.displayName, remainInBrawl)
-        Ext.Timer.Cancel(State.Session.PulseActionTimers[brawler.uuid])
-        State.Session.PulseActionTimers[brawler.uuid] = nil
+    if brawler and brawler.uuid then
+        debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
+        if not remainInBrawl then
+            brawler.isInBrawl = false
+        end
+        if State.Session.PulseActionTimers[brawler.uuid] ~= nil then
+            debugPrint("stop pulse action", brawler.displayName, remainInBrawl)
+            Ext.Timer.Cancel(State.Session.PulseActionTimers[brawler.uuid])
+            State.Session.PulseActionTimers[brawler.uuid] = nil
+        end
     end
 end
 
@@ -267,6 +269,9 @@ local function onCombatRoundStarted(combatGuid, round)
     --     onCombatStarted(combatGuid)
     -- end
     TurnOrder.setPlayersSwarmGroup()
+    TurnOrder.setPartyInitiativeRollToMean()
+    TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    TurnOrder.reorderByInitiativeRoll()
     TurnOrder.setPlayerTurnsActive()
 end
 
@@ -420,19 +425,33 @@ local function onLeftForceTurnBased(entityUuid)
     end
 end
 
+local function onGainedControl(uuid)
+    startPulseAddNearby(uuid)
+    local userId = Osi.GetReservedUserID(uuid)
+    for playerUuid, player in pairs(State.Session.Players) do
+        if player.userId == userId and playerUuid ~= uuid then
+            stopPulseAddNearby(playerUuid)
+            local brawler = Roster.getBrawlerByUuid(playerUuid)
+            if brawler and brawler.isInBrawl then
+                startPulseAction(brawler)
+            end
+        end
+    end
+    TurnOrder.setPartyInitiativeRollToMean()
+    TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    TurnOrder.reorderByInitiativeRoll()
+    TurnOrder.setPlayerTurnsActive()
+end
+
 local function onSpellSyncTargeting(spellCastState)
     if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
-        local uuid = spellCastState.Caster.Uuid.EntityUuid
-        print("SpellSyncTargeting CREATE", M.Utils.getDisplayName(uuid))
-        State.Session.PlayerTargetingSpellCast[uuid] = true
+        State.Session.PlayerTargetingSpellCast[spellCastState.Caster.Uuid.EntityUuid] = true
     end
 end
 
 local function onDestroySpellSyncTargeting(spellCastState)
     if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
-        local uuid = spellCastState.Caster.Uuid.EntityUuid
-        print("SpellSyncTargeting DESTROY", M.Utils.getDisplayName(uuid))
-        State.Session.PlayerTargetingSpellCast[uuid] = nil
+        State.Session.PlayerTargetingSpellCast[spellCastState.Caster.Uuid.EntityUuid] = nil
         if State.Session.IsNextCombatRoundQueued then
             nextCombatRound()
         end
@@ -518,6 +537,7 @@ return {
         onEnteredCombat = onEnteredCombat,
         onEnteredForceTurnBased = onEnteredForceTurnBased,
         onLeftForceTurnBased = onLeftForceTurnBased,
+        onGainedControl = onGainedControl,
         onSpellSyncTargeting = onSpellSyncTargeting,
         onDestroySpellSyncTargeting = onDestroySpellSyncTargeting,
         onDialogStarted = onDialogStarted,

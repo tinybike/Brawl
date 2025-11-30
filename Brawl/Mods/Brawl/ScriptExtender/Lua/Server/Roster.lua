@@ -22,7 +22,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and M.Utils.isAliveAndCanFight(entityUuid)
         end
         if State.Settings.TurnBasedSwarmMode and M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
-            debugPrint("ADDING COMBAT HELPER TO BRAWLERS")
             okToAdd = true
         end
         if okToAdd then
@@ -62,37 +61,24 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             State.modifyHitpoints(entityUuid)
             Osi.SetCanJoinCombat(entityUuid, 1)
             if State.Settings.TurnBasedSwarmMode then
-                -- Osi.SetCanJoinCombat(entityUuid, 1)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     State.Session.SwarmTurnComplete[entityUuid] = false
                     Osi.PROC_SelfHealing_Disable(entityUuid)
-                    -- if Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
-                    --     print("added ally", M.Utils.getDisplayName(entityUuid), entityUuid)
-                    --     State.boostAllyInitiative(entityUuid)
-                    -- end
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then
-                    -- brawler.originalCanJoinCombat = M.Osi.CanJoinCombat(entityUuid)
-                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                     -- thank u lunisole/ghostboats
                     Osi.PROC_SelfHealing_Disable(entityUuid)
-                elseif State.Session.Players[entityUuid] then
-                    -- brawler.originalCanJoinCombat = 1
-                    -- Movement.setPlayerRunToSprint(entityUuid)
-                    -- Osi.SetCanJoinCombat(entityUuid, 0)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
-                -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                     if State.Session.PulseActionTimers[entityUuid] == nil then
                         RT.Timers.startPulseAction(brawler)
                     end
                 else
-                    -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
                     RT.Timers.stopPulseAction(brawler)
                     Osi.ForceTurnBasedMode(entityUuid, 1)
@@ -142,10 +128,6 @@ local function removeBrawler(level, entityUuid)
         Osi.SetCanJoinCombat(entityUuid, 1)
         if M.Osi.IsPartyMember(entityUuid, 1) == 0 then
             State.revertHitpoints(entityUuid)
-            -- if State.Settings.TurnBasedSwarmMode and Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
-            --     print("remove ally brawler", entityUuid, M.Utils.getDisplayName(entityUuid))
-            --     State.removeBoostAllyInitiative(entityUuid)
-            -- end
         else
             State.Session.PlayerCurrentTarget[entityUuid] = nil
             State.Session.PlayerMarkedTarget[entityUuid] = nil

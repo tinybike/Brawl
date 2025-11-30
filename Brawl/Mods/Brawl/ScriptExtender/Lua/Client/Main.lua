@@ -777,10 +777,10 @@ local function onNetMessage(data)
         end
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
-    elseif data.Channel == "NextCombatRound" then
-        setDirectlyControlledCharacterIndex()
-    elseif data.Channel == "CombatRoundStarted" then
-        directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
+    -- elseif data.Channel == "NextCombatRound" then
+    --     setDirectlyControlledCharacterIndex()
+    -- elseif data.Channel == "CombatRoundStarted" then
+    --     directlyControlCharacterByIndex(DirectlyControlledCharacterIndex)
     end
 end
 

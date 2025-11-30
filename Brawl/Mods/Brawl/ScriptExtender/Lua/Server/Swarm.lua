@@ -627,38 +627,19 @@ local function onCombatRoundStarted(round)
     -- State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
     if not State.Settings.PlayersGoFirst then
-        TurnOrder.showAllInitiativeRolls()
-        debugPrint("*****onCombatRoundStarted original turn order")
-        TurnOrder.showTurnOrderGroups()
         TurnOrder.setPartyInitiativeRollToMean()
         TurnOrder.bumpNpcInitiativeRolls()
         TurnOrder.reorderByInitiativeRoll()
-        debugPrint("*****onCombatRoundStarted updated turn order")
-        TurnOrder.showTurnOrderGroups()
     end
     local enemyList, excludedEnemyList = getEnemyList(true)
     startSwarmTurn(enemyList, excludedEnemyList, true)
 end
 
 local function onCombatEnded()
-    State.Session.StoryActionIDs = {}
     State.Session.SwarmTurnComplete = {}
-    State.Session.MeanInitiativeRoll = nil
     cancelTimers()
     Leaderboard.dumpToConsole()
     Leaderboard.postDataToClients()
-end
-
-local function onEnteredCombat(uuid)
-    if uuid and State.Session.Players and State.Session.Players[uuid] then
-        debugPrint("initiative roll", TurnOrder.getInitiativeRoll(uuid))
-        if State.Session.ResurrectedPlayer[uuid] then
-            State.Session.ResurrectedPlayer[uuid] = nil
-            TurnOrder.setInitiativeRoll(uuid, TurnOrder.rollForInitiative(uuid))
-            debugPrint("updated initiative roll for resurrected player", TurnOrder.getInitiativeRoll(uuid))
-            TurnOrder.setPartyInitiativeRollToMean()
-        end
-    end
 end
 
 local function onTurnStarted(uuid)
@@ -797,7 +778,6 @@ return {
         onCombatStarted = onCombatStarted,
         onCombatRoundStarted = onCombatRoundStarted,
         onCombatEnded = onCombatEnded,
-        onEnteredCombat = onEnteredCombat,
         onTurnStarted = onTurnStarted,
         onTurnEnded = onTurnEnded,
         onDied = onDied,
