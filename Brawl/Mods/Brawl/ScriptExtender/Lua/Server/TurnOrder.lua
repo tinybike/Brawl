@@ -155,7 +155,7 @@ local function getNewInitiativeRolls(groups)
     return newInitiativeRolls
 end
 
-local function reorderByInitiativeRoll()
+local function reorderByInitiativeRoll(doNotReplicate)
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         local reorderedGroups = {}
@@ -176,7 +176,9 @@ local function reorderByInitiativeRoll()
         end
         table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
         combatEntity.TurnOrder.Groups = reorderedGroups
-        combatEntity:Replicate("TurnOrder")
+        if not doNotReplicate then
+            combatEntity:Replicate("TurnOrder")
+        end
     end
 end
 

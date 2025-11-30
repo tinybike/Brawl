@@ -229,6 +229,11 @@ local function onCombatStarted(combatGuid)
         if State.Settings.AutoPauseOnCombatStart then
             Pause.allEnterFTB()
         end
+        TurnOrder.setPlayersSwarmGroup()
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll(true)
+        TurnOrder.setPlayerTurnsActive()
     end
 end
 
@@ -268,11 +273,6 @@ local function onCombatRoundStarted(combatGuid, round)
     -- else
     --     onCombatStarted(combatGuid)
     -- end
-    TurnOrder.setPlayersSwarmGroup()
-    TurnOrder.setPartyInitiativeRollToMean()
-    TurnOrder.bumpDirectlyControlledInitiativeRolls()
-    TurnOrder.reorderByInitiativeRoll()
-    TurnOrder.setPlayerTurnsActive()
 end
 
 local function onCombatEnded(combatGuid)
@@ -439,7 +439,7 @@ local function onGainedControl(uuid)
     end
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
-    TurnOrder.reorderByInitiativeRoll()
+    TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
 end
 
