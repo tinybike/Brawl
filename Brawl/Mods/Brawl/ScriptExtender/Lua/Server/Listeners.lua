@@ -635,6 +635,8 @@ local function onReactionInterruptActionNeeded(characterGuid)
     debugPrint("ReactionInterruptActionNeeded", characterGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
+    else
+        RT.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
     end
     Movement.pauseTimers()
 end
@@ -649,6 +651,8 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
     debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
+    else
+        RT.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
     end
     Movement.resumeTimers()
 end
@@ -656,6 +660,8 @@ end
 local function onServerInterruptDecision()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onServerInterruptDecision()
+    else
+        RT.Listeners.onServerInterruptDecision()
     end
     Movement.resumeTimers()
 end

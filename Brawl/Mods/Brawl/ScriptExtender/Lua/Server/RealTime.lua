@@ -207,6 +207,7 @@ local function nextCombatRound()
     end
 end
 
+-- NB: pause timer during interrupts
 local function startCombatRoundTimer(combatGuid)
     -- if not State.isInCombat() then
     --     Osi.PauseCombat(combatGuid)
@@ -515,6 +516,31 @@ local function onPROC_Subregion_Entered(uuid)
     end
 end
 
+local function onReactionInterruptActionNeeded(uuid)
+    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
+        pauseCombatRoundTimers()
+        -- pausePulseActions()
+    end
+end
+
+local function onReactionInterruptUsed(uuid, isAutoTriggered)
+    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
+        resumeCombatRoundTimers()
+        -- resumePulseActions()
+    end
+end
+
+-- thank u focus
+local function onServerInterruptDecision()
+    if Ext.System.ServerInterruptDecision and Ext.System.ServerInterruptDecision.Decisions then
+        for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
+            resumeCombatRoundTimers()
+            -- resumePulseActions()
+            return
+        end
+    end
+end
+
 return {
     joinCombat = joinCombat,
     nextCombatRound = nextCombatRound,
@@ -552,5 +578,8 @@ return {
         onDialogEnded = onDialogEnded,
         onTeleportedToCamp = onTeleportedToCamp,
         onPROC_Subregion_Entered = onPROC_Subregion_Entered,
+        onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
+        onReactionInterruptUsed = onReactionInterruptUsed,
+        onServerInterruptDecision = onServerInterruptDecision,
     },
 }

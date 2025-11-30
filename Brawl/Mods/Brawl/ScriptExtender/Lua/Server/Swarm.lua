@@ -747,7 +747,7 @@ end
 local function onServerInterruptDecision()
     if Ext.System.ServerInterruptDecision and Ext.System.ServerInterruptDecision.Decisions then
         for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
-            resumeTimers()
+            return resumeTimers()
         end
     end
 end
