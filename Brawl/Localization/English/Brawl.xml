@@ -9,6 +9,8 @@
     <content contentuid="h9f0b74e2g0973g4847g8c88g12e26d743cb7" version="1">Hotkey for toggling the companion AI on/off</content>
     <content contentuid="h358f0669gbeffg4e34g9d77g3f7d1960c100" version="1">If checked, the game will automatically pause when the character the player is controlling goes down</content>
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
+    <content contentuid="h54ba96a6g334eg46dfg8c27g7f6a788ddbfe" version="1">If checked, the game will automatically pause when combat starts</content>
+    <content contentuid="h6413ceb1g2d0ag4866gb462g07f60d942b4f" version="1">Automatic Pause On Combat Start</content>
     <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in seconds, before adjusting for initiative.  The default is 6.0, meaning the AI will act once every 6 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.  (Note: values below 3 are not recommended and may cause strange behavior.)</content>
     <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
     <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>

@@ -170,7 +170,13 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
 end
 
 local function buildTarget(uuid, targetingType)
-    return {Target = Ext.Entity.Get(uuid), TargetingType = targetingType}
+    return {
+        -- Position = nil,
+        Target = Ext.Entity.Get(uuid),
+        -- Target2 = nil,
+        TargetingType = targetingType,
+        -- TargetProxy = nil,
+    }
 end
 
 local function buildTargets(casterUuid, spellName, targetUuid, targetingType, isFriendlyTarget)
@@ -276,14 +282,24 @@ local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid,
     local request = {
         CastOptions = castOptions,
         Caster = casterEntity,
+        -- Item = nil,
+        -- NetGuid = "",
+        -- Originator = {
+        --     ActionGuid = Constants.NULL_UUID,
+        --     CanApplyConcentration = true,
+        --     InterruptId = "",
+        --     PassiveId = "",
+        --     StatusId = "",
+        -- },
         RequestGuid = requestUuid or Utils.createUuid(),
         Spell = spell,
         -- StoryActionId = 0,
         Targets = targets,
+        -- field_70 = nil,
         field_A8 = 1,
     }
-    -- debugDump(request)
     submitSpellRequest(request, insertAtFront)
+    -- Osi.UseSpell(casterUuid, spellName, targetUuid)
     return request
 end
 

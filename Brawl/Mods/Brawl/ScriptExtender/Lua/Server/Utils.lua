@@ -437,6 +437,18 @@ local function hasBeneficialStatus(entityUuid, statusLabel)
     return false
 end
 
+-- thank u hippo0o
+local function remove(uuid)
+    Osi.PROC_RemoveAllPolymorphs(uuid)
+    Osi.PROC_RemoveAllDialogEntriesForSpeaker(uuid)
+    Osi.SetOnStage(uuid, 0)
+    Osi.SetHasDialog(uuid, 0)
+    Osi.RequestDelete(uuid)
+    Osi.RequestDeleteTemporary(uuid)
+    Osi.UnloadItem(uuid)
+    Osi.Die(uuid, 2, Constants.NULL_UUID, 0, 1)
+end
+
 local function changeHagHairStat(uuid, oldStat, newStat)
     if startsWith(oldStat, "HAG_HAIR_") and startsWith(newStat, "HAG_HAIR_") then
         local entity = Ext.Entity.Get(uuid)
@@ -554,118 +566,34 @@ local function isHostileTarget(uuid, targetUuid)
     return isHostile
 end
 
+local function getEnemyFactions()
+    local enemyFactions = {}
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Utils.isPugnacious(uuid) then
+            local faction = Osi.GetFaction(uuid)
+            if faction and not enemyFactions[faction] then
+                enemyFactions[faction] = uuid
+            end
+        end
+    end
+    return enemyFactions
+end
+
+local function getFTBEntity()
+    if State.Session.Players then
+        for uuid, _ in pairs(State.Session.Players) do
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.FTBParticipant then
+                return entity.FTBParticipant.field_18
+            end
+        end
+    end
+end
+
 local function getCombatEntity()
     local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
     if serverEnterRequestEntities and serverEnterRequestEntities[1] then
         return serverEnterRequestEntities[1]
-    end
-end
-
-local function joinCombat(uuid)
-    local combatEntity = getCombatEntity()
-    if combatEntity and combatEntity.ServerEnterRequest and combatEntity.ServerEnterRequest.EnterRequests then
-        local entity = Ext.Entity.Get(uuid)
-        if entity and M.Osi.CanJoinCombat(uuid) == 1 and M.Osi.IsInCombat(uuid) == 0 then
-            combatEntity.ServerEnterRequest.EnterRequests[entity] = true
-        end
-    end
-end
-
-local function setPlayersSwarmGroup(swarmGroupLabel)
-    local players = State.Session.Players
-    if players then
-        for uuid, _ in pairs(players) do
-            Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
-        end
-    end
-end
-
-local function showAllInitiativeRolls()
-    print("***********Initiative rolls************")
-    for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        print(M.Utils.getDisplayName(uuid), Swarm.getInitiativeRoll(uuid))
-    end
-    print("***************************************")
-end
-
-local function forceRefreshTopbar()
-    local players = State.Session.Players
-    if players then
-        local playerSwarmGroups = {}
-        for uuid, _ in pairs(players) do
-            playerSwarmGroups[uuid] = Osi.GetSwarmGroup(uuid) or ""
-        end
-        setPlayersSwarmGroup("REFRESH_TOPBAR")
-        Ext.OnNextTick(function ()
-            Ext.OnNextTick(function ()
-                for uuid, swarmGroupLabel in pairs(playerSwarmGroups) do
-                    Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel)
-                end
-            end)
-        end)
-    end
-end
-
-local function showTurnOrderGroups()
-    local combatEntity = getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        for i, group in ipairs(combatEntity.TurnOrder.Groups) do
-            if group.Members and group.Initiative ~= -20 then
-                local groupStr = ""
-                groupStr = groupStr .. tostring(i) .. " " .. tostring(group.Initiative)
-                if #group.Members then
-                    for j, member in ipairs(group.Members) do
-                        if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
-                            if j > 1 then
-                                groupStr = groupStr .. " +"
-                            end
-                            groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
-                        end
-                    end
-                end
-                if not group.IsPlayer then
-                    -- thank u hippo
-                    groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
-                end
-                print(groupStr)
-            end
-        end
-    end
-end
-
-local function setPlayerTurnsActive()
-    local combatEntity = getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        print("********init***********")
-        showTurnOrderGroups()
-        local groupsPlayers = {}
-        local groupsEnemies = {}
-        for _, info in ipairs(combatEntity.TurnOrder.Groups) do
-            if info.IsPlayer then
-                table.insert(groupsPlayers, info)
-            else
-                table.insert(groupsEnemies, info)
-            end
-        end
-        local numPlayerGroups = #groupsPlayers
-        for i = 1, numPlayerGroups do
-            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
-        end
-        for i = 1, #groupsEnemies do
-            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
-        end
-        print("********after*********")
-        showTurnOrderGroups()
-    end
-end
-
-local function getCurrentCombatRound()
-    local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-    if serverEnterRequestEntities then
-        local combatEntity = serverEnterRequestEntities[1]
-        if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
-            return combatEntity.TurnOrder.field_40
-        end
     end
 end
 
@@ -845,6 +773,7 @@ return {
     isBlinded = isBlinded,
     isSilenced = isSilenced,
     hasBeneficialStatus = hasBeneficialStatus,
+    remove = remove,
     changeHagHairStat = changeHagHairStat,
     createDummyObject = createDummyObject,
     showNotification = showNotification,
@@ -856,13 +785,9 @@ return {
     canMove = canMove,
     hasLoseControlStatus = hasLoseControlStatus,
     isHostileTarget = isHostileTarget,
+    getEnemyFactions = getEnemyFactions,
+    getFTBEntity = getFTBEntity,
     getCombatEntity = getCombatEntity,
-    showTurnOrderGroups = showTurnOrderGroups,
-    setPlayersSwarmGroup = setPlayersSwarmGroup,
-    showAllInitiativeRolls = showAllInitiativeRolls,
-    forceRefreshTopbar = forceRefreshTopbar,
-    setPlayerTurnsActive = setPlayerTurnsActive,
-    getCurrentCombatRound = getCurrentCombatRound,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
     getAbility = getAbility,

@@ -12,22 +12,6 @@ local function getNumExtraAttacks(entityUuid)
     return 0
 end
 
-local function calculateActionInterval(initiative)
-    local r = Constants.ACTION_INTERVAL_RESCALING
-    local scale = 1 + r - 4*r*initiative/(2*initiative + State.Settings.InitiativeDie + 1)
-    return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
-end
-
--- NB: is there a way to look up the initative die instead of defining it in the mod...?
-local function rollForInitiative(uuid)
-    local initiative = math.random(1, State.Settings.InitiativeDie)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.Stats and entity.Stats.InitiativeBonus ~= nil then
-        initiative = initiative + entity.Stats.InitiativeBonus
-    end
-    return initiative
-end
-
 local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = M.Osi.GetRegion(entityUuid)
@@ -38,7 +22,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             okToAdd = level and State.Session.Brawlers[level] ~= nil and State.Session.Brawlers[level][entityUuid] == nil and M.Utils.isAliveAndCanFight(entityUuid)
         end
         if State.Settings.TurnBasedSwarmMode and M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and entityUuid == Mods.ToT.PersistentVars.Scenario.CombatHelper then
-            debugPrint("ADDING COMBAT HELPER TO BRAWLERS")
             okToAdd = true
         end
         if okToAdd then
@@ -52,9 +35,21 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 isPaused = M.Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
-                actionInterval = calculateActionInterval(rollForInitiative(entityUuid)),
+                actionInterval = TurnOrder.calculateActionInterval(TurnOrder.rollForInitiative(entityUuid)),
                 auras = Spells.getAuras(entityUuid),
             }
+            local entity = Ext.Entity.Get(entityUuid)
+            local existingBrawler = State.Session.Brawlers[level][entityUuid]
+            if existingBrawler and existingBrawler.actionResources then
+                brawler.actionResources = existingBrawler.actionResources
+            else
+                -- does this work for entities that get pulled out of the brawl and then re-entered?
+                brawler.actionResources = {}
+                for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                    brawler.actionResources[resourceType] = {amount = M.Resources.getActionResourceAmount(entity, resourceType), refillQueue = {}}
+                end
+                brawler.actionResources.listener = Ext.Entity.Subscribe("ActionResources", Resources.actionResourcesCallback, entity)
+            end
             if State.getArchetype(entityUuid) == "barbarian" then
                 brawler.rage = Spells.getRageAbility(entityUuid)
                 debugPrint(displayName, "barbarian archetype, setting rage", brawler.rage)
@@ -64,50 +59,28 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
             modVars.ModifiedHitpoints = modVars.ModifiedHitpoints or {}
             State.revertHitpoints(entityUuid)
             State.modifyHitpoints(entityUuid)
-            -- If in turn-based swarm mode, then during the player's turn, SetCanJoinCombat=1 for everyone
-            -- and during the enemy turn SetCanJoinCombat=0 for everyone.
-            -- There are no circumstances where the settings should be different for players vs enemies, BUT
-            -- the trigger to change the setting should be the players' turns start/enemy turns starting.
-            -- Players must be LOCKED during enemy turns to avoid RT combat!
-            -- All players should be set to have identical initiatives for this.
-            -- Pause/True Pause should NOT do anything in this mode.
+            Osi.SetCanJoinCombat(entityUuid, 1)
             if State.Settings.TurnBasedSwarmMode then
-                Osi.SetCanJoinCombat(entityUuid, 1)
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsPartyMember(entityUuid, 1) ~= 1 then
                     State.Session.SwarmTurnComplete[entityUuid] = false
                     Osi.PROC_SelfHealing_Disable(entityUuid)
-                    -- if Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
-                    --     print("added ally", M.Utils.getDisplayName(entityUuid), entityUuid)
-                    --     State.boostAllyInitiative(entityUuid)
-                    -- end
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then
-                    -- brawler.originalCanJoinCombat = M.Osi.CanJoinCombat(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
                     -- thank u lunisole/ghostboats
                     Osi.PROC_SelfHealing_Disable(entityUuid)
-                elseif State.Session.Players[entityUuid] then
-                    -- brawler.originalCanJoinCombat = 1
-                    Movement.setPlayerRunToSprint(entityUuid)
-                    Osi.SetCanJoinCombat(entityUuid, 0)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
-                -- if isInBrawl and Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                     if State.Session.PulseActionTimers[entityUuid] == nil then
-                        startPulseAction(brawler)
-                    end
-                    if State.Session.BrawlFizzler[level] == nil then
-                        startBrawlFizzler(level)
+                        RT.Timers.startPulseAction(brawler)
                     end
                 else
-                    -- debugPrint("ADDING TO ROSTER DURING FTB...")
                     Utils.clearOsirisQueue(entityUuid)
-                    stopPulseAction(brawler)
+                    RT.Timers.stopPulseAction(brawler)
                     Osi.ForceTurnBasedMode(entityUuid, 1)
                     if not State.Session.Players[entityUuid] then
                         brawler.isPaused = true
@@ -134,16 +107,27 @@ local function removeBrawler(level, entityUuid)
             end
         end
         if brawlersInLevel[entityUuid] then
-            stopPulseAction(brawlersInLevel[entityUuid])
+            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                local actionResources = brawlersInLevel[entityUuid].actionResources
+                if actionResources then
+                    if actionResources[resourceType] then
+                        if actionResources[resourceType].refillQueue then
+                            for _, actionResourceTimer in ipairs(actionResources[resourceType].refillQueue) do
+                                Ext.Timer.Cancel(actionResourceTimer)
+                            end
+                        end
+                    end
+                    if actionResources.listener then
+                        Ext.Entity.Unsubscribe(actionResources.listener)
+                    end
+                end
+            end
+            RT.Timers.stopPulseAction(brawlersInLevel[entityUuid])
             brawlersInLevel[entityUuid] = nil
         end
         Osi.SetCanJoinCombat(entityUuid, 1)
         if M.Osi.IsPartyMember(entityUuid, 1) == 0 then
             State.revertHitpoints(entityUuid)
-            -- if State.Settings.TurnBasedSwarmMode and Osi.IsAlly(entityUuid, M.Osi.GetHostCharacter()) == 1 then
-            --     print("remove ally brawler", entityUuid, M.Utils.getDisplayName(entityUuid))
-            --     State.removeBoostAllyInitiative(entityUuid)
-            -- end
         else
             State.Session.PlayerCurrentTarget[entityUuid] = nil
             State.Session.PlayerMarkedTarget[entityUuid] = nil
@@ -158,6 +142,16 @@ local function removeBrawler(level, entityUuid)
     end
 end
 
+local function addCombatParticipantsToBrawlers()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
+        for _, participant in ipairs(combatEntity.CombatState.Participants) do
+            debugPrint(M.Utils.getDisplayName(participant.Uuid.EntityUuid), "adding to brawlers")
+            addBrawler(participant.Uuid.EntityUuid, true)
+        end
+    end
+end
+
 local function endBrawl(level)
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
@@ -167,6 +161,10 @@ local function endBrawl(level)
         end
         debugDump(brawlersInLevel)
     end
+    if State.Session.CombatHelper then
+        Utils.remove(State.Session.CombatHelper)
+        State.Session.CombatHelper = nil
+    end
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
@@ -175,8 +173,7 @@ local function endBrawl(level)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.cancelTimers()
     end
-    -- stopPulseReposition(level)
-    stopBrawlFizzler(level)
+    -- RT.Timers.stopPulseReposition(level)
 end
 
 local function getBrawlerByUuid(uuid)
@@ -261,7 +258,7 @@ end
 
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = M.State.getNumEnemiesRemaining(level)
-    debugPrint("Number of enemies remaining:", numEnemiesRemaining)
+    print("Number of enemies remaining:", numEnemiesRemaining)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
     end
@@ -272,7 +269,7 @@ local function initBrawlers(level)
     local players = State.Session.Players
     for playerUuid, player in pairs(players) do
         if not State.Settings.TurnBasedSwarmMode and player.isControllingDirectly then
-            startPulseAddNearby(playerUuid)
+            RT.Timers.startPulseAddNearby(playerUuid)
         end
         if Osi.IsInCombat(playerUuid) == 1 then
             Listeners.onCombatStarted(M.Osi.CombatGetGuidFor(playerUuid))
@@ -280,7 +277,7 @@ local function initBrawlers(level)
         end
     end
     if not State.Settings.TurnBasedSwarmMode then
-        startPulseReposition(level)
+        RT.Timers.startPulseReposition(level)
     end
 end
 
@@ -298,9 +295,9 @@ end
 return {
     getBrawlerByUuid = getBrawlerByUuid,
     getBrawlerByName = getBrawlerByName,
-    rollForInitiative = rollForInitiative,
     addBrawler = addBrawler,
     removeBrawler = removeBrawler,
+    addCombatParticipantsToBrawlers = addCombatParticipantsToBrawlers,
     endBrawl = endBrawl,
     getBrawlersSortedByDistance = getBrawlersSortedByDistance,
     addNearbyToBrawlers = addNearbyToBrawlers,

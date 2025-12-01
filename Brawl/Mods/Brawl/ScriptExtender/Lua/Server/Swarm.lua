@@ -27,62 +27,27 @@ local function getChunkTimeout(swarmActors)
     return math.floor(State.Settings.SwarmTurnTimeout*1000)
 end
 
-local function getInitiativeRoll(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.CombatParticipant then
-        return entity.CombatParticipant.InitiativeRoll
-    end
-end
-
-local function calculateMeanInitiativeRoll()
-    debugPrint("Calculating mean initiative roll")
-    local totalInitiativeRoll = 0
-    local numInitiativeRolls = 0
-    for uuid, player in pairs(State.Session.Players) do
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
-            totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
-            numInitiativeRolls = numInitiativeRolls + 1
-        end
-    end
-    local meanInitiativeRoll = math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
-    debugPrint("Mean initiative roll:", meanInitiativeRoll)
-    return meanInitiativeRoll
-end
-
-local function setInitiativeRoll(uuid, roll)
-    local entity = Ext.Entity.Get(uuid)
-    if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
-        entity.CombatParticipant.InitiativeRoll = roll
-        if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
-            entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
-            entity.CombatParticipant.CombatHandle:Replicate("CombatState")
-        end
-        entity:Replicate("CombatParticipant")
-    end
-end
-
-local function setPartyInitiativeRollToMean()
-    State.Session.MeanInitiativeRoll = calculateMeanInitiativeRoll()
-    for uuid, player in pairs(State.Session.Players) do
-        setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
-    end
-end
-
-local function bumpNpcInitiativeRoll(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    local initiativeRoll = getInitiativeRoll(uuid)
-    local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
-    debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
-    setInitiativeRoll(uuid, bumpedInitiativeRoll)
-end
-
-local function bumpNpcInitiativeRolls()
-    if State.Session.MeanInitiativeRoll ~= -100 then
-        for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            if not State.Session.Players[uuid] and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
-                bumpNpcInitiativeRoll(uuid)
+local function cancelActionTimers(swarmActors)
+    debugPrint("cancelActionTimers", swarmActors)
+    if swarmActors then debugDump(swarmActors) end
+    if State.Settings.TurnBasedSwarmMode and State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
+        if swarmActors then
+            for _, uuid in ipairs(swarmActors) do
+                local failsafe = State.Session.ActionSequenceFailsafeTimer[uuid]
+                if failsafe and failsafe.timer then
+                    Ext.Timer.Cancel(failsafe.timer)
+                    failsafe.timer = nil
+                end
+                Actions.removeActionsInProgress(uuid)
             end
+        else
+            for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
+                if failsafe.timer then
+                    Ext.Timer.Cancel(failsafe.timer)
+                    failsafe.timer = nil
+                end
+            end
+            State.Session.ActionsInProgress = {}
         end
     end
 end
@@ -444,7 +409,7 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
     local uuid = brawler.uuid
     debugPrint(brawler.displayName, "startActionSequenceFailsafeTimer", request.Spell.Prototype, swarmTurnActiveInitial, count)
     local isRetry = false
-    local currentCombatRound = M.Utils.getCurrentCombatRound()
+    local currentCombatRound = M.TurnOrder.getCurrentCombatRound()
     if State.Session.ActionSequenceFailsafeTimer[uuid] then
         cancelActionSequenceFailsafeTimer(uuid)
         isRetry = true
@@ -456,7 +421,7 @@ local function startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiv
         if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
             return callback(uuid)
         end
-        if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.Utils.getCurrentCombatRound() then
+        if Actions.getActionInProgress(uuid, request.RequestGuid) and currentCombatRound == M.TurnOrder.getCurrentCombatRound() then
             debugPrint(brawler.displayName, "action timed out", request.Spell.Prototype, isRetry)
             Actions.removeActionInProgress(uuid, request.RequestGuid)
             if not isRetry then
@@ -506,7 +471,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             return callback(brawler.uuid, swarmActors)
         end
         if numActions == 0 then
-            return AI.pulseAction(brawler, true, function (request)
+            return AI.act(brawler, true, function (request)
                 debugPrint(brawler.displayName, "bonus action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
                 if requestedEndTurn(brawler.uuid) then
                     return callback(brawler.uuid, swarmActors)
@@ -532,7 +497,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
         --     _D(State.Session.ActionsInProgress[brawler.uuid])
         --     error("we have a current AIP, what is this????")
         -- end
-        AI.pulseAction(brawler, false, function (request)
+        AI.act(brawler, false, function (request)
             debugPrint(brawler.displayName, "action SUBMITTED", request.Spell.Prototype, request.RequestGuid)
             if requestedEndTurn(brawler.uuid) then
                 return callback(brawler.uuid, swarmActors)
@@ -578,7 +543,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint("setting temporary hostile", brawler.displayName, brawler.uuid, hostCharacterUuid)
         Osi.SetRelationTemporaryHostile(brawler.uuid, hostCharacterUuid)
     end
-    if State.Session.Players[brawler.uuid] or (M.Utils.isToT() and Mods.ToT.PersistentVars.Scenario and brawler.uuid == Mods.ToT.PersistentVars.Scenario.CombatHelper) or not M.Utils.canAct(brawler.uuid) then
+    if State.Session.Players[brawler.uuid] or M.State.isToTCombatHelper(brawler.uuid) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         return false
     end
@@ -671,39 +636,16 @@ local function checkAllPlayersFinishedTurns()
     return nil
 end
 
-local function getNewInitiativeRolls(groups)
-    local newInitiativeRolls = {}
-    for _, info in ipairs(groups) do
-        if info.Members and info.Members[1] and info.Members[1].Entity then
-            table.insert(newInitiativeRolls, getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid))
-        end
+local function onStarted()
+    if State.Settings.PlayersGoFirst then
+        State.boostPlayerInitiatives()
     end
-    return newInitiativeRolls
+    State.recapPartyMembersMovementDistances()
 end
 
-local function reorderByInitiativeRoll()
-    local combatEntity = Utils.getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        local reorderedGroups = {}
-        for i, newInitiative in ipairs(getNewInitiativeRolls(combatEntity.TurnOrder.Groups)) do
-            local group = combatEntity.TurnOrder.Groups[i]
-            local members = {}
-            for _, member in ipairs(group.Members) do
-                table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
-            end
-            table.insert(reorderedGroups, {
-                Initiative = newInitiative,
-                IsPlayer = group.IsPlayer,
-                Round = group.Round,
-                Team = group.Team,
-                Members = members,
-            })
-        end
-        table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
-        combatEntity.TurnOrder.Groups = reorderedGroups
-        combatEntity:Replicate("TurnOrder")
-        -- Utils.forceRefreshTopbar()
-    end
+local function onCombatStarted()
+    -- NB: do this for RT mode too??
+    Leaderboard.initialize()
 end
 
 local function onCombatRoundStarted(round)
@@ -714,38 +656,19 @@ local function onCombatRoundStarted(round)
     -- State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
     if not State.Settings.PlayersGoFirst then
-        Utils.showAllInitiativeRolls()
-        debugPrint("*****onCombatRoundStarted original turn order")
-        Utils.showTurnOrderGroups()
-        setPartyInitiativeRollToMean()
-        bumpNpcInitiativeRolls()
-        reorderByInitiativeRoll()
-        debugPrint("*****onCombatRoundStarted updated turn order")
-        Utils.showTurnOrderGroups()
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpNpcInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll()
     end
     local enemyList, excludedEnemyList = getEnemyList(true)
     startSwarmTurn(enemyList, excludedEnemyList, true)
 end
 
 local function onCombatEnded()
-    State.Session.StoryActionIDs = {}
     State.Session.SwarmTurnComplete = {}
-    State.Session.MeanInitiativeRoll = nil
     cancelTimers()
     Leaderboard.dumpToConsole()
     Leaderboard.postDataToClients()
-end
-
-local function onEnteredCombat(uuid)
-    if uuid and State.Session.Players and State.Session.Players[uuid] then
-        debugPrint("initiative roll", getInitiativeRoll(uuid))
-        if State.Session.ResurrectedPlayer[uuid] then
-            State.Session.ResurrectedPlayer[uuid] = nil
-            setInitiativeRoll(uuid, Roster.rollForInitiative(uuid))
-            debugPrint("updated initiative roll for resurrected player", getInitiativeRoll(uuid))
-            setPartyInitiativeRollToMean()
-        end
-    end
 end
 
 local function onTurnStarted(uuid)
@@ -808,7 +731,7 @@ local function onCharacterJoinedParty(uuid)
             State.boostPlayerInitiative(uuid)
         end
         State.recapPartyMembersMovementDistances()
-        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = M.Utils.isPlayerTurnEnded(uuid)
+        State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
     end
 end
 
@@ -858,14 +781,13 @@ end
 local function onServerInterruptDecision()
     if Ext.System.ServerInterruptDecision and Ext.System.ServerInterruptDecision.Decisions then
         for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
-            resumeTimers()
+            return resumeTimers()
         end
     end
 end
 
 return {
     getEnemyList = getEnemyList,
-    getInitiativeRoll = getInitiativeRoll,
     cancelTimers = cancelTimers,
     resumeTimers = resumeTimers,
     pauseTimers = pauseTimers,
@@ -886,9 +808,10 @@ return {
     useRemainingActions = useRemainingActions,
     swarmAction = swarmAction,
     Listeners = {
+        onStarted = onStarted,
+        onCombatStarted = onCombatStarted,
         onCombatRoundStarted = onCombatRoundStarted,
         onCombatEnded = onCombatEnded,
-        onEnteredCombat = onEnteredCombat,
         onTurnStarted = onTurnStarted,
         onTurnEnded = onTurnEnded,
         onDied = onDied,

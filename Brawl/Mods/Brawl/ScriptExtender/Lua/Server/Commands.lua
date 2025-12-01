@@ -30,7 +30,7 @@ local function disableCompanionAI()
         local level = M.Osi.GetRegion(playerUuid)
         if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
             Utils.clearOsirisQueue(playerUuid)
-            stopPulseAction(State.Session.Brawlers[level][playerUuid])
+            RT.Timers.stopPulseAction(State.Session.Brawlers[level][playerUuid])
         end
     end
     modStatusMessage("Companion AI Disabled")
@@ -59,7 +59,7 @@ local function disableFullAuto()
             local level = M.Osi.GetRegion(playerUuid)
             if level and State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][playerUuid] then
                 Utils.clearOsirisQueue(playerUuid)
-                stopPulseAction(State.Session.Brawlers[level][playerUuid])
+                RT.Timers.stopPulseAction(State.Session.Brawlers[level][playerUuid])
             end
         end
     end
@@ -539,10 +539,9 @@ end
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
-        stopAllPulseAddNearbyTimers()
-        stopAllPulseRepositionTimers()
-        stopAllPulseActionTimers()
-        stopAllBrawlFizzlers()
+        RT.Timers.stopAllPulseAddNearbyTimers()
+        RT.Timers.stopAllPulseRepositionTimers()
+        RT.Timers.stopAllPulseActionTimers()
         State.endBrawls()
         if State.Settings.PlayersGoFirst then
             State.boostPlayerInitiatives()
@@ -552,6 +551,7 @@ local function onMCMTurnBasedSwarmMode(value)
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
+        State.disableDynamicCombatCamera()
         disableMod()
         enableMod()
     end

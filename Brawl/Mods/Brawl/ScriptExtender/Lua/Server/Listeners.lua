@@ -1,59 +1,21 @@
+-- ECSPrinter = require("Server/ECSPrinter.lua")
+
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
-local function onCharacterMoveFailedUseJump(character)
-    debugPrint("CharacterMoveFailedUseJump", character)
+local function cleanupAll()
+    RT.Timers.stopAllPulseAddNearbyTimers()
+    RT.Timers.stopAllPulseRepositionTimers()
+    RT.Timers.stopAllPulseActionTimers()
+    State.endBrawls()
+    State.revertAllModifiedHitpoints()
+    State.recapPartyMembersMovementDistances()
+    Spells.resetSpellData()
 end
 
-local function onCombatStarted(combatGuid)
-    debugPrint("CombatStarted", combatGuid)
-    if State.Settings.TurnBasedSwarmMode then
-        Leaderboard.initialize()
-    end
-    -- NB: clean this up / don't reassign "constant" values
-    if Utils.isToT() then
-        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
-            State.Session.TBSMToTSkippedPrepRound = false
-        else
-            State.Session.TBSMToTSkippedPrepRound = true
-        end
-        Constants.ENTER_COMBAT_RANGE = 100
-    else
-        Constants.ENTER_COMBAT_RANGE = 20
-    end
-    for playerUuid, _ in pairs(State.Session.Players) do
-        Roster.addBrawler(playerUuid, true)
-    end
-    local level = Osi.GetRegion(Osi.GetHostCharacter())
-    if level then
-        if State.Settings.TurnBasedSwarmMode then
-            local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
-            if serverEnterRequestEntities then
-                local combatEntity = serverEnterRequestEntities[1]
-                if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-                    for _, participant in ipairs(combatEntity.CombatState.Participants) do
-                        if not State.Session.Players[participant.Uuid.EntityUuid] then
-                            Roster.addBrawler(participant.Uuid.EntityUuid, true)
-                        end
-                    end
-                end
-            end
-        else
-            if not Utils.isToT() then
-                startBrawlFizzler(level)
-                Ext.Timer.WaitFor(500, function ()
-                    Roster.addNearbyToBrawlers(M.Osi.GetHostCharacter(), Constants.NEARBY_RADIUS, combatGuid)
-                    Ext.Timer.WaitFor(1500, function ()
-                        if M.Osi.CombatIsActive(combatGuid) then
-                            -- NB: is there a way to do this less aggressively?
-                            Osi.EndCombat(combatGuid)
-                        end
-                    end)
-                end)
-            else
-                startToTTimers()
-            end
-        end
+local function onGameStateChanged(e)
+    if e and e.ToState == "UnloadLevel" then
+        cleanupAll()
     end
 end
 
@@ -70,17 +32,35 @@ local function onStarted(level)
     State.setupPartyMembersHitpoints()
     Roster.initBrawlers(level)
     if State.Settings.TurnBasedSwarmMode then
-        if State.Settings.PlayersGoFirst then
-            State.boostPlayerInitiatives()
-        end
-        State.recapPartyMembersMovementDistances()
+        Swarm.Listeners.onStarted()
     else
-        State.uncapPartyMembersMovementDistances()
-        Pause.checkTruePauseParty()
+        RT.Listeners.onStarted()
     end
     Leaderboard.initialize()
     debugDump(State.Session.Players)
     Ext.ServerNet.BroadcastMessage("Started", level)
+end
+
+local function onCombatStarted(combatGuid)
+    print("CombatStarted", combatGuid)
+    if State.Settings.TurnBasedSwarmMode then
+        Swarm.Listeners.onCombatStarted()
+    end
+    -- NB: clean this up / don't reassign "constant" values
+    if Utils.isToT() then
+        if Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Round == 0 then
+            State.Session.TBSMToTSkippedPrepRound = false
+        else
+            State.Session.TBSMToTSkippedPrepRound = true
+        end
+        Constants.ENTER_COMBAT_RANGE = 100
+    else
+        Constants.ENTER_COMBAT_RANGE = 20
+    end
+    Roster.addCombatParticipantsToBrawlers()
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onCombatStarted(combatGuid)
+    end
 end
 
 local function onResetCompleted()
@@ -106,159 +86,76 @@ local function onLevelGameplayStarted(level, _)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    debugPrint("CombatRoundStarted", combatGuid, round)
+    print("CombatRoundStarted", combatGuid, round)
+    Roster.addCombatParticipantsToBrawlers()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
-        if M.Utils.isToT() then
-            startToTTimers()
-        else
-            onCombatStarted(combatGuid)
-        end
+        RT.Listeners.onCombatRoundStarted(combatGuid, round)
     end
 end
 
+-- NB: move all of the endBrawl stuff to here
 local function onCombatEnded(combatGuid)
-    debugPrint("CombatEnded", combatGuid)
+    print("CombatEnded", combatGuid)
+    State.Session.StoryActionIDs = {}
+    State.Session.MeanInitiativeRoll = nil
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatEnded()
+    else
+        RT.Listeners.onCombatEnded(combatGuid)
     end
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
-    local entityUuid = M.Osi.GetUUID(entityGuid)
-    if entityUuid then
-        Roster.addBrawler(entityUuid, true)
-    end
-    if State.Settings.TurnBasedSwarmMode then
-        Swarm.Listeners.onEnteredCombat(entityUuid)
+    local uuid = M.Osi.GetUUID(entityGuid)
+    if uuid then
+        Roster.addBrawler(uuid, true)
+        if State.Session.Players and State.Session.Players[uuid] then
+            debugPrint("initiative roll", TurnOrder.getInitiativeRoll(uuid))
+            if State.Session.ResurrectedPlayer[uuid] then
+                State.Session.ResurrectedPlayer[uuid] = nil
+                TurnOrder.setInitiativeRoll(uuid, TurnOrder.rollForInitiative(uuid))
+                debugPrint("updated initiative roll for resurrected player", TurnOrder.getInitiativeRoll(uuid))
+                TurnOrder.setPartyInitiativeRollToMean()
+            end
+        end
+        if not State.Settings.TurnBasedSwarmMode then
+            RT.Listeners.onEnteredCombat(uuid)
+        end
     end
 end
 
--- local function onCombatParticipant(entity, _, _)
---     local uuid = entity.Uuid.EntityUuid
---     if State.Settings.TurnBasedSwarmMode and M.Osi.IsPartyMember(uuid, 1) == 1 then
---         debugPrint("initiative roll", Swarm.getInitiativeRoll(uuid))
---     end
--- end
-
 local function onEnteredForceTurnBased(entityGuid)
-    debugPrint("EnteredForceTurnBased", entityGuid)
-    local entityUuid = M.Osi.GetUUID(entityGuid)
-    local level = M.Osi.GetRegion(entityGuid)
-    if level and entityUuid and not State.Settings.TurnBasedSwarmMode then
-        local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
-        if isPlayer then
-            local isHostCharacter = entityUuid == Osi.GetHostCharacter()
-            if State.Session.Players[entityUuid].isFreshSummon then
-                State.Session.Players[entityUuid].isFreshSummon = false
-                return Osi.ForceTurnBasedMode(entityUuid, 0)
-            end
-            if State.Session.AwaitingTarget[entityUuid] then
-                Commands.setAwaitingTarget(entityUuid, false)
-            end
-            Quests.stopCountdownTimer(entityUuid)
-            if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
-                State.Session.Brawlers[level][entityUuid].isInBrawl = false
-            end
-            stopPulseAddNearby(entityUuid)
-            if isHostCharacter then
-                stopPulseReposition(level)
-                stopBrawlFizzler(level)
-                if M.Utils.isToT() then
-                    stopToTTimers()
-                end
-            end
-        end
-        if M.Utils.isAliveAndCanFight(entityUuid) then
-            Utils.clearOsirisQueue(entityUuid)
-            if State.Settings.TruePause then
-                Pause.startTruePause(entityUuid)
-            end
-        end
-        if isPlayer then
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if brawlersInLevel then
-                for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                    if not brawlersInLevel[brawlerUuid].isPaused then
-                        debugPrint("stopping pulse for", brawler.uuid, brawler.displayName)
-                        stopPulseAction(brawler, true)
-                        brawlersInLevel[brawlerUuid].isPaused = true
-                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                        -- if brawlerUuid ~= entityUuid then
-                        --     if State.Session.Players[brawlerUuid] then
-                        --         brawlersInLevel[brawlerUuid].isPaused = true
-                        --         Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                        --     end
-                        -- end
-                    end
-                end
-            end
-        end
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
 local function onLeftForceTurnBased(entityGuid)
-    debugPrint("LeftForceTurnBased", entityGuid)
-    local entityUuid = M.Osi.GetUUID(entityGuid)
-    local level = M.Osi.GetRegion(entityGuid)
-    if level and entityUuid and State.Session.Players and State.Session.Players[entityUuid] and not State.Settings.TurnBasedSwarmMode then
-        if State.Session.Players[entityUuid].isFreshSummon then
-            State.Session.Players[entityUuid].isFreshSummon = false
-        end
-        Quests.resumeCountdownTimer(entityUuid)
-        if State.Session.FTBLockedIn[entityUuid] ~= nil then
-            State.Session.FTBLockedIn[entityUuid] = nil
-        end
-        State.Session.RemainingMovement[entityUuid] = nil
-        if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
-            State.Session.Brawlers[level][entityUuid].isInBrawl = true
-            if State.isPlayerControllingDirectly(entityUuid) then
-                startPulseAddNearby(entityUuid)
-            end
-        end
-        local isHostCharacter = entityUuid == Osi.GetHostCharacter()
-        if isHostCharacter then
-            startPulseReposition(level)
-        end
-        -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
-        if State.areAnyPlayersBrawling() then
-            if isHostCharacter then
-                startBrawlFizzler(level)
-                if M.Utils.isToT() then
-                    startToTTimers()
-                end
-            end
-            local brawlersInLevel = State.Session.Brawlers[level]
-            if brawlersInLevel then
-                for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                    if State.Session.Players[brawlerUuid] then
-                        if not State.isPlayerControllingDirectly(brawlerUuid) or State.Settings.FullAuto then
-                            startPulseAction(brawler)
-                            -- Ext.Timer.WaitFor(2000, function ()
-                            --     Osi.FlushOsirisQueue(brawlerUuid)
-                            --     startPulseAction(brawler)
-                            -- end)
-                        end
-                        brawlersInLevel[brawlerUuid].isPaused = false
-                        if brawlerUuid ~= entityUuid then
-                            debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
-                            Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                        end
-                    else
-                        startPulseAction(brawler)
-                    end
-                end
-            end
-        end
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
 local function onTurnStarted(entityGuid)
-    debugPrint("TurnStarted", entityGuid)
+    print("TurnStarted", entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
+    else
+        -- if M.Osi.GetUUID(entityGuid) == State.Session.CombatHelper then
+        --     local combatGuid = M.Osi.GetCombatGuidFor(entityGuid)
+        --     if combatGuid then
+        --         print("got guid, pausing combat...", combatGuid, entityGuid)
+        --         Osi.PauseCombat(combatGuid)
+        --         Ext.Timer.WaitFor(1000, function ()
+        --             print("resming")
+        --             Osi.ResumeCombat(combatGuid)
+        --             Osi.EndTurn(State.Session.CombatHelper)
+        --         end)
+        --     end
+        -- end 
     end
 end
 
@@ -323,31 +220,23 @@ local function onGainedControl(targetGuid)
                 MCM.Set("active_character_archetype", isValidArchetype and archetype or "")
             end
         end
-        if not State.Settings.FullAuto then
-            Utils.clearOsirisQueue(targetUuid)
-        end
-        local targetUserId = Osi.GetReservedUserID(targetUuid)
-        local players = State.Session.Players
-        if players[targetUuid] ~= nil and targetUserId ~= nil then
-            players[targetUuid].isControllingDirectly = true
-            if not State.Settings.TurnBasedSwarmMode then
-                startPulseAddNearby(targetUuid)
-            end
-            local level = M.Osi.GetRegion(targetUuid)
-            local brawlersInLevel = State.Session.Brawlers[level]
-            for playerUuid, player in pairs(players) do
-                if player.userId == targetUserId and playerUuid ~= targetUuid then
-                    player.isControllingDirectly = false
-                    if not State.Settings.TurnBasedSwarmMode and level and brawlersInLevel and brawlersInLevel[playerUuid] and brawlersInLevel[playerUuid].isInBrawl then
-                        stopPulseAddNearby(playerUuid)
-                        startPulseAction(brawlersInLevel[playerUuid])
+        if State.Session.Players[targetUuid] then
+            local targetUserId = Osi.GetReservedUserID(targetUuid)
+            if targetUserId then
+                State.Session.Players[targetUuid].isControllingDirectly = true
+                for playerUuid, player in pairs(State.Session.Players) do
+                    if player.userId == targetUserId and playerUuid ~= targetUuid then
+                        player.isControllingDirectly = false
                     end
                 end
             end
-            if level and brawlersInLevel and brawlersInLevel[targetUuid] and not State.Settings.FullAuto then
-                stopPulseAction(brawlersInLevel[targetUuid], true)
+            if not State.Settings.FullAuto then
+                Utils.clearOsirisQueue(targetUuid)
+                RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
             end
-            -- debugDump(players)
+            if not State.Settings.TurnBasedSwarmMode then
+                RT.Listeners.onGainedControl(targetUuid)
+            end
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
@@ -388,10 +277,11 @@ local function onCharacterLeftParty(character)
         if State.Session.Players and State.Session.Players[uuid] then
             State.Session.Players[uuid] = nil
         end
-        local level = M.Osi.GetRegion(uuid)
-        if State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][uuid] then
-            State.Session.Brawlers[level][uuid] = nil
-        end
+        -- NB: can remove this??
+        -- local level = M.Osi.GetRegion(uuid)
+        -- if State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][uuid] then
+        --     State.Session.Brawlers[level][uuid] = nil
+        -- end
     end
 end
 
@@ -400,14 +290,14 @@ local function onRollResult(eventName, roller, rollSubject, resultType, isActive
 end
 
 local function onDownedChanged(character, isDowned)
-    local entityUuid = M.Osi.GetUUID(character)
-    debugPrint("DownedChanged", character, isDowned, entityUuid)
-    local player = State.Session.Players[entityUuid]
-    local level = M.Osi.GetRegion(entityUuid)
+    local uuid = M.Osi.GetUUID(character)
+    debugPrint("DownedChanged", character, isDowned, uuid)
+    local player = State.Session.Players[uuid]
     if player then
         if isDowned == 1 and State.Settings.AutoPauseOnDowned and player.isControllingDirectly then
-            if State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] and not State.Session.Brawlers[level][entityUuid].isPaused then
-                Osi.ForceTurnBasedMode(entityUuid, 1)
+            local brawler = M.Roster.getBrawlerByUuid(uuid)
+            if brawler and not brawler.isPaused then
+                Osi.ForceTurnBasedMode(uuid, 1)
             end
         end
         if isDowned == 0 then
@@ -465,10 +355,6 @@ local function onServerStatusApplyEvent(_, _, component)
     end
 end
 
-local function onHitpointsChanged(guid, percentage)
-    -- debugPrint("hp changed", guid, percentage)
-end
-
 local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     debugPrint("AttackedBy", defenderGuid, attackerGuid, attacker2, damageType, damageAmount, damageCause, storyActionID)
     local attackerUuid = M.Osi.GetUUID(attackerGuid)
@@ -510,6 +396,18 @@ local function onKilledBy(defenderGuid, attackOwner, attackerGuid, storyActionID
     end
     State.Session.ExtraAttacksRemaining[attackerUuid] = nil
     State.Session.ExtraAttacksRemaining[defenderUuid] = nil
+end
+
+local function onSpellSyncTargeting(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onSpellSyncTargeting(cast.SpellCastState)
+    end
+end
+
+local function onDestroySpellSyncTargeting(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onDestroySpellSyncTargeting(cast.SpellCastState)
+    end
 end
 
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
@@ -596,7 +494,6 @@ end
 
 -- thank u Norb and Mazzle
 local function onSpellCastFinishedEvent(cast, _, _)
-    -- _D(cast:GetAllComponents())
     if cast and cast.SpellCastState and cast.SpellCastState.Caster and cast.ServerSpellCastState and cast.ServerSpellCastState.StoryActionId then
         -- _D(cast.SpellCastState)
         -- _D(cast.ServerSpellCastState)
@@ -607,7 +504,7 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
-            debugDump(actionInProgress)
+            -- _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             local spellName = actionInProgress.spellName
             local onCompleted = actionInProgress.onCompleted
@@ -634,55 +531,22 @@ local function onSpellCastFinishedEvent(cast, _, _)
 end
 
 local function onCastSpellFailed(casterGuid, spellName, spellType, spellElement, storyActionID)
-    local casterUuid = M.Osi.GetUUID(casterGuid)
-    debugPrint(M.Utils.getDisplayName(casterUuid), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
+    debugPrint(M.Utils.getDisplayName(M.Osi.GetUUID(casterGuid)), "CastSpellFailed", casterGuid, spellName, spellType, spellElement, storyActionID)
 end
 
-local function onDialogStarted(dialog, dialogInstanceId)
-    debugPrint("DialogStarted", dialog, dialogInstanceId)
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        stopPulseReposition(level)
-        stopBrawlFizzler(level)
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                stopPulseAction(brawler, true)
-                Utils.clearOsirisQueue(brawlerUuid)
-            end
-        end
-        -- NB: no way to just pause timers, and spinning up a new timer will appear to have a new maximum value...
-        -- if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
-        --     if State.Session.CountdownTimer.uuid ~= nil and State.Session.CountdownTimer.timer ~= nil then
-        --         Quests.stopCountdownTimer(State.Session.CountdownTimer.uuid)
-        --         Quests.questTimerCancel("TUT_Helm_Timer")
-        --     end
-        -- end
+local function onDialogStarted(...)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onDialogStarted()
     end
 end
 
-local function onDialogEnded(dialog, dialogInstanceId)
-    debugPrint("DialogEnded", dialog, dialogInstanceId)
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level and not State.Settings.TurnBasedSwarmMode then
-        startPulseReposition(level)
-        local brawlersInLevel = State.Session.Brawlers[level]
-        if brawlersInLevel then
-            for brawlerUuid, brawler in pairs(brawlersInLevel) do
-                if brawler.isInBrawl and not State.isPlayerControllingDirectly(brawlerUuid) then
-                    startPulseAction(brawler)
-                end
-            end
-        end
-        -- if dialog == "TUT_Helm_DragonAppears_6ffc2909-a928-4b8b-6901-02d823e68880" then
-        --     if State.Session.CountdownTimer.uuid ~= nil and State.Session.CountdownTimer.timer == nil then
-        --         Quests.resumeCountdownTimer(State.Session.CountdownTimer.uuid)
-        --         Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", State.Session.CountdownTimer.turnsRemaining)
-        --     end
-        -- end
+local function onDialogEnded(...)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onDialogEnded()
     end
 end
 
+-- NB: get rid of this??
 local function onDifficultyChanged(difficulty)
     debugPrint("DifficultyChanged", difficulty)
     Movement.setMovementSpeedThresholds()
@@ -690,19 +554,11 @@ end
 
 local function onTeleportedToCamp(character)
     debugPrint("TeleportedToCamp", character)
-    local entityUuid = M.Osi.GetUUID(character)
-    -- NB: use this for RT too? why remove all?
+    local uuid = M.Osi.GetUUID(character)
     if State.Settings.TurnBasedSwarmMode then
-        Swarm.Listeners.onTeleportedToCamp(entityUuid)
+        Swarm.Listeners.onTeleportedToCamp(uuid)
     else
-        if entityUuid ~= nil and State.Session.Brawlers ~= nil then
-            for level, brawlersInLevel in pairs(State.Session.Brawlers) do
-                if brawlersInLevel[entityUuid] ~= nil then
-                    Roster.removeBrawler(level, entityUuid)
-                    Roster.checkForEndOfBrawl(level)
-                end
-            end
-        end
+        RT.Listeners.onTeleportedToCamp(uuid)
     end
 end
 
@@ -717,119 +573,48 @@ end
 -- thank u focus
 local function onPROC_Subregion_Entered(characterGuid, _)
     if not State.Settings.TurnBasedSwarmMode then
-        debugPrint("PROC_Subregion_Entered", characterGuid)
-        local uuid = M.Osi.GetUUID(characterGuid)
-        local level = M.Osi.GetRegion(uuid)
-        if level and State.Session.Players and State.Session.Players[uuid] then
-            AI.pulseReposition(level)
-        end
+        RT.Listeners.onPROC_Subregion_Entered(M.Osi.GetUUID(characterGuid))
     end
 end
 
 local function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
     State.Session.Brawlers[level] = nil
-    stopPulseReposition(level)
+    RT.Timers.stopPulseReposition(level)
 end
 
 local function onObjectTimerFinished(objectGuid, timer)
     -- debugPrint("ObjectTimerFinished", objectGuid, timer)
-    if timer == "TUT_Helm_Timer" then
-        Quests.nautiloidTransponderCountdownFinished(M.Osi.GetUUID(objectGuid))
-    elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
-        Quests.lakesideRitualCountdownFinished(M.Osi.GetUUID(objectGuid))
-    end
-end
-
--- local function onSubQuestUpdateUnlocked(character, subQuestID, stateID)
---     debugPrint("SubQuestUpdateUnlocked", character, subQuestID, stateID)
--- end
-
--- local function onQuestUpdateUnlocked(character, topLevelQuestID, stateID)
---     debugPrint("QuestUpdateUnlocked", character, topLevelQuestID, stateID)
--- end
-
--- local function onQuestAccepted(character, questID)
---     debugPrint("QuestAccepted", character, questID)
--- end
-
--- local function onFlagCleared(flag, speaker, dialogInstance)
---     debugPrint("FlagCleared", flag, speaker, dialogInstance)
--- end
-
--- local function onFlagLoadedInPresetEvent(object, flag)
---     debugPrint("FlagLoadedInPresetEvent", object, flag)
--- end
-
-local function onFlagSet(flag, speaker, dialogInstance)
-    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
-    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-        Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-        Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-    elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
-        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
-        Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
-        Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-        Quests.nautiloidTransponderCountdown(M.Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
-        Quests.questTimerCancel("TUT_Helm_Timer")
-        Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
-        if not State.Settings.TurnBasedSwarmMode then
-            State.endBrawls()
-        end
-    end
-end
-
-local function onStatusApplied(object, status, causee, storyActionID)
-    -- debugPrint("StatusApplied", object, status, causee, storyActionID)
-    -- if status == "ALCH_POTION_REST_SLEEP_GREATER_RESTORATION" then
-    --     Utils.removeNegativeStatuses(M.Osi.GetUUID(object))
+    -- if timer == "TUT_Helm_Timer" then
+    --     Quests.nautiloidTransponderCountdownFinished(M.Osi.GetUUID(objectGuid))
+    -- elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
+    --     Quests.lakesideRitualCountdownFinished(M.Osi.GetUUID(objectGuid))
     -- end
 end
 
-local function onCharacterOnCrimeSensibleActionNotification(character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
-    debugPrint("onCharacterOnCrimeSensibleActionNotification", character, crimeRegion, crimeID, priortiyName, primaryDialog, criminal1, criminal2, criminal3, criminal4, isPrimary)
-end
-
-local function onCrimeIsRegistered(victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
-    debugPrint("CrimeIsRegistered", victim, crimeType, crimeID, evidence, criminal1, criminal2, criminal3, criminal4)
-end
-
-local function onCrimeProcessingStarted(crimeID, actedOnImmediately)
-    debugPrint("CrimeProcessingStarted", crimeID, actedOnImmediately)
-end
-
-local function onOnCrimeConfrontationDone(crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
-    debugPrint("OnCrimeConfrontationDone", crimeID, investigator, wasLead, criminal1, criminal2, criminal3, criminal4)
-end
-
-local function onOnCrimeInvestigatorSwitchedState(crimeID, investigator, fromState, toState)
-    debugPrint("OnCrimeInvestigatorSwitchedState", crimeID, investigator, fromState, toState)
-end
-
-local function onOnCrimeMergedWith(oldCrimeID, newCrimeID)
-    debugPrint("OnCrimeMergedWith", oldCrimeID, newCrimeID)
-end
-
-local function onOnCrimeRemoved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
-    debugPrint("OnCrimeRemoved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
-end
-
-local function onOnCrimeResetInterrogationForCriminal(crimeID, criminal)
-    debugPrint("OnCrimeResetInterrogationForCriminal", crimeID, criminal)
-end
-
-local function onOnCrimeResolved(crimeID, victim, criminal1, criminal2, criminal3, criminal4)
-    debugPrint("OnCrimeResolved", crimeID, victim, criminal1, criminal2, criminal3, criminal4)
-end
-
-local function onOnCriminalMergedWithCrime(crimeID, criminal)
-    debugPrint("OnCriminalMergedWithCrime", crimeID, criminal)
+-- NB: can remove this??
+local function onFlagSet(flag, speaker, dialogInstance)
+    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
+    -- if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+    --     Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+    --     Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
+    -- elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
+    --     Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    -- elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
+    --     Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
+    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    -- elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+    --     Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+    --     Quests.nautiloidTransponderCountdown(M.Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
+    -- elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+    --     Quests.questTimerCancel("TUT_Helm_Timer")
+    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
+    -- elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
+    --     if not State.Settings.TurnBasedSwarmMode then
+    --         State.endBrawls()
+    --     end
+    -- end
 end
 
 local function onLeveledUp(character)
@@ -850,6 +635,8 @@ local function onReactionInterruptActionNeeded(characterGuid)
     debugPrint("ReactionInterruptActionNeeded", characterGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
+    else
+        RT.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
     end
     Movement.pauseTimers()
 end
@@ -864,6 +651,8 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
     debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
+    else
+        RT.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
     end
     Movement.resumeTimers()
 end
@@ -871,6 +660,8 @@ end
 local function onServerInterruptDecision()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onServerInterruptDecision()
+    else
+        RT.Listeners.onServerInterruptDecision()
     end
     Movement.resumeTimers()
 end
@@ -911,10 +702,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", onLevelGameplayStarted),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.CharacterMoveFailedUseJump = {
-        handle = Ext.Osiris.RegisterListener("CharacterMoveFailedUseJump", 1, "after", onCharacterMoveFailedUseJump),
-        stop = Ext.Osiris.UnregisterListener,
-    }
     State.Session.Listeners.CombatStarted = {
         handle = Ext.Osiris.RegisterListener("CombatStarted", 1, "after", onCombatStarted),
         stop = Ext.Osiris.UnregisterListener,
@@ -931,10 +718,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", onEnteredCombat),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.CombatParticipant = {
-    --     handle = Ext.Entity.Subscribe("CombatParticipant", onCombatParticipant),
-    --     stop = Ext.Entity.Unsubscribe,
-    -- }
     State.Session.Listeners.EnteredForceTurnBased = {
         handle = Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", onEnteredForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
@@ -986,6 +769,14 @@ local function startListeners()
     State.Session.Listeners.AttackedBy = {
         handle = Ext.Osiris.RegisterListener("AttackedBy", 7, "after", onAttackedBy),
         stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.SpellSyncTargeting = {
+        handle = Ext.Entity.OnCreateDeferred("SpellSyncTargeting", onSpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.DestroySpellSyncTargeting = {
+        handle = Ext.Entity.OnDestroy("SpellSyncTargeting", onDestroySpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UsingSpellOnTarget = {
         handle = Ext.Osiris.RegisterListener("UsingSpellOnTarget", 6, "after", onUsingSpellOnTarget),
@@ -1043,10 +834,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.HitpointsChanged = {
-    --     handle = Ext.Osiris.RegisterListener("HitpointsChanged", 2, "after", onHitpointsChanged),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
     -- State.Session.Listeners.SubQuestUpdateUnlocked = {
     --     handle = Ext.Osiris.RegisterListener("SubQuestUpdateUnlocked", 3, "after", onSubQuestUpdateUnlocked),
     --     stop = Ext.Osiris.UnregisterListener,
@@ -1071,50 +858,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.StatusApplied = {
-        handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    -- State.Session.Listeners.CharacterOnCrimeSensibleActionNotification = {
-    --     handle = Ext.Osiris.RegisterListener("CharacterOnCrimeSensibleActionNotification", 10, "after", onCharacterOnCrimeSensibleActionNotification),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.CrimeIsRegistered = {
-    --     handle = Ext.Osiris.RegisterListener("CrimeIsRegistered", 8, "after", onCrimeIsRegistered),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.CrimeProcessingStarted = {
-    --     handle = Ext.Osiris.RegisterListener("CrimeProcessingStarted", 2, "after", onCrimeProcessingStarted),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeConfrontationDone = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeConfrontationDone", 7, "after", onOnCrimeConfrontationDone),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeInvestigatorSwitchedState = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeInvestigatorSwitchedState", 4, "after", onOnCrimeInvestigatorSwitchedState),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeMergedWith = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeMergedWith", 2, "after", onOnCrimeMergedWith),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeRemoved = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeRemoved", 6, "after", onOnCrimeRemoved),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeResetInterrogationForCriminal = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeResetInterrogationForCriminal", 2, "after", onOnCrimeResetInterrogationForCriminal),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCrimeResolved = {
-    --     handle = Ext.Osiris.RegisterListener("OnCrimeResolved", 6, "after", onOnCrimeResolved),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.OnCriminalMergedWithCrime = {
-    --     handle = Ext.Osiris.RegisterListener("OnCriminalMergedWithCrime", 2, "after", onOnCriminalMergedWithCrime),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
     State.Session.Listeners.LeveledUp = {
         handle = Ext.Osiris.RegisterListener("LeveledUp", 1, "after", onLeveledUp),
         stop = Ext.Osiris.UnregisterListener,
@@ -1137,9 +880,42 @@ local function startListeners()
     }
 end
 
+local function onMCMSettingSaved(payload)
+    if payload and payload.modUUID == ModuleUUID and payload.settingId and Commands.MCMSettingSaved[payload.settingId] then
+        Commands.MCMSettingSaved[payload.settingId](payload.value)
+    end
+end
+
+local function onNetMessage(data)
+    if Commands.NetMessage[data.Channel] then
+        Commands.NetMessage[data.Channel](data)
+    end
+end
+
+local function startSession()
+    if not State or not State.Settings then
+        return Ext.Timer.WaitFor(250, startSession)
+    end
+    if State.Settings.ModEnabled then
+        startListeners()
+    else
+        Ext.Osiris.RegisterListener("LevelGameplayStarted", 2, "after", State.resetPlayers)
+    end
+end
+
+local function onSessionLoaded()
+    Ext.Events.GameStateChanged:Subscribe(onGameStateChanged)
+    if MCM then
+        Ext.ModEvents.BG3MCM["MCM_Setting_Saved"]:Subscribe(onMCMSettingSaved)
+    end
+    Ext.Events.NetMessage:Subscribe(onNetMessage)
+    startSession()
+end
+
 return {
     onCombatStarted = onCombatStarted,
     onStarted = onStarted,
     stopListeners = stopListeners,
     startListeners = startListeners,
+    onSessionLoaded = onSessionLoaded,
 }

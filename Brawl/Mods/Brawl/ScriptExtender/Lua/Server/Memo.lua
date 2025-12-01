@@ -7,6 +7,7 @@ local Memoizable = {
         "CanSee",
         "CombatIsActive",
         "CombatGetGuidFor",
+        "CombatGetInvolvedPlayer",
         "FindValidPosition",
         "GetActionResourceValuePersonal",
         "GetActiveArchetype",
@@ -80,7 +81,6 @@ local Memoizable = {
         "isHostileTarget",
         "isValidHostileTarget",
         "getSpellNameBySlot",
-        "getCurrentCombatRound",
         "hasStatus",
         "hasPassive",
         "getAbility",
@@ -91,21 +91,27 @@ local Memoizable = {
         "contains",
         "startsWith",
     },
+    TurnOrder = {
+        "getCurrentCombatRound",
+    },
     Swarm = {
         "isExcludedFromSwarmAI",
         "isControlledByDefaultAI",
     },
     State = {
+        "isInCombat",
         "areAnyPlayersBrawling",
         "getNumEnemiesRemaining",
         "isPartyInRealTime",
         "hasDirectHeal",
+        "isToTCombatHelper",
     },
     Spells = {
         "getRageAbility",
         "getSpellByName",
         "isSingleSelect",
         "isShout",
+        "isCooldown",
     },
     Pick = {
         "checkConditions",
@@ -129,6 +135,8 @@ local Memoizable = {
         "getBrawlers",
     },
     Resources = {
+        "getActionResource",
+        "getActionResourceAmount",
         "getActionResourceInfo",
         "getActionResourceName",
         "isSpellPrepared",
