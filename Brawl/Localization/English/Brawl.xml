@@ -95,7 +95,7 @@
     <content contentuid="h787d8d9agfb49g47baga009g778b6c338a1e" version="1">Players Go First</content>
     <content contentuid="hd7a07dc8gbff0g4199gac19g100ecccf3ea1" version="1">If checked, players will always go first in the turn order for Swarm Mode.</content>
     <content contentuid="h5499cb52gcfe1g4f30g8fe5gda15f0ca7f7a" version="1">Enemy Turn Time Limit (Seconds)</content>
-    <content contentuid="h5953a09fg95d0g4129g9b58gb45e5956b68a" version="1">Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 15 seconds)</content>
+    <content contentuid="h5953a09fg95d0g4129g9b58gb45e5956b68a" version="1">Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 30 seconds)</content>
     <content contentuid="h88255cdfg90c3g4242ga828g7977f63a4977" version="1">Enemy Swarm Group Size</content>
     <content contentuid="hb00484a5g8cb3g44efg82f7ga70e3bb5c28f" version="1">The maximum number of enemies that can act at the same time.  Users with less powerful computers may need to decrease this value.  The default value is 20.  Warning: values above 30 may cause the game to slow or crash during large encounters!</content>
     <content contentuid="hf6e63658g1ccfg4abdgab30g7ee2f50b9a70" version="1">Automatically Trigger Swarm Mode Companion AI</content>

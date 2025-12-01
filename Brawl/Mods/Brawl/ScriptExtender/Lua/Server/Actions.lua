@@ -371,7 +371,6 @@ end
 return {
     getActionInProgress = getActionInProgress,
     getActionInProgressByName = getActionInProgressByName,
-    registerActionInProgress = registerActionInProgress,
     removeActionInProgress = removeActionInProgress,
     removeActionsInProgress = removeActionsInProgress,
     handleExtraAttacks = handleExtraAttacks,
