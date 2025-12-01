@@ -179,12 +179,12 @@
                             "Id": "swarm_turn_timeout",
                             "Name": "Enemy Turn Time Limit (Seconds)",
                             "Type": "slider_float",
-                            "Default": 15.0,
+                            "Default": 30.0,
                             "Options": {
                                 "Min": 1.0,
                                 "Max": 300.0
                             },
-                            "Description": "Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 15 seconds)",
+                            "Description": "Global time limit for each enemy group during their swarm turn.  Once this time limit is reached, the enemy group's turn will end, regardless of whether they have used all their resources or not.  (Default: 30 seconds)",
                             "Handles": {"DescriptionHandle": "h5953a09fg95d0g4129g9b58gb45e5956b68a", "NameHandle": "h5499cb52gcfe1g4f30g8fe5gda15f0ca7f7a"}
                         }, {
                             "Id": "swarm_chunk_size",
