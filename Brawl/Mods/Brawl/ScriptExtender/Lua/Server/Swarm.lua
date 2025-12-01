@@ -52,31 +52,6 @@ local function cancelActionTimers(swarmActors)
     end
 end
 
-local function cancelActionTimers(swarmActors)
-    debugPrint("cancelActionTimers", swarmActors)
-    if swarmActors then debugDump(swarmActors) end
-    if State.Settings.TurnBasedSwarmMode and State.Session.ActionSequenceFailsafeTimer and next(State.Session.ActionSequenceFailsafeTimer) then
-        if swarmActors then
-            for _, uuid in ipairs(swarmActors) do
-                local failsafe = State.Session.ActionSequenceFailsafeTimer[uuid]
-                if failsafe and failsafe.timer then
-                    Ext.Timer.Cancel(failsafe.timer)
-                    failsafe.timer = nil
-                end
-                Actions.removeActionsInProgress(uuid)
-            end
-        else
-            for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do
-                if failsafe.timer then
-                    Ext.Timer.Cancel(failsafe.timer)
-                    failsafe.timer = nil
-                end
-            end
-            State.Session.ActionsInProgress = {}
-        end
-    end
-end
-
 local function cancelTimers(swarmActors)
     debugPrint("cancelTimers", swarmActors)
     if swarmActors then debugDump(swarmActors) end
