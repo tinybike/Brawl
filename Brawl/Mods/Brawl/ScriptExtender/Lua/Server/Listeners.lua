@@ -5,7 +5,6 @@ local debugDump = Utils.debugDump
 
 local function cleanupAll()
     RT.Timers.stopAllPulseAddNearbyTimers()
-    RT.Timers.stopAllPulseRepositionTimers()
     RT.Timers.stopAllPulseActionTimers()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
@@ -570,17 +569,9 @@ local function onTeleportedFromCamp(character)
     end
 end
 
--- thank u focus
-local function onPROC_Subregion_Entered(characterGuid, _)
-    if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onPROC_Subregion_Entered(M.Osi.GetUUID(characterGuid))
-    end
-end
-
 local function onLevelUnloading(level)
     debugPrint("LevelUnloading", level)
     State.Session.Brawlers[level] = nil
-    RT.Timers.stopPulseReposition(level)
 end
 
 local function onObjectTimerFinished(objectGuid, timer)
@@ -822,10 +813,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("TeleportedFromCamp", 1, "after", onTeleportedFromCamp),
         stop = Ext.Osiris.UnregisterListener,
     }
-    State.Session.Listeners.PROC_Subregion_Entered = {
-        handle = Ext.Osiris.RegisterListener("PROC_Subregion_Entered", 2, "after", onPROC_Subregion_Entered),
-        stop = Ext.Osiris.UnregisterListener,
-    }
     State.Session.Listeners.LevelUnloading = {
         handle = Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", onLevelUnloading),
         stop = Ext.Osiris.UnregisterListener,
@@ -834,26 +821,6 @@ local function startListeners()
         handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
         stop = Ext.Osiris.UnregisterListener,
     }
-    -- State.Session.Listeners.SubQuestUpdateUnlocked = {
-    --     handle = Ext.Osiris.RegisterListener("SubQuestUpdateUnlocked", 3, "after", onSubQuestUpdateUnlocked),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.QuestUpdateUnlocked = {
-    --     handle = Ext.Osiris.RegisterListener("QuestUpdateUnlocked", 3, "after", onQuestUpdateUnlocked),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.QuestAccepted = {
-    --     handle = Ext.Osiris.RegisterListener("QuestAccepted", 2, "after", onQuestAccepted),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.FlagCleared = {
-    --     handle = Ext.Osiris.RegisterListener("FlagCleared", 3, "after", onFlagCleared),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
-    -- State.Session.Listeners.FlagLoadedInPresetEvent = {
-    --     handle = Ext.Osiris.RegisterListener("FlagLoadedInPresetEvent", 2, "after", onFlagLoadedInPresetEvent),
-    --     stop = Ext.Osiris.UnregisterListener,
-    -- }
     State.Session.Listeners.FlagSet = {
         handle = Ext.Osiris.RegisterListener("FlagSet", 3, "after", onFlagSet),
         stop = Ext.Osiris.UnregisterListener,

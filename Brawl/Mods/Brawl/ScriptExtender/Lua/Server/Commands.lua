@@ -540,7 +540,6 @@ local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
         RT.Timers.stopAllPulseAddNearbyTimers()
-        RT.Timers.stopAllPulseRepositionTimers()
         RT.Timers.stopAllPulseActionTimers()
         State.endBrawls()
         if State.Settings.PlayersGoFirst then

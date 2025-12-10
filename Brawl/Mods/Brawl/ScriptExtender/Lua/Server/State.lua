@@ -57,7 +57,6 @@ local Session = {
     Brawlers = {},
     Players = {},
     PulseAddNearbyTimers = {},
-    PulseRepositionTimers = {},
     PulseActionTimers = {},
     IsAttackingOrBeingAttackedByPlayer = {},
     ClosestEnemyBrawlers = {},

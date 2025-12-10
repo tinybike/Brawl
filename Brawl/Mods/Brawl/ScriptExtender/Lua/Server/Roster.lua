@@ -173,7 +173,6 @@ local function endBrawl(level)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.cancelTimers()
     end
-    -- RT.Timers.stopPulseReposition(level)
 end
 
 local function getBrawlerByUuid(uuid)
@@ -275,9 +274,6 @@ local function initBrawlers(level)
             Listeners.onCombatStarted(M.Osi.CombatGetGuidFor(playerUuid))
             break
         end
-    end
-    if not State.Settings.TurnBasedSwarmMode then
-        RT.Timers.startPulseReposition(level)
     end
 end
 

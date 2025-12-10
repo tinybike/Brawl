@@ -38,21 +38,6 @@ local function pulseAction(brawler)
     end
 end
 
--- NB: get rid of this...?
-local function pulseReposition(level)
-    State.checkForDownedOrDeadPlayers()
-    if not State.Settings.TurnBasedSwarmMode then
-        for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            if not Constants.IS_TRAINING_DUMMY[uuid] then
-                if M.Osi.IsDead(uuid) == 1 or M.Utils.isDowned(uuid) then
-                    Utils.clearOsirisQueue(uuid)
-                    Osi.LieOnGround(uuid)
-                end
-            end
-        end
-    end
-end
-
 local function startPulseAction(brawler)
     if M.Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
@@ -86,37 +71,12 @@ local function startPulseAddNearby(uuid)
     end
 end
 
-local function stopPulseReposition()
-    debugPrint("stopPulseReposition")
-    for level, timer in pairs(State.Session.PulseRepositionTimers) do
-        Ext.Timer.Cancel(timer)
-        State.Session.PulseRepositionTimers[level] = nil
-    end
-end
-
-local function startPulseReposition(level)
-    if State.Session.PulseRepositionTimers[level] == nil then
-        debugPrint("startPulseReposition", level)
-        State.Session.PulseRepositionTimers[level] = Ext.Timer.WaitFor(0, function ()
-            pulseReposition(level)
-        end, Constants.REPOSITION_INTERVAL)
-    end
-end
-
 local function stopAllPulseAddNearbyTimers()
     local pulseAddNearbyTimers = State.Session.PulseAddNearbyTimers
     for _, timer in pairs(pulseAddNearbyTimers) do
         Ext.Timer.Cancel(timer)
     end
     -- State.Session.PulseAddNearbyTimers = {}
-end
-
-local function stopAllPulseRepositionTimers()
-    local pulseRepositionTimers = State.Session.PulseRepositionTimers
-    for _, timer in pairs(pulseRepositionTimers) do
-        Ext.Timer.Cancel(timer)
-    end
-    -- State.Session.PulseRepositionTimers = {}
 end
 
 local function stopAllPulseActionTimers()
@@ -337,7 +297,6 @@ local function onEnteredForceTurnBased(entityUuid)
                 end
                 stopPulseAddNearby(entityUuid)
                 if isHostCharacter then
-                    stopPulseReposition(level)
                     if brawler and brawler.combatGuid then
                         pauseCombatRoundTimer(brawler.combatGuid)
                     end
@@ -388,13 +347,9 @@ local function onLeftForceTurnBased(entityUuid)
                         startPulseAddNearby(entityUuid)
                     end
                 end
-                local isHostCharacter = entityUuid == M.Osi.GetHostCharacter()
-                if isHostCharacter then
-                    startPulseReposition(level)
-                end
                 -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
                 if State.areAnyPlayersBrawling() then
-                    if isHostCharacter and brawler and brawler.combatGuid then
+                    if (entityUuid == M.Osi.GetHostCharacter()) and brawler and brawler.combatGuid then
                         resumeCombatRoundTimer(brawler.combatGuid)
                     end
                     for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
@@ -469,10 +424,6 @@ end
 
 local function onDialogStarted()
     debugPrint("DialogStarted")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        stopPulseReposition(level)
-    end
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         stopPulseAction(brawler, true)
         Utils.clearOsirisQueue(uuid)
@@ -481,10 +432,6 @@ end
 
 local function onDialogEnded()
     debugPrint("DialogEnded")
-    local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-    if level then
-        startPulseReposition(level)
-    end
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         if brawler.isInBrawl and not State.isPlayerControllingDirectly(uuid) then
             startPulseAction(brawler)
@@ -500,18 +447,6 @@ local function onTeleportedToCamp(uuid)
                 Roster.removeBrawler(level, uuid)
                 Roster.checkForEndOfBrawl(level)
             end
-        end
-    end
-end
-
--- thank u focus
--- NB: can get rid of this??
-local function onPROC_Subregion_Entered(uuid)
-    if uuid then
-        debugPrint("PROC_Subregion_Entered", M.Utils.getDisplayName(uuid))
-        local level = M.Osi.GetRegion(uuid)
-        if level and uuid and State.Session.Players and State.Session.Players[uuid] then
-            pulseReposition(level)
         end
     end
 end
@@ -550,10 +485,7 @@ return {
         startPulseAction = startPulseAction,
         stopPulseAddNearby = stopPulseAddNearby,
         startPulseAddNearby = startPulseAddNearby,
-        stopPulseReposition = stopPulseReposition,
-        startPulseReposition = startPulseReposition,
         stopAllPulseAddNearbyTimers = stopAllPulseAddNearbyTimers,
-        stopAllPulseRepositionTimers = stopAllPulseRepositionTimers,
         stopAllPulseActionTimers = stopAllPulseActionTimers,
         pauseCombatRoundTimer = pauseCombatRoundTimer,
         resumeCombatRoundTimer = resumeCombatRoundTimer,
@@ -577,7 +509,6 @@ return {
         onDialogStarted = onDialogStarted,
         onDialogEnded = onDialogEnded,
         onTeleportedToCamp = onTeleportedToCamp,
-        onPROC_Subregion_Entered = onPROC_Subregion_Entered,
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,
