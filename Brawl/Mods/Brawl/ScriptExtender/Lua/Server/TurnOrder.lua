@@ -23,13 +23,13 @@ end
 
 local function calculateActionInterval(initiative)
     local r = Constants.ACTION_INTERVAL_RESCALING
-    local scale = 1 + r - 4*r*initiative/(2*initiative + State.Settings.InitiativeDie + 1)
+    local scale = 1 + r - 4*r*initiative/(2*initiative + M.Utils.getInitiativeDie() + 1)
     return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
 end
 
 -- NB: is there a way to look up the initative die instead of defining it in the mod...?
 local function rollForInitiative(uuid)
-    local initiative = math.random(1, State.Settings.InitiativeDie)
+    local initiative = math.random(1, M.Utils.getInitiativeDie())
     local entity = Ext.Entity.Get(uuid)
     if entity and entity.Stats and entity.Stats.InitiativeBonus ~= nil then
         initiative = initiative + entity.Stats.InitiativeBonus

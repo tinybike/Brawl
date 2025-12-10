@@ -15,8 +15,6 @@
     <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
     <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>
     <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
-    <content contentuid="h465bcfc0g798cg4a52g84ebgbf067324fbd8" version="1">How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiatve roll, up to +/- 30%.  Turn lengths can never drop below 1 second.</content>
-    <content contentuid="hbf455959gf646g4907gae8cg6df26b6ee158" version="1">Initiative Die</content>
     <content contentuid="hc26cac3bg1de2g4808g852fga815daf697bd" version="1">Hotkey for toggling Full Auto on and off</content>
     <content contentuid="hd2d7dc1ag806eg4339gb306g679658313ab2" version="1">Fully Automated Brawls Toggle Hotkey</content>
     <content contentuid="h5d6a4c77g02edg4c96gacc3g8b5adda5dde7" version="1">Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.</content>

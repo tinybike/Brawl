@@ -138,17 +138,6 @@
                             "Description": "The AI's turn length, in seconds, before adjusting for initiative.  The default is 6.0, meaning the AI will act once every 6 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.  (Note: values below 3 are not recommended and may cause strange behavior.)",
                             "Handles": {"DescriptionHandle": "h4c13f868gad03g469ag9ce3g69560b7b3467", "NameHandle": "h63988dd4gbad9g405fgbb73gdefece90bbba"}
                         }, {
-                            "Id": "initiative_die",
-                            "Name": "Initiative Die",
-                            "Type": "slider_int",
-                            "Default": 20,
-                            "Options": {
-                                "Min": 1,
-                                "Max": 100
-                            },
-                            "Description": "How many sides the initiative die has.  By default it is a d20.  Higher values make initiative more random, lower values make initiative more deterministic.  In real-time combat, a unit's turn length is rescaled by its initiatve roll, up to +/- 30%.  Turn lengths can never drop below 1 second.",
-                            "Handles": {"DescriptionHandle": "h465bcfc0g798cg4a52g84ebgbf067324fbd8", "NameHandle": "hbf455959gf646g4907gae8cg6df26b6ee158"}
-                        }, {
                             "Id": "hogwild_mode",
                             "Name": "Hogwild Mode",
                             "Type": "checkbox",

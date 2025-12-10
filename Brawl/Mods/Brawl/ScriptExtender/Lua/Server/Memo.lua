@@ -53,6 +53,7 @@ local Memoizable = {
         "isDowned",
         "isPlayerOrAlly",
         "isPugnacious",
+        "getInitiativeDie",
         "getDifficulty",
         "isToT",
         "split",

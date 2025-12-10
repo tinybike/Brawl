@@ -92,6 +92,10 @@ local function getRangedWeaponRange(uuid)
     return item.Weapon.WeaponRange
 end
 
+local function getInitiativeDie()
+    return Ext.Stats.GetStatsManager().ExtraData.InitiativeDie
+end
+
 local function dumpEntityToFile(entityUuid)
     Ext.IO.SaveFile(entityUuid .. ".json", Ext.DumpExport(Ext.Entity.Get(entityUuid):GetAllComponents()))
 end
@@ -745,6 +749,7 @@ return {
     getEquippedRangedWeapon = getEquippedRangedWeapon,
     getMeleeWeaponRange = getMeleeWeaponRange,
     getRangedWeaponRange = getRangedWeaponRange,
+    getInitiativeDie = getInitiativeDie,
     dumpEntityToFile = dumpEntityToFile,
     checkNearby = checkNearby,
     getDisplayName = getDisplayName,
