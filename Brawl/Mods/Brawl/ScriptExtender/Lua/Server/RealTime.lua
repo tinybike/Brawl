@@ -390,7 +390,6 @@ local function onLeftForceTurnBased(entityUuid)
 end
 
 local function onGainedControl(uuid)
-    startPulseAddNearby(uuid)
     local userId = Osi.GetReservedUserID(uuid)
     for playerUuid, player in pairs(State.Session.Players) do
         if player.userId == userId and playerUuid ~= uuid then
@@ -401,6 +400,7 @@ local function onGainedControl(uuid)
             end
         end
     end
+    startPulseAddNearby(uuid)
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)

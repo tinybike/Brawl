@@ -238,18 +238,30 @@ local function setPlayerTurnsActive()
         for i = 1, #groupsEnemies do
             combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
         end
-        local turnOrderListener
-        turnOrderListener = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
+        local uuid = combatEntity.CombatState.MyGuid
+        if State.Session.TurnOrderListener[uuid] then
+            Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
+            State.Session.TurnOrderListener[uuid] = nil
+        end
+        -- TODO: cleanup on combat exit if needed (incl combat helper)
+        State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
             if entity and entity.CombatState and entity.CombatState.MyGuid then
-                Ext.Entity.Unsubscribe(turnOrderListener)
-                local refresherCombatHelper = spawnCombatHelper(entity.CombatState.MyGuid, true)
-                local boostChangedEventListener
-                boostChangedEventListener = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
-                    Ext.Entity.Unsubscribe(boostChangedEventListener)
-                    Utils.remove(refresherCombatHelper)
+                Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
+                if State.Session.RefresherCombatHelper[uuid] then
+                    Utils.remove(State.Session.RefresherCombatHelper[uuid])
+                    State.Session.RefresherCombatHelper[uuid] = nil
+                end
+                State.Session.RefresherCombatHelper[uuid] = spawnCombatHelper(uuid, true)
+                if State.Session.BoostChangedEventListener[uuid] then
+                    Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
+                    State.Session.BoostChangedEventListener[uuid] = nil
+                end
+                State.Session.BoostChangedEventListener[uuid] = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
+                    Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
+                    Utils.remove(State.Session.RefresherCombatHelper[uuid])
                     print("********after*********")
                     showTurnOrderGroups()
-                end, Ext.Entity.Get(refresherCombatHelper))
+                end, Ext.Entity.Get(State.Session.RefresherCombatHelper[uuid]))
             end
         end, combatEntity)
         combatEntity:Replicate("TurnOrder")
