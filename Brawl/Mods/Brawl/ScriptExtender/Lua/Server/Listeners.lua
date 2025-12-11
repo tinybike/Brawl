@@ -575,18 +575,16 @@ local function onLevelUnloading(level)
 end
 
 local function onObjectTimerFinished(objectGuid, timer)
-    -- debugPrint("ObjectTimerFinished", objectGuid, timer)
-    -- if timer == "TUT_Helm_Timer" then
-    --     Quests.nautiloidTransponderCountdownFinished(M.Osi.GetUUID(objectGuid))
-    -- elseif timer == "HAV_LikesideCombat_CombatRoundTimer" then
+    -- if timer == "HAV_LikesideCombat_CombatRoundTimer" then
+    --     debugPrint("ObjectTimerFinished", objectGuid, timer)
     --     Quests.lakesideRitualCountdownFinished(M.Osi.GetUUID(objectGuid))
     -- end
 end
 
 -- NB: can remove this??
 local function onFlagSet(flag, speaker, dialogInstance)
-    -- debugPrint("FlagSet", flag, speaker, dialogInstance)
-    -- if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+    print("FlagSet", flag, speaker, dialogInstance)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
     --     Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
     --     Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
     -- elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
@@ -595,17 +593,18 @@ local function onFlagSet(flag, speaker, dialogInstance)
     -- elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
     --     Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
     --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    -- elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
-    --     Quests.questTimerLaunch("TUT_Helm_Timer", "TUT_Helm_TransponderTimer", Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-    --     Quests.nautiloidTransponderCountdown(M.Osi.GetHostCharacter(), Constants.NAUTILOID_TRANSPONDER_COUNTDOWN_TURNS)
-    -- elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
-    --     Quests.questTimerCancel("TUT_Helm_Timer")
-    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    -- elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
-    --     if not State.Settings.TurnBasedSwarmMode then
-    --         State.endBrawls()
-    --     end
-    -- end
+    elseif flag == "HAG_Hag_State_ReadyForLair_658c4d09-b278-42dd-8f72-b98ec3efd0d5" then
+        if not State.Settings.TurnBasedSwarmMode then
+            -- local entity = Ext.Entity.Get("S_HAG_HagLairAccess_CrateIllusion_66b0ba70-059e-47ec-81c7-8434ab263f79")
+            -- Osi.UseSpell("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "Target_HAG_ClearIllusion", "66b0ba70-059e-47ec-81c7-8434ab263f79", "", 1)
+            Osi.UseSpell(GetHostCharacter(), "Target_HAG_ClearIllusion", GetHostCharacter(), "", 1)
+            Osi.SetEntityEvent("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "HAG_LairEntrance_Event_IllusionDispelCast")
+        end
+    elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
+        if not State.Settings.TurnBasedSwarmMode then
+            State.endBrawls()
+        end
+    end
 end
 
 local function onLeveledUp(character)
@@ -616,8 +615,8 @@ local function onLeveledUp(character)
 end
 
 local function onEntityEvent(characterGuid, eventUuid)
+    print("EntityEvent", characterGuid, eventUuid)
     if State.Session.ActiveMovements[eventUuid] then
-        debugPrint("EntityEvent", characterGuid, eventUuid)
         Movement.finishMovement(M.Osi.GetUUID(characterGuid), eventUuid, State.Session.ActiveMovements[eventUuid])
     end
 end

@@ -1,7 +1,6 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 local onLakesideRitualTurn
-local onNautiloidTransponderTurn
 
 local function questTimerCancel(timer)
     local players = State.Session.Players
@@ -39,10 +38,6 @@ local function lakesideRitualCountdown(uuid, turnsRemaining)
     setCountdownTimer(uuid, turnsRemaining, onLakesideRitualTurn)
 end
 
-local function nautiloidTransponderCountdown(uuid, turnsRemaining)
-    setCountdownTimer(uuid, turnsRemaining, onNautiloidTransponderTurn)
-end
-
 onLakesideRitualTurn = function (uuid, turnsRemaining)
     debugPrint("onLakesideRitualTurn", turnsRemaining, Osi.QRY_HAV_IsRitualActive())
     if Osi.QRY_HAV_IsRitualActive() and turnsRemaining > 0 then
@@ -78,40 +73,6 @@ onLakesideRitualTurn = function (uuid, turnsRemaining)
     end
 end
 
-onNautiloidTransponderTurn = function (uuid, turnsRemaining)
-    debugPrint("onNautiloidTransponderTurn", turnsRemaining)
-    if turnsRemaining > 0 and M.Osi.IsInForceTurnBasedMode(uuid) == 0 then
-        local level = M.Osi.GetRegion(uuid)
-        if level == "TUT_Avernus_C" then
-            Roster.addNearbyToBrawlers(uuid, 30)
-            if State.Session.Brawlers then
-                local brawlersInLevel = State.Session.Brawlers[level]
-                if brawlersInLevel and M.Utils.isAliveAndCanFight(Constants.TUT_ZHALK_UUID) and M.Utils.isAliveAndCanFight(Constants.TUT_MIND_FLAYER_UUID) then
-                    if not brawlersInLevel[Constants.TUT_ZHALK_UUID] then
-                        Roster.addBrawler(Constants.TUT_ZHALK_UUID, true)
-                    end
-                    if not brawlersInLevel[Constants.TUT_MIND_FLAYER_UUID] then
-                        Roster.addBrawler(Constants.TUT_MIND_FLAYER_UUID, true)
-                    end
-                    brawlersInLevel[Constants.TUT_ZHALK_UUID].targetUuid = Constants.TUT_MIND_FLAYER_UUID
-                    brawlersInLevel[Constants.TUT_ZHALK_UUID].lockedOnTarget = true
-                    brawlersInLevel[Constants.TUT_MIND_FLAYER_UUID].targetUuid = Constants.TUT_ZHALK_UUID
-                    brawlersInLevel[Constants.TUT_MIND_FLAYER_UUID].lockedOnTarget = true
-                end
-            end
-            nautiloidTransponderCountdown(uuid, turnsRemaining)
-        else
-            questTimerCancel("TUT_Helm_Timer")
-        end
-    end
-end
-
-local function nautiloidTransponderCountdownFinished(uuid)
-    if uuid ~= nil and uuid == Osi.GetHostCharacter() then
-        Osi.PROC_TUT_Helm_GameOver()
-    end
-end
-
 local function lakesideRitualCountdownFinished(uuid)
     if uuid ~= nil and uuid == Osi.GetHostCharacter() and Osi.GetHitpoints(Constants.HALSIN_PORTAL_UUID) ~= nil and Osi.QRY_HAV_IsRitualActive() then
         Osi.PROC_HAV_LiftingTheCurse_CheckRound(0)
@@ -134,10 +95,8 @@ local function resumeCountdownTimer(uuid)
 end
 
 return {
-    nautiloidTransponderCountdownFinished = nautiloidTransponderCountdownFinished,
     lakesideRitualCountdownFinished = lakesideRitualCountdownFinished,
     lakesideRitualCountdown = lakesideRitualCountdown,
-    nautiloidTransponderCountdown = nautiloidTransponderCountdown,
     questTimerCancel = questTimerCancel,
     questTimerLaunch = questTimerLaunch,
     stopCountdownTimer = stopCountdownTimer,

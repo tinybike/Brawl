@@ -225,6 +225,14 @@ local function onCombatRoundStarted(combatGuid, round)
             Osi.EndTurn(State.Session.CombatHelper)
         end
     end)
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        Swarm.unsetTurnComplete(uuid)
+        -- local entity = Ext.Entity.Get(uuid)
+        -- if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn then
+        --     entity.TurnBased.RequestedEndTurn = false
+        --     entity:Replicate("TurnBased")
+        -- end
+    end
     startCombatRoundTimer(combatGuid)
     -- NB: remove this?? check if needed for ToT endround
     -- if M.Utils.isToT() then
@@ -247,13 +255,7 @@ end
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
-    local host = M.Osi.GetHostCharacter()
-    if host then
-        local level = M.Osi.GetRegion(host)
-        if level then
-            Roster.endBrawl(level)
-        end
-    end
+    State.endBrawls()
 end
 
 local function onEnteredCombat(uuid)
@@ -292,7 +294,6 @@ local function onEnteredForceTurnBased(entityUuid)
                 if State.Session.AwaitingTarget[entityUuid] then
                     Commands.setAwaitingTarget(entityUuid, false)
                 end
-                Quests.stopCountdownTimer(entityUuid)
                 if brawler then
                     brawler.isInBrawl = false
                 end
@@ -337,7 +338,6 @@ local function onLeftForceTurnBased(entityUuid)
                 if State.Session.Players[entityUuid].isFreshSummon then
                     State.Session.Players[entityUuid].isFreshSummon = false
                 end
-                Quests.resumeCountdownTimer(entityUuid)
                 if State.Session.FTBLockedIn[entityUuid] ~= nil then
                     State.Session.FTBLockedIn[entityUuid] = nil
                 end

@@ -229,13 +229,56 @@ local function stopListeners(combatGuid)
     end
 end
 
+local function isInGroup(group, uuid)
+    if group.Members then
+        for _, member in ipairs(group.Members) do
+            if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid == uuid then
+                return true
+            end
+        end
+    end
+end
+
+local function setTurnActive(uuid)
+    print("set turn active for", M.Utils.getDisplayName(uuid))
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        local groupSpecial = nil
+        local groupsPlayers = {}
+        local groupsEnemies = {}
+        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+            if isInGroup(group, uuid) then
+                groupSpecial = group
+            else
+                if group.IsPlayer then
+                    reorderPlayersByControl(groupsPlayers, group, true)
+                    reorderPlayersByControl(groupsPlayers, group, false)
+                else
+                    table.insert(groupsEnemies, group)
+                end
+            end
+        end
+        if groupSpecial then
+            combatEntity.TurnOrder.Groups[1] = groupSpecial
+            local numPlayerGroups = #groupsPlayers
+            for i = 1, numPlayerGroups do
+                combatEntity.TurnOrder.Groups[1 + i] = groupsPlayers[i]
+            end
+            for i = 1, #groupsEnemies do
+                combatEntity.TurnOrder.Groups[1 + i + numPlayerGroups] = groupsEnemies[i]
+            end
+            combatEntity:Replicate("TurnOrder")
+        end
+    end
+end
+
 -- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
     print("set player turns active")
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        print("********init***********")
-        showTurnOrderGroups()
+        -- print("********init***********")
+        -- showTurnOrderGroups()
         local groupsPlayers = {}
         local groupsEnemies = {}
         for _, group in ipairs(combatEntity.TurnOrder.Groups) do
@@ -273,8 +316,8 @@ local function setPlayerTurnsActive()
                 State.Session.BoostChangedEventListener[uuid] = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
                     Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
                     Utils.remove(State.Session.RefresherCombatHelper[uuid])
-                    print("********after*********")
-                    showTurnOrderGroups()
+                    -- print("********after*********")
+                    -- showTurnOrderGroups()
                 end, Ext.Entity.Get(State.Session.RefresherCombatHelper[uuid]))
             end
         end, combatEntity)
@@ -297,5 +340,6 @@ return {
     reorderByInitiativeRoll = reorderByInitiativeRoll,
     bumpDirectlyControlledInitiativeRolls = bumpDirectlyControlledInitiativeRolls,
     stopListeners = stopListeners,
+    setTurnActive = setTurnActive,
     setPlayerTurnsActive = setPlayerTurnsActive,
 }
