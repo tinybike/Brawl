@@ -246,6 +246,7 @@ end
 
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
+    TurnOrder.stopListeners(combatGuid)
     local host = M.Osi.GetHostCharacter()
     if host then
         local level = M.Osi.GetRegion(host)

@@ -214,6 +214,21 @@ local function reorderPlayersByControl(reorderedGroups, group, isDirectlyControl
     end
 end
 
+local function stopListeners(combatGuid)
+    if State.Session.TurnOrderListener[combatGuid] then
+        Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[combatGuid])
+        State.Session.TurnOrderListener[combatGuid] = nil
+    end
+    if State.Session.BoostChangedEventListener[combatGuid] then
+        Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[combatGuid])
+        State.Session.BoostChangedEventListener[combatGuid] = nil
+    end
+    if State.Session.RefresherCombatHelper[combatGuid] then
+        Utils.remove(State.Session.RefresherCombatHelper[combatGuid])
+        State.Session.RefresherCombatHelper[combatGuid] = nil
+    end
+end
+
 -- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
     print("set player turns active")
@@ -243,7 +258,6 @@ local function setPlayerTurnsActive()
             Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
             State.Session.TurnOrderListener[uuid] = nil
         end
-        -- TODO: cleanup on combat exit if needed (incl combat helper)
         State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
             if entity and entity.CombatState and entity.CombatState.MyGuid then
                 Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
@@ -282,5 +296,6 @@ return {
     spawnCombatHelper = spawnCombatHelper,
     reorderByInitiativeRoll = reorderByInitiativeRoll,
     bumpDirectlyControlledInitiativeRolls = bumpDirectlyControlledInitiativeRolls,
+    stopListeners = stopListeners,
     setPlayerTurnsActive = setPlayerTurnsActive,
 }
