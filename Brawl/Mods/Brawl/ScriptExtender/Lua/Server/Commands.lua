@@ -94,23 +94,27 @@ local function toggleFullAuto()
     end
 end
 
-local function disableMod()
+local function disableMod(noNotify)
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
     if State.Settings.TurnBasedSwarmMode then
         State.removeBoostPlayerInitiatives()
     end
-    modStatusMessage("Brawl Disabled")
+    if not noNotify then
+        modStatusMessage("Brawl Disabled")
+    end
 end
 
-local function enableMod()
+local function enableMod(noNotify)
     State.Settings.ModEnabled = true
     Listeners.startListeners()
     local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
     if level then
         Listeners.onStarted(level)
     end
-    modStatusMessage("Brawl Enabled")
+    if not noNotify then
+        modStatusMessage("Brawl Enabled")
+    end
 end
 
 local function toggleMod()
@@ -547,13 +551,23 @@ local function onMCMTurnBasedSwarmMode(value)
         end
         State.recapPartyMembersMovementDistances()
         Swarm.resetChunkState()
+        modStatusMessage("Swarm Mode")
     else
         State.removeBoostPlayerInitiatives()
         State.uncapPartyMembersMovementDistances()
         State.disableDynamicCombatCamera()
-        disableMod()
-        enableMod()
+        disableMod(true)
+        enableMod(true)
+        modStatusMessage("Real-Time Mode")
     end
+end
+
+local function onModeToggle(data)
+    local toggle = not State.Settings.TurnBasedSwarmMode
+    if MCM then
+        MCM.Set("turn_based_swarm_mode", toggle)
+    end
+    onMCMTurnBasedSwarmMode(toggle)
 end
 
 local function onMCMPlayersGoFirst(value)
@@ -576,6 +590,7 @@ return {
     disableMod = disableMod,
     NetMessage = {
         ModToggle = onModToggle,
+        ModeToggle = onModeToggle,
         CompanionAIToggle = onCompanionAIToggle,
         QueueCompanionAIActions = onQueueCompanionAIActions,
         FullAutoToggle = onFullAutoToggle,

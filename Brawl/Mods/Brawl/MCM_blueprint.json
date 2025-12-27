@@ -220,6 +220,13 @@
                             "Default": {"ScanCode": "F11", "Modifier": ""},
                             "Description": "Hotkey for toggling the mod on/off",
                             "Handles": {"DescriptionHandle": "h47678051g6e17g4844g9740gf082019d8ab0", "NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2"}
+                        }, {
+                            "Id": "mode_toggle_hotkey",
+                            "Name": "Real-Time/Swarm Mode Toggle Hotkey",
+                            "Type": "keybinding",
+                            "Default": {"ScanCode": "F11", "Modifier": "LCtrl"},
+                            "Description": "Hotkey for toggling between Real-Time and Swarm Mode",
+                            "Handles": {"DescriptionHandle": "ha0db2dc6g09b6g4470g9066gf7457a213ce0", "NameHandle": "he97b503eg5817g4be9g8059g27a224532441"}
                         }
                     ]
                 }, {
@@ -421,6 +428,28 @@
                             "Handles": {"NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
                         }, {
                             "Id": "controller_mod_toggle_hotkey_override",
+                            "Name": "Override",
+                            "Type": "checkbox",
+                            "Default": false,
+                            "Description": "If checked, override this button's default functionality.",
+                            "Handles": {"DescriptionHandle": "h40bfe888g839bg49e8ga9bdge9a9bc209c92", "NameHandle": "hd2ff1055g739fg4113g97eeg96c84b8d23e2"}
+                        }, {
+                            "Id": "controller_mode_toggle_hotkey",
+                            "Name": "Real-Time/Swarm Mode Toggle Hotkey",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "he97b503eg5817g4be9g8059g27a224532441"}
+                        }, {
+                            "Id": "controller_mode_toggle_hotkey_2",
+                            "Name": "Real-Time/Swarm Mode Toggle Hotkey 2 (Optional)",
+                            "Description": "If hotkey 2 is set, both buttons must be pressed together.  Leave hotkey 2 blank to just use a single controller button.",
+                            "Type": "enum",
+                            "Default": "",
+                            "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "TriggerLeft", "TriggerRight"]},
+                            "Handles": {"NameHandle": "h0c398b32g0a2fg4567gbb0eg1377ac8c7856", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                        }, {
+                            "Id": "controller_mode_toggle_hotkey_override",
                             "Name": "Override",
                             "Type": "checkbox",
                             "Default": false,

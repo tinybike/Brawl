@@ -1,4 +1,5 @@
 local ModToggleHotkey = {ScanCode = "F11", Modifier = "NONE"}
+local ModeToggleHotkey = {ScanCode = "F11", Modifier = "LCtrl"}
 local CompanionAIToggleHotkey = {ScanCode = "F11", Modifier = "LShift"}
 local QueueCompanionAIActionsHotkey = {ScanCode = "C", Modifier = "LCtrl"}
 local FullAutoToggleHotkey = {ScanCode = "F6", Modifier = "NONE"}
@@ -23,6 +24,7 @@ local ActionButtonHotkeys = {
     {ScanCode = "NUM_9", Modifier = "LShift"},
 }
 local ControllerModToggleHotkey = {"", ""}
+local ControllerModeToggleHotkey = {"", ""}
 local ControllerCompanionAIToggleHotkey = {"", ""}
 local ControllerQueueCompanionAIActionsHotkey = {"", ""}
 local ControllerFullAutoToggleHotkey = {"", ""}
@@ -36,6 +38,8 @@ local ControllerRequestHealHotkey = {"", ""}
 local ControllerChangeTacticsHotkey = {"", ""}
 local ControllerLeaderboardToggleHotkey = {"", ""}
 local ControllerActionButtonHotkeys = {{"A", ""}, {"B", ""}, {"X", ""}, {"Y", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}
+local ControllerModToggleHotkeyOverride = false
+local ControllerModeToggleHotkeyOverride = false
 local ControllerCompanionAIToggleHotkeyOverride = false
 local ControllerFullAutoToggleHotkeyOverride = false
 local ControllerPauseToggleHotkeyOverride = false
@@ -50,6 +54,7 @@ local ControllerActionButtonHotkeysOverride = {false, false, false, false, false
 local ControllerLeaderboardToggleHotkeyOverride = false
 if MCM then
     ModToggleHotkey = MCM.Get("mod_toggle_hotkey")
+    ModeToggleHotkey = MCM.Get("mode_toggle_hotkey")
     CompanionAIToggleHotkey = MCM.Get("companion_ai_toggle_hotkey")
     QueueCompanionAIActionsHotkey = MCM.Get("queue_companion_ai_actions_hotkey")
     FullAutoToggleHotkey = MCM.Get("full_auto_toggle_hotkey")
@@ -74,6 +79,7 @@ if MCM then
         MCM.Get("action_9_hotkey"),
     }
     ControllerModToggleHotkey = {MCM.Get("controller_mod_toggle_hotkey"), MCM.Get("controller_mod_toggle_hotkey_2")}
+    ControllerModeToggleHotkey = {MCM.Get("controller_mode_toggle_hotkey"), MCM.Get("controller_mode_toggle_hotkey_2")}
     ControllerCompanionAIToggleHotkey = {MCM.Get("controller_companion_ai_toggle_hotkey"), MCM.Get("controller_companion_ai_toggle_hotkey_2")}
     ControllerQueueCompanionAIActionsHotkey = {MCM.Get("controller_queue_companion_ai_actions_hotkey"), MCM.Get("controller_queue_companion_ai_actions_hotkey_2")}
     ControllerFullAutoToggleHotkey = {MCM.Get("controller_full_auto_toggle_hotkey"), MCM.Get("controller_full_auto_toggle_hotkey_2")}
@@ -98,6 +104,7 @@ if MCM then
         {MCM.Get("controller_action_9_hotkey"), MCM.Get("controller_action_9_hotkey_2")},
     }
     ControllerModToggleHotkeyOverride = MCM.Get("controller_mod_toggle_hotkey_override")
+    ControllerModeToggleHotkeyOverride = MCM.Get("controller_mode_toggle_hotkey_override")
     ControllerCompanionAIToggleHotkeyOverride = MCM.Get("controller_companion_ai_toggle_hotkey_override")
     ControllerQueueCompanionAIActionsHotkeyOverride = MCM.Get("controller_queue_companion_ai_actions_hotkey_override")
     ControllerFullAutoToggleHotkeyOverride = MCM.Get("controller_full_auto_toggle_hotkey_override")
@@ -290,6 +297,10 @@ local function postModToggle()
     Ext.ClientNet.PostMessageToServer("ModToggle", "")
 end
 
+local function postModeToggle()
+    Ext.ClientNet.PostMessageToServer("ModeToggle", "")
+end
+
 local function postCompanionAIToggle()
     Ext.ClientNet.PostMessageToServer("CompanionAIToggle", "")
 end
@@ -356,6 +367,10 @@ local function onKeyInput(e)
         local keybindingPressed = false
         if isKeybindingPressed(e, ModToggleHotkey) then
             postModToggle()
+            keybindingPressed = true
+        end
+        if isKeybindingPressed(e, ModeToggleHotkey) then
+            postModeToggle()
             keybindingPressed = true
         end
         if isKeybindingPressed(e, CompanionAIToggleHotkey) then
@@ -427,6 +442,12 @@ local function onControllerButtonPressed(button)
     if isControllerKeybindingPressed(ControllerModToggleHotkey) then
         postModToggle()
         if ControllerModToggleHotkeyOverride then
+            override = true
+        end
+    end
+    if isControllerKeybindingPressed(ControllerModeToggleHotkey) then
+        postModeToggle()
+        if ControllerModeToggleHotkeyOverride then
             override = true
         end
     end

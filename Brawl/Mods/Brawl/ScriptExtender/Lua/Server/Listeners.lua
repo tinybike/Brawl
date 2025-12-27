@@ -107,7 +107,7 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    debugPrint("EnteredCombat", entityGuid, combatGuid)
+    print("EnteredCombat", entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
         Roster.addBrawler(uuid, true)
@@ -574,36 +574,10 @@ local function onLevelUnloading(level)
     State.Session.Brawlers[level] = nil
 end
 
-local function onObjectTimerFinished(objectGuid, timer)
-    -- if timer == "HAV_LikesideCombat_CombatRoundTimer" then
-    --     debugPrint("ObjectTimerFinished", objectGuid, timer)
-    --     Quests.lakesideRitualCountdownFinished(M.Osi.GetUUID(objectGuid))
-    -- end
-end
-
--- NB: can remove this??
 local function onFlagSet(flag, speaker, dialogInstance)
-    print("FlagSet", flag, speaker, dialogInstance)
-    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
-    --     Quests.questTimerLaunch("HAV_LikesideCombat_CombatRoundTimer", "HAV_HalsinPortalTimer", Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-    --     Quests.lakesideRitualCountdown(M.Osi.GetHostCharacter(), Constants.LAKESIDE_RITUAL_COUNTDOWN_TURNS)
-    -- elseif flag == "GLO_Halsin_State_PermaDefeated_86bc3df1-08b4-fbc4-b542-6241bcd03df1" then
-    --     Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    -- elseif flag == "HAV_LiftingTheCurse_Event_HalsinClosesPortal_33aa334a-3127-4be1-ad94-518aa4f24ef4" then
-    --     Quests.questTimerCancel("HAV_LikesideCombat_CombatRoundTimer")
-    --     Quests.stopCountdownTimer(M.Osi.GetHostCharacter())
-    elseif flag == "HAG_Hag_State_ReadyForLair_658c4d09-b278-42dd-8f72-b98ec3efd0d5" then
-        if not State.Settings.TurnBasedSwarmMode then
-            -- local entity = Ext.Entity.Get("S_HAG_HagLairAccess_CrateIllusion_66b0ba70-059e-47ec-81c7-8434ab263f79")
-            -- Osi.UseSpell("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "Target_HAG_ClearIllusion", "66b0ba70-059e-47ec-81c7-8434ab263f79", "", 1)
-            Osi.UseSpell(GetHostCharacter(), "Target_HAG_ClearIllusion", GetHostCharacter(), "", 1)
-            Osi.SetEntityEvent("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "HAG_LairEntrance_Event_IllusionDispelCast")
-        end
-    elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
-        if not State.Settings.TurnBasedSwarmMode then
-            State.endBrawls()
-        end
+    debugPrint("FlagSet", flag, speaker, dialogInstance)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onFlagSet(flag)
     end
 end
 
@@ -814,10 +788,6 @@ local function startListeners()
     }
     State.Session.Listeners.LevelUnloading = {
         handle = Ext.Osiris.RegisterListener("LevelUnloading", 1, "after", onLevelUnloading),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.ObjectTimerFinished = {
-        handle = Ext.Osiris.RegisterListener("ObjectTimerFinished", 2, "after", onObjectTimerFinished),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.FlagSet = {

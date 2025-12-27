@@ -452,6 +452,20 @@ local function onTeleportedToCamp(uuid)
     end
 end
 
+local function onFlagSet(flag)
+    debugPrint("FlagSet", flag)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+        Quests.halsinPortalEvent()
+    elseif flag == "HAG_Hag_State_ReadyForLair_658c4d09-b278-42dd-8f72-b98ec3efd0d5" then
+        -- local entity = Ext.Entity.Get("S_HAG_HagLairAccess_CrateIllusion_66b0ba70-059e-47ec-81c7-8434ab263f79")
+        -- Osi.UseSpell("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "Target_HAG_ClearIllusion", "66b0ba70-059e-47ec-81c7-8434ab263f79", "", 1)
+        Osi.UseSpell(GetHostCharacter(), "Target_HAG_ClearIllusion", GetHostCharacter(), "", 1)
+        Osi.SetEntityEvent("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "HAG_LairEntrance_Event_IllusionDispelCast")
+    elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
+        State.endBrawls()
+    end
+end
+
 local function onReactionInterruptActionNeeded(uuid)
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         pauseCombatRoundTimers()
@@ -510,6 +524,7 @@ return {
         onDialogStarted = onDialogStarted,
         onDialogEnded = onDialogEnded,
         onTeleportedToCamp = onTeleportedToCamp,
+        onFlagSet = onFlagSet,
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,

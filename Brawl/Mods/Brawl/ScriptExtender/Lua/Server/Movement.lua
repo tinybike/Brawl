@@ -372,7 +372,7 @@ end
 local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusActionOnly, onSuccess, onFailed)
     onSuccess = onSuccess or noop
     onFailed = onFailed or noop
-    debugPrint(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
+    print(M.Utils.getDisplayName(uuid), "moveIntoPositionForSpell", M.Utils.getDisplayName(targetUuid), spellName, bonusActionOnly)
     local swarmTurnActiveInitial = State.Session.SwarmTurnActive
     local spellRange = getEffectiveSpellRange(uuid, spellName)
     debugPrint(M.Utils.getDisplayName(uuid), "got effective spell range", spellName, spellRange)
@@ -386,7 +386,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local numActions = Resources.getActionPointsRemaining(uuid)
     local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
     local override = not State.Settings.TurnBasedSwarmMode
-    debugPrint(M.Utils.getDisplayName(uuid), "starting movement and points", baseMove, numActions, numBonusActions)
+    print(M.Utils.getDisplayName(uuid), "starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
         debugPrint(M.Utils.getDisplayName(uuid), "tryMove", allowedDistance)
         local tx, ty, tz = M.Osi.GetPosition(targetUuid)
