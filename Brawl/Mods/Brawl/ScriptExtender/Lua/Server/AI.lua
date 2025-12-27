@@ -156,7 +156,7 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or Utils.noop
     onCompleted = onCompleted or Utils.noop
     onFailed = onFailed or Utils.noop
-    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) then
+    if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) or Roster.isExcludedFromAI(brawler.uuid) then
         return onFailed("can't act or brawler not found")
     end
     -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?

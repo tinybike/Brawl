@@ -85,6 +85,7 @@ local Session = {
     ExtraAttacksRemaining = {},
     StoryActionIDs = {},
     TagNameToUuid = {},
+    ExcludedFromAI = {},
     ToTTimer = nil,
     ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
@@ -538,10 +539,12 @@ local function boostPlayerInitiatives()
 end
 
 local function endBrawls()
+    print("END BRAWLS")
     local hostCharacter = M.Osi.GetHostCharacter()
     if hostCharacter then
         local level = M.Osi.GetRegion(hostCharacter)
         if level then
+            print("ending brawl in", level)
             Roster.endBrawl(level)
         end
     end

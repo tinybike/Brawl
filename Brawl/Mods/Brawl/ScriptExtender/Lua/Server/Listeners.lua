@@ -126,6 +126,15 @@ local function onEnteredCombat(entityGuid, combatGuid)
     end
 end
 
+local function onLeftCombat(entityGuid, combatGuid)
+    local uuid = M.Osi.GetUUID(entityGuid)
+    if uuid and M.Roster.getBrawlerByUuid(uuid) then
+        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+        Roster.removeBrawler(level, uuid)
+        Roster.checkForEndOfBrawl(level)
+    end
+end
+
 local function onEnteredForceTurnBased(entityGuid)
     if not State.Settings.TurnBasedSwarmMode then
         RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
@@ -682,6 +691,10 @@ local function startListeners()
     }
     State.Session.Listeners.EnteredCombat = {
         handle = Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", onEnteredCombat),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.LeftCombat = {
+        handle = Ext.Osiris.RegisterListener("LeftCombat", 2, "after", onLeftCombat),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.EnteredForceTurnBased = {

@@ -157,7 +157,11 @@ local function endBrawl(level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
         for brawlerUuid, brawler in pairs(brawlersInLevel) do
+            local combatGuid = M.Osi.CombatGetGuidFor(brawlerUuid)
             removeBrawler(level, brawlerUuid)
+            if combatGuid then
+                Osi.EndCombat(combatGuid)
+            end
         end
         debugDump(brawlersInLevel)
     end
@@ -288,6 +292,14 @@ local function getBrawlers()
     return State.Session.Brawlers[region]
 end
 
+local function setExcludedFromAI(uuid, isExcluded)
+    State.Session.ExcludedFromAI[uuid] = isExcluded
+end
+
+local function isExcludedFromAI(uuid)
+    return State.Session.ExcludedFromAI[uuid]
+end
+
 return {
     getBrawlerByUuid = getBrawlerByUuid,
     getBrawlerByName = getBrawlerByName,
@@ -303,4 +315,6 @@ return {
     checkForEndOfBrawl = checkForEndOfBrawl,
     initBrawlers = initBrawlers,
     getBrawlers = getBrawlers,
+    setExcludedFromAI = setExcludedFromAI,
+    isExcludedFromAI = isExcludedFromAI,
 }

@@ -213,8 +213,8 @@ local function onCombatRoundStarted(combatGuid, round)
     end
     Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
     if not State.Session.CombatHelper then
-        print("ERROR No combat helper found, what happened?")
-        TurnOrder.spawnCombatHelper(combatGuid)
+        print("No combat helper found, what happened?")
+        -- TurnOrder.spawnCombatHelper(combatGuid)
     end
     for faction, enemyUuid in pairs(Utils.getEnemyFactions()) do
         print("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
@@ -440,7 +440,6 @@ local function onDialogEnded()
     end
 end
 
--- NB: fix this, shouldn't remove all, don't need to iterate over levels
 local function onTeleportedToCamp(uuid)
     if uuid ~= nil and State.Session.Brawlers ~= nil then
         for level, brawlersInLevel in pairs(State.Session.Brawlers) do
@@ -457,10 +456,8 @@ local function onFlagSet(flag)
     if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
         Quests.halsinPortalEvent()
     elseif flag == "HAG_Hag_State_ReadyForLair_658c4d09-b278-42dd-8f72-b98ec3efd0d5" then
-        -- local entity = Ext.Entity.Get("S_HAG_HagLairAccess_CrateIllusion_66b0ba70-059e-47ec-81c7-8434ab263f79")
-        -- Osi.UseSpell("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "Target_HAG_ClearIllusion", "66b0ba70-059e-47ec-81c7-8434ab263f79", "", 1)
-        Osi.UseSpell(GetHostCharacter(), "Target_HAG_ClearIllusion", GetHostCharacter(), "", 1)
-        Osi.SetEntityEvent("c457d064-83fb-4ec6-b74d-1f30dfafd12d", "HAG_LairEntrance_Event_IllusionDispelCast")
+        Quests.hagTeahouseEvent()
+        
     elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
         State.endBrawls()
     end
