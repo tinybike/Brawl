@@ -576,7 +576,9 @@ end
 
 local function onFlagSet(flag, speaker, dialogInstance)
     debugPrint("FlagSet", flag, speaker, dialogInstance)
-    if not State.Settings.TurnBasedSwarmMode then
+    if State.Session.TurnBasedSwarmMode then
+        Swarm.Listeners.onFlagSet(flag)
+    else
         RT.Listeners.onFlagSet(flag)
     end
 end

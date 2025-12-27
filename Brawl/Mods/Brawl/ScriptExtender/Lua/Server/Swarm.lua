@@ -721,6 +721,13 @@ local function onTeleportedToCamp(uuid)
     end
 end
 
+local function onFlagSet(flag)
+    debugPrint("FlagSet", flag)
+    if flag == "HAV_LiftingTheCurse_State_HalsinInShadowfell_480305fb-7b0b-4267-aab6-0090ddc12322" then
+        Quests.halsinPortalEvent()
+    end
+end
+
 local function onReactionInterruptActionNeeded(uuid)
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         pauseTimers()
@@ -793,6 +800,7 @@ return {
         onResurrected = onResurrected,
         onCharacterJoinedParty = onCharacterJoinedParty,
         onTeleportedToCamp = onTeleportedToCamp,
+        onFlagSet = onFlagSet,
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onServerInterruptUsed = onServerInterruptUsed,
         onReactionInterruptUsed = onReactionInterruptUsed,
