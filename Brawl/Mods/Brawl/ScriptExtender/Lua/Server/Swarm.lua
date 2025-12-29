@@ -534,7 +534,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*200, function ()
         State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
         if not State.Session.SwarmTurnActive then
-            return onTurnEnded(brawler.uuid)
+            return Swarm.onTurnEnded(brawler.uuid)
         end
         debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
         swarmAction(brawler, swarmActors)
