@@ -128,7 +128,7 @@ end
 
 local function onLeftCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
-    if uuid and M.Roster.getBrawlerByUuid(uuid) then
+    if uuid and M.Roster.getBrawlerByUuid(uuid) and not M.Pause.isPartyInFTB() then
         local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
         Roster.removeBrawler(level, uuid)
         Roster.checkForEndOfBrawl(level)

@@ -156,6 +156,9 @@ local Memoizable = {
         "calculateEnRouteCoords",
         "calculateJumpDistance",
     },
+    Pause = {
+        "isPartyInFTB",
+    },
     Leaderboard = {
         "isExcludedHeal",
     },
