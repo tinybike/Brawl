@@ -38,7 +38,7 @@ local function pulseAction(brawler)
     end
 end
 
-local function startPulseAction(brawler)
+local function startPulseAction(brawler, initialDelay)
     if M.Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
         return false
     end
@@ -48,7 +48,7 @@ local function startPulseAction(brawler)
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
         brawler.isInBrawl = true
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
-        State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(0, function ()
+        State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(initialDelay or 0, function ()
             pulseAction(brawler)
         end, brawler.actionInterval)
     end
@@ -195,14 +195,14 @@ end
 local function onCombatStarted(combatGuid)
     if not Utils.isToT() then
         TurnOrder.spawnCombatHelper(combatGuid)
-        if State.Settings.AutoPauseOnCombatStart then
-            Pause.allEnterFTB()
-        end
         TurnOrder.setPlayersSwarmGroup()
         TurnOrder.setPartyInitiativeRollToMean()
         TurnOrder.bumpDirectlyControlledInitiativeRolls()
         TurnOrder.reorderByInitiativeRoll(true)
         TurnOrder.setPlayerTurnsActive()
+        if State.Settings.AutoPauseOnCombatStart then
+            Ext.Timer.WaitFor(500, Pause.allEnterFTB)
+        end
     end
 end
 
@@ -435,7 +435,7 @@ local function onDialogEnded()
     debugPrint("DialogEnded")
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         if brawler.isInBrawl and not State.isPlayerControllingDirectly(uuid) then
-            startPulseAction(brawler)
+            startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
         end
     end
 end

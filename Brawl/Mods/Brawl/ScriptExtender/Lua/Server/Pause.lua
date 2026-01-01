@@ -58,7 +58,10 @@ local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
         if State.Session.CombatHelper then
-            Osi.PauseCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
+            local combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
+            if combatGuid then
+                Osi.PauseCombat(combatGuid)
+            end
         end
         RT.Timers.pauseCombatRoundTimers()
         -- RT.Timers.stopAllPulseActions(true)
