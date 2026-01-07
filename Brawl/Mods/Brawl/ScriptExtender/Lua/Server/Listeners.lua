@@ -112,12 +112,9 @@ local function onEnteredCombat(entityGuid, combatGuid)
     if uuid then
         Roster.addBrawler(uuid, true)
         if State.Session.Players and State.Session.Players[uuid] then
-            debugPrint("initiative roll", TurnOrder.getInitiativeRoll(uuid))
             if State.Session.ResurrectedPlayer[uuid] then
                 State.Session.ResurrectedPlayer[uuid] = nil
-                TurnOrder.setInitiativeRoll(uuid, TurnOrder.rollForInitiative(uuid))
-                debugPrint("updated initiative roll for resurrected player", TurnOrder.getInitiativeRoll(uuid))
-                TurnOrder.setPartyInitiativeRollToMean()
+                TurnOrder.setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
             end
         end
         if not State.Settings.TurnBasedSwarmMode then

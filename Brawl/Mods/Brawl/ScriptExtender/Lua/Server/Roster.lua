@@ -35,7 +35,7 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 isPaused = M.Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
-                actionInterval = TurnOrder.calculateActionInterval(TurnOrder.rollForInitiative(entityUuid)),
+                actionInterval = TurnOrder.calculateActionInterval(TurnOrder.getInitiativeRoll(entityUuid)),
                 auras = Spells.getAuras(entityUuid),
             }
             local entity = Ext.Entity.Get(entityUuid)

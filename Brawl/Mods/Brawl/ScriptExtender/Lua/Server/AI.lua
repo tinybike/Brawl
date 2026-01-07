@@ -128,30 +128,6 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
     return onFailed("can't find target")
 end
 
--- Enemies are pugnacious jerks and looking for a fight >:(
-local function checkForBrawlToJoin(brawler)
-    local closestPlayerUuid, closestDistance = M.Osi.GetClosestAlivePlayer(brawler.uuid)
-    local enterCombatRange = Constants.ENTER_COMBAT_RANGE
-    if State.Settings.TurnBasedSwarmMode then
-        enterCombatRange = 30
-    end
-    if closestPlayerUuid ~= nil and closestDistance ~= nil and closestDistance < enterCombatRange then
-        debugPrint(brawler.displayName, "Closest alive player to", brawler.uuid, "is", closestPlayerUuid, closestDistance)
-        Roster.addBrawler(closestPlayerUuid)
-        local players = State.Session.Players
-        for playerUuid, player in pairs(players) do
-            if playerUuid ~= closestPlayerUuid then
-                local distanceTo = M.Osi.GetDistanceTo(brawler.uuid, playerUuid)
-                if distanceTo < enterCombatRange then
-                    Roster.addBrawler(playerUuid)
-                end
-            end
-        end
-        debugPrint("check for", brawler.uuid, brawler.displayName)
-        RT.Timers.startPulseAction(brawler)
-    end
-end
-
 local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     onSubmitted = onSubmitted or Utils.noop
     onCompleted = onCompleted or Utils.noop

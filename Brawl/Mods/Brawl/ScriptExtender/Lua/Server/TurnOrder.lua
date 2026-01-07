@@ -11,13 +11,17 @@ end
 local function calculateMeanInitiativeRoll()
     local totalInitiativeRoll = 0
     local numInitiativeRolls = 0
-    for uuid, player in pairs(State.Session.Players) do
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
-            totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
-            numInitiativeRolls = numInitiativeRolls + 1
+    for uuid, _ in pairs(State.Session.Players) do
+        if Utils.isAliveAndCanFight(uuid) then
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
+                print("init roll", M.Utils.getDisplayName(uuid), entity.CombatParticipant.InitiativeRoll)
+                totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
+                numInitiativeRolls = numInitiativeRolls + 1
+            end
         end
     end
+    print("mean roll", math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5))
     return math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
 end
 
@@ -27,7 +31,6 @@ local function calculateActionInterval(initiative)
     return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
 end
 
--- NB: is there a way to look up the initative die instead of defining it in the mod...?
 local function rollForInitiative(uuid)
     local initiative = math.random(1, M.Utils.getInitiativeDie())
     local entity = Ext.Entity.Get(uuid)
@@ -51,8 +54,10 @@ end
 
 local function setPartyInitiativeRollToMean()
     State.Session.MeanInitiativeRoll = calculateMeanInitiativeRoll()
-    for uuid, player in pairs(State.Session.Players) do
-        setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+    for uuid, _ in pairs(State.Session.Players) do
+        if Utils.isAliveAndCanFight(uuid) then
+            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+        end
     end
 end
 

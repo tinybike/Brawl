@@ -39,7 +39,7 @@ local function pulseAction(brawler)
 end
 
 local function startPulseAction(brawler, initialDelay)
-    if M.Osi.IsPlayer(brawler.uuid) == 1 and not State.Settings.CompanionAIEnabled then
+    if State.Session.Players[brawler.uuid] and not State.Settings.CompanionAIEnabled then
         return false
     end
     if Constants.IS_TRAINING_DUMMY[brawler.uuid] then
@@ -212,44 +212,25 @@ local function onCombatRoundStarted(combatGuid, round)
         return Osi.PauseCombat(combatGuid)
     end
     Ext.ServerNet.BroadcastMessage("CombatRoundStarted", "")
-    if not State.Session.CombatHelper then
-        print("No combat helper found, what happened?")
-        -- TurnOrder.spawnCombatHelper(combatGuid)
-    end
-    for faction, enemyUuid in pairs(Utils.getEnemyFactions()) do
-        print("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
-        Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, faction, State.Session.CombatHelper, enemyUuid)
-    end
-    Ext.Timer.WaitFor(1000, function ()
-        if State.Session.CombatHelper then
-            Osi.EndTurn(State.Session.CombatHelper)
+    if not M.Utils.isToT() then
+        if not State.Session.CombatHelper then
+            print("No combat helper found, what happened?")
+            -- TurnOrder.spawnCombatHelper(combatGuid)
         end
-    end)
+        for faction, enemyUuid in pairs(Utils.getEnemyFactions()) do
+            debugPrint("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
+            Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, faction, State.Session.CombatHelper, enemyUuid)
+        end
+        Ext.Timer.WaitFor(1000, function ()
+            if State.Session.CombatHelper then
+                Osi.EndTurn(State.Session.CombatHelper)
+            end
+        end)
+    end
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         Swarm.unsetTurnComplete(uuid)
-        -- local entity = Ext.Entity.Get(uuid)
-        -- if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn then
-        --     entity.TurnBased.RequestedEndTurn = false
-        --     entity:Replicate("TurnBased")
-        -- end
     end
     startCombatRoundTimer(combatGuid)
-    -- NB: remove this?? check if needed for ToT endround
-    -- if M.Utils.isToT() then
-    --     startToTTimers(combatGuid)
-    --     local helperUuid = State.getToTCombatHelper()
-    --     if helperUuid then
-    --         local helperEntity = Ext.Entity.Get(helperUuid)
-    --         if helperEntity and helperEntity.TurnBased then
-    --             helperEntity.TurnBased.HadTurnInCombat = true
-    --             helperEntity.TurnBased.RequestedEndTurn = true
-    --             helperEntity.TurnBased.TurnActionsCompleted = true
-    --             helperEntity:Replicate("TurnBased")
-    --         end
-    --     end
-    -- else
-    --     onCombatStarted(combatGuid)
-    -- end
 end
 
 local function onCombatEnded(combatGuid)
@@ -402,7 +383,9 @@ local function onGainedControl(uuid)
         end
     end
     startPulseAddNearby(uuid)
-    TurnOrder.setPartyInitiativeRollToMean()
+    if not State.Session.MeanInitiativeRoll then
+       TurnOrder.setPartyInitiativeRollToMean()
+    end
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
