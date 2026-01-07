@@ -265,8 +265,10 @@ local function onCharacterJoinedParty(character)
             State.Session.Players[uuid].isFreshSummon = true
             local ownerUuid = Osi.CharacterGetOwner(uuid)
             if ownerUuid and not Utils.hasLoseControlStatus(uuid) then
-                Osi.RequestSetSwarmGroup(ownerUuid, "PLAYER_SWARM_GROUP")
-                Osi.RequestSetSwarmGroup(uuid, "PLAYER_SWARM_GROUP")
+                local ownerInitiativeRoll = TurnOrder.getInitiativeRoll(ownerUuid)
+                if ownerInitiativeRoll then
+                    TurnOrder.setInitiativeRoll(uuid, ownerInitiativeRoll)
+                end
             end
         end
         if State.areAnyPlayersBrawling() then
