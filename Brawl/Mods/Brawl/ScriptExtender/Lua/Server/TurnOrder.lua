@@ -15,13 +15,11 @@ local function calculateMeanInitiativeRoll()
         if Utils.isAliveAndCanFight(uuid) then
             local entity = Ext.Entity.Get(uuid)
             if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
-                print("init roll", M.Utils.getDisplayName(uuid), entity.CombatParticipant.InitiativeRoll)
                 totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
                 numInitiativeRolls = numInitiativeRolls + 1
             end
         end
     end
-    print("mean roll", math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5))
     return math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
 end
 
@@ -245,7 +243,6 @@ local function isInGroup(group, uuid)
 end
 
 local function setTurnActive(uuid)
-    print("set turn active for", M.Utils.getDisplayName(uuid))
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         local groupSpecial = nil
@@ -279,7 +276,6 @@ end
 
 -- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
 local function setPlayerTurnsActive()
-    print("set player turns active")
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         -- print("********init***********")

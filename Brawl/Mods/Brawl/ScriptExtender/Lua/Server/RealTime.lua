@@ -188,7 +188,7 @@ end
 
 local function onStarted()
     State.disableDynamicCombatCamera()
-    State.uncapPartyMembersMovementDistances()
+    State.uncapMovementDistances()
     Pause.checkTruePauseParty()
 end
 
@@ -200,6 +200,7 @@ local function onCombatStarted(combatGuid)
         TurnOrder.bumpDirectlyControlledInitiativeRolls()
         TurnOrder.reorderByInitiativeRoll(true)
         TurnOrder.setPlayerTurnsActive()
+        State.uncapMovementDistances()
         if State.Settings.AutoPauseOnCombatStart then
             Ext.Timer.WaitFor(500, Pause.allEnterFTB)
         end
@@ -254,6 +255,7 @@ local function onEnteredCombat(uuid)
             end
         end
     end
+    State.uncapMovementDistance(uuid)
 end
 
 local function onEnteredForceTurnBased(entityUuid)

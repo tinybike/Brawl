@@ -62,9 +62,6 @@ local function setMovementToMax(entity)
 end
 
 local function getRemainingMovement(entity)
-    if not State.Settings.TurnBasedSwarmMode then
-        return Constants.UNCAPPED_MOVEMENT_DISTANCE
-    end
     if entity and entity.ActionResources and entity.ActionResources.Resources then
         local resources = entity.ActionResources.Resources
         if resources[Constants.ACTION_RESOURCES.Movement] and resources[Constants.ACTION_RESOURCES.Movement][1] then
@@ -186,7 +183,10 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
     State.Session.ActiveMovements[eventUuid].timer = {
         handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
             debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
-            if onFailed then onFailed("movement timed out") end
+            -- debugDump(State.Session.ActiveMovements[eventUuid])
+            if onFailed then
+                onFailed("movement timed out")
+            end
         end),
         paused = false,
     }

@@ -8,7 +8,7 @@ local function cleanupAll()
     RT.Timers.stopAllPulseActionTimers()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
-    State.recapPartyMembersMovementDistances()
+    State.recapMovementDistances()
     Spells.resetSpellData()
 end
 
@@ -257,7 +257,7 @@ local function onCharacterJoinedParty(character)
             if State.Settings.TurnBasedSwarmMode then
                 Swarm.Listeners.onCharacterJoinedParty(uuid)
             else
-                State.uncapPartyMembersMovementDistances()
+                State.uncapMovementDistance(uuid)
                 -- Pause.checkTruePauseParty()
             end
         end

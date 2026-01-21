@@ -549,12 +549,12 @@ local function onMCMTurnBasedSwarmMode(value)
         if State.Settings.PlayersGoFirst then
             State.boostPlayerInitiatives()
         end
-        State.recapPartyMembersMovementDistances()
+        State.recapMovementDistances()
         Swarm.resetChunkState()
         modStatusMessage("Swarm Mode")
     else
         State.removeBoostPlayerInitiatives()
-        State.uncapPartyMembersMovementDistances()
+        State.uncapMovementDistances()
         State.disableDynamicCombatCamera()
         disableMod(true)
         enableMod(true)

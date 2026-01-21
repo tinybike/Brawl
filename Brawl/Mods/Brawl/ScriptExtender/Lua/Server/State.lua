@@ -66,7 +66,7 @@ local Session = {
     PlayerTargetingSpellCast = {},
     IsNextCombatRoundQueued = false,
     MovementQueue = {},
-    PartyMembersMovementResourceListeners = {},
+    MovementResourceListeners = {},
     PartyMembersHitpointsListeners = {},
     TurnBasedListeners = {},
     TranslateChangedEventListeners = {},
@@ -369,15 +369,16 @@ local function modifyHitpoints(entityUuid)
     end
 end
 
-local function uncapPartyMembersMovementDistances()
-    for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
-        capMovementDistance(partyMemberUuid)
-        uncapMovementDistance(partyMemberUuid)
-        if Session.PartyMembersMovementResourceListeners[partyMemberUuid] ~= nil then
-            Ext.Entity.Unsubscribe(Session.PartyMembersMovementResourceListeners[partyMemberUuid])
+local function uncapMovementDistances()
+    -- for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
+    --     local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
+    for entityUuid, _ in pairs(M.Roster.getBrawlers()) do
+        capMovementDistance(entityUuid)
+        uncapMovementDistance(entityUuid)
+        if Session.MovementResourceListeners[entityUuid] ~= nil then
+            Ext.Entity.Unsubscribe(Session.MovementResourceListeners[entityUuid])
         end
-        Session.PartyMembersMovementResourceListeners[partyMemberUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+        Session.MovementResourceListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
             local uuid = entity.Uuid.EntityUuid
             -- debugPrint("ActionResources changed", uuid)
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
@@ -397,7 +398,7 @@ local function uncapPartyMembersMovementDistances()
             movementDistances[uuid] = movementDistances[uuid] or {}
             movementDistances[uuid].updating = false
             modVars.MovementDistances = movementDistances
-        end, Ext.Entity.Get(partyMemberUuid))
+        end, Ext.Entity.Get(entityUuid))
     end
 end
 
@@ -433,14 +434,14 @@ local function setupPartyMembersHitpoints()
     end
 end
 
-local function recapPartyMembersMovementDistances()
+local function recapMovementDistances()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars.MovementDistances and next(modVars.MovementDistances) ~= nil then
         for uuid, _ in pairs(modVars.MovementDistances) do
             capMovementDistance(uuid)
         end
     end
-    for _, listener in pairs(Session.PartyMembersMovementResourceListeners) do
+    for _, listener in pairs(Session.MovementResourceListeners) do
         Ext.Entity.Unsubscribe(listener)
     end
 end
@@ -565,8 +566,10 @@ return {
     modifyHitpoints = modifyHitpoints,
     setupPartyMembersHitpoints = setupPartyMembersHitpoints,
     revertAllModifiedHitpoints = revertAllModifiedHitpoints,
-    uncapPartyMembersMovementDistances = uncapPartyMembersMovementDistances,
-    recapPartyMembersMovementDistances = recapPartyMembersMovementDistances,
+    capMovementDistance = capMovementDistance,
+    uncapMovementDistance = uncapMovementDistance,
+    uncapMovementDistances = uncapMovementDistances,
+    recapMovementDistances = recapMovementDistances,
     setMaxPartySize = setMaxPartySize,
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,

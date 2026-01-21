@@ -615,7 +615,7 @@ local function onStarted()
     if State.Settings.PlayersGoFirst then
         State.boostPlayerInitiatives()
     end
-    State.recapPartyMembersMovementDistances()
+    State.recapMovementDistances()
 end
 
 local function onCombatStarted()
@@ -705,7 +705,7 @@ local function onCharacterJoinedParty(uuid)
         if State.Settings.PlayersGoFirst then
             State.boostPlayerInitiative(uuid)
         end
-        State.recapPartyMembersMovementDistances()
+        State.recapMovementDistances()
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
     end
 end

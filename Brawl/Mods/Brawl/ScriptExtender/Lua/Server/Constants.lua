@@ -1,6 +1,6 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = true, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false, Quests = true}
+Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = true, Pause = true, Actions = true, Pick = true, AI = true, Movement = true, Listeners = true, Resources = true, Quests = true}
 -- Constants.DEBUG_LOGGING = false
 Constants.INITIAL_PULSE_ACTION_DELAY = 600
 Constants.ACTION_INTERVAL_RESCALING = 0.3
