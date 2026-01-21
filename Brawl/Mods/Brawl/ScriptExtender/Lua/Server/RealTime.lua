@@ -440,7 +440,10 @@ local function onFlagSet(flag)
         Quests.halsinPortalEvent()
     elseif flag == "HAG_Hag_State_ReadyForLair_658c4d09-b278-42dd-8f72-b98ec3efd0d5" then
         Quests.hagTeahouseEvent()
-        
+    elseif flag == "TUT_Helm_JoinedMindflayerFight_ec25d7dc-f9d6-47ff-92c9-8921d6e32f54" then
+        Quests.nautiloidTransponderEvent()
+    elseif flag == "TUT_Helm_State_TutorialEnded_55073953-23b9-448c-bee8-4c44d3d67b6b" then
+        State.endBrawls()
     elseif flag == "DEN_RaidingParty_Event_GateIsOpened_735e0e81-bd67-eb67-87ac-40da4c3e6c49" then
         State.endBrawls()
     end

@@ -530,7 +530,6 @@ end
 local function boostPlayerInitiatives()
     -- removeBoostPlayerInitiatives()
     local players = Session.Players
-    -- Players always go first, should this be a setting instead or...?
     if players then
         for playerUuid, _ in pairs(players) do
             boostPlayerInitiative(playerUuid)
@@ -539,12 +538,10 @@ local function boostPlayerInitiatives()
 end
 
 local function endBrawls()
-    print("END BRAWLS")
     local hostCharacter = M.Osi.GetHostCharacter()
     if hostCharacter then
         local level = M.Osi.GetRegion(hostCharacter)
         if level then
-            print("ending brawl in", level)
             Roster.endBrawl(level)
         end
     end

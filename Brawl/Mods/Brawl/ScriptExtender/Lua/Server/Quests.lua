@@ -1,6 +1,16 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
+local function nautiloidTransponderEvent()
+    local brawlers = M.Roster.getBrawlers()
+    if brawlers and brawlers[Constants.TUT_ZHALK_UUID] and brawlers[Constants.TUT_MIND_FLAYER_UUID] and M.Utils.isAliveAndCanFight(Constants.TUT_ZHALK_UUID) and M.Utils.isAliveAndCanFight(Constants.TUT_MIND_FLAYER_UUID) then
+        brawlers[Constants.TUT_ZHALK_UUID].targetUuid = Constants.TUT_MIND_FLAYER_UUID
+        brawlers[Constants.TUT_ZHALK_UUID].lockedOnTarget = true
+        brawlers[Constants.TUT_MIND_FLAYER_UUID].targetUuid = Constants.TUT_ZHALK_UUID
+        brawlers[Constants.TUT_MIND_FLAYER_UUID].lockedOnTarget = true
+    end
+end
+
 local function hagTeahouseEvent()
     local function clearIllusion()
         Osi.SetEntityEvent(Constants.AUNTIE_ETHEL_UUID, "HAG_LairEntrance_Event_IllusionDispelCast")
