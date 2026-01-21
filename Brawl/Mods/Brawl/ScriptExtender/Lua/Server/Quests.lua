@@ -100,6 +100,7 @@ local function halsinPortalEvent()
 end
 
 return {
+    nautiloidTransponderEvent = nautiloidTransponderEvent,
     hagTeahouseEvent = hagTeahouseEvent,
     halsinPortalEvent = halsinPortalEvent,
 }

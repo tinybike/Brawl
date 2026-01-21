@@ -374,6 +374,7 @@ local function onLeftForceTurnBased(entityUuid)
 end
 
 local function onGainedControl(uuid)
+    debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
     local userId = Osi.GetReservedUserID(uuid)
     for playerUuid, player in pairs(State.Session.Players) do
         if player.userId == userId and playerUuid ~= uuid then

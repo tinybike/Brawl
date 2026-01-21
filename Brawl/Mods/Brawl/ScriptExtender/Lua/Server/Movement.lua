@@ -42,11 +42,9 @@ local function getMovementDistanceMaxAmount(entity)
 end
 
 local function getMovementSpeed(entityUuid)
-    -- local statuses = Ext.Entity.Get(entityUuid).StatusContainer.Statuses
     local entity = Ext.Entity.Get(entityUuid)
     local movementDistance = getMovementDistanceAmount(entity)
     local movementSpeed = M.Utils.isPlayerOrAlly(entityUuid) and playerMovementDistanceToSpeed(movementDistance) or enemyMovementDistanceToSpeed(movementDistance)
-    -- debugPrint("getMovementSpeed", entityUuid, movementDistance, movementSpeed)
     return movementSpeed
 end
 

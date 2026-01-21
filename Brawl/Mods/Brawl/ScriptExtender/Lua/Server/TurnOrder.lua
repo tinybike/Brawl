@@ -78,6 +78,7 @@ local function bumpNpcInitiativeRolls()
 end
 
 local function setPlayersSwarmGroup(swarmGroupLabel)
+    debugPrint("setPlayersSwarmGroup", swarmGroupLabel)
     if State.Session.Players then
         for uuid, _ in pairs(State.Session.Players) do
             Osi.RequestSetSwarmGroup(uuid, swarmGroupLabel or "PLAYER_SWARM_GROUP")
@@ -182,10 +183,13 @@ local function reorderByInitiativeRoll(doNotReplicate)
         if not doNotReplicate then
             combatEntity:Replicate("TurnOrder")
         end
+        showAllInitiativeRolls()
+        showTurnOrderGroups()
     end
 end
 
 local function bumpDirectlyControlledInitiativeRolls()
+    debugPrint("bumpDirectlyControlledInitiativeRolls")
     for uuid, player in pairs(State.Session.Players) do
         if player.isControllingDirectly then
             setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll + 1)
