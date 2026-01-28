@@ -85,7 +85,7 @@ local function onLevelGameplayStarted(level, _)
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    print("CombatRoundStarted", combatGuid, round)
+    debugPrint("CombatRoundStarted", combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
@@ -107,7 +107,7 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(entityGuid, combatGuid)
-    print("EnteredCombat", entityGuid, combatGuid)
+    debugPrint("EnteredCombat", entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
         Roster.addBrawler(uuid, true)
@@ -145,7 +145,7 @@ local function onLeftForceTurnBased(entityGuid)
 end
 
 local function onTurnStarted(entityGuid)
-    print("TurnStarted", entityGuid)
+    debugPrint("TurnStarted", entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
     else
@@ -599,7 +599,7 @@ local function onLeveledUp(character)
 end
 
 local function onEntityEvent(characterGuid, eventUuid)
-    print("EntityEvent", characterGuid, eventUuid)
+    debugPrint("EntityEvent", characterGuid, eventUuid)
     if State.Session.ActiveMovements[eventUuid] then
         Movement.finishMovement(M.Osi.GetUUID(characterGuid), eventUuid, State.Session.ActiveMovements[eventUuid])
     end

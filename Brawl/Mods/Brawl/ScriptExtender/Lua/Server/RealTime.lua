@@ -220,7 +220,9 @@ local function onCombatRoundStarted(combatGuid, round)
         end
         for faction, enemyUuid in pairs(Utils.getEnemyFactions()) do
             debugPrint("combat helper set hostile to enemy faction", faction, enemyUuid, M.Utils.getDisplayName(enemyUuid))
-            Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, faction, State.Session.CombatHelper, enemyUuid)
+            if enemyUuid and faction and State.Session.CombatHelper then
+                Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, faction, State.Session.CombatHelper, enemyUuid)
+            end
         end
         Ext.Timer.WaitFor(1000, function ()
             if State.Session.CombatHelper then
@@ -246,7 +248,7 @@ local function onEnteredCombat(uuid)
         for _, participant in ipairs(combatEntity.CombatState.Participants) do
             local entity = Ext.Entity.Get(uuid)
             if entity and entity.TurnBased then
-                if State.Session.Players[participant.Uuid.EntityUuid] then
+                if participant and participant.Uuid and participant.Uuid.EntityUuid and State.Session.Players[participant.Uuid.EntityUuid] then
                     entity.TurnBased.IsActiveCombatTurn = true
                 else
                     entity.TurnBased.IsActiveCombatTurn = false
