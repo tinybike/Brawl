@@ -131,6 +131,7 @@ end
 -- thank u hippo
 local function spawnCombatHelper(combatGuid, isRefreshOnly)
     if not State.Session.CombatHelper or isRefreshOnly then
+        debugPrint("Spawn combat helper", combatGuid, isRefreshOnly)
         local playerUuid = Osi.CombatGetInvolvedPlayer(combatGuid, 1) or M.Osi.GetHostCharacter()
         local x, y, z = Osi.GetPosition(playerUuid)
         local combatHelper = Osi.CreateAt(Constants.COMBAT_HELPER.templateId, x, y, z, 0, 1, "")
@@ -145,6 +146,11 @@ local function spawnCombatHelper(combatGuid, isRefreshOnly)
         end
         Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
         Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
+        local narrativeCombat = Osi.DB_GLO_NarrativeCombat_ID:Get(nil, combatGuid)
+        if narrativeCombat and #narrativeCombat > 0 and narrativeCombat[1][1] then
+            debugPrint("Narrative combat identifier", narrativeCombat[1][1])
+            Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombat[1][1], combatHelper)
+        end
         return combatHelper
     end
 end
@@ -184,7 +190,7 @@ local function reorderByInitiativeRoll(doNotReplicate)
             combatEntity:Replicate("TurnOrder")
         end
         showAllInitiativeRolls()
-        showTurnOrderGroups()
+        -- showTurnOrderGroups()
     end
 end
 
@@ -321,8 +327,6 @@ local function setPlayerTurnsActive()
                 State.Session.BoostChangedEventListener[uuid] = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
                     Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
                     Utils.remove(State.Session.RefresherCombatHelper[uuid])
-                    -- print("********after*********")
-                    -- showTurnOrderGroups()
                 end, Ext.Entity.Get(State.Session.RefresherCombatHelper[uuid]))
             end
         end, combatEntity)
