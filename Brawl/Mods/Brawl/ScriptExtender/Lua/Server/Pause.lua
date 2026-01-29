@@ -57,9 +57,11 @@ end
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
+        local narrativeCombatLabel
         if State.Session.CombatHelper then
             local combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
             if combatGuid then
+                narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
                 Osi.PauseCombat(combatGuid)
             end
         end
@@ -69,6 +71,9 @@ local function allEnterFTB()
             if player and player[1] then
                 local uuid = M.Osi.GetUUID(player[1])
                 if uuid then
+                    if narrativeCombatLabel then
+                        Osi.PROC_GLO_NarrativeCombat_LeaveCombat(narrativeCombatLabel, uuid)
+                    end
                     Osi.SetCanJoinCombat(uuid, 0)
                     Osi.ForceTurnBasedMode(uuid, 1)
                 end
@@ -89,6 +94,22 @@ end
 local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
+        local combatGuid, narrativeCombatLabel
+        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+            if not combatGuid then
+                combatGuid = brawler.combatGuid
+                narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
+            end
+            if M.Osi.IsPlayer(uuid) == 0 then
+                unlock(Ext.Entity.Get(uuid))
+                Osi.ForceTurnBasedMode(uuid, 0)
+                stopTruePause(uuid)
+                RT.joinCombat(uuid)
+                if narrativeCombatLabel then
+                    Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
+                end
+            end
+        end
         for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
             local uuid = M.Osi.GetUUID(player[1])
             if uuid then
@@ -96,18 +117,9 @@ local function allExitFTB()
                 Osi.ForceTurnBasedMode(uuid, 0)
                 Osi.SetCanJoinCombat(uuid, 1)
                 stopTruePause(uuid)
-            end
-        end
-        local combatGuid
-        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-            if not combatGuid then
-                combatGuid = brawler.combatGuid
-            end
-            if M.Osi.IsPlayer(uuid) == 0 then
-                unlock(Ext.Entity.Get(uuid))
-                Osi.ForceTurnBasedMode(uuid, 0)
-                stopTruePause(uuid)
-                RT.joinCombat(uuid)
+                if narrativeCombatLabel then
+                    Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
+                end
             end
         end
         if State.Session.CombatHelper then

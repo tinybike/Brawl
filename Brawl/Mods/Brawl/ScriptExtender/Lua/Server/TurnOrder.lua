@@ -146,10 +146,9 @@ local function spawnCombatHelper(combatGuid, isRefreshOnly)
         end
         Ext.Loca.UpdateTranslatedString(Constants.COMBAT_HELPER.handle, "Combat Helper")
         Osi.SetHostileAndEnterCombat(Constants.COMBAT_HELPER.faction, Osi.GetFaction(playerUuid), combatHelper, playerUuid)
-        local narrativeCombat = Osi.DB_GLO_NarrativeCombat_ID:Get(nil, combatGuid)
-        if narrativeCombat and #narrativeCombat > 0 and narrativeCombat[1][1] then
-            debugPrint("Narrative combat identifier", narrativeCombat[1][1])
-            Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombat[1][1], combatHelper)
+        local narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
+        if narrativeCombatLabel then
+            Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, combatHelper)
         end
         return combatHelper
     end

@@ -594,6 +594,14 @@ local function getFTBEntity()
     end
 end
 
+local function getNarrativeCombatLabel(combatGuid)
+    local narrativeCombat = Osi.DB_GLO_NarrativeCombat_ID:Get(nil, combatGuid)
+    if narrativeCombat and #narrativeCombat > 0 and narrativeCombat[1][1] then
+        debugPrint("Narrative combat identifier", narrativeCombat[1][1])
+        return narrativeCombat[1][1]
+    end
+end
+
 local function getCombatEntity()
     local serverEnterRequestEntities = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
     if serverEnterRequestEntities and serverEnterRequestEntities[1] then
@@ -792,6 +800,7 @@ return {
     isHostileTarget = isHostileTarget,
     getEnemyFactions = getEnemyFactions,
     getFTBEntity = getFTBEntity,
+    getNarrativeCombatLabel = getNarrativeCombatLabel,
     getCombatEntity = getCombatEntity,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
