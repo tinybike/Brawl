@@ -295,16 +295,16 @@ local function onEnteredForceTurnBased(entityUuid)
                     Pause.startTruePause(entityUuid)
                 end
             end
-            if isPlayer then
-                for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
-                    if not b.isPaused then
-                        debugPrint("stopping pulse for", b.uuid, b.displayName)
-                        stopPulseAction(b, true)
-                        b.isPaused = true
-                        Osi.ForceTurnBasedMode(brawlerUuid, 1)
-                    end
-                end
-            end
+            -- if isPlayer then
+            --     for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
+            --         if not b.isPaused then
+            --             debugPrint("stopping pulse for", b.uuid, b.displayName)
+            --             stopPulseAction(b, true)
+            --             b.isPaused = true
+            --             Osi.ForceTurnBasedMode(brawlerUuid, 1)
+            --         end
+            --     end
+            -- end
         end
     end
 end
@@ -343,7 +343,7 @@ local function onLeftForceTurnBased(entityUuid)
                             if not State.isPlayerControllingDirectly(brawlerUuid) or State.Settings.FullAuto then
                                 startPulseAction(b)
                             end
-                            b.isPaused = false
+                            -- b.isPaused = false
                             if brawlerUuid ~= entityUuid then
                                 debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
                                 Osi.ForceTurnBasedMode(brawlerUuid, 0)

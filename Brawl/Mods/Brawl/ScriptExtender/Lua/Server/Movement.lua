@@ -181,15 +181,12 @@ local function registerActiveMovement(moverUuid, goalPosition, goalTarget, onCom
     State.Session.ActiveMovements[eventUuid].timer = {
         handle = Ext.Timer.WaitFor(Constants.MOVEMENT_MAX_TIME, function ()
             debugPrint(M.Utils.getDisplayName(moverUuid), "movement timed out")
-            -- debugDump(State.Session.ActiveMovements[eventUuid])
             if onFailed then
                 onFailed("movement timed out")
             end
         end),
         paused = false,
     }
-    -- debugPrint(M.Utils.getDisplayName(moverUuid), "registerActiveMovement")
-    -- debugDump(State.Session.ActiveMovements[eventUuid])
     return eventUuid
 end
 

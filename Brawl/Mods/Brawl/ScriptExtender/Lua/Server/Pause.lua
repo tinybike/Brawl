@@ -53,7 +53,6 @@ local function stopTruePause(entityUuid)
     end
 end
 
--- NB: need to either disable the built-in AI or force-pause it during pause
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
@@ -82,6 +81,7 @@ local function allEnterFTB()
         for uuid, brawler in pairs(M.Roster.getBrawlers()) do
             RT.Timers.stopPulseAction(brawler, true)
             brawler.isPaused = true
+            Utils.clearOsirisQueue(uuid)
             if M.Osi.IsPlayer(uuid) == 0 then
                 Osi.ForceTurnBasedMode(uuid, 1)
                 Pause.startTruePause(uuid)
@@ -100,6 +100,7 @@ local function allExitFTB()
                 combatGuid = brawler.combatGuid
                 narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
             end
+            brawler.isPaused = false
             if M.Osi.IsPlayer(uuid) == 0 then
                 unlock(Ext.Entity.Get(uuid))
                 Osi.ForceTurnBasedMode(uuid, 0)
