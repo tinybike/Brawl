@@ -387,9 +387,9 @@ local function uncapMovementDistances()
                 movementDistances[uuid].updating = false
                 modVars.MovementDistances = movementDistances
             end, Ext.Entity.Get(entityUuid))
+        else
+            print("WARN brawler uuid or entity not found, what happened here?", entityUuid, M.Utils.getDisplayName(entityUuid))
         end
-    else
-        print("WARN brawler uuid or entity not found, what happened here?", entityUuid, M.Utils.getDisplayName(entityUuid))
     end
 end
 

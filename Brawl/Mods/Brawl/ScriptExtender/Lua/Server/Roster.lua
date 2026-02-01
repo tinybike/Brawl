@@ -148,6 +148,7 @@ local function addCombatParticipantsToBrawlers()
     if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
         for _, participant in ipairs(combatEntity.CombatState.Participants) do
             debugPrint(M.Utils.getDisplayName(participant.Uuid.EntityUuid), "adding to brawlers")
+            Osi.RequestSetSwarmGroup(participant.Uuid.EntityUuid, "")
             addBrawler(participant.Uuid.EntityUuid, true)
         end
     end
