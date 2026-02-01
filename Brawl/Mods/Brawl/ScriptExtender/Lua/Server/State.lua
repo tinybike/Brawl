@@ -362,60 +362,69 @@ end
 
 local function uncapMovementDistances()
     for entityUuid, _ in pairs(M.Roster.getBrawlers()) do
-        capMovementDistance(entityUuid)
-        uncapMovementDistance(entityUuid)
-        if Session.MovementResourceListeners[entityUuid] ~= nil then
-            Ext.Entity.Unsubscribe(Session.MovementResourceListeners[entityUuid])
-        end
-        Session.MovementResourceListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
-            local uuid = entity.Uuid.EntityUuid
-            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-            local movementDistances = modVars.MovementDistances
-            if movementDistances and movementDistances[uuid] ~= nil and Constants.UNCAPPED_MOVEMENT_DISTANCE ~= Movement.getMovementDistanceMaxAmount(entity) then
-                debugDump(movementDistances[uuid])
-                if movementDistances[uuid].updating == false then
-                    -- External change detected; re-apply modifications
-                    movementDistances[uuid] = nil
-                    modVars.MovementDistances = movementDistances
-                    uncapMovementDistance(uuid)
-                end
+        if entityUuid and Ext.Entity.Get(entityUuid) then
+            capMovementDistance(entityUuid)
+            uncapMovementDistance(entityUuid)
+            if Session.MovementResourceListeners[entityUuid] ~= nil then
+                Ext.Entity.Unsubscribe(Session.MovementResourceListeners[entityUuid])
             end
-            modVars = Ext.Vars.GetModVariables(ModuleUUID)
-            movementDistances = modVars.MovementDistances
-            movementDistances[uuid] = movementDistances[uuid] or {}
-            movementDistances[uuid].updating = false
-            modVars.MovementDistances = movementDistances
-        end, Ext.Entity.Get(entityUuid))
+            Session.MovementResourceListeners[entityUuid] = Ext.Entity.Subscribe("ActionResources", function (entity, _, _)
+                local uuid = entity.Uuid.EntityUuid
+                local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+                local movementDistances = modVars.MovementDistances
+                if movementDistances and movementDistances[uuid] ~= nil and Constants.UNCAPPED_MOVEMENT_DISTANCE ~= Movement.getMovementDistanceMaxAmount(entity) then
+                    debugDump(movementDistances[uuid])
+                    if movementDistances[uuid].updating == false then
+                        -- External change detected; re-apply modifications
+                        movementDistances[uuid] = nil
+                        modVars.MovementDistances = movementDistances
+                        uncapMovementDistance(uuid)
+                    end
+                end
+                modVars = Ext.Vars.GetModVariables(ModuleUUID)
+                movementDistances = modVars.MovementDistances
+                movementDistances[uuid] = movementDistances[uuid] or {}
+                movementDistances[uuid].updating = false
+                modVars.MovementDistances = movementDistances
+            end, Ext.Entity.Get(entityUuid))
+        end
+    else
+        print("WARN brawler uuid or entity not found, what happened here?", entityUuid, M.Utils.getDisplayName(entityUuid))
     end
 end
 
 local function setupPartyMembersHitpoints()
     for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
         local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
-        revertHitpoints(partyMemberUuid)
-        modifyHitpoints(partyMemberUuid)
-        if Session.PartyMembersHitpointsListeners[partyMemberUuid] ~= nil then
-            Ext.Entity.Unsubscribe(Session.PartyMembersHitpointsListeners[partyMemberUuid])
-        end
-        Session.PartyMembersHitpointsListeners[partyMemberUuid] = Ext.Entity.Subscribe("Health", function (entity, _, _)
-            local uuid = entity.Uuid.EntityUuid
-            local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-            local modifiedHitpoints = modVars.ModifiedHitpoints
-            if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil and modifiedHitpoints[uuid].maxHp ~= entity.Health.MaxHp then
-                debugDump(modifiedHitpoints[uuid])
-                if modifiedHitpoints[uuid].updating == false then
-                    -- External change detected; re-apply modifications
-                    modifiedHitpoints[uuid] = nil
-                    modVars.ModifiedHitpoints = modifiedHitpoints
-                    modifyHitpoints(uuid)
-                end
+        if partyMemberUuid and Ext.Entity.Get(partyMemberUuid) then
+            revertHitpoints(partyMemberUuid)
+            modifyHitpoints(partyMemberUuid)
+            if Session.PartyMembersHitpointsListeners[partyMemberUuid] ~= nil then
+                Ext.Entity.Unsubscribe(Session.PartyMembersHitpointsListeners[partyMemberUuid])
             end
-            modVars = Ext.Vars.GetModVariables(ModuleUUID)
-            modifiedHitpoints = modVars.ModifiedHitpoints
-            modifiedHitpoints[uuid] = modifiedHitpoints[uuid] or {}
-            modifiedHitpoints[uuid].updating = false
-            modVars.ModifiedHitpoints = modifiedHitpoints
-        end, Ext.Entity.Get(partyMemberUuid))
+            Session.PartyMembersHitpointsListeners[partyMemberUuid] = Ext.Entity.Subscribe("Health", function (entity, _, _)
+                local uuid = entity.Uuid.EntityUuid
+                local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+                local modifiedHitpoints = modVars.ModifiedHitpoints
+                if modifiedHitpoints and modifiedHitpoints[uuid] ~= nil and modifiedHitpoints[uuid].maxHp ~= entity.Health.MaxHp then
+                    debugDump(modifiedHitpoints[uuid])
+                    if modifiedHitpoints[uuid].updating == false then
+                        -- External change detected; re-apply modifications
+                        modifiedHitpoints[uuid] = nil
+                        modVars.ModifiedHitpoints = modifiedHitpoints
+                        modifyHitpoints(uuid)
+                    end
+                end
+                modVars = Ext.Vars.GetModVariables(ModuleUUID)
+                modifiedHitpoints = modVars.ModifiedHitpoints
+                modifiedHitpoints[uuid] = modifiedHitpoints[uuid] or {}
+                modifiedHitpoints[uuid].updating = false
+                modVars.ModifiedHitpoints = modifiedHitpoints
+            end, Ext.Entity.Get(partyMemberUuid))
+        else
+            print("WARN party member uuid or entity not found, what happened here?")
+            _D(partyMember)
+        end
     end
 end
 

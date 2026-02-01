@@ -87,11 +87,9 @@ local function setPlayersSwarmGroup(swarmGroupLabel)
 end
 
 local function showAllInitiativeRolls()
-    print("***********Initiative rolls************")
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         print(M.Utils.getDisplayName(uuid), getInitiativeRoll(uuid))
     end
-    print("***************************************")
 end
 
 local function showTurnOrderGroups()

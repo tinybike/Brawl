@@ -126,6 +126,7 @@ local function removeBrawler(level, entityUuid)
             brawlersInLevel[entityUuid] = nil
         end
         Osi.SetCanJoinCombat(entityUuid, 1)
+        Osi.RequestSetSwarmGroup(entityUuid, "")
         if M.Osi.IsPartyMember(entityUuid, 1) == 0 then
             State.revertHitpoints(entityUuid)
         else
