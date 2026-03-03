@@ -2,7 +2,7 @@
 
 Brawl is a combat mod for Baldur's Gate 3.  It includes a Real Time with Pause combat system and a Swarm Mode combat system.  [Download from Nexus.](https://www.nexusmods.com/baldursgate3/mods/12614/)
 
-Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and advice and [Hippo0o](https://github.com/Hippo0o) for the excellent library.
+Thanks to [Focus](https://next.nexusmods.com/profile/FocusBG3) for the idea and advice.
 
 ## Videos
 

@@ -186,6 +186,31 @@ local function startCombatRoundTimer(combatGuid)
     end
 end
 
+local function hasEnemyBrawlers()
+    for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+        if M.Osi.IsPlayer(uuid) == 0 and M.Utils.isPugnacious(uuid) then
+            return true
+        end
+    end
+    return false
+end
+
+local function initializeCombat(combatGuid)
+    if State.Session.CombatHelper then
+        return -- already initialized
+    end
+    debugPrint("initializeCombat: enemies present, spawning combat helper")
+    TurnOrder.spawnCombatHelper(combatGuid)
+    TurnOrder.setPlayersSwarmGroup()
+    TurnOrder.setPartyInitiativeRollToMean()
+    TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    TurnOrder.reorderByInitiativeRoll(true)
+    TurnOrder.setPlayerTurnsActive()
+    if State.Settings.AutoPauseOnCombatStart then
+        Ext.Timer.WaitFor(500, Pause.allEnterFTB)
+    end
+end
+
 local function onStarted()
     State.disableDynamicCombatCamera()
     State.uncapMovementDistances()
@@ -194,15 +219,11 @@ end
 
 local function onCombatStarted(combatGuid)
     if not Utils.isToT() then
-        TurnOrder.spawnCombatHelper(combatGuid)
-        TurnOrder.setPlayersSwarmGroup()
-        TurnOrder.setPartyInitiativeRollToMean()
-        TurnOrder.bumpDirectlyControlledInitiativeRolls()
-        TurnOrder.reorderByInitiativeRoll(true)
-        TurnOrder.setPlayerTurnsActive()
         State.uncapMovementDistances()
-        if State.Settings.AutoPauseOnCombatStart then
-            Ext.Timer.WaitFor(500, Pause.allEnterFTB)
+        -- If enemies are already in the combat participants list (normal case),
+        -- initialize immediately.  Otherwise, onEnteredCombat will handle it.
+        if hasEnemyBrawlers() then
+            initializeCombat(combatGuid)
         end
     end
 end
@@ -258,119 +279,11 @@ local function onEnteredCombat(uuid)
         end
     end
     State.uncapMovementDistance(uuid)
-end
-
-local function onEnteredForceTurnBased(entityUuid)
-    if entityUuid then
-        debugPrint("EnteredForceTurnBased", M.Utils.getDisplayName(entityUuid))
-        local level = M.Osi.GetRegion(entityUuid)
-        if level then
-            local brawler = Roster.getBrawlerByUuid(entityUuid)
-            if brawler then
-                Resources.pauseActionResourcesRefillTimers(brawler)
-            end
-            local isPlayer = State.Session.Players and State.Session.Players[entityUuid]
-            if isPlayer then
-                local isHostCharacter = entityUuid == M.Osi.GetHostCharacter()
-                if State.Session.Players[entityUuid].isFreshSummon then
-                    State.Session.Players[entityUuid].isFreshSummon = false
-                    return Osi.ForceTurnBasedMode(entityUuid, 0)
-                end
-                if State.Session.AwaitingTarget[entityUuid] then
-                    Commands.setAwaitingTarget(entityUuid, false)
-                end
-                if brawler then
-                    brawler.isInBrawl = false
-                end
-                stopPulseAddNearby(entityUuid)
-                if isHostCharacter then
-                    if brawler and brawler.combatGuid then
-                        pauseCombatRoundTimer(brawler.combatGuid)
-                    end
-                end
-            end
-            if M.Utils.isAliveAndCanFight(entityUuid) then
-                Utils.clearOsirisQueue(entityUuid)
-                if State.Settings.TruePause then
-                    Pause.startTruePause(entityUuid)
-                end
-            end
-            -- if isPlayer then
-            --     for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
-            --         if not b.isPaused then
-            --             debugPrint("stopping pulse for", b.uuid, b.displayName)
-            --             stopPulseAction(b, true)
-            --             b.isPaused = true
-            --             Osi.ForceTurnBasedMode(brawlerUuid, 1)
-            --         end
-            --     end
-            -- end
-        end
-    end
-end
-
-local function onLeftForceTurnBased(entityUuid)
-    if entityUuid then
-        debugPrint("LeftForceTurnBased", M.Utils.getDisplayName(entityUuid))
-        local level = M.Osi.GetRegion(entityUuid)
-        if level then
-            local brawler = Roster.getBrawlerByUuid(entityUuid)
-            if brawler then
-                Resources.resumeActionResourcesRefillTimers(brawler)
-                joinCombat(entityUuid)
-            end
-            if State.Session.Players and State.Session.Players[entityUuid] then
-                if State.Session.Players[entityUuid].isFreshSummon then
-                    State.Session.Players[entityUuid].isFreshSummon = false
-                end
-                if State.Session.FTBLockedIn[entityUuid] ~= nil then
-                    State.Session.FTBLockedIn[entityUuid] = nil
-                end
-                State.Session.RemainingMovement[entityUuid] = nil
-                if brawler then
-                    brawler.isInBrawl = false
-                    if State.isPlayerControllingDirectly(entityUuid) then
-                        startPulseAddNearby(entityUuid)
-                    end
-                end
-                -- NB: should this logic all be in Pause.lua instead? can it get triggered incorrectly? (e.g. downed players?)
-                if State.areAnyPlayersBrawling() then
-                    if (entityUuid == M.Osi.GetHostCharacter()) and brawler and brawler.combatGuid then
-                        resumeCombatRoundTimer(brawler.combatGuid)
-                    end
-                    for brawlerUuid, b in pairs(M.Roster.getBrawlers()) do
-                        if State.Session.Players[brawlerUuid] then
-                            if not State.isPlayerControllingDirectly(brawlerUuid) or State.Settings.FullAuto then
-                                startPulseAction(b)
-                            end
-                            -- b.isPaused = false
-                            if brawlerUuid ~= entityUuid then
-                                debugPrint("setting fTB to 0 for", brawlerUuid, entityUuid)
-                                Osi.ForceTurnBasedMode(brawlerUuid, 0)
-                            end
-                        else
-                            startPulseAction(brawler)
-                        end
-                    end
-                end
-                local entity = Ext.Entity.Get(entityUuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.IsActiveCombatTurn = true
-                    entity.TurnBased.HadTurnInCombat = false
-                    entity.TurnBased.RequestedEndTurn = false
-                    entity.TurnBased.TurnActionsCompleted = false
-                    entity:Replicate("TurnBased")
-                end
-            else
-                local entity = Ext.Entity.Get(entityUuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.IsActiveCombatTurn = false
-                    entity.TurnBased.HadTurnInCombat = true
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity.TurnBased.TurnActionsCompleted = true
-                    entity:Replicate("TurnBased")
-                end
-            end
+    -- Deferred combat helper spawn: if this is the first enemy entering combat and we haven't initialized yet, do it now
+    if not State.Session.CombatHelper and M.Osi.IsPlayer(uuid) == 0 and M.Utils.isPugnacious(uuid) then
+        local combatGuid = M.Osi.CombatGetGuidFor(uuid)
+        if combatGuid then
+            initializeCombat(combatGuid)
         end
     end
 end
@@ -504,8 +417,6 @@ return {
         onCombatRoundStarted = onCombatRoundStarted,
         onCombatEnded = onCombatEnded,
         onEnteredCombat = onEnteredCombat,
-        onEnteredForceTurnBased = onEnteredForceTurnBased,
-        onLeftForceTurnBased = onLeftForceTurnBased,
         onGainedControl = onGainedControl,
         onSpellSyncTargeting = onSpellSyncTargeting,
         onDestroySpellSyncTargeting = onDestroySpellSyncTargeting,

@@ -132,18 +132,6 @@ local function onLeftCombat(entityGuid, combatGuid)
     end
 end
 
-local function onEnteredForceTurnBased(entityGuid)
-    if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
-    end
-end
-
-local function onLeftForceTurnBased(entityGuid)
-    if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
-    end
-end
-
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
     if State.Settings.TurnBasedSwarmMode then
@@ -262,7 +250,6 @@ local function onCharacterJoinedParty(character)
             end
         end
         if M.Osi.IsSummon(uuid) == 1 then
-            State.Session.Players[uuid].isFreshSummon = true
             local ownerUuid = Osi.CharacterGetOwner(uuid)
             if ownerUuid and not Utils.hasLoseControlStatus(uuid) then
                 local ownerInitiativeRoll = TurnOrder.getInitiativeRoll(ownerUuid)
@@ -694,14 +681,6 @@ local function startListeners()
     }
     State.Session.Listeners.LeftCombat = {
         handle = Ext.Osiris.RegisterListener("LeftCombat", 2, "after", onLeftCombat),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.EnteredForceTurnBased = {
-        handle = Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", onEnteredForceTurnBased),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.LeftForceTurnBased = {
-        handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.TurnStarted = {
