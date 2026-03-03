@@ -171,6 +171,12 @@ local function endBrawl(level)
         Utils.remove(State.Session.CombatHelper)
         State.Session.CombatHelper = nil
     end
+    for combatGuid, refreshers in pairs(State.Session.RefresherCombatHelper) do
+        for _, refresherUuid in ipairs(refreshers) do
+            Utils.remove(refresherUuid)
+        end
+    end
+    State.Session.RefresherCombatHelper = {}
     Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}

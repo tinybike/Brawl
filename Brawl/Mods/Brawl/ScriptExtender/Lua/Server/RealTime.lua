@@ -27,9 +27,8 @@ end
 
 local function pulseAction(brawler)
     if brawler and brawler.uuid then
-        -- debugPrint("pulseAction", brawler.displayName, bonusActionOnly)
-        if not Utils.canAct(brawler.uuid) or brawler.isPaused or State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto then
-            return stopPulseAction(brawler)
+        if not Utils.canAct(brawler.uuid) or brawler.isPaused or (State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto) then
+            return
         end
         if not State.Settings.TurnBasedSwarmMode then
             Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
@@ -272,7 +271,7 @@ local function onEnteredCombat(uuid)
                 if participant and participant.Uuid and participant.Uuid.EntityUuid and State.Session.Players[participant.Uuid.EntityUuid] then
                     entity.TurnBased.IsActiveCombatTurn = true
                 else
-                    entity.TurnBased.IsActiveCombatTurn = false
+                    entity.TurnBased.RequestedEndTurn = true
                 end
                 entity:Replicate("TurnBased")
             end

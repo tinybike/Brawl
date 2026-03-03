@@ -213,7 +213,7 @@ end
 
 local function buildSpell(entity, spellName, stats)
     local originatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats)
-    if State.Settings.HogwildMode or not State.Settings.TurnBasedSwarmMode then
+    if State.Settings.HogwildMode then
         return {
             OriginatorPrototype = originatorPrototype,
             ProgressionSource = Constants.NULL_UUID,
@@ -252,19 +252,13 @@ local function submitSpellRequest(request, insertAtFront)
 end
 
 local function getCastOptions()
-    if State.Settings.TurnBasedSwarmMode then
-        if State.Settings.HogwildMode then
-            return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks", "NoMovement"}
-        else
-            return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
-        end
-    else
-        if State.Settings.HogwildMode then
-            return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
-        else
-            return {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "IgnoreTargetChecks"}
-        end
+    if not State.Settings.HogwildMode then
+        return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
     end
+    if State.Settings.TurnBasedSwarmMode then
+        return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks", "NoMovement"}
+    end
+    return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
 end
 
 -- thank u focus and mazzle

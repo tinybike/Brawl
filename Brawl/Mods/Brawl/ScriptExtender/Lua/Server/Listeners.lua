@@ -466,9 +466,6 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         debugPrint("onCompleted onCastedSpell")
         local onCompleted = actionInProgress.onCompleted
         Actions.removeActionInProgress(casterUuid, requestUuid)
-        if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
-            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
-        end
         onCompleted(spellName)
     end
     if M.Utils.isCounterspell(spellName) then
@@ -508,9 +505,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 debugPrint("onCompleted")
-                if not State.Settings.TurnBasedSwarmMode and not State.Settings.HogwildMode then
-                    Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
-                end
                 onCompleted(spellName)
             else
                 if outcome == "CantSpendUseCosts" then

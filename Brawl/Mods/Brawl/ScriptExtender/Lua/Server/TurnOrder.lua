@@ -234,7 +234,9 @@ local function stopListeners(combatGuid)
         State.Session.BoostChangedEventListener[combatGuid] = nil
     end
     if State.Session.RefresherCombatHelper[combatGuid] then
-        Utils.remove(State.Session.RefresherCombatHelper[combatGuid])
+        for _, refresherUuid in ipairs(State.Session.RefresherCombatHelper[combatGuid]) do
+            Utils.remove(refresherUuid)
+        end
         State.Session.RefresherCombatHelper[combatGuid] = nil
     end
 end
@@ -312,19 +314,13 @@ local function setPlayerTurnsActive()
         State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
             if entity and entity.CombatState and entity.CombatState.MyGuid then
                 Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
-                if State.Session.RefresherCombatHelper[uuid] then
-                    Utils.remove(State.Session.RefresherCombatHelper[uuid])
-                    State.Session.RefresherCombatHelper[uuid] = nil
+                local refresher = spawnCombatHelper(uuid, true)
+                if refresher then
+                    if not State.Session.RefresherCombatHelper[uuid] then
+                        State.Session.RefresherCombatHelper[uuid] = {}
+                    end
+                    table.insert(State.Session.RefresherCombatHelper[uuid], refresher)
                 end
-                State.Session.RefresherCombatHelper[uuid] = spawnCombatHelper(uuid, true)
-                if State.Session.BoostChangedEventListener[uuid] then
-                    Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
-                    State.Session.BoostChangedEventListener[uuid] = nil
-                end
-                State.Session.BoostChangedEventListener[uuid] = Ext.Entity.OnCreateDeferred("BoostChangedEvent", function (_, _, _)
-                    Ext.Entity.Unsubscribe(State.Session.BoostChangedEventListener[uuid])
-                    Utils.remove(State.Session.RefresherCombatHelper[uuid])
-                end, Ext.Entity.Get(State.Session.RefresherCombatHelper[uuid]))
             end
         end, combatEntity)
         combatEntity:Replicate("TurnOrder")
