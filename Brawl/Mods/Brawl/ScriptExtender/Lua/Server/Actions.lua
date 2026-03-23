@@ -51,16 +51,11 @@ local function removeActionInProgress(casterUuid, requestUuid)
         if foundActionInProgress then
             for i = actionsInProgressIndex, 1, -1 do
                 debugPrint("complete action in progress", i, M.Utils.getDisplayName(casterUuid), actionsInProgress[i].spellName)
+                if i < actionsInProgressIndex then
+                    actionsInProgress[i].onFailed("stale action cleared")
+                end
                 table.remove(actionsInProgress, i)
             end
-        end
-    end
-end
-
-local function removeActionsInProgress(casterUuid)
-    if State.Session.ActionsInProgress[casterUuid] and next(State.Session.ActionsInProgress[casterUuid]) then
-        for _, actionInProgress in ipairs(State.Session.ActionsInProgress[casterUuid]) do
-            removeActionInProgress(casterUuid, actionInProgress.requestUuid)
         end
     end
 end
@@ -147,6 +142,7 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
         if not State.Settings.TurnBasedSwarmMode or M.Utils.isPugnacious(attackerUuid) then
             if State.Session.StoryActionIDs[storyActionID] and State.Session.StoryActionIDs[storyActionID].spellName then
+                local spellName = State.Session.StoryActionIDs[storyActionID].spellName
                 debugPrint("Handle extra attacks", spellName, attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
                 State.Session.StoryActionIDs[storyActionID] = nil
                 local spell = Spells.getSpellByName(spellName)
@@ -382,7 +378,6 @@ return {
     getActionInProgress = getActionInProgress,
     getActionInProgressByName = getActionInProgressByName,
     removeActionInProgress = removeActionInProgress,
-    removeActionsInProgress = removeActionsInProgress,
     handleExtraAttacks = handleExtraAttacks,
     submitSpellRequest = submitSpellRequest,
     queueSpellRequest = queueSpellRequest,

@@ -250,6 +250,7 @@ local function onCharacterJoinedParty(character)
             end
         end
         if M.Osi.IsSummon(uuid) == 1 then
+            State.Session.Players[uuid].isFreshSummon = true
             local ownerUuid = Osi.CharacterGetOwner(uuid)
             if ownerUuid and not Utils.hasLoseControlStatus(uuid) then
                 local ownerInitiativeRoll = TurnOrder.getInitiativeRoll(ownerUuid)

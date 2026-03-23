@@ -38,7 +38,7 @@ local function cancelActionTimers(swarmActors)
                     Ext.Timer.Cancel(failsafe.timer)
                     failsafe.timer = nil
                 end
-                Actions.removeActionsInProgress(uuid)
+                State.Session.ActionsInProgress[uuid] = {}
             end
         else
             for uuid, failsafe in pairs(State.Session.ActionSequenceFailsafeTimer) do

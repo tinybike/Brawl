@@ -392,6 +392,7 @@ local function selectRandomSpell(preparedSpells)
             end
         end
     end
+    local actionToTake
     if numUsableSpells > 1 then
         actionToTake = usableSpells[math.random(1, numUsableSpells)]
     elseif numUsableSpells == 1 then

@@ -20,7 +20,11 @@ local function stopPulseAction(brawler, remainInBrawl)
 end
 
 local function stopAllPulseActions(remainInBrawl)
-    for uuid, timer in pairs(State.Session.PulseActionTimers) do
+    local uuids = {}
+    for uuid, _ in pairs(State.Session.PulseActionTimers) do
+        table.insert(uuids, uuid)
+    end
+    for _, uuid in ipairs(uuids) do
         stopPulseAction(M.Roster.getBrawlerByUuid(uuid), remainInBrawl)
     end
 end
@@ -71,19 +75,17 @@ local function startPulseAddNearby(uuid)
 end
 
 local function stopAllPulseAddNearbyTimers()
-    local pulseAddNearbyTimers = State.Session.PulseAddNearbyTimers
-    for _, timer in pairs(pulseAddNearbyTimers) do
+    for _, timer in pairs(State.Session.PulseAddNearbyTimers) do
         Ext.Timer.Cancel(timer)
     end
-    -- State.Session.PulseAddNearbyTimers = {}
+    State.Session.PulseAddNearbyTimers = {}
 end
 
 local function stopAllPulseActionTimers()
-    local pulseActionTimers = State.Session.PulseActionTimers
-    for _, timer in pairs(pulseActionTimers) do
+    for _, timer in pairs(State.Session.PulseActionTimers) do
         Ext.Timer.Cancel(timer)
     end
-    -- State.Session.PulseActionTimers = {}
+    State.Session.PulseActionTimers = {}
 end
 
 local function pauseCombatRoundTimer(combatGuid)
@@ -129,8 +131,8 @@ local function cancelCombatRoundTimers()
     if State.Session.CombatRoundTimer and next(State.Session.CombatRoundTimer) then
         for combatGuid, timer in pairs(State.Session.CombatRoundTimer) do
             Ext.Timer.Cancel(timer)
-            State.Session.CombatRoundTimer[combatGuid] = nil
         end
+        State.Session.CombatRoundTimer = {}
     end
 end
 
@@ -263,19 +265,14 @@ local function onCombatEnded(combatGuid)
 end
 
 local function onEnteredCombat(uuid)
-    local combatEntity = Utils.getCombatEntity()
-    if combatEntity and combatEntity.CombatState and combatEntity.CombatState.Participants then
-        for _, participant in ipairs(combatEntity.CombatState.Participants) do
-            local entity = Ext.Entity.Get(uuid)
-            if entity and entity.TurnBased then
-                if participant and participant.Uuid and participant.Uuid.EntityUuid and State.Session.Players[participant.Uuid.EntityUuid] then
-                    entity.TurnBased.IsActiveCombatTurn = true
-                else
-                    entity.TurnBased.RequestedEndTurn = true
-                end
-                entity:Replicate("TurnBased")
-            end
+    local entity = Ext.Entity.Get(uuid)
+    if entity and entity.TurnBased then
+        if State.Session.Players[uuid] then
+            entity.TurnBased.IsActiveCombatTurn = true
+        else
+            entity.TurnBased.RequestedEndTurn = true
         end
+        entity:Replicate("TurnBased")
     end
     State.uncapMovementDistance(uuid)
     -- Deferred combat helper spawn: if this is the first enemy entering combat and we haven't initialized yet, do it now

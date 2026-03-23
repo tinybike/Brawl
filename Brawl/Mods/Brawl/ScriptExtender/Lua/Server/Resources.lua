@@ -94,8 +94,17 @@ local function decreaseActionResource(uuid, resourceType, amount)
     entity:Replicate("ActionResources")
 end
 
-local function refillTimerComplete(brawler, resourceType)
+local function refillTimerComplete(brawler, resourceType, timerHandle)
     if brawler and brawler.uuid and brawler.actionResources and brawler.actionResources[resourceType] then
+        local refillQueue = brawler.actionResources[resourceType].refillQueue
+        if refillQueue then
+            for i, handle in ipairs(refillQueue) do
+                if handle == timerHandle then
+                    table.remove(refillQueue, i)
+                    break
+                end
+            end
+        end
         local entity = Ext.Entity.Get(brawler.uuid)
         if entity then
             local uuid = brawler.uuid
@@ -128,9 +137,11 @@ local function actionResourcesCallback(entity, _, _)
                         -- just compare to max amount? does that work for things like Haste?
                         -- print("Resource comparison:", resource.Amount, savedActionResource.amount, resource.Amount < savedActionResource.amount, resource.MaxAmount)
                         if resource.Amount < savedActionResource.amount then
-                            table.insert(savedActionResource.refillQueue, Ext.Timer.WaitFor(brawler.actionInterval, function ()
-                                refillTimerComplete(brawler, resourceType)
-                            end))
+                            local timer
+                            timer = Ext.Timer.WaitFor(brawler.actionInterval, function ()
+                                refillTimerComplete(brawler, resourceType, timer)
+                            end)
+                            table.insert(savedActionResource.refillQueue, timer)
                         end
                         savedActionResource.amount = resource.Amount
                     end
@@ -184,11 +195,11 @@ end
 
 local function isSpellOnCooldown(uuid, spellName)
     if not spellName or not uuid then
-        return false
+        return true
     end
     local entity = Ext.Entity.Get(uuid)
     if not entity then
-        return false
+        return true
     end
     if entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns then
         for _, cooldown in ipairs(entity.SpellBookCooldowns.Cooldowns) do
@@ -198,11 +209,11 @@ local function isSpellOnCooldown(uuid, spellName)
             end
             if cooldown.SpellId and cooldown.SpellId.OriginatorPrototype == spellName then
                 debugPrint(M.Utils.getDisplayName(uuid), "spell on cooldown", spellName, uuid)
-                return false
+                return true
             end
         end
     end
-    return true
+    return false
 end
 
 local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
@@ -220,7 +231,7 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
     end
     for costType, costValue in pairs(spell.costs) do
         if costType == "LongRest" or costType == "ShortRest" then
-            if costValue and not M.Resources.isSpellOnCooldown(casterUuid, spellName) then
+            if costValue and M.Resources.isSpellOnCooldown(casterUuid, spellName) then
                 return false
             end
         elseif costType == "SpellSlot" or costType == "WarlockSpellSlot" then

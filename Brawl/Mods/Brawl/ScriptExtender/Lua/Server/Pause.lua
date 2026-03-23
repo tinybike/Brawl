@@ -122,7 +122,6 @@ local function allExitFTB()
                 end
                 local entity = Ext.Entity.Get(uuid)
                 if entity and entity.TurnBased then
-                    entity.TurnBased.IsActiveCombatTurn = false
                     entity.TurnBased.HadTurnInCombat = true
                     entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = true
@@ -146,7 +145,7 @@ local function allExitFTB()
                 if entity and entity.TurnBased then
                     entity.TurnBased.IsActiveCombatTurn = true
                     entity.TurnBased.HadTurnInCombat = false
-                    entity.TurnBased.RequestedEndTurn = false
+                    entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = false
                     entity:Replicate("TurnBased")
                 end
