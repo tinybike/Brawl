@@ -127,7 +127,7 @@ local function allExitFTB()
                     entity.TurnBased.TurnActionsCompleted = true
                     entity:Replicate("TurnBased")
                 end
-                RT.Timers.startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
+                RT.Timers.startPulseAction(brawler, 0)
             end
         end
         -- Unpause all party members
@@ -157,7 +157,7 @@ local function allExitFTB()
                     brawler.isPaused = false
                     Resources.resumeActionResourcesRefillTimers(brawler)
                     if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-                        RT.Timers.startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
+                        RT.Timers.startPulseAction(brawler, 0)
                     end
                 end
             end
@@ -314,21 +314,10 @@ local function startTruePause(entityUuid)
     -- act (incl. jump) triggers SpellCastMovement, (TurnBased?)
     if M.Utils.isAliveAndCanFight(entityUuid) then
         debugPrint("startTruePause", entityUuid, M.Utils.getDisplayName(entityUuid))
-        -- NB: this doesn't always stop NPCs dead in their tracks, why not?
         Utils.clearOsirisQueue(entityUuid)
         startTurnBasedListener(entityUuid)
         startTranslateChangedEventListener(entityUuid)
         startSpellCastPrepareEndEventListener(entityUuid)
-        if Osi.IsPartyMember(entityUuid, 1) == 0 and Utils.canAct(entityUuid) and not isLocked(Ext.Entity.Get(entityUuid)) then
-            debugPrint("AI acting automatically for NPC", M.Utils.getDisplayName(entityUuid))
-            AI.act(M.Roster.getBrawlerByUuid(entityUuid), false, function (request)
-                debugPrint(M.Utils.getDisplayName(entityUuid), "submitted", request.Spell.Prototype)
-            end, function (spellName)
-                debugPrint(M.Utils.getDisplayName(entityUuid), "completed", spellName)
-            end, function (err)
-                debugPrint(M.Utils.getDisplayName(entityUuid), "failed", err)
-            end)
-        end
     end
 end
 

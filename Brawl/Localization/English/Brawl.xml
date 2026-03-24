@@ -14,8 +14,10 @@
     <content contentuid="hb6bc0e94gc809g4b4fga6aegc4c961e1e51e" version="1">Automatic Pause On Downed</content>
     <content contentuid="h54ba96a6g334eg46dfg8c27g7f6a788ddbfe" version="1">If checked, the game will automatically pause when combat starts</content>
     <content contentuid="h6413ceb1g2d0ag4866gb462g07f60d942b4f" version="1">Automatic Pause On Combat Start</content>
-    <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The AI's turn length, in seconds, before adjusting for initiative.  The default is 6.0, meaning the AI will act once every 6 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.  (Note: values below 3 are not recommended and may cause strange behavior.)</content>
-    <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">AI Turn Length</content>
+    <content contentuid="h4c13f868gad03g469ag9ce3g69560b7b3467" version="1">The action interval, in seconds, before adjusting for initiative.  This controls how often the AI acts, and how often action and bonus action points refill.  The default is 6.0 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.</content>
+    <content contentuid="h63988dd4gbad9g405fgbb73gdefece90bbba" version="1">Action Interval</content>
+    <content contentuid="h330a80aega0d8g49a1g85c5g2db7e42ef0d8" version="1">The duration of each combat round, in seconds.  The default is 6.0, meaning a new round will start every 6 seconds, unless delayed by player action selection.  Note that, if this value is smaller than the Action Interval value, then characters can do more actions per round than they 'should'.</content>
+    <content contentuid="hcee7d8fege6c9g44fdg884fg4a1a28e802a5" version="1">Combat Round Duration</content>
     <content contentuid="h0c4f4c12g54a4g4d43g9dd9g0f61857119d9" version="1">If checked, the companion AI will control ALL player characters, including the active character.</content>
     <content contentuid="hd6431cb2g76b4g497bgaccbg202b25c375c7" version="1">Fully Automated Brawls</content>
     <content contentuid="hc26cac3bg1de2g4808g852fga815daf697bd" version="1">Hotkey for toggling Full Auto on and off</content>

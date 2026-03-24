@@ -12,7 +12,7 @@ local function calculateMeanInitiativeRoll()
     local totalInitiativeRoll = 0
     local numInitiativeRolls = 0
     for uuid, _ in pairs(State.Session.Players) do
-        if Utils.isAliveAndCanFight(uuid) and M.Utils.isInCurrentCombat(uuid) then
+        if Utils.isAliveAndCanFight(uuid) then
             local entity = Ext.Entity.Get(uuid)
             if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll and entity.CombatParticipant.InitiativeRoll > 0 then
                 totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
@@ -28,7 +28,7 @@ end
 
 local function calculateActionInterval(initiative)
     if not initiative then
-        return Constants.MINIMUM_ACTION_INTERVAL
+        return math.floor(1000*State.Settings.ActionInterval + 0.5)
     end
     local r = Constants.ACTION_INTERVAL_RESCALING
     local scale = 1 + r - 4*r*initiative/(2*math.abs(initiative) + M.Utils.getInitiativeDie() + 1)
@@ -62,7 +62,7 @@ local function setPartyInitiativeRollToMean()
     if mean then
         State.Session.MeanInitiativeRoll = mean
         for uuid, _ in pairs(State.Session.Players) do
-            if Utils.isAliveAndCanFight(uuid) and M.Utils.isInCurrentCombat(uuid) then
+            if Utils.isAliveAndCanFight(uuid) then
                 setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
             end
         end
@@ -70,8 +70,8 @@ local function setPartyInitiativeRollToMean()
 end
 
 local function bumpNpcInitiativeRoll(uuid)
-    if M.Utils.isInCurrentCombat(uuid) then
-        local initiativeRoll = getInitiativeRoll(uuid)
+    local initiativeRoll = getInitiativeRoll(uuid)
+    if initiativeRoll then
         local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
         debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
         setInitiativeRoll(uuid, bumpedInitiativeRoll)
@@ -197,18 +197,20 @@ local function reorderByInitiativeRoll(doNotReplicate)
         if not doNotReplicate then
             combatEntity:Replicate("TurnOrder")
         end
-        showAllInitiativeRolls()
+        -- showAllInitiativeRolls()
         -- showTurnOrderGroups()
     end
 end
 
 local function bumpDirectlyControlledInitiativeRolls()
     debugPrint("bumpDirectlyControlledInitiativeRolls")
-    for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly then
-            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll + 1)
-        else
-            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+    if State.Session.MeanInitiativeRoll then
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly then
+                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll + 1)
+            else
+                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+            end
         end
     end
 end

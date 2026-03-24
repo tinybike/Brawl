@@ -75,7 +75,9 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
-                    if State.Session.PulseActionTimers[entityUuid] == nil then
+                    if State.Settings.AutoPauseOnCombatStart then
+                        brawler.isPaused = true
+                    elseif State.Session.PulseActionTimers[entityUuid] == nil then
                         RT.Timers.startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
                     end
                 else

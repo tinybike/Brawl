@@ -128,15 +128,26 @@
                             "Handles": {"DescriptionHandle": "h54ba96a6g334eg46dfg8c27g7f6a788ddbfe", "NameHandle": "h6413ceb1g2d0ag4866gb462g07f60d942b4f"}
                         }, {
                             "Id": "action_interval",
-                            "Name": "AI Turn Length",
+                            "Name": "Action Interval",
                             "Type": "slider_float",
                             "Default": 6.0,
                             "Options": {
                                 "Min": 1.0,
-                                "Max": 10.0
+                                "Max": 30.0
                             },
-                            "Description": "The AI's turn length, in seconds, before adjusting for initiative.  The default is 6.0, meaning the AI will act once every 6 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.  (Note: values below 3 are not recommended and may cause strange behavior.)",
+                            "Description": "The action interval, in seconds, before adjusting for initiative.  This controls how often the AI acts, and how often action and bonus action points refill.  The default is 6.0 seconds.  Lower values make combat feel more frenetic, higher values make combat feel more relaxed.",
                             "Handles": {"DescriptionHandle": "h4c13f868gad03g469ag9ce3g69560b7b3467", "NameHandle": "h63988dd4gbad9g405fgbb73gdefece90bbba"}
+                        }, {
+                            "Id": "combat_round_duration",
+                            "Name": "Combat Round Duration",
+                            "Type": "slider_float",
+                            "Default": 6.0,
+                            "Options": {
+                                "Min": 1.0,
+                                "Max": 30.0
+                            },
+                            "Description": "The duration of each combat round, in seconds.  The default is 6.0, meaning a new round will start every 6 seconds, unless delayed by player action selection.  Note that, if this value is smaller than the Action Interval value, then characters can do more actions per round than they 'should'.",
+                            "Handles": {"DescriptionHandle": "h330a80aega0d8g49a1g85c5g2db7e42ef0d8", "NameHandle": "hcee7d8fege6c9g44fdg884fg4a1a28e802a5"}
                         }, {
                             "Id": "hogwild_mode",
                             "Name": "Hogwild Mode",

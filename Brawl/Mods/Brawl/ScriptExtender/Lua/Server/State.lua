@@ -9,6 +9,7 @@ local Settings = {
     AutoPauseOnDowned = true,
     AutoPauseOnCombatStart = false,
     ActionInterval = 6.0,
+    CombatRoundDuration = 6.0,
     FullAuto = false,
     HitpointsMultiplier = 1.0,
     CompanionTactics = "Balanced",
@@ -32,6 +33,7 @@ if MCM then
     Settings.AutoPauseOnDowned = MCM.Get("auto_pause_on_downed")
     Settings.AutoPauseOnCombatStart = MCM.Get("auto_pause_on_combat_start")
     Settings.ActionInterval = MCM.Get("action_interval")
+    Settings.CombatRoundDuration = MCM.Get("combat_round_duration")
     Settings.FullAuto = MCM.Get("full_auto")
     Settings.HitpointsMultiplier = MCM.Get("hitpoints_multiplier")
     Settings.CompanionTactics = MCM.Get("companion_tactics")

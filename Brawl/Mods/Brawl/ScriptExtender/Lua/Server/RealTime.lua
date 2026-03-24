@@ -2,7 +2,7 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
 local function getCombatRoundDuration()
-    return State.Settings.ActionInterval*1000
+    return State.Settings.CombatRoundDuration*1000
 end
 
 local function stopPulseAction(brawler, remainInBrawl)
@@ -162,6 +162,7 @@ local function nextCombatRound()
                     entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = true
                 else
+                    entity.TurnBased.RequestedEndTurn = true
                     if Utils.canAct(uuid) then
                         entity.TurnBased.IsActiveCombatTurn = true
                     end
@@ -201,18 +202,14 @@ local function hasEnemyBrawlers()
 end
 
 local function initializeCombat(combatGuid)
-    if State.Session.CombatHelper then
-        return -- already initialized
-    end
-    debugPrint("initializeCombat: enemies present, spawning combat helper")
-    TurnOrder.spawnCombatHelper(combatGuid)
-    TurnOrder.setPlayersSwarmGroup()
-    TurnOrder.setPartyInitiativeRollToMean()
-    TurnOrder.bumpDirectlyControlledInitiativeRolls()
-    TurnOrder.reorderByInitiativeRoll(true)
-    TurnOrder.setPlayerTurnsActive()
-    if State.Settings.AutoPauseOnCombatStart then
-        Ext.Timer.WaitFor(500, Pause.allEnterFTB)
+    if not State.Session.CombatHelper then
+        debugPrint("initializeCombat: enemies present, spawning combat helper")
+        TurnOrder.spawnCombatHelper(combatGuid)
+        TurnOrder.setPlayersSwarmGroup()
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll(true)
+        TurnOrder.setPlayerTurnsActive()
     end
 end
 
@@ -260,6 +257,9 @@ local function onCombatRoundStarted(combatGuid, round)
         Swarm.unsetTurnComplete(uuid)
     end
     startCombatRoundTimer(combatGuid)
+    if State.Settings.AutoPauseOnCombatStart and round == 1 then
+        Pause.allEnterFTB()
+    end
 end
 
 local function onCombatEnded(combatGuid)
