@@ -148,7 +148,7 @@ end
 
 -- NB: is the wrapping timer getting paused correctly during pause?
 local function nextCombatRound()
-    print("nextCombatRound")
+    debugPrint("nextCombatRound")
     State.Session.IsNextCombatRoundQueued = false
     if State.areAnyPlayersTargeting() then
         State.Session.IsNextCombatRoundQueued = true
@@ -159,9 +159,13 @@ local function nextCombatRound()
             if entity and entity.TurnBased then
                 if M.Osi.IsPartyMember(uuid, 1) == 0 then
                     entity.TurnBased.HadTurnInCombat = true
+                    entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = true
+                else
+                    if Utils.canAct(uuid) then
+                        entity.TurnBased.IsActiveCombatTurn = true
+                    end
                 end
-                entity.TurnBased.RequestedEndTurn = true
                 entity:Replicate("TurnBased")
             end
         end
