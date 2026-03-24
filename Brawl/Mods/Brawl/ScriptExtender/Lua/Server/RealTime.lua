@@ -265,7 +265,11 @@ end
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
-    State.endBrawls()
+    Ext.Timer.WaitFor(1500, function()
+        if not State.isInCombat() then
+            State.endBrawls()
+        end
+    end)
 end
 
 local function onEnteredCombat(uuid)

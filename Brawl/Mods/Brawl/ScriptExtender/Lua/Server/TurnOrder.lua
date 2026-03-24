@@ -12,20 +12,26 @@ local function calculateMeanInitiativeRoll()
     local totalInitiativeRoll = 0
     local numInitiativeRolls = 0
     for uuid, _ in pairs(State.Session.Players) do
-        if Utils.isAliveAndCanFight(uuid) then
+        if Utils.isAliveAndCanFight(uuid) and M.Utils.isInCurrentCombat(uuid) then
             local entity = Ext.Entity.Get(uuid)
-            if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
+            if entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll and entity.CombatParticipant.InitiativeRoll > 0 then
                 totalInitiativeRoll = totalInitiativeRoll + entity.CombatParticipant.InitiativeRoll
                 numInitiativeRolls = numInitiativeRolls + 1
             end
         end
     end
+    if numInitiativeRolls == 0 then
+        return nil
+    end
     return math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
 end
 
 local function calculateActionInterval(initiative)
+    if not initiative then
+        return Constants.MINIMUM_ACTION_INTERVAL
+    end
     local r = Constants.ACTION_INTERVAL_RESCALING
-    local scale = 1 + r - 4*r*initiative/(2*initiative + M.Utils.getInitiativeDie() + 1)
+    local scale = 1 + r - 4*r*initiative/(2*math.abs(initiative) + M.Utils.getInitiativeDie() + 1)
     return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
 end
 
@@ -51,26 +57,31 @@ local function setInitiativeRoll(uuid, roll)
 end
 
 local function setPartyInitiativeRollToMean()
-    State.Session.MeanInitiativeRoll = calculateMeanInitiativeRoll()
-    for uuid, _ in pairs(State.Session.Players) do
-        if Utils.isAliveAndCanFight(uuid) then
-            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+    debugPrint("setting party init roll to mean...")
+    local mean = calculateMeanInitiativeRoll()
+    if mean then
+        State.Session.MeanInitiativeRoll = mean
+        for uuid, _ in pairs(State.Session.Players) do
+            if Utils.isAliveAndCanFight(uuid) and M.Utils.isInCurrentCombat(uuid) then
+                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+            end
         end
     end
 end
 
 local function bumpNpcInitiativeRoll(uuid)
-    local entity = Ext.Entity.Get(uuid)
-    local initiativeRoll = getInitiativeRoll(uuid)
-    local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
-    debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
-    setInitiativeRoll(uuid, bumpedInitiativeRoll)
+    if M.Utils.isInCurrentCombat(uuid) then
+        local initiativeRoll = getInitiativeRoll(uuid)
+        local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
+        debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
+        setInitiativeRoll(uuid, bumpedInitiativeRoll)
+    end
 end
 
 local function bumpNpcInitiativeRolls()
-    if State.Session.MeanInitiativeRoll ~= -100 then
+    if State.Session.MeanInitiativeRoll then
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
-            if not State.Session.Players[uuid] and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
+            if not State.Session.Players[uuid] and not M.Utils.isCombatHelper(uuid) and getInitiativeRoll(uuid) == State.Session.MeanInitiativeRoll then
                 bumpNpcInitiativeRoll(uuid)
             end
         end

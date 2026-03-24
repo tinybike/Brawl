@@ -676,6 +676,29 @@ local function isValidHostileTarget(uuid, targetUuid)
     return true
 end
 
+local function isCombatHelper(uuid)
+    if uuid == State.Session.CombatHelper then
+        return true
+    end
+    for _, refreshers in pairs(State.Session.RefresherCombatHelper) do
+        for _, refresherUuid in ipairs(refreshers) do
+            if uuid == refresherUuid then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function isInCurrentCombat(uuid)
+    local combatEntity = getCombatEntity()
+    if not combatEntity or not combatEntity.CombatState then
+        return false
+    end
+    local combatGuid = M.Osi.CombatGetGuidFor(uuid)
+    return combatGuid ~= nil and combatGuid == combatEntity.CombatState.MyGuid
+end
+
 local function checkDivineIntervention(spellName, casterUuid)
     if spellName == "Shout_DivineIntervention_Healing" or spellName == "Shout_DivineIntervention_Healing_Improvement" then
         local areaRadius = Ext.Stats.Get(spellName).AreaRadius
@@ -808,6 +831,8 @@ return {
     getTierIndex = getTierIndex,
     isConcentrating = isConcentrating,
     isValidHostileTarget = isValidHostileTarget,
+    isCombatHelper = isCombatHelper,
+    isInCurrentCombat = isInCurrentCombat,
     checkDivineIntervention = checkDivineIntervention,
     getSpellNameBySlot = getSpellNameBySlot,
     getCurrentRegion = getCurrentRegion,

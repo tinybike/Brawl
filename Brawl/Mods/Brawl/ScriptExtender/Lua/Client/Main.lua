@@ -259,7 +259,6 @@ local function setDirectlyControlledCharacterIndex()
             local assignedCharacters = child.DataContext.CurrentPlayer.AssignedCharacters
             for characterIndex, assignedCharacter in ipairs(assignedCharacters) do
                 if assignedCharacter.EntityUUID == directlyControlledCharacterUuid then
-                    print("directly controlled character index", characterIndex)
                     DirectlyControlledCharacterIndex = characterIndex
                 end
             end

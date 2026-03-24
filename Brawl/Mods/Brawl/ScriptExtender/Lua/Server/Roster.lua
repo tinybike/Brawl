@@ -269,7 +269,7 @@ end
 
 local function checkForEndOfBrawl(level)
     local numEnemiesRemaining = M.State.getNumEnemiesRemaining(level)
-    print("Number of enemies remaining:", numEnemiesRemaining)
+    debugPrint("Number of enemies remaining:", numEnemiesRemaining)
     if numEnemiesRemaining == 0 then
         endBrawl(level)
     end

@@ -41,7 +41,7 @@ local function onStarted(level)
 end
 
 local function onCombatStarted(combatGuid)
-    print("CombatStarted", combatGuid)
+    debugPrint("CombatStarted", combatGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatStarted()
     end
@@ -96,7 +96,7 @@ end
 
 -- NB: move all of the endBrawl stuff to here
 local function onCombatEnded(combatGuid)
-    print("CombatEnded", combatGuid)
+    debugPrint("CombatEnded", combatGuid)
     State.Session.StoryActionIDs = {}
     State.Session.MeanInitiativeRoll = nil
     if State.Settings.TurnBasedSwarmMode then
@@ -136,19 +136,6 @@ local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
-    else
-        -- if M.Osi.GetUUID(entityGuid) == State.Session.CombatHelper then
-        --     local combatGuid = M.Osi.GetCombatGuidFor(entityGuid)
-        --     if combatGuid then
-        --         print("got guid, pausing combat...", combatGuid, entityGuid)
-        --         Osi.PauseCombat(combatGuid)
-        --         Ext.Timer.WaitFor(1000, function ()
-        --             print("resming")
-        --             Osi.ResumeCombat(combatGuid)
-        --             Osi.EndTurn(State.Session.CombatHelper)
-        --         end)
-        --     end
-        -- end 
     end
 end
 

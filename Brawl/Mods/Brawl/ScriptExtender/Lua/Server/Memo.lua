@@ -76,6 +76,8 @@ local Memoizable = {
         "isSilenced",
         "isBlinded",
         "isPlayerTurnEnded",
+        "isCombatHelper",
+        "isInCurrentCombat",
         "canAct",
         "canMove",
         "hasLoseControlStatus",

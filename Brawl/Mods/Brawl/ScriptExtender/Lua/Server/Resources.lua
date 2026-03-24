@@ -113,7 +113,7 @@ local function refillTimerComplete(brawler, resourceType, timerHandle)
                 local updatedAmount = math.min(resource.MaxAmount, resource.Amount + 1)
                 resource.Amount = updatedAmount
                 brawler.actionResources[resourceType].amount = updatedAmount
-                print("refillTimerComplete", brawler.displayName, resourceType, updatedAmount)
+                debugPrint("refillTimerComplete", brawler.displayName, resourceType, updatedAmount)
                 entity:Replicate("ActionResources")
             end
         end
@@ -173,7 +173,6 @@ local function resumeActionResourcesRefillTimers(brawler)
                 local refillQueue = brawler.actionResources[resourceType].refillQueue
                 if refillQueue then
                     for _, refillTimer in ipairs(refillQueue) do
-                        print(brawler.displayName, "resume timer for", resourceType)
                         Ext.Timer.Resume(refillTimer)
                     end
                 end
