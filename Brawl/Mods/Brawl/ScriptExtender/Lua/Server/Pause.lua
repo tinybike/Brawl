@@ -145,7 +145,7 @@ local function allExitFTB()
                 if entity and entity.TurnBased then
                     entity.TurnBased.IsActiveCombatTurn = true
                     entity.TurnBased.HadTurnInCombat = false
-                    entity.TurnBased.RequestedEndTurn = true
+                    entity.TurnBased.RequestedEndTurn = false
                     entity.TurnBased.TurnActionsCompleted = false
                     entity:Replicate("TurnBased")
                 end

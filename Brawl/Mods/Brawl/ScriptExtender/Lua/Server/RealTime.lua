@@ -256,6 +256,13 @@ local function onCombatRoundStarted(combatGuid, round)
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         Swarm.unsetTurnComplete(uuid)
     end
+    for uuid, _ in pairs(State.Session.Players) do
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased then
+            entity.TurnBased.RequestedEndTurn = false
+            entity:Replicate("TurnBased")
+        end
+    end
     startCombatRoundTimer(combatGuid)
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
         Pause.allEnterFTB()
