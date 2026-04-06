@@ -335,12 +335,10 @@ startChunk = function (chunkIndex, swarmActors)
             Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
             State.Session.CurrentChunkTimer = nil
         end
-        local idx = 0
         for uuid, brawler in pairs(chunk) do
             State.Session.SwarmTurnComplete[uuid] = false
             if State.Session.SwarmTurnActive then
-                singleCharacterTurn(brawler, idx, swarmActors)
-                idx = idx + 1
+                singleCharacterTurn(brawler, swarmActors)
             end
         end
         State.Session.CurrentChunkTimer = Ext.Timer.WaitFor(getChunkTimeout(swarmActors), function ()
@@ -503,8 +501,8 @@ local function swarmAction(brawler, swarmActors)
     end
 end
 
-singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
-    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid), brawlerIndex*25)
+singleCharacterTurn = function (brawler, swarmActors)
+    debugPrint("singleCharacterTurn", brawler.displayName, brawler.uuid, M.Utils.canAct(brawler.uuid))
     debugPrint("remaining movement", Movement.getMovementDistanceAmount(Ext.Entity.Get(brawler.uuid)))
     local hostCharacterUuid = M.Osi.GetHostCharacter()
     if M.Utils.isToT() and M.Osi.IsEnemy(brawler.uuid, hostCharacterUuid) == 0 and not M.Utils.isPlayerOrAlly(brawler.uuid) then
@@ -525,14 +523,11 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
         debugPrint(brawler.displayName, "singleCharacterTurn, swarm turn already complete")
         return false
     end
-    State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = Ext.Timer.WaitFor(brawlerIndex*200, function ()
-        State.Session.SwarmBrawlerIndexDelay[brawler.uuid] = nil
-        if not State.Session.SwarmTurnActive then
-            return Swarm.onTurnEnded(brawler.uuid)
-        end
-        debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
-        swarmAction(brawler, swarmActors)
-    end)
+    if not State.Session.SwarmTurnActive then
+        return Swarm.onTurnEnded(brawler.uuid)
+    end
+    debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid)
+    swarmAction(brawler, swarmActors)
     return true
 end
 

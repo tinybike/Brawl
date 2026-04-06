@@ -381,6 +381,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local numActions = Resources.getActionPointsRemaining(uuid)
     local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
     local override = not State.Settings.TurnBasedSwarmMode
+    local movementRetries = 0
     debugPrint(M.Utils.getDisplayName(uuid), "starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
         debugPrint(M.Utils.getDisplayName(uuid), "tryMove", allowedDistance)
@@ -389,6 +390,17 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         local need = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
+            return onSuccess()
+        end
+        -- wrap onSuccess to re-check distance after movement completes (target may have moved)
+        local function onSuccessWithCorrection()
+            local postMoveDist = M.Osi.GetDistanceTo(uuid, targetUuid)
+            local remaining = getRemainingMovementByUuid(uuid)
+            if postMoveDist and postMoveDist - spellRange > 0 and remaining > 0 and movementRetries < Constants.MAX_MOVEMENT_RETRIES then
+                movementRetries = movementRetries + 1
+                debugPrint(M.Utils.getDisplayName(uuid), "movement correction retry", movementRetries, postMoveDist, spellRange, remaining)
+                return tryMove(remaining, false, false)
+            end
             return onSuccess()
         end
         -- dash if we need more than base move
@@ -464,7 +476,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             if path.Nodes[#path.Nodes].Distance <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "goal within range, moving to")
-                return moveToPosition(uuid, path.Nodes[#path.Nodes].Position, override, onSuccess, onFailed)
+                return moveToPosition(uuid, path.Nodes[#path.Nodes].Position, override, onSuccessWithCorrection, onFailed)
             end
             -- scan for best in‑range node and fallback
             local bestPos, bestDist = nil, -1
@@ -493,7 +505,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "best within range, moving to")
-                return moveToPosition(uuid, bestPos, override, onSuccess, onFailed)
+                return moveToPosition(uuid, bestPos, override, onSuccessWithCorrection, onFailed)
             end
             -- 2) interpolation fallback if farDist < baseMove
             if farPos and nextPos and farDist < allowedDistance then
@@ -523,7 +535,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             -- 3) final fallback move
             debugPrint("final fallback move")
-            moveToPosition(uuid, farPos, override, onSuccess, onFailed)
+            moveToPosition(uuid, farPos, override, onSuccessWithCorrection, onFailed)
         end)
         if path then
             path.CanUseLadders = true

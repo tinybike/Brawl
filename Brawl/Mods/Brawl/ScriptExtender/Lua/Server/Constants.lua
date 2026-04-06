@@ -1,7 +1,7 @@
 local Constants = {}
 
-Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = false, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false, Quests = false}
--- Constants.DEBUG_LOGGING = false
+-- Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = true, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false, Quests = false}
+Constants.DEBUG_LOGGING = true
 Constants.INITIAL_PULSE_ACTION_DELAY = 600
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -439,8 +439,9 @@ Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
 Constants.ACTION_MAX_TIME = 6000
 Constants.MOVEMENT_MAX_TIME = 8000
-Constants.ACTION_ATTEMPT_LIMIT = 3
+Constants.ACTION_ATTEMPT_LIMIT = 8
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
+Constants.MAX_MOVEMENT_RETRIES = 3
 Constants.OVERFLOW_DAMAGE_PENALTY = 0.4
 Constants.OVERFLOW_HEALING_PENALTY = 0.6
 Constants.AI_UNPREFERRED_TARGET = "9787450d-f34d-43bd-be88-d2bac00bb8ee"
