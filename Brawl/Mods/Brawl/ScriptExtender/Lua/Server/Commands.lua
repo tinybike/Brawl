@@ -299,7 +299,6 @@ local function onActionButton(data, isController)
     local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player then
         -- controllers don't have many buttons, so we only want the actionbar hotkeys to trigger actions if we're in a fight and not paused
-        local uuid = player.uuid
         if isController then
             local brawler = M.Roster.getBrawlerByUuid(player.uuid)
             if not brawler or brawler.isPaused then

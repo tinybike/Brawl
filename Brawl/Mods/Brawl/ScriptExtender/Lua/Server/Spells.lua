@@ -275,6 +275,7 @@ local function checkForConcentration(spellFlags)
             return true
         end
     end
+    return false
 end
 
 local function checkForApplyStatus(spell, applyStatusType)

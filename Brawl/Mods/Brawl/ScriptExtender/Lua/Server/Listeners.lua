@@ -74,7 +74,6 @@ local function onUserReservedFor(entity, _, _)
     State.setIsControllingDirectly()
     local entityUuid = entity.Uuid.EntityUuid
     if State.Session.Players and State.Session.Players[entityUuid] then
-        local userId = entity.UserReservedFor.UserID
         State.Session.Players[entityUuid].userId = entity.UserReservedFor.UserID
     end
 end
