@@ -136,7 +136,7 @@ local function useBonusAttacks(uuid)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-    if State.Settings.TurnBasedSwarmMode and not State.Session.SwarmTurnActive then
+    if State.Settings.TurnBasedSwarmMode and (not State.Session.SwarmTurnActive or State.Session.SwarmTurnComplete[attackerUuid]) then
         return
     end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then

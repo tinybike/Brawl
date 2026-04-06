@@ -653,7 +653,7 @@ local function onCombatRoundStarted(round)
     cancelTimers()
     State.Session.SwarmTurnActive = false
     State.Session.QueuedCompanionAIAction = {}
-    -- State.Session.ActionsInProgress = {}
+    State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
