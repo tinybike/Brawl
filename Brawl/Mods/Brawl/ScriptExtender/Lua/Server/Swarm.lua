@@ -61,6 +61,12 @@ local function cancelTimers(swarmActors)
             State.Session.CurrentChunkTimer = nil
         end
         cancelActionTimers(swarmActors)
+        if State.Session.EnemyTurnFailsafeTimer then
+            for uuid, timer in pairs(State.Session.EnemyTurnFailsafeTimer) do
+                Ext.Timer.Cancel(timer)
+            end
+            State.Session.EnemyTurnFailsafeTimer = {}
+        end
     end
 end
 
@@ -152,9 +158,9 @@ local function getEnemyList(isBeforePlayer)
             if group.IsPlayer then
                 debugPrint("got to player group", i)
                 playerGroupFound = true
-            elseif group.Members and #group.Members > 0 and group.Initiative > -20 then
+            elseif group.Members and #group.Members > 0 then
                 for _, member in ipairs(group.Members) do
-                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and M.Osi.IsCharacter(member.Entity.Uuid.EntityUuid) == 1 then
                         if isBeforePlayer then
                             if playerGroupFound then
                                 table.insert(excludedEnemyList, member.Entity.Uuid.EntityUuid)
@@ -294,6 +300,10 @@ local function completeSwarmTurn(uuid, swarmActors)
                 end
             end
             cancelActionTimers({uuid})
+            if State.Session.EnemyTurnFailsafeTimer and State.Session.EnemyTurnFailsafeTimer[uuid] then
+                Ext.Timer.Cancel(State.Session.EnemyTurnFailsafeTimer[uuid])
+                State.Session.EnemyTurnFailsafeTimer[uuid] = nil
+            end
         end
         local chunkIndex = State.Session.CurrentChunkIndex or 1
         debugPrint(M.Utils.getDisplayName(uuid), "completeSwarmTurn", chunkIndex, State.Session.ChunkInProgress, State.Session.CurrentChunkIndex)
@@ -544,6 +554,15 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
             return Swarm.onTurnEnded(brawler.uuid)
         end
         debugPrint("initiating swarm action for brawler", brawler.displayName, brawler.uuid, brawlerIndex*200)
+        -- per-enemy failsafe: if this enemy's turn hasn't completed in time, force-complete them
+        State.Session.EnemyTurnFailsafeTimer = State.Session.EnemyTurnFailsafeTimer or {}
+        State.Session.EnemyTurnFailsafeTimer[brawler.uuid] = Ext.Timer.WaitFor(Constants.ENEMY_TURN_FAILSAFE_TIMEOUT, function ()
+            State.Session.EnemyTurnFailsafeTimer[brawler.uuid] = nil
+            if State.Session.SwarmTurnActive and not State.Session.SwarmTurnComplete[brawler.uuid] then
+                debugPrint(brawler.displayName, "enemy turn failsafe expired, force-completing")
+                completeSwarmTurn(brawler.uuid, swarmActors)
+            end
+        end)
         swarmAction(brawler, swarmActors)
     end)
     return true
