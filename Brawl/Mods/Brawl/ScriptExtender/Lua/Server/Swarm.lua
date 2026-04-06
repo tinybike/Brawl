@@ -644,10 +644,6 @@ local function onCombatRoundStarted(round)
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpNpcInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll()
-    local enemyList, excludedEnemyList = getEnemyList(true)
-    Ext.Timer.WaitFor(500, function ()
-        startSwarmTurn(enemyList, excludedEnemyList, true)
-    end)
 end
 
 local function onCombatEnded()
@@ -659,6 +655,12 @@ end
 
 local function onTurnStarted(uuid)
     debugPrint("ON TURN STARTED**********************************", M.Utils.getDisplayName(uuid))
+    if uuid and M.Osi.IsPartyMember(uuid, 1) == 0 and not State.Session.SwarmTurnActive then
+        local enemyList, excludedEnemyList = getEnemyList(true)
+        if next(enemyList) then
+            startSwarmTurn(enemyList, excludedEnemyList, true)
+        end
+    end
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
         -- unsetTurnComplete(uuid)

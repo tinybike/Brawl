@@ -137,7 +137,7 @@ local function removeBrawler(level, entityUuid)
             State.Session.IsAttackingOrBeingAttackedByPlayer[entityUuid] = nil
         end
         if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
-            State.Session.SwarmTurnComplete[entityUuid] = nil
+            State.Session.SwarmTurnComplete[entityUuid] = true
         end
         if State.Session.ResurrectedPlayer[entityUuid] ~= nil then
             State.Session.ResurrectedPlayer[entityUuid] = nil
