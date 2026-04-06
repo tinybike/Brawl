@@ -499,9 +499,9 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
-            -- clear target on movement/range/LOS failures so AI picks a new one
+            -- movement/range/LOS failures are terminal in swarm mode — let Larian's AI handle these during mop-up
             if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" or (type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight"))) then
-                brawler.targetUuid = nil
+                return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
         end)
