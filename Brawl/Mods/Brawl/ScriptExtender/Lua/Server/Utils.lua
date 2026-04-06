@@ -307,6 +307,7 @@ local function getForwardVector(entityUuid)
 end
 
 local function getPointInFrontOf(entityUuid, distance)
+    local entity = Ext.Entity.Get(entityUuid)
     local forwardX, forwardY, forwardZ = M.Utils.getForwardVector(entityUuid)
     local translate = entity.Transform.Transform.Translate
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance

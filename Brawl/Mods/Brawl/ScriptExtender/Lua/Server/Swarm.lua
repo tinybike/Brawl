@@ -520,6 +520,7 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     end
     if State.Session.Players[brawler.uuid] or M.State.isToTCombatHelper(brawler.uuid) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
+        State.Session.SwarmTurnComplete[brawler.uuid] = true
         return false
     end
     if M.Swarm.isControlledByDefaultAI(brawler.uuid) then
@@ -687,9 +688,13 @@ end
 local function onDied(uuid)
     if uuid then
         if State.Session.SwarmTurnComplete[uuid] ~= nil then
-            State.Session.SwarmTurnComplete[uuid] = nil
+            State.Session.SwarmTurnComplete[uuid] = true
         end
         cancelActionSequenceFailsafeTimer(uuid)
+        if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
+            Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
+            State.Session.SwarmBrawlerIndexDelay[uuid] = nil
+        end
     end
 end
 

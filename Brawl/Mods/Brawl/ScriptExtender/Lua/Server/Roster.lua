@@ -160,7 +160,11 @@ local function endBrawl(level)
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
-        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+        local uuids = {}
+        for brawlerUuid, _ in pairs(brawlersInLevel) do
+            table.insert(uuids, brawlerUuid)
+        end
+        for _, brawlerUuid in ipairs(uuids) do
             local combatGuid = M.Osi.CombatGetGuidFor(brawlerUuid)
             removeBrawler(level, brawlerUuid)
             if combatGuid then

@@ -391,7 +391,6 @@ return {
     allEnterFTB = allEnterFTB,
     allExitFTB = allExitFTB,
     cancelQueuedMovement = cancelQueuedMovement,
-    enqueueMovement = enqueueMovement,
     startTruePause = startTruePause,
     queueSingleCompanionAIActions = queueSingleCompanionAIActions,
     queueCompanionAIActions = queueCompanionAIActions,

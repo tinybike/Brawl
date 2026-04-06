@@ -426,7 +426,7 @@ local function getBalancedWeightedTarget(distanceToTarget, targetHp, targetHpPct
     end
     if not anchorCharacterUuid then
         debugPrint("(Balanced) Anchor character not found, reverting to Offense weighting")
-        return getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
+        return getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
     end
     local weightedTarget
     local targetDistanceToParty = M.Osi.GetDistanceTo(targetUuid, anchorCharacterUuid)
@@ -454,7 +454,7 @@ local function getDefenseWeightedTarget(distanceToTarget, targetHp, targetHpPct,
     end
     if not anchorCharacterUuid then
         debugPrint("(Defense) Anchor character not found, reverting to Offense weighting")
-        return getOffenseWeightedTarget(distanceToTarget, targetHp, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
+        return getOffenseWeightedTarget(distanceToTarget, targetHp, targetHpPct, canSeeTarget, isHealer, isHostile, isMelee, hasPathToTarget)
     end
     local weightedTarget
     local targetDistanceToAnchor = M.Osi.GetDistanceTo(targetUuid, anchorCharacterUuid)

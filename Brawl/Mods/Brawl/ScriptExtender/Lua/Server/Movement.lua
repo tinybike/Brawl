@@ -294,7 +294,7 @@ end
 -- Jump has a base range of 4.5 m / 15 ft and is increased by 1 m / 3 ft for 2 points of Strength above 10
 local function calculateJumpDistance(uuid)
     local entity = Ext.Entity.Get(uuid)
-    local strength = M.Utils.getAbility(entity) or 10
+    local strength = M.Utils.getAbility(entity, "Strength") or 10
     local jumpDistance = 4.5 + math.max(0, math.floor((strength - 10)/2))
     if M.Utils.hasPassive(entity, "UnarmoredMovement_DifficultTerrain") then
         jumpDistance = jumpDistance + 6

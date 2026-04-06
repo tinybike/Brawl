@@ -90,8 +90,8 @@ local function decreaseActionResource(uuid, resourceType, amount)
                 resources[1].Amount = 0.0
             end
         end
+        entity:Replicate("ActionResources")
     end
-    entity:Replicate("ActionResources")
 end
 
 local function refillTimerComplete(brawler, resourceType, timerHandle)

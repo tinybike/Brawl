@@ -8,7 +8,11 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
     end
     local actionToTake = nil
     local spellTypes = {"Control", "Damage"}
-    local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+    local entity = Ext.Entity.Get(brawler.uuid)
+    if not entity or not entity.SpellBookPrepares then
+        return onFailed("no prepared spells")
+    end
+    local preparedSpells = entity.SpellBookPrepares.PreparedSpells
     local damageAmountNeeded = M.Osi.GetHitpoints(target.uuid)
     if M.Osi.IsPlayer(brawler.uuid) == 1 then
         local allowAoE = M.Osi.HasPassive(brawler.uuid, "SculptSpells") == 1
@@ -47,7 +51,11 @@ end
 
 local function actOnFriendlyTarget(brawler, target, bonusActionOnly, excludedSpells, onSubmitted, onCompleted, onFailed)
     local distanceToTarget = M.Osi.GetDistanceTo(brawler.uuid, target.uuid)
-    local preparedSpells = Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells
+    local entity = Ext.Entity.Get(brawler.uuid)
+    if not entity or not entity.SpellBookPrepares then
+        return onFailed("no prepared spells")
+    end
+    local preparedSpells = entity.SpellBookPrepares.PreparedSpells
     if not preparedSpells then
         return onFailed("no prepared spells")
     end
@@ -104,7 +112,7 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
                 return actOnFriendlyTarget(brawler, brawlers[friendlyTargetUuid], bonusActionOnly, nil, function (request)
                     State.Session.HealRequested[userId] = false
                     onSubmitted(request)
-                end, onFailed)
+                end, onCompleted, onFailed)
             end
         end
         local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlers, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid))

@@ -148,6 +148,7 @@ local function getAdjustedDistanceTo(sourcePos, targetPos, sourceForwardX, sourc
 end
 
 local function buildClosestEnemyBrawlers(playerUuid)
+    local maxTargets = 10
     if State.Session.PlayerMarkedTarget[playerUuid] and not M.Utils.isAliveAndCanFight(State.Session.PlayerMarkedTarget[playerUuid]) then
         State.Session.PlayerMarkedTarget[playerUuid] = nil
     end
