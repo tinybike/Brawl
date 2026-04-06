@@ -136,10 +136,6 @@ local function unsetTurnComplete(uuid)
         entity:Replicate("TurnBased")
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
             State.Session.SwarmTurnComplete[uuid] = false
-            local brawler = M.Roster.getBrawlerByUuid(uuid)
-            if brawler then
-                brawler.excludedTargets = nil
-            end
         end
         -- Resources.restoreActionResource(entity, "Movement")
     end
@@ -505,11 +501,6 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             end
             -- clear target on movement/range/LOS failures so AI picks a new one
             if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" or (type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight"))) then
-                if brawler.targetUuid then
-                    brawler.excludedTargets = brawler.excludedTargets or {}
-                    brawler.excludedTargets[brawler.targetUuid] = true
-                    debugPrint(brawler.displayName, "excluding target", M.Utils.getDisplayName(brawler.targetUuid))
-                end
                 brawler.targetUuid = nil
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
@@ -655,14 +646,11 @@ local function onCombatRoundStarted(round)
     State.Session.QueuedCompanionAIAction = {}
     State.Session.ActionsInProgress = {}
     unsetAllEnemyTurnsComplete()
-    for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        if M.Osi.IsPartyMember(uuid, 1) == 0 then
-            Resources.restoreAllActionResources(uuid)
-        end
-    end
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpNpcInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll()
+    local enemyList, excludedEnemyList = getEnemyList(true)
+    startSwarmTurn(enemyList, excludedEnemyList, true)
 end
 
 local function onCombatEnded()
@@ -674,12 +662,6 @@ end
 
 local function onTurnStarted(uuid)
     debugPrint("ON TURN STARTED**********************************", M.Utils.getDisplayName(uuid))
-    if uuid and M.Osi.IsPartyMember(uuid, 1) == 0 and not State.Session.SwarmTurnActive then
-        local enemyList, excludedEnemyList = getEnemyList(true)
-        if next(enemyList) then
-            startSwarmTurn(enemyList, excludedEnemyList, true)
-        end
-    end
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
         -- unsetTurnComplete(uuid)
