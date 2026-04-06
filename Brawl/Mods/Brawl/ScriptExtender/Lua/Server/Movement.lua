@@ -516,7 +516,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
                     local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
                     local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
-                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0, uuid, 1)
+                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0.5, uuid, 1)
                     if vx then
                         farPos = {vx, vy, vz}
                         valid = true

@@ -116,6 +116,11 @@ local function findTarget(brawler, bonusActionOnly, onSubmitted, onCompleted, on
             end
         end
         local weightedTargets = M.Pick.getWeightedTargets(brawler, brawlers, bonusActionOnly, M.Pick.whoNeedsHealing(brawler.uuid))
+        if brawler.excludedTargets then
+            for uuid, _ in pairs(brawler.excludedTargets) do
+                weightedTargets[uuid] = nil
+            end
+        end
         debugDump(weightedTargets)
         local targetUuid = M.Pick.decideOnTarget(weightedTargets)
         if targetUuid then

@@ -130,6 +130,10 @@ local function unsetTurnComplete(uuid)
         entity:Replicate("TurnBased")
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
             State.Session.SwarmTurnComplete[uuid] = false
+            local brawler = M.Roster.getBrawlerByUuid(uuid)
+            if brawler then
+                brawler.excludedTargets = nil
+            end
         end
         -- Resources.restoreActionResource(entity, "Movement")
     end
@@ -486,6 +490,15 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             end
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
+            end
+            -- clear target on movement/range/LOS failures so AI picks a new one
+            if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" or (type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight"))) then
+                if brawler.targetUuid then
+                    brawler.excludedTargets = brawler.excludedTargets or {}
+                    brawler.excludedTargets[brawler.targetUuid] = true
+                    debugPrint(brawler.displayName, "excluding target", M.Utils.getDisplayName(brawler.targetUuid))
+                end
+                brawler.targetUuid = nil
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
         end)
