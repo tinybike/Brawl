@@ -235,13 +235,6 @@ local function unsetEnemyTurnsComplete(uuids)
     resetChunkState()
 end
 
-local function allBrawlersCanAct()
-    local brawlersCanAct = {}
-    for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        brawlersCanAct[uuid] = M.Utils.canAct(uuid)
-    end
-    return brawlersCanAct
-end
 
 local function checkSwarmTurnComplete(swarmActors)
     if swarmActors then
@@ -345,7 +338,7 @@ startChunk = function (chunkIndex, swarmActors)
         local idx = 0
         for uuid, brawler in pairs(chunk) do
             State.Session.SwarmTurnComplete[uuid] = false
-            if State.Session.SwarmTurnActive and State.Session.CanActBeforeDelay[uuid] ~= false then
+            if State.Session.SwarmTurnActive then
                 singleCharacterTurn(brawler, idx, swarmActors)
                 idx = idx + 1
             end
@@ -580,7 +573,6 @@ local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
             debugPrint(M.Utils.getDisplayName(uuid), uuid)
         end
         State.Session.TurnBasedSwarmModePlayerTurnEnded = {}
-        State.Session.CanActBeforeDelay = allBrawlersCanAct()
         State.Session.SwarmTurnActive = true
         State.Session.SwarmActors = swarmActors
         State.Session.SwarmTurnIsBeforePlayer = isBeforePlayer
