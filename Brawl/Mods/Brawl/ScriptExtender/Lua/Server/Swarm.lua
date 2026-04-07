@@ -269,6 +269,20 @@ local function resetSwarmTurnComplete(swarmActors)
     end
     -- NB: all timers? or just action?
     cancelTimers(swarmActors)
+    -- Clear any pending movements and actions so they don't fire during the player turn
+    if swarmActors then
+        for _, uuid in ipairs(swarmActors) do
+            Utils.clearOsirisQueue(uuid)
+        end
+    end
+    -- Cancel active movement timers
+    for eventUuid, activeMovement in pairs(State.Session.ActiveMovements) do
+        if activeMovement.timer and activeMovement.timer.handle then
+            Ext.Timer.Cancel(activeMovement.timer.handle)
+        end
+    end
+    State.Session.ActiveMovements = {}
+    State.Session.ActionsInProgress = {}
     State.Session.SwarmTurnActive = false
     State.SwarmActors = nil
 end

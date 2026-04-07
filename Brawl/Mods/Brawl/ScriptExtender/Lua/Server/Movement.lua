@@ -435,8 +435,12 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 end)
             end, onFailed)
         end
-        -- find a valid point just outside the target
-        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, uuid, 1)
+        -- find a valid point just outside the target (tighter radius for melee, fallback to 3.0 for large units)
+        local findRadius = math.min(spellRange, 3.0)
+        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, findRadius, uuid, 1)
+        if not gx and findRadius < 3.0 then
+            gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, uuid, 1)
+        end
         if not gx then
             return onFailed("no valid points")
         end
