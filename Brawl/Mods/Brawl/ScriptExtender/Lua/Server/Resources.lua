@@ -228,8 +228,15 @@ local function hasEnoughToCastSpell(casterUuid, spellName, variant, upcastLevel)
         debugPrint("Error: spell not found")
         return false
     end
+    local isExtraAttack = State.Session.ExtraAttackInProgress and State.Session.ExtraAttackInProgress[casterUuid]
+    if isExtraAttack and not spell.triggersExtraAttack then
+        return false
+    end
     for costType, costValue in pairs(spell.costs) do
-        if costType == "LongRest" or costType == "ShortRest" then
+        -- Extra attacks don't cost AP/BA
+        if isExtraAttack and (costType == "ActionPoint" or costType == "BonusActionPoint") then
+            -- skip
+        elseif costType == "LongRest" or costType == "ShortRest" then
             if costValue and M.Resources.isSpellOnCooldown(casterUuid, spellName) then
                 return false
             end
@@ -264,8 +271,11 @@ end
 local function deductCastedSpell(uuid, spellName, requestUuid)
     local entity = Ext.Entity.Get(uuid)
     local spell = M.Spells.getSpellByName(spellName)
+    local isExtraAttack = State.Session.ExtraAttackInProgress and State.Session.ExtraAttackInProgress[uuid]
     if entity and spell then
         for costType, costValue in pairs(spell.costs) do
+            -- Extra attacks don't cost AP/BA
+            if not (isExtraAttack and (costType == "ActionPoint" or costType == "BonusActionPoint")) then
             if costType == "LongRest" or costType == "ShortRest" then
                 local preparedSpell = getPreparedSpell(entity, spellName)
                 local stats = Ext.Stats.Get(spellName)
@@ -313,6 +323,7 @@ local function deductCastedSpell(uuid, spellName, requestUuid)
                     end
                 end
             end
+            end -- extra attack AP/BA skip
         end
         entity:Replicate("ActionResources")
     end

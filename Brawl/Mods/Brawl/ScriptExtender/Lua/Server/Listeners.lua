@@ -485,7 +485,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
-            -- _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             local spellName = actionInProgress.spellName
             local onCompleted = actionInProgress.onCompleted
@@ -500,10 +499,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 end
                 onCompleted(spellName)
             else
-                if outcome == "CantSpendUseCosts" then
-                    -- check for ActionResourceBlock boosts? why did this fail
-                    debugDump(cast:GetAllComponents())
-                end
                 debugPrint("onFailed")
                 onFailed(outcome)
             end

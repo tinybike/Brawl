@@ -166,13 +166,21 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
 end
 
 local function buildTarget(uuid, targetingType)
-    return {
-        -- Position = nil,
-        Target = Ext.Entity.Get(uuid),
-        -- Target2 = nil,
+    local entity = Ext.Entity.Get(uuid)
+    local target = {
+        Target = entity,
         TargetingType = targetingType,
-        -- TargetProxy = nil,
     }
+    if entity and entity.Transform then
+        local pos = entity.Transform.Transform.Translate
+        target.Position = {pos[1], pos[2], pos[3]}
+    end
+    -- If target is dead, use position-only targeting so AoE spells still work
+    if M.Osi.IsDead(uuid) == 1 then
+        debugPrint("buildTarget: target is dead, using position-only", M.Utils.getDisplayName(uuid))
+        target.Target = nil
+    end
+    return target
 end
 
 local function buildTargets(casterUuid, spellName, targetUuid, targetingType, isFriendlyTarget)
@@ -252,7 +260,7 @@ local function getCastOptions()
         return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
     end
     if State.Settings.TurnBasedSwarmMode then
-        return {"FromClient", "IgnoreHasSpell", "IgnoreTargetChecks", "IgnoreCastChecks", "ShowPrepareAnimation", "NoMovement"}
+        return {"FromClient", "IgnoreHasSpell", "IgnoreCastChecks", "ShowPrepareAnimation", "NoMovement"}
     end
     return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
 end

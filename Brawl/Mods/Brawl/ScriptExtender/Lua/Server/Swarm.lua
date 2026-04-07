@@ -4,6 +4,7 @@ local noop = Utils.noop
 local startChunk
 local singleCharacterTurn
 local useRemainingActions
+local useExtraAttacks
 
 local function isExcludedFromSwarmAI(uuid)
     return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isToTExcludedEnemyTier(uuid)
@@ -487,6 +488,17 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if requestedEndTurn(brawler.uuid) then
                 return callback(brawler.uuid, swarmActors)
             end
+            -- Check for extra attacks after a triggering spell completes
+            local spell = M.Spells.getSpellByName(spellName)
+            if spell and spell.triggersExtraAttack and brawler.extraAttacksRemaining and brawler.extraAttacksRemaining > 0 then
+                return Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
+                    useExtraAttacks(brawler, swarmTurnActiveInitial, swarmActors, function ()
+                        Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
+                            useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count)
+                        end)
+                    end)
+                end)
+            end
             Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
                 useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count)
             end)
@@ -499,18 +511,63 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
-            -- movement/range/LOS failures are terminal in swarm mode — let Larian's AI handle these during mop-up
-            if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" or (type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight"))) then
+            -- movement failures are terminal — let Larian's AI handle these during mop-up
+            if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
+            end
+            -- range/LOS failures: clear target and retry with a different one
+            if type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight")) then
+                brawler.targetUuid = nil
+            end
+            -- Canceled usually means invalid target (dead, etc.) — clear target and retry
+            if tostring(err) == "Canceled" then
+                brawler.targetUuid = nil
             end
             useRemainingActions(brawler, swarmTurnActiveInitial, swarmActors, callback, count + 1)
         end)
     end
 end
 
+useExtraAttacks = function (brawler, swarmTurnActiveInitial, swarmActors, callback)
+    if not brawler or not brawler.uuid or not brawler.extraAttacksRemaining or brawler.extraAttacksRemaining <= 0 then
+        return callback()
+    end
+    if not M.Utils.canAct(brawler.uuid) then
+        brawler.extraAttacksRemaining = 0
+        return callback()
+    end
+    debugPrint(brawler.displayName, "useExtraAttacks", brawler.extraAttacksRemaining)
+    brawler.extraAttacksRemaining = brawler.extraAttacksRemaining - 1
+    State.Session.ExtraAttackInProgress = State.Session.ExtraAttackInProgress or {}
+    State.Session.ExtraAttackInProgress[brawler.uuid] = true
+    AI.act(brawler, false, function (request)
+        debugPrint(brawler.displayName, "extra attack SUBMITTED", request.Spell.Prototype, request.RequestGuid)
+        if swarmTurnActiveInitial then
+            startActionSequenceFailsafeTimer(brawler, request, swarmTurnActiveInitial, swarmActors, function (uuid, actors)
+                State.Session.ExtraAttackInProgress[brawler.uuid] = nil
+                if callback then callback() end
+            end)
+        end
+    end, function (spellName)
+        debugPrint(brawler.displayName, "extra attack COMPLETED", spellName)
+        cancelActionSequenceFailsafeTimer(brawler.uuid)
+        State.Session.ExtraAttackInProgress[brawler.uuid] = nil
+        Ext.Timer.WaitFor(Constants.TIME_BETWEEN_ACTIONS, function ()
+            useExtraAttacks(brawler, swarmTurnActiveInitial, swarmActors, callback)
+        end)
+    end, function (err)
+        debugPrint(brawler.displayName, "extra attack FAILED", err)
+        cancelActionSequenceFailsafeTimer(brawler.uuid)
+        State.Session.ExtraAttackInProgress[brawler.uuid] = nil
+        brawler.extraAttacksRemaining = 0
+        callback()
+    end)
+end
+
 local function swarmAction(brawler, swarmActors)
     debugPrint(brawler.displayName, "swarmAction")
     if State.Session.SwarmTurnActive and M.Osi.IsPartyMember(brawler.uuid, 1) == 0 then
+        brawler.extraAttacksRemaining = brawler.numExtraAttacks or 0
         useRemainingActions(brawler, true, swarmActors, completeSwarmTurn)
     elseif State.Session.QueuedCompanionAIAction[brawler.uuid] then
         useRemainingActions(brawler, false)
@@ -645,6 +702,7 @@ local function onCombatRoundStarted(round)
     State.Session.SwarmTurnActive = false
     State.Session.QueuedCompanionAIAction = {}
     State.Session.ActionsInProgress = {}
+    State.Session.ExtraAttackInProgress = {}
     -- Restore per-turn resources: the game restores AP/BA/RAP on TurnStarted,
     -- but Brawl's swarm fires before the game gets to them
     for uuid, _ in pairs(M.Roster.getBrawlers()) do

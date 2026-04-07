@@ -44,7 +44,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         local targetUuid = M.Spells.isShout(actionToTake) and brawler.uuid or target.uuid
         Actions.useSpellOnTarget(brawler.uuid, targetUuid, actionToTake, false, onSubmitted, function ()
             debugPrint(brawler.displayName, "complete (hostile)", bonusActionOnly)
-            onCompleted()
+            onCompleted(actionToTake)
         end, onFailed)
     end, onFailed)
 end
