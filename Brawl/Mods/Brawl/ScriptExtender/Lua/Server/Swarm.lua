@@ -286,12 +286,6 @@ local function isChunkDone(chunkIndex)
 end
 
 local function completeSwarmTurn(uuid, swarmActors)
-    -- AP diagnostic
-    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
-        if M.Osi.IsPartyMember(brawlerUuid, 1) == 0 then
-            debugPrint("AP TRACK", M.Utils.getDisplayName(uuid), "completed;", M.Utils.getDisplayName(brawlerUuid), "AP:", Resources.getActionPointsRemaining(brawlerUuid))
-        end
-    end
     if State.Session.SwarmTurnActive then
         if not M.Swarm.isControlledByDefaultAI(uuid) then
             if M.Osi.IsPartyMember(uuid, 1) == 0 then
@@ -651,7 +645,8 @@ local function onCombatRoundStarted(round)
     State.Session.SwarmTurnActive = false
     State.Session.QueuedCompanionAIAction = {}
     State.Session.ActionsInProgress = {}
-    -- Restore per-turn resources for enemies whose TurnStarted hasn't fired yet
+    -- Restore per-turn resources: the game restores AP/BA/RAP on TurnStarted,
+    -- but Brawl's swarm fires before the game gets to them
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
             local entity = Ext.Entity.Get(uuid)
