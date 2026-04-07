@@ -106,6 +106,19 @@ end
 
 local function finishMovement(uuid, eventUuid, activeMovement, override)
     if uuid and activeMovement and uuid == activeMovement.moverUuid then
+        -- Check if the entity actually reached near the goal position
+        if activeMovement.goalPosition and not override then
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.Transform then
+                local pos = entity.Transform.Transform.Translate
+                local gp = activeMovement.goalPosition
+                local dist = math.sqrt((pos[1] - gp[1])^2 + (pos[2] - gp[2])^2 + (pos[3] - gp[3])^2)
+                if dist > 2.0 then
+                    debugPrint(M.Utils.getDisplayName(uuid), "finishMovement SPURIOUS — still", dist, "from goal, ignoring")
+                    return
+                end
+            end
+        end
         debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
         if activeMovement.timer and activeMovement.timer.handle then
             Ext.Timer.Cancel(activeMovement.timer.handle)

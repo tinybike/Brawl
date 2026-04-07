@@ -105,16 +105,22 @@ local function setTurnComplete(uuid)
     if State.Session.QueuedCompanionAIAction[uuid] then
         State.Session.QueuedCompanionAIAction[uuid] = false
     end
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.TurnBased then
-        debugPrint(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
-        entity.TurnBased.RequestedEndTurn = true
-        if M.Osi.IsPartyMember(uuid, 1) == 0 then
-            entity.TurnBased.HadTurnInCombat = true
-            entity.TurnBased.TurnActionsCompleted = true
-            entity.TurnBased.ActedThisRoundInCombat = true
+    -- If Larian is currently controlling this unit, don't touch TurnBased flags
+    -- Let Larian finish naturally; onTurnEnded will handle completion
+    if not M.Utils.isActiveCombatTurn(uuid) then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased then
+            debugPrint(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
+            entity.TurnBased.RequestedEndTurn = true
+            if M.Osi.IsPartyMember(uuid, 1) == 0 then
+                entity.TurnBased.HadTurnInCombat = true
+                entity.TurnBased.TurnActionsCompleted = true
+                entity.TurnBased.ActedThisRoundInCombat = true
+            end
+            entity:Replicate("TurnBased")
         end
-        entity:Replicate("TurnBased")
+    else
+        debugPrint(M.Utils.getDisplayName(uuid), "Larian controlling, skipping TurnBased flags", uuid)
     end
     if M.Osi.IsPartyMember(uuid, 1) == 0 then
         State.Session.SwarmTurnComplete[uuid] = true
@@ -383,7 +389,6 @@ local function terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors
     if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
         return callback(uuid, swarmActors)
     end
-    -- NB: is this needed?
     if not M.Swarm.isControlledByDefaultAI(uuid) then
         setTurnComplete(uuid)
     end
@@ -758,18 +763,41 @@ end
 
 local function onTurnEnded(uuid)
     if uuid then
+        local brawlStillActive = State.Session.ActionsInProgress[uuid] and next(State.Session.ActionsInProgress[uuid])
         cancelActionSequenceFailsafeTimer(uuid)
-        if State.Session.ActionsInProgress[uuid] and next(State.Session.ActionsInProgress[uuid]) then
+        if brawlStillActive then
             debugPrint(M.Utils.getDisplayName(uuid), "leftover ActionsInProgress", #State.Session.ActionsInProgress[uuid])
-            if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            cancelActionTimers({uuid})
+            State.Session.ActionsInProgress[uuid] = {}
+        end
+        if M.Osi.IsPartyMember(uuid, 1) == 0 and State.Session.SwarmTurnActive then
+            if not brawlStillActive then
+                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded: Larian done")
                 State.Session.SwarmTurnComplete[uuid] = true
                 if State.Session.SwarmBrawlerIndexDelay[uuid] ~= nil then
                     Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
                     State.Session.SwarmBrawlerIndexDelay[uuid] = nil
                 end
-                cancelActionTimers({uuid})
+                -- Check if chunk/swarm can advance (Larian might be the last to finish)
+                local swarmActors = State.Session.SwarmActors
+                local chunkIndex = State.Session.CurrentChunkIndex or 1
+                if State.Session.BrawlerChunks and State.Session.BrawlerChunks[chunkIndex] and isChunkDone(chunkIndex) then
+                    if State.Session.ChunkInProgress == chunkIndex then
+                        State.Session.ChunkInProgress = nil
+                        if State.Session.CurrentChunkTimer then
+                            Ext.Timer.Cancel(State.Session.CurrentChunkTimer)
+                            State.Session.CurrentChunkTimer = nil
+                        end
+                        debugPrint("onTurnEnded advance to next chunk", chunkIndex + 1)
+                        startChunk(chunkIndex + 1, swarmActors)
+                    end
+                end
+                if swarmActors and checkSwarmTurnComplete(swarmActors) then
+                    resetSwarmTurnComplete(swarmActors)
+                end
+            else
+                debugPrint(M.Utils.getDisplayName(uuid), "onTurnEnded: Larian done but Brawl was still active, deferring to Brawl")
             end
-            State.Session.ActionsInProgress[uuid] = {}
         end
         if M.Roster.getBrawlerByUuid(uuid) and M.Osi.IsPartyMember(uuid, 1) == 1 then
             State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
