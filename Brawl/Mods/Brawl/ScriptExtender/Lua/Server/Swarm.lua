@@ -747,7 +747,7 @@ local function onCombatEnded()
     State.Session.SwarmTurnComplete = {}
     cancelTimers()
     Leaderboard.dumpToConsole()
-    Leaderboard.postDataToClients()
+    Leaderboard.postDataToClients(true)
 end
 
 local function onTurnStarted(uuid)

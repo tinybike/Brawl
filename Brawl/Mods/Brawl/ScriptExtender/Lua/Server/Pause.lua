@@ -21,9 +21,12 @@ local function unlock(entity)
                 State.Session.TranslateChangedEventListeners[uuid] = nil
             end
             local moveTo = State.Session.MovementQueue[uuid]
-            debugDump(moveTo)
-            Movement.moveToPosition(uuid, moveTo, false)
             State.Session.MovementQueue[uuid] = nil
+            debugDump(moveTo)
+            -- Delay movement execution to let the event cascade from unpause settle
+            Ext.Timer.WaitFor(500, function ()
+                Movement.moveToPosition(uuid, moveTo, false)
+            end)
         end
     end
 end
