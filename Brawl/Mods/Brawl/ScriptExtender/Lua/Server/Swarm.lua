@@ -105,9 +105,10 @@ local function setTurnComplete(uuid)
     if State.Session.QueuedCompanionAIAction[uuid] then
         State.Session.QueuedCompanionAIAction[uuid] = false
     end
-    -- If Larian is currently controlling this unit, don't touch TurnBased flags
+    -- If Larian is currently controlling this NPC, don't touch TurnBased flags
     -- Let Larian finish naturally; onTurnEnded will handle completion
-    if not M.Utils.isActiveCombatTurn(uuid) then
+    -- Always set flags for player characters (companion AI needs turns to end)
+    if M.Osi.IsPartyMember(uuid, 1) == 1 or not M.Utils.isActiveCombatTurn(uuid) then
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased then
             debugPrint(M.Utils.getDisplayName(uuid), "Setting turn complete", uuid)
