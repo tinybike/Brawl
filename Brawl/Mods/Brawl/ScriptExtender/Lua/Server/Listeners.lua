@@ -210,7 +210,9 @@ local function onGainedControl(targetGuid)
                 end
             end
             if not State.Settings.FullAuto then
-                Utils.clearOsirisQueue(targetUuid)
+                if not Movement.getActiveMovement(targetUuid) then
+                    Utils.clearOsirisQueue(targetUuid)
+                end
                 RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
             end
             if not State.Settings.TurnBasedSwarmMode then
