@@ -271,12 +271,12 @@ end
 local function deductCastedSpell(uuid, spellName, requestUuid)
     local entity = Ext.Entity.Get(uuid)
     local spell = M.Spells.getSpellByName(spellName)
-    local isExtraAttack = State.Session.ExtraAttackInProgress and State.Session.ExtraAttackInProgress[uuid]
     if entity and spell then
         for costType, costValue in pairs(spell.costs) do
-            -- Extra attacks don't cost AP/BA
-            if not (isExtraAttack and (costType == "ActionPoint" or costType == "BonusActionPoint")) then
-            if costType == "LongRest" or costType == "ShortRest" then
+            -- Game engine handles AP/BA deduction; we handle everything else
+            if costType == "ActionPoint" or costType == "BonusActionPoint" then
+                -- skip, game deducts these
+            elseif costType == "LongRest" or costType == "ShortRest" then
                 local preparedSpell = getPreparedSpell(entity, spellName)
                 local stats = Ext.Stats.Get(spellName)
                 if preparedSpell and costValue and entity.SpellBookCooldowns and entity.SpellBookCooldowns.Cooldowns and stats.Cooldown then
@@ -323,7 +323,6 @@ local function deductCastedSpell(uuid, spellName, requestUuid)
                     end
                 end
             end
-            end -- extra attack AP/BA skip
         end
         entity:Replicate("ActionResources")
     end

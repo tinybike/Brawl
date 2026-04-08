@@ -260,7 +260,7 @@ local function getCastOptions()
         return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
     end
     if State.Settings.TurnBasedSwarmMode then
-        return {"FromClient", "IgnoreHasSpell", "IgnoreCastChecks", "ShowPrepareAnimation", "NoMovement"}
+        return {"IgnoreHasSpell", "ShowPrepareAnimation", "NoMovement"}
     end
     return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
 end
