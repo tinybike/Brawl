@@ -390,7 +390,7 @@ local function terminateActionSequence(uuid, swarmTurnActiveInitial, swarmActors
     if swarmTurnActiveInitial and not State.Session.SwarmTurnActive then
         return callback(uuid, swarmActors)
     end
-    if not M.Swarm.isControlledByDefaultAI(uuid) then
+    if M.Osi.IsPartyMember(uuid, 1) == 1 or not M.Swarm.isControlledByDefaultAI(uuid) then
         setTurnComplete(uuid)
     end
     callback(uuid, swarmActors)
@@ -464,7 +464,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if count > Constants.ACTION_ATTEMPT_LIMIT then
                 debugPrint(brawler.displayName, count, "counter limit reached, what happened here??")
             end
-            if not M.Swarm.isControlledByDefaultAI(brawler.uuid) then
+            if M.Osi.IsPartyMember(brawler.uuid, 1) == 1 or not M.Swarm.isControlledByDefaultAI(brawler.uuid) then
                 setTurnComplete(brawler.uuid)
             end
             return callback(brawler.uuid, swarmActors)
