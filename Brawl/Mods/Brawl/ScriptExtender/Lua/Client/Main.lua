@@ -796,38 +796,22 @@ local function onNetMessage(data)
         AwaitingTarget = data.Payload == "1"
     elseif data.Channel == "SelectCharacter" then
         local targetUuid = data.Payload
-        print("[Brawl Client] SelectCharacter received for", targetUuid)
-        local ok, err = pcall(function ()
+        pcall(function ()
             local root = Ext.UI.GetRoot()
-            if not root then
-                print("[Brawl Client] No UI root")
-                return
-            end
-            local contentRoot = root:Find("ContentRoot")
-            if not contentRoot then
-                print("[Brawl Client] No ContentRoot")
-                return
-            end
-            for _, child in ipairs(contentRoot.Children) do
-                if child.Name == "PlayerPortraits" then
-                    print("[Brawl Client] Found PlayerPortraits, checking", #child.DataContext.CurrentPlayer.AssignedCharacters, "characters")
-                    for i, character in ipairs(child.DataContext.CurrentPlayer.AssignedCharacters) do
-                        print("[Brawl Client]", i, character.EntityUUID)
-                        if character.EntityUUID == targetUuid then
-                            print("[Brawl Client] Executing SelectCharacter for index", i)
-                            child.DataContext.SelectCharacter:Execute(character)
-                            return
+            if root then
+                for _, child in ipairs(root:Find("ContentRoot").Children) do
+                    if child.Name == "PlayerPortraits" then
+                        for _, character in ipairs(child.DataContext.CurrentPlayer.AssignedCharacters) do
+                            if character.EntityUUID == targetUuid then
+                                child.DataContext.SelectCharacter:Execute(character)
+                                return
+                            end
                         end
+                        return
                     end
-                    print("[Brawl Client] Character not found in AssignedCharacters")
-                    return
                 end
             end
-            print("[Brawl Client] PlayerPortraits not found")
         end)
-        if not ok then
-            print("[Brawl Client] SelectCharacter error:", err)
-        end
     elseif data.Channel == "Notification" then
         showNotification(Ext.Json.Parse(data.Payload))
     elseif data.Channel == "Leaderboard" then

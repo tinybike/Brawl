@@ -124,6 +124,14 @@ end
 local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
+        -- Capture who's selected BEFORE exiting FTB (leaving FTB reassigns control)
+        local selectedUuidDuringPause = nil
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly then
+                selectedUuidDuringPause = uuid
+                break
+            end
+        end
         -- Track which characters have queued movements before we start unpausing
         local hasQueuedMovement = {}
         for uuid, _ in pairs(State.Session.MovementQueue) do
@@ -197,14 +205,6 @@ local function allExitFTB()
             Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
         end
         TurnOrder.setPlayersSwarmGroup()
-        -- Capture who's selected during FTB before exiting
-        local selectedUuidDuringPause = nil
-        for uuid, player in pairs(State.Session.Players) do
-            if player.isControllingDirectly then
-                selectedUuidDuringPause = uuid
-                break
-            end
-        end
         if selectedUuidDuringPause then
             State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
         end

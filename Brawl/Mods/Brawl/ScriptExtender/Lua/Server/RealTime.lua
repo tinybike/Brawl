@@ -302,6 +302,16 @@ end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
+    -- If we have a pending post-unpause selection and the wrong character got control, override it
+    if State.Session.PendingSelectCharOnLeftFTB and uuid ~= State.Session.PendingSelectCharOnLeftFTB then
+        local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
+        State.Session.PendingSelectCharOnLeftFTB = nil
+        debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
+        Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+    elseif State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
+        State.Session.PendingSelectCharOnLeftFTB = nil
+        debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
+    end
     local userId = Osi.GetReservedUserID(uuid)
     for playerUuid, player in pairs(State.Session.Players) do
         if player.userId == userId and playerUuid ~= uuid then
@@ -448,11 +458,9 @@ return {
             end
         end,
         onLeftForceTurnBased = function (uuid)
-            if State.Session.PendingSelectCharOnLeftFTB then
-                local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
-                State.Session.PendingSelectCharOnLeftFTB = nil
-                debugPrint("Left FTB, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
-                Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+            if State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
+                debugPrint("Left FTB for target char", M.Utils.getDisplayName(uuid))
+                -- Don't send yet — wait for GainedControl to settle, then override
             end
         end,
     },
