@@ -133,9 +133,6 @@ local function actionResourcesCallback(entity, _, _)
                 if savedActionResource and savedActionResource.amount then
                     local resource = getActionResource(entity, resourceType)
                     if resource and resource.Amount then
-                        -- was this a decrease? if so, create timer for refilling 1 point
-                        -- just compare to max amount? does that work for things like Haste?
-                        -- print("Resource comparison:", resource.Amount, savedActionResource.amount, resource.Amount < savedActionResource.amount, resource.MaxAmount)
                         if resource.Amount < savedActionResource.amount then
                             local timer
                             timer = Ext.Timer.WaitFor(brawler.actionInterval, function ()

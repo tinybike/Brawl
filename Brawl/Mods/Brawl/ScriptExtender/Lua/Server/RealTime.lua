@@ -272,6 +272,7 @@ end
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
+    stopAllPulseActions(true)
     Ext.Timer.WaitFor(1500, function()
         if not State.isInCombat() then
             State.endBrawls()
@@ -438,5 +439,21 @@ return {
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,
+        onEnteredForceTurnBased = function (uuid)
+            if State.Session.PendingSelectCharOnFTB then
+                local selectedUuid = State.Session.PendingSelectCharOnFTB
+                State.Session.PendingSelectCharOnFTB = nil
+                debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
+                Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+            end
+        end,
+        onLeftForceTurnBased = function (uuid)
+            if State.Session.PendingSelectCharOnLeftFTB then
+                local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
+                State.Session.PendingSelectCharOnLeftFTB = nil
+                debugPrint("Left FTB, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
+                Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+            end
+        end,
     },
 }

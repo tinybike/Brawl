@@ -62,6 +62,15 @@ end
 local function allEnterFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allEnterFTB")
+        -- Capture the currently controlled character BEFORE pulling anyone out of combat
+        -- (leaving combat triggers GainedControl which resets the selection)
+        local selectedUuidBeforePause = nil
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly then
+                selectedUuidBeforePause = uuid
+                break
+            end
+        end
         local narrativeCombatLabel
         if State.Session.CombatHelper then
             local combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
@@ -102,6 +111,12 @@ local function allEnterFTB()
                     end
                 end
             end
+        end
+        -- Select the character the player was controlling before pause
+        -- Delay to let FTB fully initialize before switching
+        if selectedUuidBeforePause then
+            -- Wait for FTB to be ready, then reselect the character
+            State.Session.PendingSelectCharOnFTB = selectedUuidBeforePause
         end
     end
 end
@@ -182,19 +197,32 @@ local function allExitFTB()
             Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
         end
         TurnOrder.setPlayersSwarmGroup()
-        TurnOrder.setPlayerTurnsActive()
-        -- Ensure the currently controlled character is first in turn order
-        -- so the game doesn't switch control away during unpause
+        -- Capture who's selected during FTB before exiting
+        local selectedUuidDuringPause = nil
         for uuid, player in pairs(State.Session.Players) do
             if player.isControllingDirectly then
-                TurnOrder.setTurnActive(uuid)
+                selectedUuidDuringPause = uuid
                 break
             end
+        end
+        if selectedUuidDuringPause then
+            State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
         end
         if combatGuid then
             RT.Timers.resumeCombatRoundTimer(combatGuid)
         end
         Movement.resumeTimers()
+        -- Process any deferred left-combat removals from during FTB
+        if State.Session.PendingLeftCombat and next(State.Session.PendingLeftCombat) then
+            local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+            for uuid, _ in pairs(State.Session.PendingLeftCombat) do
+                if M.Roster.getBrawlerByUuid(uuid) then
+                    Roster.removeBrawler(level, uuid)
+                end
+            end
+            State.Session.PendingLeftCombat = {}
+            Roster.checkForEndOfBrawl(level)
+        end
     end
 end
 

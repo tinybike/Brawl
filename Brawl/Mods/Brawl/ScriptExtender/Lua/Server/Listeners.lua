@@ -124,10 +124,16 @@ end
 
 local function onLeftCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
-    if uuid and M.Roster.getBrawlerByUuid(uuid) and not M.Pause.isPartyInFTB() then
-        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-        Roster.removeBrawler(level, uuid)
-        Roster.checkForEndOfBrawl(level)
+    if uuid and M.Roster.getBrawlerByUuid(uuid) then
+        if M.Pause.isPartyInFTB() then
+            -- Defer removal until FTB exits
+            State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
+            State.Session.PendingLeftCombat[uuid] = true
+        else
+            local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+            Roster.removeBrawler(level, uuid)
+            Roster.checkForEndOfBrawl(level)
+        end
     end
 end
 
@@ -210,9 +216,6 @@ local function onGainedControl(targetGuid)
                 end
             end
             if not State.Settings.FullAuto then
-                if not Movement.getActiveMovement(targetUuid) then
-                    Utils.clearOsirisQueue(targetUuid)
-                end
                 RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
             end
             if not State.Settings.TurnBasedSwarmMode then
@@ -220,6 +223,18 @@ local function onGainedControl(targetGuid)
             end
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
+    end
+end
+
+local function onEnteredForceTurnBased(entityGuid)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
+    end
+end
+
+local function onLeftForceTurnBased(entityGuid)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
@@ -685,6 +700,14 @@ local function startListeners()
     }
     State.Session.Listeners.GainedControl = {
         handle = Ext.Osiris.RegisterListener("GainedControl", 1, "after", onGainedControl),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.EnteredForceTurnBased = {
+        handle = Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", onEnteredForceTurnBased),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.LeftForceTurnBased = {
+        handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.CharacterJoinedParty = {
