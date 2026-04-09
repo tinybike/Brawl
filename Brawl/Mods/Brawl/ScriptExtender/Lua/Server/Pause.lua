@@ -22,7 +22,13 @@ local function unlock(entity)
             end
             local moveTo = State.Session.MovementQueue[uuid]
             debugDump(moveTo)
-            Movement.moveToPosition(uuid, moveTo, false)
+            Movement.moveToPosition(uuid, moveTo, false, function ()
+                debugPrint(M.Utils.getDisplayName(uuid), "queued movement completed, starting pulse action")
+                local brawler = M.Roster.getBrawlerByUuid(uuid)
+                if brawler and not State.isPlayerControllingDirectly(uuid) then
+                    RT.Timers.startPulseAction(brawler)
+                end
+            end)
             State.Session.MovementQueue[uuid] = nil
         end
     end
@@ -103,6 +109,11 @@ end
 local function allExitFTB()
     if not State.Settings.TurnBasedSwarmMode then
         debugPrint("allExitFTB")
+        -- Track which characters have queued movements before we start unpausing
+        local hasQueuedMovement = {}
+        for uuid, _ in pairs(State.Session.MovementQueue) do
+            hasQueuedMovement[uuid] = true
+        end
         local combatGuid, narrativeCombatLabel
         -- Unpause NPC brawlers
         for uuid, brawler in pairs(M.Roster.getBrawlers()) do
@@ -157,7 +168,11 @@ local function allExitFTB()
                     brawler.isPaused = false
                     Resources.resumeActionResourcesRefillTimers(brawler)
                     if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-                        RT.Timers.startPulseAction(brawler, 0)
+                        if not hasQueuedMovement[uuid] then
+                            RT.Timers.startPulseAction(brawler, 0)
+                        else
+                            debugPrint(M.Utils.getDisplayName(uuid), "delaying pulse action for queued movement")
+                        end
                     end
                 end
             end
@@ -168,6 +183,14 @@ local function allExitFTB()
         end
         TurnOrder.setPlayersSwarmGroup()
         TurnOrder.setPlayerTurnsActive()
+        -- Ensure the currently controlled character is first in turn order
+        -- so the game doesn't switch control away during unpause
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly then
+                TurnOrder.setTurnActive(uuid)
+                break
+            end
+        end
         if combatGuid then
             RT.Timers.resumeCombatRoundTimer(combatGuid)
         end
@@ -391,7 +414,6 @@ return {
     allEnterFTB = allEnterFTB,
     allExitFTB = allExitFTB,
     cancelQueuedMovement = cancelQueuedMovement,
-    enqueueMovement = enqueueMovement,
     startTruePause = startTruePause,
     queueSingleCompanionAIActions = queueSingleCompanionAIActions,
     queueCompanionAIActions = queueCompanionAIActions,

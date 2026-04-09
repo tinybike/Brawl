@@ -110,7 +110,7 @@ local function showTurnOrderGroups()
             if group.Members and group.Initiative ~= -20 then
                 local groupStr = ""
                 groupStr = groupStr .. tostring(i) .. " " .. tostring(group.Initiative)
-                if #group.Members then
+                if #group.Members > 0 then
                     for j, member in ipairs(group.Members) do
                         if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
                             if j > 1 then

@@ -307,6 +307,7 @@ local function getForwardVector(entityUuid)
 end
 
 local function getPointInFrontOf(entityUuid, distance)
+    local entity = Ext.Entity.Get(entityUuid)
     local forwardX, forwardY, forwardZ = M.Utils.getForwardVector(entityUuid)
     local translate = entity.Transform.Transform.Translate
     return translate[1] + forwardX*distance, translate[2] + forwardY*distance, translate[3] + forwardZ*distance
@@ -715,7 +716,6 @@ local function getSpellNameBySlot(uuid, slot)
     -- NB: is this always index 6?
     if entity and entity.HotbarContainer and entity.HotbarContainer.Containers and entity.HotbarContainer.Containers.DefaultBarContainer then
         local customBar = entity.HotbarContainer.Containers.DefaultBarContainer[6]
-        local spellName = nil
         for _, element in ipairs(customBar.Elements) do
             if element.Slot == slot then
                 if element.SpellId then

@@ -417,7 +417,14 @@ local function onKeyInput(e)
             keybindingPressed = true
         end
         if isKeybindingPressed(e, LeaderboardToggleHotkey) then
-            postLeaderboardToggle()
+            if LeaderboardWindow then
+                LeaderboardWindow:Destroy()
+                LeaderboardWindow = nil
+                cellRefs.party = {}
+                cellRefs.enemy = {}
+            else
+                postLeaderboardToggle()
+            end
             keybindingPressed = true
         end
         for actionButtonLabel, actionButtonHotkey in ipairs(ActionButtonHotkeys) do

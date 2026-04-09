@@ -74,7 +74,6 @@ local function onUserReservedFor(entity, _, _)
     State.setIsControllingDirectly()
     local entityUuid = entity.Uuid.EntityUuid
     if State.Session.Players and State.Session.Players[entityUuid] then
-        local userId = entity.UserReservedFor.UserID
         State.Session.Players[entityUuid].userId = entity.UserReservedFor.UserID
     end
 end
@@ -211,7 +210,9 @@ local function onGainedControl(targetGuid)
                 end
             end
             if not State.Settings.FullAuto then
-                Utils.clearOsirisQueue(targetUuid)
+                if not Movement.getActiveMovement(targetUuid) then
+                    Utils.clearOsirisQueue(targetUuid)
+                end
                 RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
             end
             if not State.Settings.TurnBasedSwarmMode then
@@ -454,6 +455,9 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
         debugPrint("onCompleted onCastedSpell")
         local onCompleted = actionInProgress.onCompleted
         Actions.removeActionInProgress(casterUuid, requestUuid)
+        if not State.Settings.HogwildMode and M.Osi.IsPlayer(casterUuid) == 0 then
+            Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+        end
         onCompleted(spellName)
     end
     if M.Utils.isCounterspell(spellName) then
@@ -483,7 +487,6 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
-            -- _D(actionInProgress)
             local outcome = cast.SpellCastOutcome.Result
             local spellName = actionInProgress.spellName
             local onCompleted = actionInProgress.onCompleted
@@ -493,12 +496,11 @@ local function onSpellCastFinishedEvent(cast, _, _)
                 debugPrint("Spell cast succeeded")
                 Swarm.resumeTimers() -- for interrupts, does this need to be here?
                 debugPrint("onCompleted")
+                if not State.Settings.HogwildMode and M.Osi.IsPlayer(casterUuid) == 0 then
+                    Resources.deductCastedSpell(casterUuid, spellName, requestUuid)
+                end
                 onCompleted(spellName)
             else
-                if outcome == "CantSpendUseCosts" then
-                    -- check for ActionResourceBlock boosts? why did this fail
-                    debugDump(cast:GetAllComponents())
-                end
                 debugPrint("onFailed")
                 onFailed(outcome)
             end

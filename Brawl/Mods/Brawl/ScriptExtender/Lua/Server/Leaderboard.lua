@@ -21,21 +21,14 @@ local function showForUser(userId)
     end
 end
 
-local function postDataToClients(updateOnly)
+local function postDataToClients()
     if State.Settings.LeaderboardEnabled then
-        State.Session.LeaderboardPendingUpdateOnly = updateOnly
         if State.Session.LeaderboardUpdateTimer then
             Ext.Timer.Cancel(State.Session.LeaderboardUpdateTimer)
         end
         State.Session.LeaderboardUpdateTimer = Ext.Timer.WaitFor(Constants.LEADERBOARD_UPDATE_TIMEOUT, function ()
             State.Session.LeaderboardUpdateTimer = nil
-            local data = Ext.Json.Stringify(State.Session.Leaderboard)
-            if State.Session.LeaderboardPendingUpdateOnly then
-                Ext.ServerNet.BroadcastMessage("UpdateLeaderboard", data)
-            else
-                Ext.ServerNet.BroadcastMessage("Leaderboard", data)
-            end
-            State.Session.LeaderboardPendingUpdateOnly = nil
+            Ext.ServerNet.BroadcastMessage("UpdateLeaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
         end)
     end
 end

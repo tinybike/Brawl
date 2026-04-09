@@ -136,7 +136,7 @@ local function useBonusAttacks(uuid)
 end
 
 local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, damageType, damageAmount)
-    if State.Settings.TurnBasedSwarmMode and not State.Session.SwarmTurnActive then
+    if State.Settings.TurnBasedSwarmMode then
         return
     end
     if attackerUuid ~= nil and defenderUuid ~= nil and storyActionID ~= nil and damageAmount ~= nil and damageAmount > 0 then
@@ -166,13 +166,21 @@ local function handleExtraAttacks(attackerUuid, defenderUuid, storyActionID, dam
 end
 
 local function buildTarget(uuid, targetingType)
-    return {
-        -- Position = nil,
-        Target = Ext.Entity.Get(uuid),
-        -- Target2 = nil,
+    local entity = Ext.Entity.Get(uuid)
+    local target = {
+        Target = entity,
         TargetingType = targetingType,
-        -- TargetProxy = nil,
     }
+    if entity and entity.Transform then
+        local pos = entity.Transform.Transform.Translate
+        target.Position = {pos[1], pos[2], pos[3]}
+    end
+    -- If target is dead, use position-only targeting so AoE spells still work
+    if M.Osi.IsDead(uuid) == 1 then
+        debugPrint("buildTarget: target is dead, using position-only", M.Utils.getDisplayName(uuid))
+        target.Target = nil
+    end
+    return target
 end
 
 local function buildTargets(casterUuid, spellName, targetUuid, targetingType, isFriendlyTarget)
@@ -209,28 +217,31 @@ end
 
 local function buildSpell(entity, spellName, stats)
     local originatorPrototype = M.Utils.getOriginatorPrototype(spellName, stats)
-    if State.Settings.HogwildMode then
-        return {
-            OriginatorPrototype = originatorPrototype,
-            ProgressionSource = Constants.NULL_UUID,
-            Prototype = spellName,
-            Source = Constants.NULL_UUID,
-            SourceType = "Osiris",
-        }
-    end
-    if entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
-        for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
-            if preparedSpell.OriginatorPrototype == originatorPrototype then
-                return {
-                    OriginatorPrototype = originatorPrototype,
-                    ProgressionSource = preparedSpell.ProgressionSource,
-                    Prototype = spellName,
-                    Source = preparedSpell.Source,
-                    SourceType = preparedSpell.SourceType,
-                }
+    -- Players use spellbook source (game handles resources/cooldowns natively)
+    -- NPCs use Osiris source (avoids CantCast issues with turn state)
+    local uuid = entity.Uuid and entity.Uuid.EntityUuid
+    if uuid and M.Osi.IsPlayer(uuid) == 1 then
+        if entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+            for _, preparedSpell in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+                if preparedSpell.OriginatorPrototype == originatorPrototype then
+                    return {
+                        OriginatorPrototype = originatorPrototype,
+                        ProgressionSource = preparedSpell.ProgressionSource,
+                        Prototype = spellName,
+                        Source = preparedSpell.Source,
+                        SourceType = preparedSpell.SourceType,
+                    }
+                end
             end
         end
     end
+    return {
+        OriginatorPrototype = originatorPrototype,
+        ProgressionSource = Constants.NULL_UUID,
+        Prototype = spellName,
+        Source = Constants.NULL_UUID,
+        SourceType = "Osiris",
+    }
 end
 
 local function submitSpellRequest(request, insertAtFront)
@@ -247,21 +258,31 @@ local function submitSpellRequest(request, insertAtFront)
     debugPrint(M.Utils.getDisplayName(request.Caster.Uuid.EntityUuid), "inserted cast request", #queuedRequests, request.Spell.Prototype, isPausedRequest, request.RequestGuid)
 end
 
-local function getCastOptions()
-    if not State.Settings.HogwildMode then
+local function getCastOptions(casterUuid)
+    if State.Settings.HogwildMode then
+        return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
+    end
+    local isPlayer = casterUuid and M.Osi.IsPlayer(casterUuid) == 1
+    if isPlayer then
+        -- Players use FromClient — game handles resources/cooldowns natively
+        if State.Settings.TurnBasedSwarmMode then
+            return {"FromClient", "ShowPrepareAnimation", "NoMovement"}
+        end
         return {"FromClient", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
+    else
+        -- NPCs use IgnoreHasSpell with Osiris source
+        if State.Settings.TurnBasedSwarmMode then
+            return {"IgnoreHasSpell", "ShowPrepareAnimation", "NoMovement"}
+        end
+        return {"IgnoreHasSpell", "ShowPrepareAnimation", "AvoidDangerousAuras", "NoMovement"}
     end
-    if State.Settings.TurnBasedSwarmMode then
-        return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks", "NoMovement"}
-    end
-    return {"IgnoreHasSpell", "ShowPrepareAnimation", "IgnoreSpellRolls", "IgnoreTargetChecks", "IgnoreCastChecks"}
 end
 
 -- thank u focus and mazzle
 local function queueSpellRequest(casterUuid, spellName, targetUuid, requestUuid, isFriendlyTarget, castOptions, insertAtFront)
     local stats = Ext.Stats.Get(spellName)
     if not castOptions then
-        castOptions = getCastOptions()
+        castOptions = getCastOptions(casterUuid)
     end
     local targets = buildTargets(casterUuid, spellName, targetUuid, stats.SpellType, isFriendlyTarget)
     local casterEntity = Ext.Entity.Get(casterUuid)

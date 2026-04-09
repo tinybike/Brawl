@@ -137,7 +137,7 @@ local function removeBrawler(level, entityUuid)
             State.Session.IsAttackingOrBeingAttackedByPlayer[entityUuid] = nil
         end
         if State.Session.SwarmTurnComplete[entityUuid] ~= nil then
-            State.Session.SwarmTurnComplete[entityUuid] = nil
+            State.Session.SwarmTurnComplete[entityUuid] = true
         end
         if State.Session.ResurrectedPlayer[entityUuid] ~= nil then
             State.Session.ResurrectedPlayer[entityUuid] = nil
@@ -160,7 +160,11 @@ local function endBrawl(level)
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then
-        for brawlerUuid, brawler in pairs(brawlersInLevel) do
+        local uuids = {}
+        for brawlerUuid, _ in pairs(brawlersInLevel) do
+            table.insert(uuids, brawlerUuid)
+        end
+        for _, brawlerUuid in ipairs(uuids) do
             local combatGuid = M.Osi.CombatGetGuidFor(brawlerUuid)
             removeBrawler(level, brawlerUuid)
             if combatGuid then

@@ -106,6 +106,19 @@ end
 
 local function finishMovement(uuid, eventUuid, activeMovement, override)
     if uuid and activeMovement and uuid == activeMovement.moverUuid then
+        -- Check if the entity actually reached near the goal position
+        if activeMovement.goalPosition and not override then
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.Transform then
+                local pos = entity.Transform.Transform.Translate
+                local gp = activeMovement.goalPosition
+                local dist = math.sqrt((pos[1] - gp[1])^2 + (pos[2] - gp[2])^2 + (pos[3] - gp[3])^2)
+                if dist > 2.0 then
+                    debugPrint(M.Utils.getDisplayName(uuid), "finishMovement SPURIOUS — still", dist, "from goal, ignoring")
+                    return
+                end
+            end
+        end
         debugPrint(M.Utils.getDisplayName(uuid), "finishMovement")
         if activeMovement.timer and activeMovement.timer.handle then
             Ext.Timer.Cancel(activeMovement.timer.handle)
@@ -294,7 +307,7 @@ end
 -- Jump has a base range of 4.5 m / 15 ft and is increased by 1 m / 3 ft for 2 points of Strength above 10
 local function calculateJumpDistance(uuid)
     local entity = Ext.Entity.Get(uuid)
-    local strength = M.Utils.getAbility(entity) or 10
+    local strength = M.Utils.getAbility(entity, "Strength") or 10
     local jumpDistance = 4.5 + math.max(0, math.floor((strength - 10)/2))
     if M.Utils.hasPassive(entity, "UnarmoredMovement_DifficultTerrain") then
         jumpDistance = jumpDistance + 6
@@ -381,6 +394,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     local numActions = Resources.getActionPointsRemaining(uuid)
     local numBonusActions = Resources.getBonusActionPointsRemaining(uuid)
     local override = not State.Settings.TurnBasedSwarmMode
+    local movementRetries = 0
     debugPrint(M.Utils.getDisplayName(uuid), "starting movement and points", baseMove, numActions, numBonusActions)
     local function tryMove(allowedDistance, isDashAvailable, isBonusDashOnly)
         debugPrint(M.Utils.getDisplayName(uuid), "tryMove", allowedDistance)
@@ -389,6 +403,17 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
         local need = distToTarget - spellRange
         -- already in range?
         if need <= 0 then
+            return onSuccess()
+        end
+        -- wrap onSuccess to re-check distance after movement completes (target may have moved)
+        local function onSuccessWithCorrection()
+            local postMoveDist = M.Osi.GetDistanceTo(uuid, targetUuid)
+            local remaining = getRemainingMovementByUuid(uuid)
+            if postMoveDist and postMoveDist - spellRange > 0 and remaining > 0 and movementRetries < Constants.MAX_MOVEMENT_RETRIES then
+                movementRetries = movementRetries + 1
+                debugPrint(M.Utils.getDisplayName(uuid), "movement correction retry", movementRetries, postMoveDist, spellRange, remaining)
+                return tryMove(remaining, false, false)
+            end
             return onSuccess()
         end
         -- dash if we need more than base move
@@ -423,8 +448,12 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                 end)
             end, onFailed)
         end
-        -- find a valid point just outside the target
-        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, uuid, 1)
+        -- find a valid point just outside the target (tighter radius for melee, fallback to 3.0 for large units)
+        local findRadius = math.min(spellRange, 3.0)
+        local gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, findRadius, uuid, 1)
+        if not gx and findRadius < 3.0 then
+            gx, gy, gz = M.Osi.FindValidPosition(tx, ty, tz, 3.0, uuid, 1)
+        end
         if not gx then
             return onFailed("no valid points")
         end
@@ -464,7 +493,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             if path.Nodes[#path.Nodes].Distance <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "goal within range, moving to")
-                return moveToPosition(uuid, path.Nodes[#path.Nodes].Position, override, onSuccess, onFailed)
+                return moveToPosition(uuid, path.Nodes[#path.Nodes].Position, override, onSuccessWithCorrection, onFailed)
             end
             -- scan for best in‑range node and fallback
             local bestPos, bestDist = nil, -1
@@ -493,7 +522,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             -- 1) if bestPos is within baseMove, move there
             if bestPos and bestDist <= allowedDistance then
                 debugPrint(M.Utils.getDisplayName(uuid), "best within range, moving to")
-                return moveToPosition(uuid, bestPos, override, onSuccess, onFailed)
+                return moveToPosition(uuid, bestPos, override, onSuccessWithCorrection, onFailed)
             end
             -- 2) interpolation fallback if farDist < baseMove
             if farPos and nextPos and farDist < allowedDistance then
@@ -504,7 +533,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
                     local ix = farPos[1] + (nextPos[1] - farPos[1])*frac
                     local iy = farPos[2] + (nextPos[2] - farPos[2])*frac
                     local iz = farPos[3] + (nextPos[3] - farPos[3])*frac
-                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0, uuid, 1)
+                    local vx, vy, vz = M.Osi.FindValidPosition(ix, iy, iz, 0.5, uuid, 1)
                     if vx then
                         farPos = {vx, vy, vz}
                         valid = true
@@ -523,7 +552,7 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
             end
             -- 3) final fallback move
             debugPrint("final fallback move")
-            moveToPosition(uuid, farPos, override, onSuccess, onFailed)
+            moveToPosition(uuid, farPos, override, onSuccessWithCorrection, onFailed)
         end)
         if path then
             path.CanUseLadders = true
