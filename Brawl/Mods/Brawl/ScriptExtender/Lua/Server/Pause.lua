@@ -60,169 +60,186 @@ local function stopTruePause(entityUuid)
 end
 
 local function allEnterFTB()
-    if not State.Settings.TurnBasedSwarmMode and next(M.Roster.getBrawlers()) ~= nil then
-        debugPrint("allEnterFTB")
-        -- Capture the currently controlled character BEFORE pulling anyone out of combat
-        -- (leaving combat triggers GainedControl which resets the selection)
-        local selectedUuidBeforePause = nil
-        for uuid, player in pairs(State.Session.Players) do
-            if player.isControllingDirectly then
-                selectedUuidBeforePause = uuid
-                break
+    if State.Settings.TurnBasedSwarmMode then
+        return
+    end
+    debugPrint("allEnterFTB")
+    -- Out of combat: minimal FTB on party members, no pause machinery. Players
+    -- can move around freely and the game's native FTB handles everything.
+    if next(M.Roster.getBrawlers()) == nil then
+        for uuid, _ in pairs(State.Session.Players) do
+            Osi.ForceTurnBasedMode(uuid, 1)
+        end
+        return
+    end
+    -- Capture the currently controlled character BEFORE pulling anyone out of combat
+    -- (leaving combat triggers GainedControl which resets the selection)
+    local selectedUuidBeforePause = nil
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            selectedUuidBeforePause = uuid
+            break
+        end
+    end
+    local narrativeCombatLabel
+    if State.Session.CombatHelper then
+        local combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
+        if combatGuid then
+            narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
+            Osi.PauseCombat(combatGuid)
+        end
+    end
+    RT.Timers.pauseCombatRoundTimers()
+    -- Stop pulse actions and pause resource refill timers for ALL brawlers
+    for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+        RT.Timers.stopPulseAction(brawler, true)
+        brawler.isPaused = true
+        Utils.clearOsirisQueue(uuid)
+        Resources.pauseActionResourcesRefillTimers(brawler)
+        if State.Session.Players[uuid] and State.Session.AwaitingTarget[uuid] then
+            Commands.setAwaitingTarget(uuid, false)
+        end
+        if M.Osi.IsPlayer(uuid) == 0 then
+            Osi.ForceTurnBasedMode(uuid, 1)
+            if State.Settings.TruePause then
+                Pause.startTruePause(uuid)
             end
         end
-        local narrativeCombatLabel
-        if State.Session.CombatHelper then
-            local combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
-            if combatGuid then
-                narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
-                Osi.PauseCombat(combatGuid)
-            end
-        end
-        RT.Timers.pauseCombatRoundTimers()
-        -- Stop pulse actions and pause resource refill timers for ALL brawlers
-        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-            RT.Timers.stopPulseAction(brawler, true)
-            brawler.isPaused = true
-            Utils.clearOsirisQueue(uuid)
-            Resources.pauseActionResourcesRefillTimers(brawler)
-            if State.Session.Players[uuid] and State.Session.AwaitingTarget[uuid] then
-                Commands.setAwaitingTarget(uuid, false)
-            end
-            if M.Osi.IsPlayer(uuid) == 0 then
+    end
+    -- Put all party members into FTB
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        if player and player[1] then
+            local uuid = M.Osi.GetUUID(player[1])
+            if uuid then
+                if narrativeCombatLabel then
+                    Osi.PROC_GLO_NarrativeCombat_LeaveCombat(narrativeCombatLabel, uuid)
+                end
+                Osi.SetCanJoinCombat(uuid, 0)
                 Osi.ForceTurnBasedMode(uuid, 1)
                 if State.Settings.TruePause then
                     Pause.startTruePause(uuid)
                 end
             end
         end
-        -- Put all party members into FTB
-        for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            if player and player[1] then
-                local uuid = M.Osi.GetUUID(player[1])
-                if uuid then
-                    if narrativeCombatLabel then
-                        Osi.PROC_GLO_NarrativeCombat_LeaveCombat(narrativeCombatLabel, uuid)
-                    end
-                    Osi.SetCanJoinCombat(uuid, 0)
-                    Osi.ForceTurnBasedMode(uuid, 1)
-                    if State.Settings.TruePause then
-                        Pause.startTruePause(uuid)
-                    end
-                end
-            end
-        end
-        -- Select the character the player was controlling before pause
-        -- Delay to let FTB fully initialize before switching
-        if selectedUuidBeforePause then
-            -- Wait for FTB to be ready, then reselect the character
-            State.Session.PendingSelectCharOnFTB = selectedUuidBeforePause
-        end
+    end
+    -- Select the character the player was controlling before pause
+    -- Delay to let FTB fully initialize before switching
+    if selectedUuidBeforePause then
+        -- Wait for FTB to be ready, then reselect the character
+        State.Session.PendingSelectCharOnFTB = selectedUuidBeforePause
     end
 end
 
 local function allExitFTB()
-    if not State.Settings.TurnBasedSwarmMode then
-        debugPrint("allExitFTB")
-        -- Capture who's selected BEFORE exiting FTB (leaving FTB reassigns control)
-        local selectedUuidDuringPause = nil
-        for uuid, player in pairs(State.Session.Players) do
-            if player.isControllingDirectly then
-                selectedUuidDuringPause = uuid
-                break
-            end
+    if State.Settings.TurnBasedSwarmMode then
+        return
+    end
+    debugPrint("allExitFTB")
+    -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
+    if next(M.Roster.getBrawlers()) == nil then
+        for uuid, _ in pairs(State.Session.Players) do
+            Osi.ForceTurnBasedMode(uuid, 0)
         end
-        -- Track which characters have queued movements before we start unpausing
-        local hasQueuedMovement = {}
-        for uuid, _ in pairs(State.Session.MovementQueue) do
-            hasQueuedMovement[uuid] = true
+        return
+    end
+    -- Capture who's selected BEFORE exiting FTB (leaving FTB reassigns control)
+    local selectedUuidDuringPause = nil
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            selectedUuidDuringPause = uuid
+            break
         end
-        local combatGuid, narrativeCombatLabel
-        -- Unpause NPC brawlers
-        for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-            if not combatGuid then
-                combatGuid = brawler.combatGuid
-                narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
+    end
+    -- Track which characters have queued movements before we start unpausing
+    local hasQueuedMovement = {}
+    for uuid, _ in pairs(State.Session.MovementQueue) do
+        hasQueuedMovement[uuid] = true
+    end
+    local combatGuid, narrativeCombatLabel
+    -- Unpause NPC brawlers
+    for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+        if not combatGuid then
+            combatGuid = brawler.combatGuid
+            narrativeCombatLabel = Utils.getNarrativeCombatLabel(combatGuid)
+        end
+        if M.Osi.IsPlayer(uuid) == 0 then
+            brawler.isPaused = false
+            Resources.resumeActionResourcesRefillTimers(brawler)
+            unlock(Ext.Entity.Get(uuid))
+            Osi.ForceTurnBasedMode(uuid, 0)
+            stopTruePause(uuid)
+            RT.joinCombat(uuid)
+            if narrativeCombatLabel then
+                Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
             end
-            if M.Osi.IsPlayer(uuid) == 0 then
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.TurnBased then
+                entity.TurnBased.HadTurnInCombat = true
+                entity.TurnBased.RequestedEndTurn = true
+                entity.TurnBased.TurnActionsCompleted = true
+                entity:Replicate("TurnBased")
+            end
+            RT.Timers.startPulseAction(brawler, 0)
+        end
+    end
+    -- Unpause all party members
+    for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local uuid = M.Osi.GetUUID(player[1])
+        if uuid then
+            unlock(Ext.Entity.Get(uuid))
+            Osi.ForceTurnBasedMode(uuid, 0)
+            Osi.SetCanJoinCombat(uuid, 1)
+            stopTruePause(uuid)
+            if narrativeCombatLabel then
+                Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
+            end
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.TurnBased then
+                entity.TurnBased.IsActiveCombatTurn = true
+                entity.TurnBased.HadTurnInCombat = false
+                entity.TurnBased.RequestedEndTurn = false
+                entity.TurnBased.TurnActionsCompleted = false
+                entity:Replicate("TurnBased")
+            end
+            if State.isPlayerControllingDirectly(uuid) then
+                RT.Timers.startPulseAddNearby(uuid)
+            end
+            local brawler = Roster.getBrawlerByUuid(uuid)
+            if brawler then
                 brawler.isPaused = false
                 Resources.resumeActionResourcesRefillTimers(brawler)
-                unlock(Ext.Entity.Get(uuid))
-                Osi.ForceTurnBasedMode(uuid, 0)
-                stopTruePause(uuid)
-                RT.joinCombat(uuid)
-                if narrativeCombatLabel then
-                    Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
-                end
-                local entity = Ext.Entity.Get(uuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.HadTurnInCombat = true
-                    entity.TurnBased.RequestedEndTurn = true
-                    entity.TurnBased.TurnActionsCompleted = true
-                    entity:Replicate("TurnBased")
-                end
-                RT.Timers.startPulseAction(brawler, 0)
-            end
-        end
-        -- Unpause all party members
-        for _, player in pairs(Osi.DB_PartyMembers:Get(nil)) do
-            local uuid = M.Osi.GetUUID(player[1])
-            if uuid then
-                unlock(Ext.Entity.Get(uuid))
-                Osi.ForceTurnBasedMode(uuid, 0)
-                Osi.SetCanJoinCombat(uuid, 1)
-                stopTruePause(uuid)
-                if narrativeCombatLabel then
-                    Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
-                end
-                local entity = Ext.Entity.Get(uuid)
-                if entity and entity.TurnBased then
-                    entity.TurnBased.IsActiveCombatTurn = true
-                    entity.TurnBased.HadTurnInCombat = false
-                    entity.TurnBased.RequestedEndTurn = false
-                    entity.TurnBased.TurnActionsCompleted = false
-                    entity:Replicate("TurnBased")
-                end
-                if State.isPlayerControllingDirectly(uuid) then
-                    RT.Timers.startPulseAddNearby(uuid)
-                end
-                local brawler = Roster.getBrawlerByUuid(uuid)
-                if brawler then
-                    brawler.isPaused = false
-                    Resources.resumeActionResourcesRefillTimers(brawler)
-                    if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-                        if not hasQueuedMovement[uuid] then
-                            RT.Timers.startPulseAction(brawler, 0)
-                        else
-                            debugPrint(M.Utils.getDisplayName(uuid), "delaying pulse action for queued movement")
-                        end
+                if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
+                    if not hasQueuedMovement[uuid] then
+                        RT.Timers.startPulseAction(brawler, 0)
+                    else
+                        debugPrint(M.Utils.getDisplayName(uuid), "delaying pulse action for queued movement")
                     end
                 end
             end
         end
-        -- Resume underlying combat
-        if State.Session.CombatHelper then
-            Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
-        end
-        TurnOrder.setPlayersSwarmGroup()
-        if selectedUuidDuringPause then
-            State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
-        end
-        if combatGuid then
-            RT.Timers.resumeCombatRoundTimer(combatGuid)
-        end
-        Movement.resumeTimers()
-        -- Process any deferred left-combat removals from during FTB
-        if State.Session.PendingLeftCombat and next(State.Session.PendingLeftCombat) then
-            local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
-            for uuid, _ in pairs(State.Session.PendingLeftCombat) do
-                if M.Roster.getBrawlerByUuid(uuid) then
-                    Roster.removeBrawler(level, uuid)
-                end
+    end
+    -- Resume underlying combat
+    if State.Session.CombatHelper then
+        Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
+    end
+    TurnOrder.setPlayersSwarmGroup()
+    if selectedUuidDuringPause then
+        State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
+    end
+    if combatGuid then
+        RT.Timers.resumeCombatRoundTimer(combatGuid)
+    end
+    Movement.resumeTimers()
+    -- Process any deferred left-combat removals from during FTB
+    if State.Session.PendingLeftCombat and next(State.Session.PendingLeftCombat) then
+        local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
+        for uuid, _ in pairs(State.Session.PendingLeftCombat) do
+            if M.Roster.getBrawlerByUuid(uuid) then
+                Roster.removeBrawler(level, uuid)
             end
-            State.Session.PendingLeftCombat = {}
-            Roster.checkForEndOfBrawl(level)
         end
+        State.Session.PendingLeftCombat = {}
+        Roster.checkForEndOfBrawl(level)
     end
 end
 
