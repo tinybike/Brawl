@@ -359,6 +359,10 @@ local function onClickPosition(data)
             State.Session.LastClickPosition[playerUuid] = {position = clickPosition.position}
             if State.Session.AwaitingTarget[playerUuid] and clickPosition.uuid then
                 setAttackMoveTarget(playerUuid, clickPosition.uuid)
+                -- Also move the active character toward the target (without AI engagement)
+                if not State.Settings.FullAuto then
+                    Movement.moveToTargetUuid(playerUuid, clickPosition.uuid, true)
+                end
             elseif clickPosition.position and State.Session.AwaitingTarget[playerUuid] then
                 M.Movement.findPathToPosition(playerUuid, clickPosition.position, function (err, validPosition)
                     if err then
@@ -368,6 +372,10 @@ local function onClickPosition(data)
                     allCompanionsDisableLockedOnTarget()
                     Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
                     Movement.moveCompanionsToPosition(validPosition)
+                    -- Also move the active character to the position
+                    if not State.Settings.FullAuto then
+                        Movement.moveToPosition(playerUuid, validPosition, true)
+                    end
                 end)
             end
         end
