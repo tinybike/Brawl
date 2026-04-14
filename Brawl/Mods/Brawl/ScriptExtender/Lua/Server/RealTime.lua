@@ -31,8 +31,9 @@ local function pulseAction(brawler)
         if not Utils.canAct(brawler.uuid) or brawler.isPaused or (State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto) then
             return
         end
-        -- Brawlers in the table should always be in combat. If somehow we end up with an out-of-combat brawler, do nothing.
-        if M.Osi.IsInCombat(brawler.uuid) == 0 then
+        -- NPC brawlers in the table should always be in combat with the combat helper. Safety net against stale brawlers.
+        -- Players go out of IsInCombat during FTB/pause, so this gate is NPC-only.
+        if M.Osi.IsPlayer(brawler.uuid) == 0 and M.Osi.IsInCombat(brawler.uuid) == 0 then
             return
         end
         if not State.Settings.TurnBasedSwarmMode then
