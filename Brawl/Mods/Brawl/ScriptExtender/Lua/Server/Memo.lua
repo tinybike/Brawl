@@ -64,7 +64,6 @@ local Memoizable = {
         "isVisible",
         "isMeleeArchetype",
         "isHealerArchetype",
-        "isBrawlingWithValidTarget",
         "isOnSameLevel",
         "getToTEnemyTier",
         "isToTExcludedEnemyTier",

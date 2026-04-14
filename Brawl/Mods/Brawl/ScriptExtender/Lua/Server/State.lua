@@ -58,7 +58,6 @@ local Session = {
     Listeners = {},
     Brawlers = {},
     Players = {},
-    PulseAddNearbyTimers = {},
     PulseActionTimers = {},
     IsAttackingOrBeingAttackedByPlayer = {},
     ClosestEnemyBrawlers = {},
@@ -197,7 +196,7 @@ end
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
     for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if M.Osi.IsEnemy(M.Osi.GetHostCharacter(), brawlerUuid) == 1 and brawler.isInBrawl and M.Osi.IsInCombat(brawlerUuid) == 1 then
+        if M.Osi.IsEnemy(M.Osi.GetHostCharacter(), brawlerUuid) == 1 and M.Osi.IsInCombat(brawlerUuid) == 1 then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end

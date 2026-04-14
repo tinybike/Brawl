@@ -5,33 +5,34 @@ local function getCombatRoundDuration()
     return State.Settings.CombatRoundDuration*1000
 end
 
-local function stopPulseAction(brawler, remainInBrawl)
+local function stopPulseAction(brawler)
     if brawler and brawler.uuid then
         debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
-        if not remainInBrawl then
-            brawler.isInBrawl = false
-        end
         if State.Session.PulseActionTimers[brawler.uuid] ~= nil then
-            debugPrint("stop pulse action", brawler.displayName, remainInBrawl)
+            debugPrint("stop pulse action", brawler.displayName)
             Ext.Timer.Cancel(State.Session.PulseActionTimers[brawler.uuid])
             State.Session.PulseActionTimers[brawler.uuid] = nil
         end
     end
 end
 
-local function stopAllPulseActions(remainInBrawl)
+local function stopAllPulseActions()
     local uuids = {}
     for uuid, _ in pairs(State.Session.PulseActionTimers) do
         table.insert(uuids, uuid)
     end
     for _, uuid in ipairs(uuids) do
-        stopPulseAction(M.Roster.getBrawlerByUuid(uuid), remainInBrawl)
+        stopPulseAction(M.Roster.getBrawlerByUuid(uuid))
     end
 end
 
 local function pulseAction(brawler)
     if brawler and brawler.uuid then
         if not Utils.canAct(brawler.uuid) or brawler.isPaused or (State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto) then
+            return
+        end
+        -- Brawlers in the table should always be in combat. If somehow we end up with an out-of-combat brawler, do nothing.
+        if M.Osi.IsInCombat(brawler.uuid) == 0 then
             return
         end
         if not State.Settings.TurnBasedSwarmMode then
@@ -49,36 +50,11 @@ local function startPulseAction(brawler, initialDelay)
         return false
     end
     if State.Session.PulseActionTimers[brawler.uuid] == nil then
-        brawler.isInBrawl = true
         debugPrint("Starting pulse action", brawler.displayName, brawler.uuid, brawler.actionInterval)
         State.Session.PulseActionTimers[brawler.uuid] = Ext.Timer.WaitFor(initialDelay or 0, function ()
             pulseAction(brawler)
         end, brawler.actionInterval)
     end
-end
-
-local function stopPulseAddNearby(uuid)
-    debugPrint("stopPulseAddNearby", uuid, M.Utils.getDisplayName(uuid))
-    if State.Session.PulseAddNearbyTimers[uuid] ~= nil then
-        Ext.Timer.Cancel(State.Session.PulseAddNearbyTimers[uuid])
-        State.Session.PulseAddNearbyTimers[uuid] = nil
-    end
-end
-
-local function startPulseAddNearby(uuid)
-    debugPrint("startPulseAddNearby", uuid, Utils.getDisplayName(uuid))
-    if State.Session.PulseAddNearbyTimers[uuid] == nil then
-        State.Session.PulseAddNearbyTimers[uuid] = Ext.Timer.WaitFor(0, function ()
-            Roster.addNearbyEnemiesToBrawlers(uuid, 30)
-        end, 7500)
-    end
-end
-
-local function stopAllPulseAddNearbyTimers()
-    for _, timer in pairs(State.Session.PulseAddNearbyTimers) do
-        Ext.Timer.Cancel(timer)
-    end
-    State.Session.PulseAddNearbyTimers = {}
 end
 
 local function stopAllPulseActionTimers()
@@ -272,7 +248,7 @@ end
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
-    stopAllPulseActions(true)
+    stopAllPulseActions()
     Ext.Timer.WaitFor(1500, function()
         if not State.isInCombat() then
             State.endBrawls()
@@ -315,14 +291,12 @@ local function onGainedControl(uuid)
     local userId = Osi.GetReservedUserID(uuid)
     for playerUuid, player in pairs(State.Session.Players) do
         if player.userId == userId and playerUuid ~= uuid then
-            stopPulseAddNearby(playerUuid)
             local brawler = Roster.getBrawlerByUuid(playerUuid)
-            if brawler and brawler.isInBrawl then
+            if brawler then
                 startPulseAction(brawler)
             end
         end
     end
-    startPulseAddNearby(uuid)
     if not State.Session.MeanInitiativeRoll then
        TurnOrder.setPartyInitiativeRollToMean()
     end
@@ -349,7 +323,7 @@ end
 local function onDialogStarted()
     debugPrint("DialogStarted")
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-        stopPulseAction(brawler, true)
+        stopPulseAction(brawler)
         Utils.clearOsirisQueue(uuid)
     end
 end
@@ -357,7 +331,7 @@ end
 local function onDialogEnded()
     debugPrint("DialogEnded")
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-        if brawler.isInBrawl and not State.isPlayerControllingDirectly(uuid) then
+        if not State.isPlayerControllingDirectly(uuid) then
             startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
         end
     end
@@ -437,9 +411,6 @@ return {
         stopPulseAction = stopPulseAction,
         stopAllPulseActions = stopAllPulseActions,
         startPulseAction = startPulseAction,
-        stopPulseAddNearby = stopPulseAddNearby,
-        startPulseAddNearby = startPulseAddNearby,
-        stopAllPulseAddNearbyTimers = stopAllPulseAddNearbyTimers,
         stopAllPulseActionTimers = stopAllPulseActionTimers,
         pauseCombatRoundTimer = pauseCombatRoundTimer,
         resumeCombatRoundTimer = resumeCombatRoundTimer,

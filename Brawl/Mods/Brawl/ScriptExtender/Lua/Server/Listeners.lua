@@ -4,7 +4,6 @@ local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
 local function cleanupAll()
-    RT.Timers.stopAllPulseAddNearbyTimers()
     RT.Timers.stopAllPulseActionTimers()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
@@ -109,7 +108,7 @@ local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
-        Roster.addBrawler(uuid, true)
+        Roster.addBrawler(uuid)
         if State.Session.Players and State.Session.Players[uuid] then
             if State.Session.ResurrectedPlayer[uuid] then
                 State.Session.ResurrectedPlayer[uuid] = nil
@@ -218,7 +217,7 @@ local function onGainedControl(targetGuid)
                 end
             end
             if not State.Settings.FullAuto then
-                RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid), true)
+                RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid))
             end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
@@ -265,7 +264,7 @@ local function onCharacterJoinedParty(character)
             end
         end
         if State.areAnyPlayersBrawling() then
-            Roster.addBrawler(uuid, true)
+            Roster.addBrawler(uuid)
         end
     end
 end
@@ -361,8 +360,8 @@ local function onAttackedBy(defenderGuid, attackerGuid, attacker2, damageType, d
     local defenderUuid = M.Osi.GetUUID(defenderGuid)
     if attackerUuid ~= nil and defenderUuid ~= nil and M.Osi.IsCharacter(attackerUuid) == 1 and M.Osi.IsCharacter(defenderUuid) == 1 then
         if M.Utils.isToT() then
-            Roster.addBrawler(attackerUuid, true)
-            Roster.addBrawler(defenderUuid, true)
+            Roster.addBrawler(attackerUuid)
+            Roster.addBrawler(defenderUuid)
         end
         if M.Osi.IsPlayer(attackerUuid) == 1 then
             State.Session.PlayerCurrentTarget[attackerUuid] = defenderUuid
@@ -554,14 +553,6 @@ local function onTeleportedToCamp(character)
         Swarm.Listeners.onTeleportedToCamp(uuid)
     else
         RT.Listeners.onTeleportedToCamp(uuid)
-    end
-end
-
-local function onTeleportedFromCamp(character)
-    debugPrint("TeleportedFromCamp", character)
-    local entityUuid = M.Osi.GetUUID(character)
-    if entityUuid ~= nil and State.areAnyPlayersBrawling() then
-        Roster.addBrawler(entityUuid, false)
     end
 end
 
@@ -782,10 +773,6 @@ local function startListeners()
     }
     State.Session.Listeners.TeleportedToCamp = {
         handle = Ext.Osiris.RegisterListener("TeleportedToCamp", 1, "after", onTeleportedToCamp),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.TeleportedFromCamp = {
-        handle = Ext.Osiris.RegisterListener("TeleportedFromCamp", 1, "after", onTeleportedFromCamp),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.LevelUnloading = {

@@ -43,7 +43,7 @@ local function enableCompanionAI()
     if players and State.areAnyPlayersBrawling() then
         for playerUuid, player in pairs(players) do
             if not State.isPlayerControllingDirectly(playerUuid) then
-                Roster.addBrawler(playerUuid, true, true)
+                Roster.addBrawler(playerUuid, true)
             end
         end
     end
@@ -72,7 +72,7 @@ local function enableFullAuto()
     local players = State.Session.Players
     if players and State.areAnyPlayersBrawling() then
         for playerUuid, player in pairs(players) do
-            Roster.addBrawler(playerUuid, true, true)
+            Roster.addBrawler(playerUuid, true)
         end
     end
     modStatusMessage("Full Auto Enabled")
@@ -261,7 +261,7 @@ local function lockCompanionsOnTarget(level, targetUuid)
         for uuid, _ in pairs(players) do
             if M.Utils.isAliveAndCanFight(uuid) and (not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto) then
                 if not brawlersInLevel[uuid] then
-                    Roster.addBrawler(uuid, true)
+                    Roster.addBrawler(uuid)
                 end
                 if brawlersInLevel[uuid] and uuid ~= targetUuid then
                     brawlersInLevel[uuid].targetUuid = targetUuid
@@ -289,7 +289,7 @@ local function setAttackMoveTarget(playerUuid, targetUuid)
     if level and targetUuid and not M.Utils.isPlayerOrAlly(targetUuid) and State.Session.Brawlers and State.Session.Brawlers[level] then
         Utils.applyAttackMoveTargetVfx(targetUuid)
         if not State.Session.Brawlers[level][targetUuid] then
-            Roster.addBrawler(targetUuid, true)
+            Roster.addBrawler(targetUuid)
         end
         lockCompanionsOnTarget(level, targetUuid)
     end
@@ -551,7 +551,6 @@ end
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
-        RT.Timers.stopAllPulseAddNearbyTimers()
         RT.Timers.stopAllPulseActionTimers()
         State.endBrawls()
         if State.Settings.PlayersGoFirst then

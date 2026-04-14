@@ -12,7 +12,7 @@ local function getNumExtraAttacks(entityUuid)
     return 0
 end
 
-local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
+local function addBrawler(entityUuid, replaceExistingBrawler)
     if entityUuid ~= nil then
         local level = M.Osi.GetRegion(entityUuid)
         local okToAdd = false
@@ -31,7 +31,6 @@ local function addBrawler(entityUuid, isInBrawl, replaceExistingBrawler)
                 displayName = displayName,
                 combatGuid = M.Osi.CombatGetGuidFor(entityUuid),
                 combatGroupId = M.Osi.GetCombatGroupID(entityUuid),
-                isInBrawl = isInBrawl,
                 isPaused = M.Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
@@ -153,7 +152,7 @@ local function addCombatParticipantsToBrawlers()
         for _, participant in ipairs(combatEntity.CombatState.Participants) do
             debugPrint(M.Utils.getDisplayName(participant.Uuid.EntityUuid), "adding to brawlers")
             Osi.RequestSetSwarmGroup(participant.Uuid.EntityUuid, "")
-            addBrawler(participant.Uuid.EntityUuid, true)
+            addBrawler(participant.Uuid.EntityUuid)
         end
     end
 end
@@ -235,26 +234,6 @@ local function getBrawlersSortedByDistance(entityUuid)
     return brawlersSortedByDistance
 end
 
-local function addNearbyToBrawlers(entityUuid, nearbyRadius, combatGuid, replaceExistingBrawler)
-    local nearby = M.Utils.getNearby(entityUuid, nearbyRadius)
-    for _, uuid in ipairs(nearby) do
-        if combatGuid == nil or M.Osi.CombatGetGuidFor(uuid) == combatGuid then
-            addBrawler(uuid, true, replaceExistingBrawler)
-        else
-            addBrawler(uuid, false, replaceExistingBrawler)
-        end
-    end
-end
-
-local function addNearbyEnemiesToBrawlers(entityUuid, nearbyRadius)
-    local nearby = M.Utils.getNearby(entityUuid, nearbyRadius)
-    for _, uuid in ipairs(nearby) do
-        if M.Utils.isPugnacious(uuid) then
-            addBrawler(uuid)
-        end
-    end
-end
-
 local function addPlayersInEnterCombatRangeToBrawlers(brawlerUuid)
     local players = State.Session.Players
     for playerUuid, _ in pairs(players) do
@@ -286,10 +265,7 @@ end
 local function initBrawlers(level)
     State.Session.Brawlers[level] = {}
     local players = State.Session.Players
-    for playerUuid, player in pairs(players) do
-        if not State.Settings.TurnBasedSwarmMode and player.isControllingDirectly then
-            RT.Timers.startPulseAddNearby(playerUuid)
-        end
+    for playerUuid, _ in pairs(players) do
         if Osi.IsInCombat(playerUuid) == 1 then
             Listeners.onCombatStarted(M.Osi.CombatGetGuidFor(playerUuid))
             break
@@ -324,8 +300,6 @@ return {
     addCombatParticipantsToBrawlers = addCombatParticipantsToBrawlers,
     endBrawl = endBrawl,
     getBrawlersSortedByDistance = getBrawlersSortedByDistance,
-    addNearbyToBrawlers = addNearbyToBrawlers,
-    addNearbyEnemiesToBrawlers = addNearbyEnemiesToBrawlers,
     addPlayersInEnterCombatRangeToBrawlers = addPlayersInEnterCombatRangeToBrawlers,
     disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,

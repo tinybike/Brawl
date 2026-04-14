@@ -92,7 +92,7 @@ local function allEnterFTB()
     RT.Timers.pauseCombatRoundTimers()
     -- Stop pulse actions and pause resource refill timers for ALL brawlers
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
-        RT.Timers.stopPulseAction(brawler, true)
+        RT.Timers.stopPulseAction(brawler)
         brawler.isPaused = true
         Utils.clearOsirisQueue(uuid)
         Resources.pauseActionResourcesRefillTimers(brawler)
@@ -200,9 +200,6 @@ local function allExitFTB()
                 entity.TurnBased.RequestedEndTurn = false
                 entity.TurnBased.TurnActionsCompleted = false
                 entity:Replicate("TurnBased")
-            end
-            if State.isPlayerControllingDirectly(uuid) then
-                RT.Timers.startPulseAddNearby(uuid)
             end
             local brawler = Roster.getBrawlerByUuid(uuid)
             if brawler then

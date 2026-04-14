@@ -282,10 +282,6 @@ local function isHealerArchetype(archetype)
     return archetype:find("healer") ~= nil
 end
 
-local function isBrawlingWithValidTarget(brawler)
-    return brawler.isInBrawl and brawler.targetUuid ~= nil and M.Utils.isAliveAndCanFight(brawler.targetUuid)
-end
-
 local function isOnSameLevel(uuid1, uuid2)
     local level1 = M.Osi.GetRegion(uuid1)
     local level2 = M.Osi.GetRegion(uuid2)
@@ -799,7 +795,6 @@ return {
     isVisible = isVisible,
     isHealerArchetype = isHealerArchetype,
     isMeleeArchetype = isMeleeArchetype,
-    isBrawlingWithValidTarget = isBrawlingWithValidTarget,
     getNearby = getNearby,
     isOnSameLevel = isOnSameLevel,
     getForwardVector = getForwardVector,
