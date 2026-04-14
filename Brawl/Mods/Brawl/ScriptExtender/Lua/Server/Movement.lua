@@ -114,7 +114,7 @@ local function finishMovement(uuid, eventUuid, activeMovement, override)
                 local gp = activeMovement.goalPosition
                 local dist = math.sqrt((pos[1] - gp[1])^2 + (pos[2] - gp[2])^2 + (pos[3] - gp[3])^2)
                 if dist > 2.0 then
-                    debugPrint(M.Utils.getDisplayName(uuid), "finishMovement SPURIOUS — still", dist, "from goal, ignoring")
+                    debugPrint(M.Utils.getDisplayName(uuid), "finishMovement SPURIOUS: still", dist, "from goal, ignoring")
                     return
                 end
             end

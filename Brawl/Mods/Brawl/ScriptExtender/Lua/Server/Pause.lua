@@ -60,7 +60,7 @@ local function stopTruePause(entityUuid)
 end
 
 local function allEnterFTB()
-    if not State.Settings.TurnBasedSwarmMode then
+    if not State.Settings.TurnBasedSwarmMode and next(M.Roster.getBrawlers()) ~= nil then
         debugPrint("allEnterFTB")
         -- Capture the currently controlled character BEFORE pulling anyone out of combat
         -- (leaving combat triggers GainedControl which resets the selection)

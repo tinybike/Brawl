@@ -264,7 +264,7 @@ local function getCastOptions(casterUuid)
     end
     local isPlayer = casterUuid and M.Osi.IsPlayer(casterUuid) == 1
     if isPlayer then
-        -- Players use FromClient — game handles resources/cooldowns natively
+        -- Players use FromClient so that game handles resources/cooldowns natively
         if State.Settings.TurnBasedSwarmMode then
             return {"FromClient", "ShowPrepareAnimation", "NoMovement"}
         end

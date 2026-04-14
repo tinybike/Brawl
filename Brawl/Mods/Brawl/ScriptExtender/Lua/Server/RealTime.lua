@@ -414,6 +414,22 @@ local function onServerInterruptDecision()
     end
 end
 
+local function onEnteredForceTurnBased(uuid)
+    if State.Session.PendingSelectCharOnFTB then
+        local selectedUuid = State.Session.PendingSelectCharOnFTB
+        State.Session.PendingSelectCharOnFTB = nil
+        debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
+        Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+    end
+end
+
+local function onLeftForceTurnBased(uuid)
+    if State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
+        debugPrint("Left FTB for target char", M.Utils.getDisplayName(uuid))
+        -- Don't send yet (wait for GainedControl to settle, then override)
+    end
+end
+
 return {
     joinCombat = joinCombat,
     nextCombatRound = nextCombatRound,
@@ -449,19 +465,7 @@ return {
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,
-        onEnteredForceTurnBased = function (uuid)
-            if State.Session.PendingSelectCharOnFTB then
-                local selectedUuid = State.Session.PendingSelectCharOnFTB
-                State.Session.PendingSelectCharOnFTB = nil
-                debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
-                Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
-            end
-        end,
-        onLeftForceTurnBased = function (uuid)
-            if State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
-                debugPrint("Left FTB for target char", M.Utils.getDisplayName(uuid))
-                -- Don't send yet — wait for GainedControl to settle, then override
-            end
-        end,
+        onEnteredForceTurnBased = onEnteredForceTurnBased,
+        onLeftForceTurnBased = onLeftForceTurnBased,
     },
 }

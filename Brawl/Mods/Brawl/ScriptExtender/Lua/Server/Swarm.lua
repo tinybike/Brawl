@@ -531,7 +531,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if Resources.getBonusActionPointsRemaining(brawler.uuid) == 0 or err == "can't find target" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
-            -- movement failures are terminal — let Larian's AI handle these during mop-up
+            -- movement failures are terminal: let Larian's AI handle these during mop-up
             if err == "interpolation" or err == "path not found" or err == "out of movement" or err == "nodes" or err == "can't move" or err == "movement timed out" then
                 return terminateActionSequence(brawler.uuid, swarmTurnActiveInitial, swarmActors, callback)
             end
@@ -539,7 +539,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             if type(err) == "string" and (err:find("cast failed, out of range") or err:find("cast failed, no line of sight")) then
                 brawler.targetUuid = nil
             end
-            -- Canceled usually means invalid target (dead, etc.) — clear target and retry
+            -- Canceled usually means invalid target (dead, etc.): clear target and retry
             if tostring(err) == "Canceled" then
                 brawler.targetUuid = nil
             end
