@@ -116,7 +116,9 @@ local function onEnteredCombat(entityGuid, combatGuid)
                 TurnOrder.setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
             end
         end
-        if not State.Settings.TurnBasedSwarmMode then
+        if State.Settings.TurnBasedSwarmMode then
+            Swarm.Listeners.onEnteredCombat(uuid)
+        else
             RT.Listeners.onEnteredCombat(uuid)
         end
     end

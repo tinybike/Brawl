@@ -739,15 +739,38 @@ local function onCombatRoundStarted(round)
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpNpcInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll()
+    -- Mark all players currently in combat as accounted for in the turn order,
+    -- so mid-round joiners can be detected in onEnteredCombat.
+    State.Session.SwarmTurnOrderPlayers = {}
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Osi.IsPartyMember(uuid, 1) == 1 then
+            State.Session.SwarmTurnOrderPlayers[uuid] = true
+        end
+    end
     local enemyList, excludedEnemyList = getEnemyList(true)
     startSwarmTurn(enemyList, excludedEnemyList, true)
 end
 
 local function onCombatEnded()
     State.Session.SwarmTurnComplete = {}
+    State.Session.SwarmTurnOrderPlayers = {}
     cancelTimers()
     Leaderboard.dumpToConsole()
     Leaderboard.postDataToClients(true)
+end
+
+-- When a player character joins combat mid-round (e.g. late entrance into an
+-- in-progress fight), recompute initiative/turn ordering so they get slotted
+-- into the swarm turn order correctly. Players present at round start are
+-- tracked in SwarmTurnOrderPlayers and skipped here to avoid redundant recalcs.
+local function onEnteredCombat(uuid)
+    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and not State.Session.SwarmTurnOrderPlayers[uuid] then
+        debugPrint("onEnteredCombat: mid-round player join, recalculating turn order for", M.Utils.getDisplayName(uuid))
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpNpcInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll()
+        State.Session.SwarmTurnOrderPlayers[uuid] = true
+    end
 end
 
 local function onTurnStarted(uuid)
@@ -925,6 +948,7 @@ return {
         onCombatStarted = onCombatStarted,
         onCombatRoundStarted = onCombatRoundStarted,
         onCombatEnded = onCombatEnded,
+        onEnteredCombat = onEnteredCombat,
         onTurnStarted = onTurnStarted,
         onTurnEnded = onTurnEnded,
         onDied = onDied,
