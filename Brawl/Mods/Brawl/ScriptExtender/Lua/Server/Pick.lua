@@ -179,6 +179,10 @@ local function isCompanionSpellAvailable(uuid, targetUuid, spellName, spell, isS
     if isSpellExcluded(spellName, excludedSpells) then
         return false
     end
+    -- Divine Intervention is too disruptive/scarce to spend automatically
+    if M.Utils.startsWith(spellName, "Shout_DivineIntervention_") then
+        return false
+    end
     -- If we're silenced, we can't use spells that have a verbal component
     if isSilenced and spell.hasVerbalComponent then
         return false
