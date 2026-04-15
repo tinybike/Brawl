@@ -360,6 +360,163 @@ local function postCancelQueuedMovement()
     Ext.ClientNet.PostMessageToServer("CancelQueuedMovement", "")
 end
 
+-- TEMP DEBUG: HotBar exploration for out-of-combat-spell greying feature.
+-- Press X to walk the HotBar and attach MouseEnter listeners to every descendant
+-- so we can hover over buttons and see how spell identity is exposed.
+local HotBarDebugAttached = false
+local function safeGetProperty(obj, propName)
+    local ok, result = pcall(function() return obj[propName] end)
+    if ok then return result end
+    return nil
+end
+local function findNodeByName(node, targetName, visited)
+    visited = visited or {}
+    if visited[node] then return nil end
+    visited[node] = true
+    if node:GetProperty("Name") == targetName then return node end
+    local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
+    for i = 1, childrenCount do
+        local child = node:Child(i)
+        if child then
+            local found = findNodeByName(child, targetName, visited)
+            if found then return found end
+        end
+    end
+    local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
+    for i = 1, visualChildrenCount do
+        local vchild = node:VisualChild(i)
+        if vchild then
+            local found = findNodeByName(vchild, targetName, visited)
+            if found then return found end
+        end
+    end
+    return nil
+end
+local function describeNode(node)
+    local props = {}
+    local p = node:GetAllProperties()
+    if p then
+        for _, name in ipairs({"Name", "Tag", "ToolTip", "Content", "IsEnabled", "Opacity", "Visibility"}) do
+            if p[name] ~= nil then
+                table.insert(props, name .. "=" .. tostring(p[name]))
+            end
+        end
+    end
+    return tostring(node.Type) .. " [" .. table.concat(props, ", ") .. "]"
+end
+-- Dump ALL nodes in a subtree (unfiltered).
+local function dumpTreeAll(node, depth, path, visited)
+    visited = visited or {}
+    if visited[node] or depth > 15 then return end
+    visited[node] = true
+    local nodeType = tostring(node.Type)
+    local nodeName = safeGetProperty(node, "Name")
+    print("[DumpAll]", path, "type=" .. nodeType, "name=" .. tostring(nodeName))
+    local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
+    for i = 1, childrenCount do
+        local child = node:Child(i)
+        if child then dumpTreeAll(child, depth + 1, path .. "/C" .. i, visited) end
+    end
+    local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
+    for i = 1, visualChildrenCount do
+        local vchild = node:VisualChild(i)
+        if vchild then dumpTreeAll(vchild, depth + 1, path .. "/V" .. i, visited) end
+    end
+end
+local function dumpProperties(node, label)
+    local props = node:GetAllProperties()
+    if not props then
+        print("[Props]", label, "no properties")
+        return
+    end
+    print("[Props]", label, "keys:")
+    for k, v in pairs(props) do
+        local vs = tostring(v)
+        if #vs > 120 then vs = vs:sub(1, 120) .. "..." end
+        print("[Props]", "  " .. tostring(k) .. " = " .. vs)
+    end
+end
+local function debugExploreHotBar()
+    print("[HoverHotBar] X pressed — probing Content + CanUse write")
+    local root = Ext.UI.GetRoot()
+    if not root then return end
+    -- Find the CommonHotBar VMHotBar
+    local target = nil
+    local function walk(node, visited)
+        if target then return end
+        visited = visited or {}
+        if visited[node] then return end
+        visited[node] = true
+        if tostring(node.Type) == "ls.VMHotBar" then
+            local hbt = safeGetProperty(node, "HotBarType")
+            if tostring(hbt) == "CommonHotBar" then
+                target = node
+                return
+            end
+        end
+        local childrenCount = safeGetProperty(node, "ChildrenCount") or 0
+        for i = 1, childrenCount do
+            local child = node:Child(i)
+            if child then walk(child, visited) end
+        end
+        local visualChildrenCount = safeGetProperty(node, "VisualChildrenCount") or 0
+        for i = 1, visualChildrenCount do
+            local vchild = node:VisualChild(i)
+            if vchild then walk(vchild, visited) end
+        end
+    end
+    walk(root)
+    if not target then
+        print("[HoverHotBar] CommonHotBar not found")
+        return
+    end
+    local slotList = safeGetProperty(target, "SlotList")
+    if not slotList then
+        print("[HoverHotBar] no SlotList on CommonHotBar")
+        return
+    end
+    -- 1. Dump Content of first 3 non-empty slots
+    local count = 0
+    for i = 1, 30 do
+        local ok, slot = pcall(function () return slotList[i] end)
+        if not ok or slot == nil then break end
+        local content = safeGetProperty(slot, "Content")
+        if content then
+            count = count + 1
+            print("[HoverHotBar] Slot[" .. i .. "] SlotType=" ..
+                tostring(safeGetProperty(slot, "SlotType")) ..
+                " HotKey=" .. tostring(safeGetProperty(slot, "HotKey")) ..
+                " CanUse=" .. tostring(safeGetProperty(slot, "CanUse")))
+            print("[HoverHotBar]   Content.Type=" .. tostring(content.Type))
+            dumpProperties(content, "Slot[" .. i .. "].Content")
+            if count >= 3 then break end
+        end
+    end
+    -- 2. Test: try writing various properties to find what's settable.
+    print("[HoverHotBar] === Probing writable properties on slot 1 ===")
+    local slot1 = slotList[1]
+    if slot1 then
+        local content = safeGetProperty(slot1, "Content")
+        local function tryWrite(obj, prop, value, label)
+            if not obj then print("[HoverHotBar] " .. label .. ": no obj") return end
+            local before = safeGetProperty(obj, prop)
+            local ok, err = pcall(function () obj[prop] = value end)
+            local after = safeGetProperty(obj, prop)
+            local result = ok and "OK" or "READ-ONLY"
+            print("[HoverHotBar] " .. label .. " write=" .. result .. " before=" .. tostring(before) .. " after=" .. tostring(after))
+            if not ok and err then print("[HoverHotBar]   err=" .. tostring(err):sub(1, 200)) end
+        end
+        tryWrite(slot1, "IsActive", true, "slot.IsActive")
+        tryWrite(slot1, "IsNew", true, "slot.IsNew")
+        tryWrite(content, "Activated", false, "Content.Activated")
+        tryWrite(content, "Equipped", false, "Content.Equipped")
+        tryWrite(content, "NeedsActivation", true, "Content.NeedsActivation")
+        tryWrite(content, "IsRitualDisabled", true, "Content.IsRitualDisabled")
+        tryWrite(content, "IsModified", true, "Content.IsModified")
+    end
+    print("[HoverHotBar] dump done")
+end
+
 local function onKeyInput(e)
     if e.Repeat == false and e.Event == "KeyDown" then
         local key = tostring(e.Key)
@@ -432,6 +589,11 @@ local function onKeyInput(e)
                 postActionButton(actionButtonLabel)
                 keybindingPressed = true
             end
+        end
+        -- TEMP DEBUG: X triggers HotBar exploration
+        if e.Key == "X" then
+            debugExploreHotBar()
+            keybindingPressed = true
         end
         if keybindingPressed then
             e:PreventAction()
