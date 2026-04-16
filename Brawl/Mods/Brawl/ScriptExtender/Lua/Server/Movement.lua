@@ -42,6 +42,12 @@ local function getMovementDistanceMaxAmount(entity)
 end
 
 local function getMovementSpeed(entityUuid)
+    -- Players/allies out of combat should move at Run, not Sprint. Movement
+    -- distance is always pinned to 1000 so the threshold check below would
+    -- otherwise always return Sprint for them.
+    if M.Utils.isPlayerOrAlly(entityUuid) and M.Osi.IsInCombat(entityUuid) == 0 then
+        return "Run"
+    end
     local entity = Ext.Entity.Get(entityUuid)
     local movementDistance = getMovementDistanceAmount(entity)
     local movementSpeed = M.Utils.isPlayerOrAlly(entityUuid) and playerMovementDistanceToSpeed(movementDistance) or enemyMovementDistanceToSpeed(movementDistance)
