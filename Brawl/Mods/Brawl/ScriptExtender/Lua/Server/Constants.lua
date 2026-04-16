@@ -303,7 +303,6 @@ Constants.ARCHETYPE_WEIGHTS = {
 Constants.ARCHETYPE_WEIGHTS.beast = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.goblin_melee = Constants.ARCHETYPE_WEIGHTS.melee
 Constants.ARCHETYPE_WEIGHTS.goblin_ranged = Constants.ARCHETYPE_WEIGHTS.ranged
-Constants.ARCHETYPE_WEIGHTS.mage = Constants.ARCHETYPE_WEIGHTS.mage
 Constants.ARCHETYPE_WEIGHTS.ranged_stupid = Constants.ARCHETYPE_WEIGHTS.ranged
 Constants.ARCHETYPE_WEIGHTS.melee_magic_smart = Constants.ARCHETYPE_WEIGHTS.melee_magic
 Constants.ARCHETYPE_WEIGHTS.act3_LOW_ghost_nurse = Constants.ARCHETYPE_WEIGHTS.melee
@@ -324,8 +323,6 @@ Constants.DAMAGE_TYPES = {
     Radiant = 13,
     Force = 14,
 }
--- NB: Is "Dash" different from "Sprint"?
-Constants.PLAYER_MOVEMENT_SPEED_DEFAULT = {Dash = 6.0, Sprint = 6.0, Run = 3.75, Walk = 2.0, Stroll = 1.4}
 Constants.MOVEMENT_SPEED_THRESHOLDS = {
     HONOUR = {Sprint = 5, Run = 2, Walk = 1},
     HARD = {Sprint = 6, Run = 4, Walk = 2},

@@ -68,6 +68,12 @@ local function cancelTimers(swarmActors)
             end
             State.Session.EnemyTurnFailsafeTimer = {}
         end
+        if State.Session.SwarmBrawlerIndexDelay then
+            for uuid, timer in pairs(State.Session.SwarmBrawlerIndexDelay) do
+                Ext.Timer.Cancel(timer)
+            end
+            State.Session.SwarmBrawlerIndexDelay = {}
+        end
     end
 end
 
@@ -844,6 +850,7 @@ local function onDied(uuid)
             Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
             State.Session.SwarmBrawlerIndexDelay[uuid] = nil
         end
+        M.Roster.handleDeath(M.Osi.GetRegion(uuid), uuid)
     end
 end
 
@@ -883,6 +890,7 @@ local function onFlagSet(flag)
 end
 
 local function onReactionInterruptActionNeeded(uuid)
+    Movement.pauseTimers()
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         pauseTimers()
     end
@@ -908,6 +916,7 @@ local function onServerInterruptUsed(entity, label, component)
 end
 
 local function onReactionInterruptUsed(uuid, isAutoTriggered)
+    Movement.resumeTimers()
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
         resumeTimers()
     end
@@ -915,6 +924,7 @@ end
 
 -- thank u focus
 local function onServerInterruptDecision()
+    Movement.resumeTimers()
     if Ext.System.ServerInterruptDecision and Ext.System.ServerInterruptDecision.Decisions then
         for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
             return resumeTimers()

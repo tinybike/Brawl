@@ -89,7 +89,6 @@ local Session = {
     TagNameToUuid = {},
     ExcludedFromAI = {},
     ToTTimer = nil,
-    ToTRoundAddNearbyTimer = nil,
     ModStatusMessageTimer = nil,
     ActiveMovements = {},
     TurnBasedSwarmModePlayerTurnEnded = {},
@@ -434,7 +433,12 @@ end
 local function recapMovementDistances()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars.MovementDistances and next(modVars.MovementDistances) ~= nil then
+        -- Snapshot UUIDs first since capMovementDistance mutates modVars.MovementDistances
+        local uuids = {}
         for uuid, _ in pairs(modVars.MovementDistances) do
+            table.insert(uuids, uuid)
+        end
+        for _, uuid in ipairs(uuids) do
             capMovementDistance(uuid)
         end
     end

@@ -555,7 +555,9 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, he
                     debugPrint(isHostile, ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
                     if M.Utils.isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
                         local hasPathToTarget = nil
-                        local hasDirectHeal = M.State.hasDirectHeal(brawler.uuid, Ext.Entity.Get(brawler.uuid).SpellBookPrepares.PreparedSpells, true, bonusActionOnly)
+                        local casterEntity = Ext.Entity.Get(brawler.uuid)
+                        local preparedSpells = casterEntity and casterEntity.SpellBookPrepares and casterEntity.SpellBookPrepares.PreparedSpells
+                        local hasDirectHeal = preparedSpells and M.State.hasDirectHeal(brawler.uuid, preparedSpells, true, bonusActionOnly)
                         debugPrint(isHostile, M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid), hasDirectHeal)
                         if (isHostile and M.Utils.isValidHostileTarget(brawler.uuid, potentialTargetUuid)) or hasDirectHeal then
                             if isMelee and isHostile then

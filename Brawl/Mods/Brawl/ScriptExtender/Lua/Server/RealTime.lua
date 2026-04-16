@@ -279,6 +279,9 @@ end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
+    if not State.Settings.FullAuto then
+        stopPulseAction(Roster.getBrawlerByUuid(uuid))
+    end
     -- If we have a pending post-unpause selection and the wrong character got control, override it
     if State.Session.PendingSelectCharOnLeftFTB and uuid ~= State.Session.PendingSelectCharOnLeftFTB then
         local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
@@ -340,6 +343,10 @@ local function onDialogEnded()
     end
 end
 
+local function onDied(uuid)
+    Roster.handleDeath(M.Osi.GetRegion(uuid), uuid)
+end
+
 local function onTeleportedToCamp(uuid)
     if uuid ~= nil and State.Session.Brawlers ~= nil then
         for level, brawlersInLevel in pairs(State.Session.Brawlers) do
@@ -367,25 +374,25 @@ local function onFlagSet(flag)
 end
 
 local function onReactionInterruptActionNeeded(uuid)
+    Movement.pauseTimers()
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         pauseCombatRoundTimers()
-        -- pausePulseActions()
     end
 end
 
 local function onReactionInterruptUsed(uuid, isAutoTriggered)
+    Movement.resumeTimers()
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
         resumeCombatRoundTimers()
-        -- resumePulseActions()
     end
 end
 
 -- thank u focus
 local function onServerInterruptDecision()
+    Movement.resumeTimers()
     if Ext.System.ServerInterruptDecision and Ext.System.ServerInterruptDecision.Decisions then
         for _, _ in pairs(Ext.System.ServerInterruptDecision.Decisions) do
             resumeCombatRoundTimers()
-            -- resumePulseActions()
             return
         end
     end
@@ -397,13 +404,6 @@ local function onEnteredForceTurnBased(uuid)
         State.Session.PendingSelectCharOnFTB = nil
         debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
         Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
-    end
-end
-
-local function onLeftForceTurnBased(uuid)
-    if State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
-        debugPrint("Left FTB for target char", M.Utils.getDisplayName(uuid))
-        -- Don't send yet (wait for GainedControl to settle, then override)
     end
 end
 
@@ -452,13 +452,13 @@ return {
         onDestroySpellSyncTargeting = onDestroySpellSyncTargeting,
         onDialogStarted = onDialogStarted,
         onDialogEnded = onDialogEnded,
+        onDied = onDied,
         onTeleportedToCamp = onTeleportedToCamp,
         onFlagSet = onFlagSet,
         onReactionInterruptActionNeeded = onReactionInterruptActionNeeded,
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,
         onEnteredForceTurnBased = onEnteredForceTurnBased,
-        onLeftForceTurnBased = onLeftForceTurnBased,
         onStatusApplied = onStatusApplied,
         onStatusRemoved = onStatusRemoved,
     },

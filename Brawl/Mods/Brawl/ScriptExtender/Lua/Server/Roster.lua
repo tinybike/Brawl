@@ -182,7 +182,6 @@ local function endBrawl(level)
         end
     end
     State.Session.RefresherCombatHelper = {}
-    Movement.resetPlayersMovementSpeed()
     State.Session.ActiveCombatGroups = {}
     State.Session.Brawlers[level] = {}
     State.Session.StoryActionIDs = {}
@@ -260,6 +259,20 @@ local function checkForEndOfBrawl(level)
     end
 end
 
+-- Shared death cleanup: lay the body flat, remove from brawler table, check if combat ended.
+-- Runs in both RT and Swarm modes. Called from each mode's onDied handler.
+local function handleDeath(level, entityUuid)
+    if level and entityUuid and State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
+        Ext.Timer.WaitFor(Constants.LIE_ON_GROUND_TIMEOUT, function ()
+            debugPrint("LieOnGround", entityUuid)
+            Utils.clearOsirisQueue(entityUuid)
+            Osi.LieOnGround(entityUuid)
+        end)
+        removeBrawler(level, entityUuid)
+        checkForEndOfBrawl(level)
+    end
+end
+
 local function initBrawlers(level)
     State.Session.Brawlers[level] = {}
     local players = State.Session.Players
@@ -301,6 +314,7 @@ return {
     addPlayersInEnterCombatRangeToBrawlers = addPlayersInEnterCombatRangeToBrawlers,
     disableLockedOnTarget = disableLockedOnTarget,
     checkForEndOfBrawl = checkForEndOfBrawl,
+    handleDeath = handleDeath,
     initBrawlers = initBrawlers,
     getBrawlers = getBrawlers,
     setExcludedFromAI = setExcludedFromAI,

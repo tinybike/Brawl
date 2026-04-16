@@ -567,33 +567,6 @@ local function moveIntoPositionForSpell(uuid, targetUuid, spellName, bonusAction
     tryMove(baseMove, State.Settings.TurnBasedSwarmMode, bonusActionOnly)
 end
 
-local function setPlayerRunToSprint(entityUuid)
-    local entity = Ext.Entity.Get(entityUuid)
-    if entity and entity.ServerCharacter then
-        if State.Session.Players[entityUuid].movementSpeedRun == nil then
-            State.Session.Players[entityUuid].movementSpeedRun = entity.ServerCharacter.Template.MovementSpeedRun
-        end
-        entity.ServerCharacter.Template.MovementSpeedRun = entity.ServerCharacter.Template.MovementSpeedSprint
-    end
-end
-
-local function resetPlayerMovementSpeed(uuid)
-    local player = State.Session.Players[uuid]
-    if player and player.movementSpeedRun ~= nil then
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.ServerCharacter then
-            entity.ServerCharacter.Template.MovementSpeedRun = player.movementSpeedRun
-            player.movementSpeedRun = nil
-        end
-    end
-end
-
-local function resetPlayersMovementSpeed()
-    for uuid, _ in pairs(State.Session.Players) do
-        resetPlayerMovementSpeed(uuid)
-    end
-end
-
 -- Additive speed boost multipliers per status. Base is 1.0x (no boost).
 local SPEED_BOOST_VALUES = {
     DASH = 1.0,
@@ -697,9 +670,6 @@ return {
     moveIntoPositionForSpell = moveIntoPositionForSpell,
     holdPosition = holdPosition,
     repositionRelativeToTarget = repositionRelativeToTarget,
-    setPlayerRunToSprint = setPlayerRunToSprint,
-    resetPlayerMovementSpeed = resetPlayerMovementSpeed,
-    resetPlayersMovementSpeed = resetPlayersMovementSpeed,
     setMovementSpeedThresholds = setMovementSpeedThresholds,
     selectDash = selectDash,
     selectBonusActionDash = selectBonusActionDash,

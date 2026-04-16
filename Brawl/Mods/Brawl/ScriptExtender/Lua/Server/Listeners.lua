@@ -27,7 +27,6 @@ local function onStarted(level)
     State.resetPlayers()
     State.setIsControllingDirectly()
     Movement.setMovementSpeedThresholds()
-    Movement.resetPlayersMovementSpeed()
     State.setupPartyMembersHitpoints()
     Roster.initBrawlers(level)
     if State.Settings.TurnBasedSwarmMode then
@@ -156,21 +155,11 @@ end
 
 local function onDied(entityGuid)
     debugPrint("Died", entityGuid)
-    local level = M.Osi.GetRegion(entityGuid)
     local entityUuid = M.Osi.GetUUID(entityGuid)
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onDied(entityUuid)
-    end
-    if level and entityUuid and State.Session.Brawlers[level] and State.Session.Brawlers[level][entityUuid] then
-        -- Sometimes units don't appear dead when killed out-of-combat...
-        -- this at least makes them lie prone (and dead-appearing units still appear dead)
-        Ext.Timer.WaitFor(Constants.LIE_ON_GROUND_TIMEOUT, function ()
-            debugPrint("LieOnGround", entityUuid)
-            Utils.clearOsirisQueue(entityUuid)
-            Osi.LieOnGround(entityUuid)
-        end)
-        Roster.removeBrawler(level, entityUuid)
-        Roster.checkForEndOfBrawl(level)
+    else
+        RT.Listeners.onDied(entityUuid)
     end
 end
 
@@ -218,9 +207,6 @@ local function onGainedControl(targetGuid)
                     end
                 end
             end
-            if not State.Settings.FullAuto then
-                RT.Timers.stopPulseAction(Roster.getBrawlerByUuid(targetUuid))
-            end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
             end
@@ -232,12 +218,6 @@ end
 local function onEnteredForceTurnBased(entityGuid)
     if not State.Settings.TurnBasedSwarmMode then
         RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
-    end
-end
-
-local function onLeftForceTurnBased(entityGuid)
-    if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
@@ -605,7 +585,6 @@ local function onReactionInterruptActionNeeded(characterGuid)
     else
         RT.Listeners.onReactionInterruptActionNeeded(M.Osi.GetUUID(characterGuid))
     end
-    Movement.pauseTimers()
 end
 
 local function onServerInterruptUsed(entity, label, component)
@@ -621,7 +600,6 @@ local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototype
     else
         RT.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
     end
-    Movement.resumeTimers()
 end
 
 local function onServerInterruptDecision()
@@ -630,7 +608,6 @@ local function onServerInterruptDecision()
     else
         RT.Listeners.onServerInterruptDecision()
     end
-    Movement.resumeTimers()
 end
 
 local function stopListeners()
@@ -711,10 +688,6 @@ local function startListeners()
     }
     State.Session.Listeners.EnteredForceTurnBased = {
         handle = Ext.Osiris.RegisterListener("EnteredForceTurnBased", 1, "after", onEnteredForceTurnBased),
-        stop = Ext.Osiris.UnregisterListener,
-    }
-    State.Session.Listeners.LeftForceTurnBased = {
-        handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.CharacterJoinedParty = {
