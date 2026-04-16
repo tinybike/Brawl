@@ -109,13 +109,17 @@ local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
-        Roster.addBrawler(uuid, true)
+        -- Handle resurrection first so the entity's InitiativeRoll is set to the
+        -- mean before addBrawler caches actionInterval from it.
         if State.Session.Players and State.Session.Players[uuid] then
             if State.Session.ResurrectedPlayer[uuid] then
                 State.Session.ResurrectedPlayer[uuid] = nil
                 TurnOrder.setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
             end
         end
+        -- Replace existing brawler entries so actionInterval is refreshed from the
+        -- now-rolled InitiativeRoll (entries added pre-combat got the default).
+        Roster.addBrawler(uuid, true)
         if State.Settings.TurnBasedSwarmMode then
             Swarm.Listeners.onEnteredCombat(uuid)
         else
