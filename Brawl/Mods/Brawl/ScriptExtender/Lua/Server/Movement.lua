@@ -244,6 +244,15 @@ local function moveCompanionsToPlayer(playerUuid)
     end
 end
 
+local function moveCompanionsToTargetUuid(targetUuid)
+    local players = State.Session.Players
+    for uuid, _ in pairs(players) do
+        if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
+            moveToTargetUuid(uuid, targetUuid, true)
+        end
+    end
+end
+
 local function moveCompanionsToPosition(position)
     local players = State.Session.Players
     for uuid, _ in pairs(players) do
@@ -664,6 +673,7 @@ return {
     findPathToPosition = findPathToPosition,
     moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,
+    moveCompanionsToTargetUuid = moveCompanionsToTargetUuid,
     calculateEnRouteCoords = calculateEnRouteCoords,
     moveToDistanceFromTarget = moveToDistanceFromTarget,
     calculateJumpDistance = calculateJumpDistance,

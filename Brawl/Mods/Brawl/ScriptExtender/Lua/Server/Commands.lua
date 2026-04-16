@@ -359,8 +359,11 @@ local function onClickPosition(data)
         if clickPosition then
             State.Session.LastClickPosition[playerUuid] = {position = clickPosition.position}
             if State.Session.AwaitingTarget[playerUuid] and clickPosition.uuid then
+                -- setAttackMoveTarget only actually engages companions on valid enemies;
+                -- regardless of validity, everyone (companions + active char) should still
+                -- move toward the clicked target.
                 setAttackMoveTarget(playerUuid, clickPosition.uuid)
-                -- Also move the active character toward the target (without AI engagement)
+                Movement.moveCompanionsToTargetUuid(clickPosition.uuid)
                 if not State.Settings.FullAuto then
                     Movement.moveToTargetUuid(playerUuid, clickPosition.uuid, true)
                 end

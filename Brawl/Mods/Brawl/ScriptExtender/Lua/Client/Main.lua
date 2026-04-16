@@ -835,10 +835,16 @@ local function onMCMSettingSaved(payload)
     end
     if payload.settingId == "mod_toggle_hotkey" then
         ModToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "mode_toggle_hotkey" then
+        ModeToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "companion_ai_toggle_hotkey" then
         CompanionAIToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "queue_companion_ai_actions_hotkey" then
+        QueueCompanionAIActionsHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "full_auto_toggle_hotkey" then
         FullAutoToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "leaderboard_toggle_hotkey" then
+        LeaderboardToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "pause_toggle_hotkey" then
         PauseToggleHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "target_closer_enemy_hotkey" then
@@ -859,10 +865,18 @@ local function onMCMSettingSaved(payload)
         ControllerModToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_mod_toggle_hotkey_2" then
         ControllerModToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_mode_toggle_hotkey" then
+        ControllerModeToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_mode_toggle_hotkey_2" then
+        ControllerModeToggleHotkey[2] = payload.value
     elseif payload.settingId == "controller_companion_ai_toggle_hotkey" then
         ControllerCompanionAIToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_companion_ai_toggle_hotkey_2" then
         ControllerCompanionAIToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_queue_companion_ai_actions_hotkey" then
+        ControllerQueueCompanionAIActionsHotkey[1] = payload.value
+    elseif payload.settingId == "controller_queue_companion_ai_actions_hotkey_2" then
+        ControllerQueueCompanionAIActionsHotkey[2] = payload.value
     elseif payload.settingId == "controller_full_auto_toggle_hotkey" then
         ControllerFullAutoToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_full_auto_toggle_hotkey_2" then
@@ -899,6 +913,10 @@ local function onMCMSettingSaved(payload)
         ControllerChangeTacticsHotkey[1] = payload.value
     elseif payload.settingId == "controller_change_tactics_hotkey_2" then
         ControllerChangeTacticsHotkey[2] = payload.value
+    elseif payload.settingId == "controller_leaderboard_toggle_hotkey" then
+        ControllerLeaderboardToggleHotkey[1] = payload.value
+    elseif payload.settingId == "controller_leaderboard_toggle_hotkey_2" then
+        ControllerLeaderboardToggleHotkey[2] = payload.value
     elseif payload.settingId:find("controller_action_") ~= nil then
         for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
             if payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey" then
