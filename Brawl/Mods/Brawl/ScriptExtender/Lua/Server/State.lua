@@ -85,6 +85,7 @@ local Session = {
     HealRequestedTimer = {},
     CountdownTimer = {},
     ExtraAttacksRemaining = {},
+    ExtraAttackInProgress = {},
     StoryActionIDs = {},
     TagNameToUuid = {},
     ExcludedFromAI = {},

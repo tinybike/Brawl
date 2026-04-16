@@ -87,6 +87,9 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
         if spell.isWeaponOrUnarmedDamage then
             weight = weight + archetypeWeights.weaponOrUnarmedDamage
         end
+        if spell.isUnarmedDamage then
+            weight = weight + archetypeWeights.unarmedDamage
+        end
         debugPrint("amt damage weight", spellName, spell.averageDamage, amountNeeded, M.Pick.getHealingOrDamageAmountWeight(spell.averageDamage, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY))
         weight = weight + archetypeWeights.spellDamage*M.Pick.getHealingOrDamageAmountWeight(spell.averageDamage, amountNeeded, Constants.OVERFLOW_DAMAGE_PENALTY)
         -- weight = weight + archetypeWeights.spellDamage*spell.averageDamage

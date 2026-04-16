@@ -262,6 +262,10 @@ local function onCharacterLeftParty(character)
         if State.Session.Players and State.Session.Players[uuid] then
             State.Session.Players[uuid] = nil
         end
+        if State.Session.PartyMembersHitpointsListeners[uuid] then
+            Ext.Entity.Unsubscribe(State.Session.PartyMembersHitpointsListeners[uuid])
+            State.Session.PartyMembersHitpointsListeners[uuid] = nil
+        end
         -- NB: can remove this??
         -- local level = M.Osi.GetRegion(uuid)
         -- if State.Session.Brawlers and State.Session.Brawlers[level] and State.Session.Brawlers[level][uuid] then

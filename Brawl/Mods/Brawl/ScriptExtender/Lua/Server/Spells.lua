@@ -208,7 +208,12 @@ local function isWeaponOrUnarmed(value)
 end
 
 local function calculateMean(value, level)
-    local str = tostring(value):gsub("Level", tostring(level))
+    -- Substitute ClassLevel (and related compound variables) BEFORE the bare
+    -- "Level" substitution to avoid "ClassLevel" → "Class<N>" breakage.
+    local str = tostring(value)
+        :gsub("ClassLevel", tostring(level))
+        :gsub("CharacterLevel", tostring(level))
+        :gsub("Level", tostring(level))
     local numDice, numSides = str:match("(%d+)d(%d+)")
     local mean = 0
     if numDice and numSides then

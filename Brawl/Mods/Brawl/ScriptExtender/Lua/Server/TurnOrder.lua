@@ -35,15 +35,6 @@ local function calculateActionInterval(initiative)
     return math.max(Constants.MINIMUM_ACTION_INTERVAL, math.floor(1000*State.Settings.ActionInterval*scale + 0.5))
 end
 
-local function rollForInitiative(uuid)
-    local initiative = math.random(1, M.Utils.getInitiativeDie())
-    local entity = Ext.Entity.Get(uuid)
-    if entity and entity.Stats and entity.Stats.InitiativeBonus ~= nil then
-        initiative = initiative + entity.Stats.InitiativeBonus
-    end
-    return initiative
-end
-
 local function setInitiativeRoll(uuid, roll)
     local entity = Ext.Entity.Get(uuid)
     if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
@@ -165,9 +156,11 @@ end
 
 local function getNewInitiativeRolls(groups)
     local newInitiativeRolls = {}
-    for _, info in ipairs(groups) do
+    for i, info in ipairs(groups) do
         if info.Members and info.Members[1] and info.Members[1].Entity then
-            table.insert(newInitiativeRolls, getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid))
+            -- Sparse indexing: skipped groups stay nil at their original index so
+            -- callers can detect-and-skip without losing alignment with `groups`.
+            newInitiativeRolls[i] = getInitiativeRoll(info.Members[1].Entity.Uuid.EntityUuid)
         end
     end
     return newInitiativeRolls
@@ -176,21 +169,27 @@ end
 local function reorderByInitiativeRoll(doNotReplicate)
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        local groups = combatEntity.TurnOrder.Groups
+        local newInitiativeRolls = getNewInitiativeRolls(groups)
         local reorderedGroups = {}
-        for i, newInitiative in ipairs(getNewInitiativeRolls(combatEntity.TurnOrder.Groups)) do
-            local group = combatEntity.TurnOrder.Groups[i]
-            local members = {}
-            for _, member in ipairs(group.Members) do
-                -- NB: should this be newInitiative, vs member.Initiative...?
-                table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+        -- Numeric for (not ipairs) because newInitiativeRolls may be sparse
+        for i = 1, #groups do
+            local newInitiative = newInitiativeRolls[i]
+            if newInitiative then
+                local group = groups[i]
+                local members = {}
+                for _, member in ipairs(group.Members) do
+                    -- NB: should this be newInitiative, vs member.Initiative...?
+                    table.insert(members, {Entity = member.Entity, Initiative = member.Initiative})
+                end
+                table.insert(reorderedGroups, {
+                    Initiative = newInitiative,
+                    IsPlayer = group.IsPlayer,
+                    Round = group.Round,
+                    Team = group.Team,
+                    Members = members,
+                })
             end
-            table.insert(reorderedGroups, {
-                Initiative = newInitiative,
-                IsPlayer = group.IsPlayer,
-                Round = group.Round,
-                Team = group.Team,
-                Members = members,
-            })
         end
         table.sort(reorderedGroups, function (a, b) return a.Initiative > b.Initiative end)
         combatEntity.TurnOrder.Groups = reorderedGroups
@@ -343,7 +342,6 @@ end
 return {
     getInitiativeRoll = getInitiativeRoll,
     calculateActionInterval = calculateActionInterval,
-    rollForInitiative = rollForInitiative,
     setInitiativeRoll = setInitiativeRoll,
     setPartyInitiativeRollToMean = setPartyInitiativeRollToMean,
     bumpNpcInitiativeRolls = bumpNpcInitiativeRolls,

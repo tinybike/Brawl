@@ -19,7 +19,7 @@ local function actOnHostileTarget(brawler, target, bonusActionOnly, excludedSpel
         local playerClosestToTarget = M.Osi.GetClosestAlivePlayer(target.uuid) or brawler.uuid
         local targetDistanceToParty = M.Osi.GetDistanceTo(target.uuid, playerClosestToTarget)
         -- debugPrint("target distance to party", targetDistanceToParty, playerClosestToTarget)
-        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, {"Damage"}, damageAmountNeeded, targetDistanceToParty, allowAoE, bonusActionOnly)
+        actionToTake = Pick.decideCompanionActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, damageAmountNeeded, targetDistanceToParty, allowAoE, bonusActionOnly)
         debugPrint(brawler.displayName, "Companion action to take on hostile target", actionToTake, brawler.uuid, target.uuid, target.displayName, bonusActionOnly)
     else
         actionToTake = Pick.decideActionOnTarget(brawler, target.uuid, preparedSpells, excludedSpells, distanceToTarget, spellTypes, damageAmountNeeded, bonusActionOnly)
