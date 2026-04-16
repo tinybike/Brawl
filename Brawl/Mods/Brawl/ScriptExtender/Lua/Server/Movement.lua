@@ -594,6 +594,79 @@ local function resetPlayersMovementSpeed()
     end
 end
 
+-- Additive speed boost multipliers per status. Base is 1.0x (no boost).
+local SPEED_BOOST_VALUES = {
+    DASH = 1.0,
+    DASH_STACKED = 1.0,
+    DASH_STACKED_2 = 1.0,
+    HASTE = 0.5,
+    LONGSTRIDER = 0.1,
+}
+
+local function isSpeedBoostStatus(statusId)
+    return SPEED_BOOST_VALUES[statusId] ~= nil
+end
+
+local function computeSpeedMultiplier(uuid)
+    local multiplier = 1.0
+    for status, bonus in pairs(SPEED_BOOST_VALUES) do
+        if M.Osi.HasActiveStatus(uuid, status) == 1 then
+            multiplier = multiplier + bonus
+        end
+    end
+    return multiplier
+end
+
+local function hasActiveSpeedBoostStatus(uuid)
+    for status, _ in pairs(SPEED_BOOST_VALUES) do
+        if M.Osi.HasActiveStatus(uuid, status) == 1 then
+            return true
+        end
+    end
+    return false
+end
+
+local function updateSpeedBoost(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity or not entity.ServerCharacter or not entity.ServerCharacter.Template then return end
+    local template = entity.ServerCharacter.Template
+    local boost = State.Session.DashSpeedBoosts[uuid]
+    if not boost then
+        boost = {
+            Sprint = template.MovementSpeedSprint,
+            Run = template.MovementSpeedRun,
+        }
+        State.Session.DashSpeedBoosts[uuid] = boost
+    end
+    local multiplier = computeSpeedMultiplier(uuid)
+    if multiplier <= 1.0 then
+        template.MovementSpeedSprint = boost.Sprint
+        template.MovementSpeedRun = boost.Run
+        State.Session.DashSpeedBoosts[uuid] = nil
+        debugPrint("Speed boost removed from", M.Utils.getDisplayName(uuid))
+    else
+        template.MovementSpeedSprint = boost.Sprint * multiplier
+        template.MovementSpeedRun = boost.Run * multiplier
+        debugPrint("Speed boost updated for", M.Utils.getDisplayName(uuid), "x" .. multiplier)
+    end
+end
+
+local function removeAllDashSpeedBoosts()
+    local uuids = {}
+    for uuid, _ in pairs(State.Session.DashSpeedBoosts) do
+        table.insert(uuids, uuid)
+    end
+    for _, uuid in ipairs(uuids) do
+        local entity = Ext.Entity.Get(uuid)
+        local boost = State.Session.DashSpeedBoosts[uuid]
+        if entity and entity.ServerCharacter and entity.ServerCharacter.Template and boost then
+            entity.ServerCharacter.Template.MovementSpeedSprint = boost.Sprint
+            entity.ServerCharacter.Template.MovementSpeedRun = boost.Run
+        end
+        State.Session.DashSpeedBoosts[uuid] = nil
+    end
+end
+
 local function setMovementSpeedThresholds()
     State.Session.MovementSpeedThresholds = Constants.MOVEMENT_SPEED_THRESHOLDS[M.Utils.getDifficulty()]
 end
@@ -631,4 +704,8 @@ return {
     selectDash = selectDash,
     selectBonusActionDash = selectBonusActionDash,
     selectTeleport = selectTeleport,
+    isSpeedBoostStatus = isSpeedBoostStatus,
+    hasActiveSpeedBoostStatus = hasActiveSpeedBoostStatus,
+    updateSpeedBoost = updateSpeedBoost,
+    removeAllDashSpeedBoosts = removeAllDashSpeedBoosts,
 }

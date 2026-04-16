@@ -405,6 +405,24 @@ local function onLeftForceTurnBased(uuid)
     end
 end
 
+local function onStatusApplied(targetGuid, statusId)
+    if Movement.isSpeedBoostStatus(statusId) then
+        local uuid = M.Osi.GetUUID(targetGuid)
+        if uuid and M.Roster.getBrawlerByUuid(uuid) then
+            Movement.updateSpeedBoost(uuid)
+        end
+    end
+end
+
+local function onStatusRemoved(targetGuid, statusId)
+    if Movement.isSpeedBoostStatus(statusId) then
+        local uuid = M.Osi.GetUUID(targetGuid)
+        if uuid then
+            Movement.updateSpeedBoost(uuid)
+        end
+    end
+end
+
 return {
     joinCombat = joinCombat,
     nextCombatRound = nextCombatRound,
@@ -439,5 +457,7 @@ return {
         onServerInterruptDecision = onServerInterruptDecision,
         onEnteredForceTurnBased = onEnteredForceTurnBased,
         onLeftForceTurnBased = onLeftForceTurnBased,
+        onStatusApplied = onStatusApplied,
+        onStatusRemoved = onStatusRemoved,
     },
 }

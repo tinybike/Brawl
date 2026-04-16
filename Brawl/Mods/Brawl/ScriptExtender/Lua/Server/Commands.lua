@@ -97,6 +97,7 @@ end
 local function disableMod(noNotify)
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
+    Movement.removeAllDashSpeedBoosts()
     if State.Settings.TurnBasedSwarmMode then
         State.removeBoostPlayerInitiatives()
     end
@@ -552,6 +553,7 @@ local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     if value == true then
         RT.Timers.stopAllPulseActionTimers()
+        Movement.removeAllDashSpeedBoosts()
         State.endBrawls()
         if State.Settings.PlayersGoFirst then
             State.boostPlayerInitiatives()

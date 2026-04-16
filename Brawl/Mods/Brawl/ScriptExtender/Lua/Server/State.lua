@@ -59,6 +59,7 @@ local Session = {
     Brawlers = {},
     Players = {},
     PulseActionTimers = {},
+    DashSpeedBoosts = {},
     IsAttackingOrBeingAttackedByPlayer = {},
     ClosestEnemyBrawlers = {},
     PlayerMarkedTarget = {},

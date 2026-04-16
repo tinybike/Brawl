@@ -5,6 +5,7 @@ local debugDump = Utils.debugDump
 
 local function cleanupAll()
     RT.Timers.stopAllPulseActionTimers()
+    Movement.removeAllDashSpeedBoosts()
     State.endBrawls()
     State.revertAllModifiedHitpoints()
     State.recapMovementDistances()
@@ -97,6 +98,7 @@ local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
     State.Session.StoryActionIDs = {}
     State.Session.MeanInitiativeRoll = nil
+    Movement.removeAllDashSpeedBoosts()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatEnded()
     else
@@ -541,6 +543,18 @@ local function onDialogEnded(...)
 end
 
 -- NB: get rid of this??
+local function onStatusApplied(targetGuid, statusId, causeeGuid, storyActionId)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onStatusApplied(targetGuid, statusId)
+    end
+end
+
+local function onStatusRemoved(targetGuid, statusId, causeeGuid, storyActionId)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onStatusRemoved(targetGuid, statusId)
+    end
+end
+
 local function onDifficultyChanged(difficulty)
     debugPrint("DifficultyChanged", difficulty)
     Movement.setMovementSpeedThresholds()
@@ -765,6 +779,14 @@ local function startListeners()
     }
     State.Session.Listeners.DialogEnded = {
         handle = Ext.Osiris.RegisterListener("DialogEnded", 2, "after", onDialogEnded),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.StatusApplied = {
+        handle = Ext.Osiris.RegisterListener("StatusApplied", 4, "after", onStatusApplied),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.StatusRemoved = {
+        handle = Ext.Osiris.RegisterListener("StatusRemoved", 4, "after", onStatusRemoved),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.DifficultyChanged = {
