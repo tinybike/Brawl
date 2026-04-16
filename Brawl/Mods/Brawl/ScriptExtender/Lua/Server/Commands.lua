@@ -204,6 +204,7 @@ local function selectNextEnemyBrawler(playerUuid, isNext)
     local nextTargetIndex = nil
     local nextTargetUuid = nil
     local closestEnemyBrawlers = State.Session.ClosestEnemyBrawlers[playerUuid]
+    if not closestEnemyBrawlers then return end
     for enemyBrawlerIndex, enemyBrawlerUuid in ipairs(closestEnemyBrawlers) do
         if State.Session.PlayerMarkedTarget[playerUuid] == enemyBrawlerUuid then
             debugPrint("found current target", State.Session.PlayerMarkedTarget[playerUuid], enemyBrawlerUuid, enemyBrawlerIndex, closestEnemyBrawlers[enemyBrawlerIndex])
@@ -335,6 +336,7 @@ local function onAttackMyTarget(data)
     end
     if State.Session.Players and State.Session.Brawlers then
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
+        if not player or not player.uuid then return end
         local level = M.Osi.GetRegion(player.uuid)
         if level and State.Session.Brawlers[level] and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             local currentTarget

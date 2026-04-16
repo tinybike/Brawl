@@ -186,6 +186,17 @@ local function endBrawl(level)
     State.Session.Brawlers[level] = {}
     State.Session.StoryActionIDs = {}
     State.Session.SwarmTurnComplete = {}
+    State.Session.ActionsInProgress = {}
+    State.Session.ExtraAttacksRemaining = {}
+    State.Session.FTBLockedIn = {}
+    State.Session.MovementQueue = {}
+    State.Session.IsAttackingOrBeingAttackedByPlayer = {}
+    -- Cancel any pending heal-request timers before zeroing (the values are timer handles)
+    for _, timerHandle in pairs(State.Session.HealRequestedTimer) do
+        Ext.Timer.Cancel(timerHandle)
+    end
+    State.Session.HealRequestedTimer = {}
+    State.Session.HealRequested = {}
     if State.Settings.TurnBasedSwarmMode then
         Swarm.cancelTimers()
     end
