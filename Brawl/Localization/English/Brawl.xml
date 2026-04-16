@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <contentList>
-    <content contentuid="h86632c48g3d29g43bbgb7e4g0fc4daa1ad80" version="1">Enable/disable Brawl without uninstalling</content>
+    <content contentuid="h86632c48g3d29g43bbgb7e4g0fc4daa1ad80" version="1">Toggle the mod on/off without uninstalling it</content>
     <content contentuid="ha00e929fg3f41g4dacg9ca0g2f26ea70ab25" version="1">Enable Mod</content>
-    <content contentuid="h610d142agadb3g4d87ga5deg186ff031831c" version="1">Enable/disable companion AI control</content>
+    <content contentuid="h610d142agadb3g4d87ga5deg186ff031831c" version="1">Toggle the companion AI on or off</content>
     <content contentuid="hae8f7216g6047g46adg839bga877ccbd6147" version="1">Enable Companion AI</content>
     <content contentuid="h47678051g6e17g4844g9740gf082019d8ab0" version="1">Hotkey for toggling the mod on/off</content>
     <content contentuid="h5de513b6g8819g43f5ga5fag90de0b66f6f2" version="1">Mod Toggle Hotkey</content>
@@ -35,7 +35,7 @@
     <content contentuid="h4bbbab16g51e8g4671g847agdf9ea4352e39" version="1">Defensive Tactics - Max Distance</content>
     <content contentuid="h0d1139c2g11b3g4bd5g9fd4g7391d94cb1b0" version="1">The companion AI will use spells only of this spell level or lower (for example, if set to 3, the AI will use spells of levels 1, 2, and 3).  If set to 0 (the default), the AI will only use cantrips and will not deplete your spell slots.</content>
     <content contentuid="hfeb61696ga4bfg4f53g8fd6g4a123be02832" version="1">Companion AI Maximum Allowed Spell Level</content>
-    <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the AI will freely use any of their spells/abilities with zero resource costs.</content>
+    <content contentuid="h82826325ge87dg4b9fga2d4g1918131934e8" version="1">If checked, the AI will go hogwild, freely using any of their spells/abilities with zero resource costs.</content>
     <content contentuid="h3a37f938gf803g45f1gb3bage75ca7adae42" version="1">Hogwild Mode</content>
     <content contentuid="h093bb5f6g0706g401fgb0dfg36dd685cf28d" version="1">Pause Toggle Hotkey</content>
     <content contentuid="heae14576gd38dg4abdgb2eagd99a9aef0374" version="1">Hotkey for pause/unpause</content>

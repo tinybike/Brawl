@@ -109,7 +109,7 @@ local function onEnteredCombat(entityGuid, combatGuid)
     debugPrint("EnteredCombat", entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid then
-        Roster.addBrawler(uuid)
+        Roster.addBrawler(uuid, true)
         if State.Session.Players and State.Session.Players[uuid] then
             if State.Session.ResurrectedPlayer[uuid] then
                 State.Session.ResurrectedPlayer[uuid] = nil

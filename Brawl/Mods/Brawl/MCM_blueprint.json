@@ -16,7 +16,7 @@
                             "Type": "checkbox",
                             "Default": true,
                             "Description": "Toggle the mod on/off without uninstalling it",
-                            "Handles": {"DescriptionHandle": "h012f6360970348a09ec00cfbae32d13a078e", "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"}
+                            "Handles": {"DescriptionHandle": "h86632c48g3d29g43bbgb7e4g0fc4daa1ad80", "NameHandle": "ha00e929fg3f41g4dacg9ca0g2f26ea70ab25"}
                         },
                         {
                             "Id": "turn_based_swarm_mode",
@@ -90,7 +90,7 @@
                             "Default": 1.0,
                             "Options": {"Min": 0.1, "Max": 10.0},
                             "Description": "Increase or decrease the health of all units (players and enemies) by this factor, e.g. a value of 3 will triple all health values.",
-                            "Handles": {"DescriptionHandle": "hc26cac3bg1de2g4808g852fga815daf697bd", "NameHandle": "hd2d7dc1ag806eg4339gb306g679658313ab2"}
+                            "Handles": {"DescriptionHandle": "h5d6a4c77g02edg4c96gacc3g8b5adda5dde7", "NameHandle": "h41ad2ed5g77dfg45c7g83f9g43fcf62e2376"}
                         }, {
                             "Id": "max_party_size",
                             "Name": "Max Party Size",
@@ -118,7 +118,7 @@
                             "Type": "checkbox",
                             "Default": true,
                             "Description": "If checked, the game will automatically pause when the character the player is controlling goes down",
-                            "Handles": {"DescriptionHandle": "h610d142agadb3g4d87ga5deg186ff031831c", "NameHandle": "hae8f7216g6047g46adg839bga877ccbd6147"}
+                            "Handles": {"DescriptionHandle": "h358f0669gbeffg4e34g9d77g3f7d1960c100", "NameHandle": "hb6bc0e94gc809g4b4fga6aegc4c961e1e51e"}
                         }, {
                             "Id": "auto_pause_on_combat_start",
                             "Name": "Automatic Pause On Combat Start",
@@ -318,7 +318,7 @@
                             "Type": "keybinding",
                             "Default": {"ScanCode": "SPACE", "Modifier": "LShift"},
                             "Description": "Hotkey for pause/unpause",
-                            "Handles": {"DescriptionHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d", "NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"}
+                            "Handles": {"DescriptionHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374", "NameHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d"}
                         }
                     ]
                 }, {
@@ -436,7 +436,7 @@
                             "Type": "enum",
                             "Default": "",
                             "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "TriggerLeft", "TriggerRight"]},
-                            "Handles": {"NameHandle": "h5de513b6g8819g43f5ga5fag90de0b66f6f2", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
+                            "Handles": {"NameHandle": "hd4810f84g0a89g4cf1ga874ga8cd18897e96", "DescriptionHandle": "h31c4820dg3873g4c88gb703g821e8061692e"}
                         }, {
                             "Id": "controller_mod_toggle_hotkey_override",
                             "Name": "Override",
@@ -666,7 +666,7 @@
                             "Type": "enum",
                             "Default": "RightStick",
                             "Options": {"Choices": ["", "A", "B", "X", "Y", "DPadLeft", "DPadRight", "DPadUp", "Back", "Start", "Touchpad", "LeftStick", "RightStick", "LeftShoulder", "RightShoulder", "TriggerLeft", "TriggerRight"]},
-                            "Handles": {"NameHandle": "heae14576gd38dg4abdgb2eagd99a9aef0374"}
+                            "Handles": {"NameHandle": "h093bb5f6g0706g401fgb0dfg36dd685cf28d"}
                         }, {
                             "Id": "controller_pause_toggle_hotkey_2",
                             "Name": "Pause Toggle Hotkey 2 (Optional)",

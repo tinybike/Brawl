@@ -628,6 +628,7 @@ return {
         companion_ai_enabled = onMCMCompanionAIEnabled,
         true_pause = onMCMTruePause,
         auto_pause_on_downed = function (v) State.Settings.AutoPauseOnDowned = v end,
+        auto_pause_on_combat_start = function (v) State.Settings.AutoPauseOnCombatStart = v end,
         action_interval = function (v) State.Settings.ActionInterval = v end,
         combat_round_duration = function (v) State.Settings.CombatRoundDuration = v end,
         hitpoints_multiplier = onMCMHitpointsMultiplier,
