@@ -917,12 +917,42 @@ local function onMCMSettingSaved(payload)
         ControllerLeaderboardToggleHotkey[1] = payload.value
     elseif payload.settingId == "controller_leaderboard_toggle_hotkey_2" then
         ControllerLeaderboardToggleHotkey[2] = payload.value
+    elseif payload.settingId == "controller_mod_toggle_hotkey_override" then
+        ControllerModToggleHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_mode_toggle_hotkey_override" then
+        ControllerModeToggleHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_companion_ai_toggle_hotkey_override" then
+        ControllerCompanionAIToggleHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_queue_companion_ai_actions_hotkey_override" then
+        ControllerQueueCompanionAIActionsHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_full_auto_toggle_hotkey_override" then
+        ControllerFullAutoToggleHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_pause_toggle_hotkey_override" then
+        ControllerPauseToggleHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_target_closer_enemy_hotkey_override" then
+        ControllerTargetCloserEnemyHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_target_farther_enemy_hotkey_override" then
+        ControllerTargetFartherEnemyHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_on_me_hotkey_override" then
+        ControllerOnMeHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_attack_my_target_hotkey_override" then
+        ControllerAttackMyTargetHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_attack_move_hotkey_override" then
+        ControllerAttackMoveHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_request_heal_hotkey_override" then
+        ControllerRequestHealHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_change_tactics_hotkey_override" then
+        ControllerChangeTacticsHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_leaderboard_toggle_hotkey_override" then
+        ControllerLeaderboardToggleHotkeyOverride = payload.value
     elseif payload.settingId:find("controller_action_") ~= nil then
         for actionButtonLabel, controllerActionButtonHotkey in ipairs(ControllerActionButtonHotkeys) do
             if payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey" then
                 controllerActionButtonHotkey[1] = payload.value
             elseif payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey_2" then
                 controllerActionButtonHotkey[2] = payload.value
+            elseif payload.settingId == "controller_action_" .. actionButtonLabel .. "_hotkey_override" then
+                ControllerActionButtonHotkeysOverride[actionButtonLabel] = payload.value
             end
         end
     else
