@@ -82,7 +82,7 @@ local function getSpellWeight(uuid, spellName, spell, distanceToTarget, hasLineO
     end
     if spellType == "Damage" then
         if spell.triggersExtraAttack and numExtraAttacks > 0 then
-            weight = numExtraAttacks*archetypeWeights.triggersExtraAttack
+            weight = weight + numExtraAttacks*archetypeWeights.triggersExtraAttack
         end
         if spell.isWeaponOrUnarmedDamage then
             weight = weight + archetypeWeights.weaponOrUnarmedDamage

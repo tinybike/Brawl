@@ -291,7 +291,7 @@ local function resetSwarmTurnComplete(swarmActors)
     State.Session.ActiveMovements = {}
     State.Session.ActionsInProgress = {}
     State.Session.SwarmTurnActive = false
-    State.SwarmActors = nil
+    State.Session.SwarmActors = nil
 end
 
 local function isChunkDone(chunkIndex)

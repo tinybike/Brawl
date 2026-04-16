@@ -223,6 +223,9 @@ local function allExitFTB()
     if selectedUuidDuringPause then
         State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
     end
+    if not combatGuid and State.Session.CombatHelper then
+        combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
+    end
     if combatGuid then
         RT.Timers.resumeCombatRoundTimer(combatGuid)
     end

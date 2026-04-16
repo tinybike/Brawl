@@ -110,19 +110,17 @@ local function removeBrawler(level, entityUuid)
             end
         end
         if brawlersInLevel[entityUuid] then
-            for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
-                local actionResources = brawlersInLevel[entityUuid].actionResources
-                if actionResources then
-                    if actionResources[resourceType] then
-                        if actionResources[resourceType].refillQueue then
-                            for _, actionResourceTimer in ipairs(actionResources[resourceType].refillQueue) do
-                                Ext.Timer.Cancel(actionResourceTimer)
-                            end
+            local actionResources = brawlersInLevel[entityUuid].actionResources
+            if actionResources then
+                for _, resourceType in ipairs(Constants.PER_TURN_ACTION_RESOURCES) do
+                    if actionResources[resourceType] and actionResources[resourceType].refillQueue then
+                        for _, actionResourceTimer in ipairs(actionResources[resourceType].refillQueue) do
+                            Ext.Timer.Cancel(actionResourceTimer)
                         end
                     end
-                    if actionResources.listener then
-                        Ext.Entity.Unsubscribe(actionResources.listener)
-                    end
+                end
+                if actionResources.listener then
+                    Ext.Entity.Unsubscribe(actionResources.listener)
                 end
             end
             RT.Timers.stopPulseAction(brawlersInLevel[entityUuid])

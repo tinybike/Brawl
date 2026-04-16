@@ -390,7 +390,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
         local directHeal, averageHealing = checkForDirectHeal(spell, hostLevel)
         local spellInfo = {
             level = spell.Level,
-            areaRadius = spell.AreaRadius,
+            areaRadius = tonumber(spell.AreaRadius) or 0,
             damageType = spell.DamageType,
             isGapCloser = spell.SpellType == "Rush",
             isSpell = spell.SpellSchool ~= "None",

@@ -323,6 +323,7 @@ end
 
 local function onDialogStarted()
     debugPrint("DialogStarted")
+    pauseCombatRoundTimers()
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         stopPulseAction(brawler)
         Utils.clearOsirisQueue(uuid)
@@ -331,6 +332,7 @@ end
 
 local function onDialogEnded()
     debugPrint("DialogEnded")
+    resumeCombatRoundTimers()
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         if not State.isPlayerControllingDirectly(uuid) then
             startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
