@@ -323,7 +323,9 @@ local function onActionButton(data, isController)
                 local target = State.Session.PlayerMarkedTarget[player.uuid]
                 if target == nil or M.Osi.IsDead(target) == 1 then
                     buildClosestEnemyBrawlers(player.uuid)
+                    target = State.Session.PlayerMarkedTarget[player.uuid]
                 end
+                if target == nil then return end
                 return Actions.useSpellOnTarget(player.uuid, target, spellName, M.Utils.isPugnacious(player.uuid, target))
             end
         end
