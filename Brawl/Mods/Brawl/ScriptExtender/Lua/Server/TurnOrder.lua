@@ -98,25 +98,23 @@ local function showTurnOrderGroups()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         for i, group in ipairs(combatEntity.TurnOrder.Groups) do
-            if group.Members and group.Initiative ~= -20 then
-                local groupStr = ""
-                groupStr = groupStr .. tostring(i) .. " " .. tostring(group.Initiative)
-                if #group.Members > 0 then
-                    for j, member in ipairs(group.Members) do
-                        if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
-                            if j > 1 then
-                                groupStr = groupStr .. " +"
-                            end
-                            groupStr = groupStr .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
-                        end
+            local groupStr = tostring(i) .. " init=" .. tostring(group.Initiative) .. " IsPlayer=" .. tostring(group.IsPlayer)
+            if group.Members and #group.Members > 0 then
+                for j, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                        groupStr = groupStr .. (j == 1 and " " or " +") .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
+                    else
+                        groupStr = groupStr .. " [nil-entity]"
                     end
                 end
-                if not group.IsPlayer then
-                    -- thank u hippo
-                    groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
-                end
-                print(groupStr)
+            else
+                groupStr = groupStr .. " [empty]"
             end
+            if not group.IsPlayer then
+                -- thank u hippo
+                groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
+            end
+            print(groupStr)
         end
     end
 end
@@ -336,6 +334,8 @@ local function setPlayerTurnsActive()
             end
         end, combatEntity)
         combatEntity:Replicate("TurnOrder")
+        -- print("********final***********")
+        -- showTurnOrderGroups()
     end
 end
 

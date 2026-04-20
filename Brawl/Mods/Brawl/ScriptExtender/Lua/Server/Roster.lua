@@ -190,6 +190,7 @@ local function endBrawl(level)
     State.Session.ExtraAttacksRemaining = {}
     State.Session.FTBLockedIn = {}
     State.Session.MovementQueue = {}
+    State.Session.PreExistingCastAtPause = {}
     State.Session.IsAttackingOrBeingAttackedByPlayer = {}
     -- Cancel any pending heal-request timers before zeroing (the values are timer handles)
     for _, timerHandle in pairs(State.Session.HealRequestedTimer) do

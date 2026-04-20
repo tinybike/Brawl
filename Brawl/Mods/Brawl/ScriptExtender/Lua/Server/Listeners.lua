@@ -225,6 +225,12 @@ local function onEnteredForceTurnBased(entityGuid)
     end
 end
 
+local function onLeftForceTurnBased(entityGuid)
+    if not State.Settings.TurnBasedSwarmMode then
+        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
+    end
+end
+
 local function onCharacterJoinedParty(character)
     debugPrint("CharacterJoinedParty", character)
     local uuid = M.Osi.GetUUID(character)
@@ -692,6 +698,10 @@ local function startListeners()
     }
     State.Session.Listeners.GainedControl = {
         handle = Ext.Osiris.RegisterListener("GainedControl", 1, "after", onGainedControl),
+        stop = Ext.Osiris.UnregisterListener,
+    }
+    State.Session.Listeners.LeftForceTurnBased = {
+        handle = Ext.Osiris.RegisterListener("LeftForceTurnBased", 1, "after", onLeftForceTurnBased),
         stop = Ext.Osiris.UnregisterListener,
     }
     State.Session.Listeners.EnteredForceTurnBased = {

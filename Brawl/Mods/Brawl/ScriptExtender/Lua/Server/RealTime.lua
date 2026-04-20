@@ -7,7 +7,6 @@ end
 
 local function stopPulseAction(brawler)
     if brawler and brawler.uuid then
-        debugPrint("Stop Pulse Action for brawler", brawler.uuid, brawler.displayName)
         if State.Session.PulseActionTimers[brawler.uuid] ~= nil then
             debugPrint("stop pulse action", brawler.displayName)
             Ext.Timer.Cancel(State.Session.PulseActionTimers[brawler.uuid])
@@ -183,10 +182,6 @@ local function initializeCombat(combatGuid)
         debugPrint("initializeCombat: enemies present, spawning combat helper")
         TurnOrder.spawnCombatHelper(combatGuid)
         TurnOrder.setPlayersSwarmGroup()
-        TurnOrder.setPartyInitiativeRollToMean()
-        TurnOrder.bumpDirectlyControlledInitiativeRolls()
-        TurnOrder.reorderByInitiativeRoll(true)
-        TurnOrder.setPlayerTurnsActive()
     end
 end
 
@@ -244,14 +239,21 @@ local function onCombatRoundStarted(combatGuid, round)
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
         Pause.allEnterFTB()
     end
+    -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
+    TurnOrder.setPartyInitiativeRollToMean()
+    TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    TurnOrder.reorderByInitiativeRoll(true)
+    TurnOrder.setPlayerTurnsActive()
 end
 
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
-    stopAllPulseActions()
+    -- Defer stopping pulse actions + endBrawls together: the game may fire CombatEnded spuriously (e.g. during NPC-vs-NPC fights).
+    -- If isInCombat is still true after the delay, the fight is ongoing and we leave pulses alone.
     Ext.Timer.WaitFor(1500, function()
         if not State.isInCombat() then
+            stopAllPulseActions()
             State.endBrawls()
         end
     end)
@@ -407,6 +409,18 @@ local function onEnteredForceTurnBased(uuid)
     end
 end
 
+local function onLeftForceTurnBased(uuid)
+    -- Clear stuck RequestedEndTurn on party members leaving FTB.  The engine can strand this flag (e.g. from an offered reaction prompt or a
+    -- nextCombatRound that raced with pause) which triggers the End Turn popup and greys the hotbar in subsequent RT combat.
+    if M.Osi.IsPartyMember(uuid, 1) == 1 then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn then
+            entity.TurnBased.RequestedEndTurn = false
+            entity:Replicate("TurnBased")
+        end
+    end
+end
+
 local function onStatusApplied(targetGuid, statusId)
     if Movement.isSpeedBoostStatus(statusId) then
         local uuid = M.Osi.GetUUID(targetGuid)
@@ -459,6 +473,7 @@ return {
         onReactionInterruptUsed = onReactionInterruptUsed,
         onServerInterruptDecision = onServerInterruptDecision,
         onEnteredForceTurnBased = onEnteredForceTurnBased,
+        onLeftForceTurnBased = onLeftForceTurnBased,
         onStatusApplied = onStatusApplied,
         onStatusRemoved = onStatusRemoved,
     },

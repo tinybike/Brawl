@@ -600,11 +600,93 @@ local function onMCMExcludeEnemyTiers(excludeEnemyTier)
     State.Session.ExcludeEnemyTierIndex = M.Utils.getTierIndex(excludeEnemyTier)
 end
 
+-- TEMP DEBUG: dump state of ALL brawlers for grey-out / stuck-enemy investigation
+local function dumpBrawlerState(uuid, label)
+    local name = M.Utils.getDisplayName(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity then
+        print("[DebugDump]", label, name, "no entity")
+        return
+    end
+    local combatGuid = M.Osi.CombatGetGuidFor(uuid) or "<nil>"
+    print("[DebugDump] === " .. label .. " " .. name .. " (" .. uuid .. ") combatGuid=" .. tostring(combatGuid) .. " ===")
+    print(string.format("[DebugDump]   IsInCombat=%s IsInFTB=%s CanAct=%s",
+        tostring(M.Osi.IsInCombat(uuid)), tostring(M.Osi.IsInForceTurnBasedMode(uuid)),
+        tostring(M.Utils.canAct(uuid))))
+    if entity.TurnBased then
+        local tb = entity.TurnBased
+        print(string.format("[DebugDump]   TurnBased: IsActive=%s ReqEnd=%s HadTurn=%s TurnDone=%s CanActInCombat=%s",
+            tostring(tb.IsActiveCombatTurn), tostring(tb.RequestedEndTurn),
+            tostring(tb.HadTurnInCombat), tostring(tb.TurnActionsCompleted),
+            tostring(tb.CanActInCombat)))
+    end
+    local castComp = entity.SpellCastIsCasting
+    if castComp then
+        local hasCast = castComp.Cast and true or false
+        local hasState = castComp.Cast and castComp.Cast.SpellCastState and true or false
+        local spell = hasState and castComp.Cast.SpellCastState.SpellId and castComp.Cast.SpellCastState.SpellId.OriginatorPrototype or "<nil>"
+        print(string.format("[DebugDump]   SpellCastIsCasting: present hasCast=%s hasState=%s spell=%s",
+            tostring(hasCast), tostring(hasState), tostring(spell)))
+    end
+    print(string.format("[DebugDump]   FTBLockedIn=%s MovementQueue=%s",
+        tostring(State.Session.FTBLockedIn[uuid]),
+        tostring(State.Session.MovementQueue[uuid] ~= nil)))
+    if entity.ServerCharacter and entity.ServerCharacter.StatusManager and entity.ServerCharacter.StatusManager.Statuses then
+        local statusIds = {}
+        for _, status in ipairs(entity.ServerCharacter.StatusManager.Statuses) do
+            if status.StatusId then table.insert(statusIds, status.StatusId) end
+        end
+        if #statusIds > 0 then
+            print("[DebugDump]   Statuses: " .. table.concat(statusIds, ", "))
+        end
+    end
+    if entity.ActionResources and entity.ActionResources.Resources then
+        local parts = {}
+        for _, rt in ipairs({"ActionPoint", "BonusActionPoint", "ReactionActionPoint", "Movement"}) do
+            local ruuid = Constants.ACTION_RESOURCES[rt]
+            local r = ruuid and entity.ActionResources.Resources[ruuid]
+            if r and r[1] then
+                table.insert(parts, rt .. "=" .. tostring(r[1].Amount) .. "/" .. tostring(r[1].MaxAmount))
+            end
+        end
+        if #parts > 0 then print("[DebugDump]   Resources: " .. table.concat(parts, " ")) end
+    end
+    local brawler = M.Roster.getBrawlerByUuid(uuid)
+    if brawler then
+        print(string.format("[DebugDump]   Brawler: isPaused=%s actionInterval=%s targetUuid=%s hasPulseTimer=%s",
+            tostring(brawler.isPaused), tostring(brawler.actionInterval),
+            tostring(brawler.targetUuid and M.Utils.getDisplayName(brawler.targetUuid) or "<nil>"),
+            tostring(State.Session.PulseActionTimers[uuid] ~= nil)))
+    end
+end
+
+local function onDebugDumpSelected(_)
+    print("[DebugDump] ======== DUMP START ========")
+    -- Dump the currently-controlled character first
+    if State.Session.Players then
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly then
+                dumpBrawlerState(uuid, "CONTROLLED")
+                break
+            end
+        end
+    end
+    -- Dump all brawlers
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if not (State.Session.Players[uuid] and State.Session.Players[uuid].isControllingDirectly) then
+            local label = State.Session.Players[uuid] and "PLAYER" or "NPC"
+            dumpBrawlerState(uuid, label)
+        end
+    end
+    print("[DebugDump] ======== DUMP END ========")
+end
+
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
     disableMod = disableMod,
     NetMessage = {
+        DebugDumpSelected = onDebugDumpSelected,
         ModToggle = onModToggle,
         ModeToggle = onModeToggle,
         CompanionAIToggle = onCompanionAIToggle,

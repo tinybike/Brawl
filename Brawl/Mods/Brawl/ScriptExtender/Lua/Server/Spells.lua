@@ -413,6 +413,7 @@ local function getSpellInfo(spellType, spellName, hostLevel)
             triggersExtraAttack = extraAttackCheck(spell),
             isDirectHeal = directHeal,
             isBonusAction = costs.BonusActionPoint ~= nil and costs.ActionPoint == nil,
+            isReaction = costs.ReactionActionPoint ~= nil,
             isSafeAoE = isSafeAoESpell(spellName),
             applyStatusOnSuccess = checkForApplyStatus(spell, "SpellSuccess"),
             applyStatus = checkForApplyStatus(spell, "SpellProperties"),

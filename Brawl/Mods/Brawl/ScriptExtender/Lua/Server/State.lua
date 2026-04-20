@@ -17,7 +17,7 @@ local Settings = {
     CompanionAIMaxSpellLevel = 0,
     HogwildMode = false,
     MaxPartySize = 4,
-    TurnBasedSwarmMode = false,
+    TurnBasedSwarmMode = true,
     LeaderboardEnabled = true,
     NoFreezeOnBonusActionsDuringPause = false,
     PlayersGoFirst = false,
@@ -74,6 +74,7 @@ local Session = {
     TranslateChangedEventListeners = {},
     SpellCastPrepareEndEventListeners = {},
     FTBLockedIn = {},
+    PreExistingCastAtPause = {},
     TurnOrderListener = {},
     BoostChangedEventListener = {},
     RefresherCombatHelper = {},
@@ -196,8 +197,13 @@ end
 
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
-    for brawlerUuid, brawler in pairs(Session.Brawlers[level]) do
-        if M.Osi.IsEnemy(M.Osi.GetHostCharacter(), brawlerUuid) == 1 and M.Osi.IsInCombat(brawlerUuid) == 1 then
+    for brawlerUuid, _ in pairs(Session.Brawlers[level]) do
+        -- Count any non-party brawler still in combat as "enemy remaining".
+        -- Using IsEnemy(host, uuid) would falsely end the brawl during
+        -- NPC-vs-NPC fights where surviving combatants aren't host-hostile.
+        if not Session.Players[brawlerUuid]
+                and not M.Utils.isCombatHelper(brawlerUuid)
+                and M.Osi.IsInCombat(brawlerUuid) == 1 then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end
@@ -397,9 +403,8 @@ local function uncapMovementDistances()
 end
 
 local function setupPartyMembersHitpoints()
-    for _, partyMember in ipairs(Osi.DB_PartyMembers:Get(nil)) do
-        local partyMemberUuid = M.Osi.GetUUID(partyMember[1])
-        if partyMemberUuid and Ext.Entity.Get(partyMemberUuid) then
+    for partyMemberUuid, _ in pairs(Session.Players) do
+        if Ext.Entity.Get(partyMemberUuid) then
             revertHitpoints(partyMemberUuid)
             modifyHitpoints(partyMemberUuid)
             if Session.PartyMembersHitpointsListeners[partyMemberUuid] ~= nil then
