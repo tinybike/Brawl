@@ -68,7 +68,9 @@ local function allEnterFTB()
     -- can move around freely and the game's native FTB handles everything.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
-            Osi.ForceTurnBasedMode(uuid, 1)
+            if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+                Osi.ForceTurnBasedMode(uuid, 1)
+            end
         end
         return
     end
@@ -106,34 +108,35 @@ local function allEnterFTB()
             end
         end
     end
-    -- Put all party members into FTB
+    -- Put all party members into FTB; skip dead/downed.
     local pauseEntryExpiry = Ext.Utils.MonotonicTime() + 2000
     for uuid, _ in pairs(State.Session.Players) do
-        if narrativeCombatLabel then
-            Osi.PROC_GLO_NarrativeCombat_LeaveCombat(narrativeCombatLabel, uuid)
-        end
-        Osi.SetCanJoinCombat(uuid, 0)
-        Osi.ForceTurnBasedMode(uuid, 1)
-        -- Proactively unlock so stale IsActiveCombatTurn=false from a prior midActionLock doesn't leave the character greyed-out on re-pause.
-        local entity = Ext.Entity.Get(uuid)
-        unlock(entity)
-        -- Clear RequestedEndTurn: nextCombatRound sets it true on all party members at round-end (and onCombatRoundStarted clears it at the
-        -- next round).  If pause lands in that window, the TurnBased listener will read it true -> flag all as FTB-ready -> engine shows End Turn
-        -- popup / greys out players.
-        if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn then
-            entity.TurnBased.RequestedEndTurn = false
-            entity:Replicate("TurnBased")
-        end
-        -- Clear any pending REACTION status: when pause interrupts a reaction-trigger event (e.g. ally takes a hit and offers a
-        -- Shield reaction), the engine's reaction-prompt state gets stuck and greys out the character's hotbar.
-        Osi.RemoveStatus(uuid, "REACTION")
-        -- If an attack/spell was already in-flight when pause hit, the engine still fires SpellCastPrepareEndEvent during FTB.  Mark
-        -- the character so midActionLock skips that first event (otherwise the in-flight cast greys them out).
-        if entity and entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast then
+        if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+            if narrativeCombatLabel then
+                Osi.PROC_GLO_NarrativeCombat_LeaveCombat(narrativeCombatLabel, uuid)
+            end
+            Osi.SetCanJoinCombat(uuid, 0)
+            Osi.ForceTurnBasedMode(uuid, 1)
+            -- Proactively unlock so stale IsActiveCombatTurn=false from a prior midActionLock doesn't leave the character greyed-out on re-pause.
+            local entity = Ext.Entity.Get(uuid)
+            unlock(entity)
+            -- Clear RequestedEndTurn: nextCombatRound sets it true on all party members at round-end (and onCombatRoundStarted clears it at the
+            -- next round).  If pause lands in that window, the TurnBased listener will read it true -> flag all as FTB-ready -> engine shows End Turn
+            -- popup / greys out players.
+            if entity and entity.TurnBased and entity.TurnBased.RequestedEndTurn then
+                entity.TurnBased.RequestedEndTurn = false
+                entity:Replicate("TurnBased")
+            end
+            -- Clear any pending REACTION status: when pause interrupts a reaction-trigger event (e.g. ally takes a hit and offers a
+            -- Shield reaction), the engine's reaction-prompt state gets stuck and greys out the character's hotbar.
+            Osi.RemoveStatus(uuid, "REACTION")
+            -- Flag every party member for the 2s skip window, not just those where SpellCastIsCasting.Cast is already present: some casts
+            -- haven't materialized into Cast yet at pause entry (pre-prepare phase), but still fire SpellCastPrepareEndEvent during FTB and
+            -- lock the character. Also covers reactions (e.g. Divine Allegiance) that the engine auto-fires post-pause.
             State.Session.PreExistingCastAtPause[uuid] = pauseEntryExpiry
-        end
-        if State.Settings.TruePause then
-            Pause.startTruePause(uuid)
+            if State.Settings.TruePause then
+                Pause.startTruePause(uuid)
+            end
         end
     end
     -- Select the character the player was controlling before pause
@@ -153,7 +156,9 @@ local function allExitFTB()
     -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
-            Osi.ForceTurnBasedMode(uuid, 0)
+            if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+                Osi.ForceTurnBasedMode(uuid, 0)
+            end
         end
         return
     end
@@ -197,32 +202,34 @@ local function allExitFTB()
             RT.Timers.startPulseAction(brawler, 0)
         end
     end
-    -- Unpause all party members
+    -- Unpause all party members (skip dead/downed — they never entered FTB via allEnterFTB)
     for uuid, _ in pairs(State.Session.Players) do
-        unlock(Ext.Entity.Get(uuid))
-        Osi.ForceTurnBasedMode(uuid, 0)
-        Osi.SetCanJoinCombat(uuid, 1)
-        stopTruePause(uuid)
-        if narrativeCombatLabel then
-            Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
-        end
-        local entity = Ext.Entity.Get(uuid)
-        if entity and entity.TurnBased then
-            entity.TurnBased.IsActiveCombatTurn = true
-            entity.TurnBased.HadTurnInCombat = false
-            entity.TurnBased.RequestedEndTurn = false
-            entity.TurnBased.TurnActionsCompleted = false
-            entity:Replicate("TurnBased")
-        end
-        local brawler = Roster.getBrawlerByUuid(uuid)
-        if brawler then
-            brawler.isPaused = false
-            Resources.resumeActionResourcesRefillTimers(brawler)
-            if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-                if not hasQueuedMovement[uuid] then
-                    RT.Timers.startPulseAction(brawler, 0)
-                else
-                    debugPrint(M.Utils.getDisplayName(uuid), "delaying pulse action for queued movement")
+        if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
+            unlock(Ext.Entity.Get(uuid))
+            Osi.ForceTurnBasedMode(uuid, 0)
+            Osi.SetCanJoinCombat(uuid, 1)
+            stopTruePause(uuid)
+            if narrativeCombatLabel then
+                Osi.PROC_GLO_NarrativeCombat_JoinCombat(narrativeCombatLabel, uuid)
+            end
+            local entity = Ext.Entity.Get(uuid)
+            if entity and entity.TurnBased then
+                entity.TurnBased.IsActiveCombatTurn = true
+                entity.TurnBased.HadTurnInCombat = false
+                entity.TurnBased.RequestedEndTurn = false
+                entity.TurnBased.TurnActionsCompleted = false
+                entity:Replicate("TurnBased")
+            end
+            local brawler = Roster.getBrawlerByUuid(uuid)
+            if brawler then
+                brawler.isPaused = false
+                Resources.resumeActionResourcesRefillTimers(brawler)
+                if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
+                    if not hasQueuedMovement[uuid] then
+                        RT.Timers.startPulseAction(brawler, 0)
+                    else
+                        debugPrint(M.Utils.getDisplayName(uuid), "delaying pulse action for queued movement")
+                    end
                 end
             end
         end
@@ -367,8 +374,30 @@ local function startSpellCastPrepareEndEventListener(entityUuid)
                 if isInFTB(caster) and isActionFinalized(caster) and not isLocked(caster) then
                     local spellName = cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype
                     local spell = spellName and M.Spells.getSpellByName(spellName)
+                    -- Fallback reaction detection: some reaction spells (e.g.
+                    -- Target_DivineAllegiance) have empty UseCosts so our
+                    -- isReaction flag is false for them. The engine applies
+                    -- the REACTION status to the caster while the reaction is
+                    -- resolving; treat that as a reaction cast and skip lock.
+                    local hasReactionStatus = false
+                    if caster.ServerCharacter and caster.ServerCharacter.StatusManager
+                            and caster.ServerCharacter.StatusManager.Statuses then
+                        for _, status in ipairs(caster.ServerCharacter.StatusManager.Statuses) do
+                            if status.StatusId == "REACTION" then
+                                hasReactionStatus = true
+                                break
+                            end
+                        end
+                    end
+                    print(string.format("[ReactionCheck] uuid=%s spell=%s inTable=%s isReaction=%s isBonusAction=%s hasReactionStatus=%s",
+                        tostring(entityUuid), tostring(spellName),
+                        tostring(spell ~= nil),
+                        tostring(spell and spell.isReaction),
+                        tostring(spell and spell.isBonusAction),
+                        tostring(hasReactionStatus)))
                     -- Reactions (e.g. Divine Allegiance, Shield) can be engine-fired automatically; locking can strand the character greyed-out mid-reaction.
-                    if spell and spell.isReaction then
+                    if (spell and spell.isReaction) or hasReactionStatus then
+                        print("[ReactionCheck]   -> skipping midActionLock")
                         return
                     end
                     if State.Settings.NoFreezeOnBonusActionsDuringPause and spell and spell.isBonusAction and M.Osi.IsPartyMember(entityUuid, 1) == 1 then

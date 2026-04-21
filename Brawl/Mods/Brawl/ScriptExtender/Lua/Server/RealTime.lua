@@ -124,11 +124,16 @@ end
 
 -- NB: is the wrapping timer getting paused correctly during pause?
 local function nextCombatRound()
-    debugPrint("nextCombatRound")
+    print("[SwitchTrace] nextCombatRound fired at " .. tostring(Ext.Utils.MonotonicTime()))
     State.Session.IsNextCombatRoundQueued = false
     if State.areAnyPlayersTargeting() then
         State.Session.IsNextCombatRoundQueued = true
     elseif not Pause.isPartyInFTB() then
+        -- Snapshot the currently-controlled character before the round turnover
+        -- mutations. The engine briefly deselects and rapidly cycles
+        -- onGainedControl events through other characters during the transition;
+        -- after a short delay, restore control to the snapshotted uuid.
+        local intendedControlled = State.Session.LastControlledUuid
         Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
             local entity = Ext.Entity.Get(uuid)
@@ -138,6 +143,7 @@ local function nextCombatRound()
                     entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = true
                 else
+                    entity.TurnBased.HadTurnInCombat = false
                     entity.TurnBased.RequestedEndTurn = true
                     if Utils.canAct(uuid) then
                         entity.TurnBased.IsActiveCombatTurn = true
@@ -145,6 +151,25 @@ local function nextCombatRound()
                 end
                 entity:Replicate("TurnBased")
             end
+        end
+        if intendedControlled then
+            Ext.Timer.WaitFor(500, function()
+                local currentControlled
+                if State.Session.Players then
+                    for uuid, player in pairs(State.Session.Players) do
+                        if player.isControllingDirectly then
+                            currentControlled = uuid
+                            break
+                        end
+                    end
+                end
+                if currentControlled and currentControlled ~= intendedControlled then
+                    print(string.format("[SwitchRedirect] round turnover drifted %s -> %s, restoring",
+                        tostring(M.Utils.getDisplayName(currentControlled)),
+                        tostring(M.Utils.getDisplayName(intendedControlled))))
+                    Ext.ServerNet.BroadcastMessage("SelectCharacter", intendedControlled)
+                end
+            end)
         end
     end
 end
@@ -200,9 +225,14 @@ local function onCombatStarted(combatGuid)
             initializeCombat(combatGuid)
         end
     end
+    -- TEMP: deterministic dump for control-switch investigation.
+    Commands.dumpFullState("onCombatStarted " .. tostring(combatGuid))
 end
 
 local function onCombatRoundStarted(combatGuid, round)
+    -- TEMP: dump BEFORE our setPlayerTurnsActive re-runs, to see what the
+    -- engine produced at round advance vs what we re-mangle into.
+    Commands.dumpFullState("onCombatRoundStarted round=" .. tostring(round) .. " PRE")
     if Pause.isPartyInFTB() then
         print("party is in FTB, pausing underlying combat", combatGuid, round)
         return Osi.PauseCombat(combatGuid)
@@ -232,6 +262,9 @@ local function onCombatRoundStarted(combatGuid, round)
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased then
             entity.TurnBased.RequestedEndTurn = false
+            -- Same rationale as in nextCombatRound: clear HadTurn so the
+            -- engine doesn't skip the controlled character's Groups entries.
+            entity.TurnBased.HadTurnInCombat = false
             entity:Replicate("TurnBased")
         end
     end
@@ -244,6 +277,7 @@ local function onCombatRoundStarted(combatGuid, round)
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
+    Commands.dumpFullState("onCombatRoundStarted round=" .. tostring(round) .. " POST")
 end
 
 local function onCombatEnded(combatGuid)
@@ -281,6 +315,42 @@ end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
+    -- TEMP: log control-switch for unwanted-switch investigation.
+    do
+        local now = Ext.Utils.MonotonicTime()
+        local prevUuid
+        if State.Session.Players then
+            for u, p in pairs(State.Session.Players) do
+                if p.isControllingDirectly and u ~= uuid then
+                    prevUuid = u
+                    break
+                end
+            end
+        end
+        local newName = M.Utils.getDisplayName(uuid)
+        local prevName = prevUuid and M.Utils.getDisplayName(prevUuid) or "<nil>"
+        print(string.format("[SwitchTrace] onGainedControl at %s: %s -> %s",
+            tostring(now), tostring(prevName), tostring(newName)))
+        if State.Session.Players then
+            for playerUuid, _ in pairs(State.Session.Players) do
+                local entity = Ext.Entity.Get(playerUuid)
+                if entity and entity.TurnBased then
+                    local tb = entity.TurnBased
+                    local castSpell
+                    if entity.SpellCastIsCasting and entity.SpellCastIsCasting.Cast
+                            and entity.SpellCastIsCasting.Cast.SpellCastState
+                            and entity.SpellCastIsCasting.Cast.SpellCastState.SpellId then
+                        castSpell = entity.SpellCastIsCasting.Cast.SpellCastState.SpellId.OriginatorPrototype
+                    end
+                    print(string.format("[SwitchTrace]   %s: IsActive=%s ReqEnd=%s HadTurn=%s TurnDone=%s cast=%s",
+                        M.Utils.getDisplayName(playerUuid),
+                        tostring(tb.IsActiveCombatTurn), tostring(tb.RequestedEndTurn),
+                        tostring(tb.HadTurnInCombat), tostring(tb.TurnActionsCompleted),
+                        tostring(castSpell or "<nil>")))
+                end
+            end
+        end
+    end
     if not State.Settings.FullAuto then
         stopPulseAction(Roster.getBrawlerByUuid(uuid))
     end

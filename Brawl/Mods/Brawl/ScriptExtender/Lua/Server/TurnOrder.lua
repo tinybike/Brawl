@@ -94,27 +94,40 @@ local function showAllInitiativeRolls()
     end
 end
 
+local function formatGroupStr(i, group)
+    local groupStr = tostring(i) .. " init=" .. tostring(group.Initiative) .. " IsPlayer=" .. tostring(group.IsPlayer)
+    if group.Members and #group.Members > 0 then
+        for j, member in ipairs(group.Members) do
+            if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
+                groupStr = groupStr .. (j == 1 and " " or " +") .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
+            else
+                groupStr = groupStr .. " [nil-entity]"
+            end
+        end
+    else
+        groupStr = groupStr .. " [empty]"
+    end
+    if not group.IsPlayer then
+        -- thank u hippo
+        groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
+    end
+    return groupStr
+end
+
 local function showTurnOrderGroups()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
         for i, group in ipairs(combatEntity.TurnOrder.Groups) do
-            local groupStr = tostring(i) .. " init=" .. tostring(group.Initiative) .. " IsPlayer=" .. tostring(group.IsPlayer)
-            if group.Members and #group.Members > 0 then
-                for j, member in ipairs(group.Members) do
-                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
-                        groupStr = groupStr .. (j == 1 and " " or " +") .. " " .. M.Utils.getDisplayName(member.Entity.Uuid.EntityUuid)
-                    else
-                        groupStr = groupStr .. " [nil-entity]"
-                    end
-                end
-            else
-                groupStr = groupStr .. " [empty]"
-            end
-            if not group.IsPlayer then
-                -- thank u hippo
-                groupStr = string.format("\x1b[38;2;%d;%d;%dm%s\x1b[0m", 110, 150, 90, groupStr)
-            end
-            print(groupStr)
+            print(formatGroupStr(i, group))
+        end
+    end
+end
+
+local function showTurnOrderGroups2()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups2 then
+        for i, group in ipairs(combatEntity.TurnOrder.Groups2) do
+            print(formatGroupStr(i, group))
         end
     end
 end
@@ -293,50 +306,98 @@ local function setTurnActive(uuid)
     end
 end
 
--- NB: this makes an absolute mess of combatEntity.TurnOrder.Groups, but it seems to work as intended
+-- Rebuild TurnOrder.Groups from Session.Players (controlled first). The
+-- controlled character gets many single-member group copies at the front;
+-- this mangling is what keeps the engine's turn cycle locked on players
+-- ("persistent active turns") and stops control from drifting. Existing
+-- enemy groups are preserved verbatim after the player block. After the
+-- Replicate, a refresher combat helper is spawned so the topbar re-sorts.
 local function setPlayerTurnsActive()
     local combatEntity = Utils.getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
-        -- print("********init***********")
-        -- showTurnOrderGroups()
-        local groupsPlayers = {}
-        local groupsEnemies = {}
-        for _, group in ipairs(combatEntity.TurnOrder.Groups) do
-            if group.IsPlayer then
-                reorderPlayersByControl(groupsPlayers, group, true)
-                reorderPlayersByControl(groupsPlayers, group, false)
-            else
-                table.insert(groupsEnemies, group)
-            end
-        end
-        local numPlayerGroups = #groupsPlayers
-        for i = 1, numPlayerGroups do
-            combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
-        end
-        for i = 1, #groupsEnemies do
-            combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
-        end
-        local uuid = combatEntity.CombatState.MyGuid
-        if State.Session.TurnOrderListener[uuid] then
-            Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
-            State.Session.TurnOrderListener[uuid] = nil
-        end
-        State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
-            if entity and entity.CombatState and entity.CombatState.MyGuid then
-                Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
-                local refresher = spawnCombatHelper(uuid, true)
-                if refresher then
-                    if not State.Session.RefresherCombatHelper[uuid] then
-                        State.Session.RefresherCombatHelper[uuid] = {}
-                    end
-                    table.insert(State.Session.RefresherCombatHelper[uuid], refresher)
-                end
-            end
-        end, combatEntity)
-        combatEntity:Replicate("TurnOrder")
-        -- print("********final***********")
-        -- showTurnOrderGroups()
+    if not (combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups) then
+        return
     end
+    local round, team
+    local groupsEnemies = {}
+    for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+        if group.IsPlayer then
+            if not round then
+                round = group.Round
+                team = group.Team
+            end
+        else
+            table.insert(groupsEnemies, group)
+        end
+    end
+    local controlledUuid
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            controlledUuid = uuid
+            break
+        end
+    end
+    -- Fallback: at round turnover the engine transiently deselects the
+    -- controlled character (ClientControl component removed), so no player
+    -- has isControllingDirectly=true when we run. Use the cached last-known
+    -- controlled uuid so the 10-copy mangling still targets the right char.
+    if not controlledUuid and State.Session.LastControlledUuid
+            and State.Session.Players[State.Session.LastControlledUuid] then
+        controlledUuid = State.Session.LastControlledUuid
+    end
+    local otherUuids = {}
+    for uuid, _ in pairs(State.Session.Players) do
+        if uuid ~= controlledUuid then
+            table.insert(otherUuids, uuid)
+        end
+    end
+    local CONTROLLED_COPIES = 10
+    local groupsPlayers = {}
+    local function addGroup(uuid)
+        local entity = Ext.Entity.Get(uuid)
+        if entity then
+            local initiative = getInitiativeRoll(uuid)
+            table.insert(groupsPlayers, {
+                Initiative = initiative,
+                IsPlayer = true,
+                Round = round,
+                Team = team,
+                Members = {{Entity = entity, Initiative = initiative}},
+            })
+        end
+    end
+    if controlledUuid then
+        for _ = 1, CONTROLLED_COPIES do
+            addGroup(controlledUuid)
+        end
+    end
+    for _, uuid in ipairs(otherUuids) do
+        addGroup(uuid)
+    end
+    local numPlayerGroups = #groupsPlayers
+    for i = 1, numPlayerGroups do
+        combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
+    end
+    for i = 1, #groupsEnemies do
+        combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
+    end
+    local uuid = combatEntity.CombatState.MyGuid
+    if State.Session.TurnOrderListener[uuid] then
+        Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
+        State.Session.TurnOrderListener[uuid] = nil
+    end
+    State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
+        if entity and entity.CombatState and entity.CombatState.MyGuid then
+            Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
+            local refresher = spawnCombatHelper(uuid, true)
+            if refresher then
+                if not State.Session.RefresherCombatHelper[uuid] then
+                    State.Session.RefresherCombatHelper[uuid] = {}
+                end
+                table.insert(State.Session.RefresherCombatHelper[uuid], refresher)
+            end
+        end
+    end, combatEntity)
+    combatEntity:Replicate("TurnOrder")
 end
 
 return {
@@ -348,6 +409,7 @@ return {
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,
     showTurnOrderGroups = showTurnOrderGroups,
+    showTurnOrderGroups2 = showTurnOrderGroups2,
     getCurrentCombatRound = getCurrentCombatRound,
     spawnCombatHelper = spawnCombatHelper,
     reorderByInitiativeRoll = reorderByInitiativeRoll,

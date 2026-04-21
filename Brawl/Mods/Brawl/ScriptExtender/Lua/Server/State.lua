@@ -507,6 +507,12 @@ local function setIsControllingDirectly()
         end
         for _, entity in ipairs(entities) do
             Session.Players[entity.Uuid.EntityUuid].isControllingDirectly = true
+            -- Cache as fallback for setPlayerTurnsActive: at round turnover
+            -- the engine briefly deselects the controlled character, which
+            -- leaves isControllingDirectly=false for everyone when
+            -- setPlayerTurnsActive runs. The fallback lets us still produce
+            -- the 10-copy block for the right character.
+            Session.LastControlledUuid = entity.Uuid.EntityUuid
         end
     end
 end
