@@ -12,6 +12,45 @@ local function cleanupAll()
     Spells.resetSpellData()
 end
 
+-- Probe: log every ClientControl create/destroy.  The engine adds the ClientControl component to whichever entity should be controlled by the client.
+local function onProbeClientControlCreated(entity, _, _)
+    local uuid = "<no-uuid>"
+    if entity and entity.Uuid then uuid = entity.Uuid.EntityUuid end
+    print(string.format("[Probe T=%s] ClientControl OnCreateDeferred entity=%s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(uuid) or uuid)))
+end
+
+local function onProbeClientControlDestroyed(entity, _, _)
+    local uuid = "<no-uuid>"
+    if entity and entity.Uuid then uuid = entity.Uuid.EntityUuid end
+    print(string.format("[Probe T=%s] ClientControl OnDestroy entity=%s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(uuid) or uuid)))
+end
+
+local function onProbeUserReservedForCreated(entity, _, _)
+    local uuid = "<no-uuid>"
+    if entity and entity.Uuid then uuid = entity.Uuid.EntityUuid end
+    local userId = "<nil>"
+    if entity and entity.UserReservedFor then userId = tostring(entity.UserReservedFor.UserID) end
+    print(string.format("[Probe T=%s] UserReservedFor OnCreateDeferred entity=%s user=%s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(uuid) or uuid),
+        userId))
+end
+
+local function onProbeUserReservedForDestroyed(entity, _, _)
+    local uuid = "<no-uuid>"
+    if entity and entity.Uuid then uuid = entity.Uuid.EntityUuid end
+    local userId = "<nil>"
+    if entity and entity.UserReservedFor then userId = tostring(entity.UserReservedFor.UserID) end
+    print(string.format("[Probe T=%s] UserReservedFor OnDestroy entity=%s lastUser=%s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(uuid) or uuid),
+        userId))
+end
+
 local function onGameStateChanged(e)
     if e and e.ToState == "UnloadLevel" then
         cleanupAll()
@@ -68,10 +107,22 @@ local function onResetCompleted()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
--- New user joined (multiplayer)
+-- New user joined (multiplayer).  Also fires whenever UserReservedFor changes on any entity, including engine-driven reassignments at FTB entry.
 local function onUserReservedFor(entity, _, _)
+    local entityUuid = "<no-uuid>"
+    if entity and entity.Uuid then entityUuid = entity.Uuid.EntityUuid end
+    local newUserId = "<nil>"
+    if entity and entity.UserReservedFor then newUserId = tostring(entity.UserReservedFor.UserID) end
+    local prevUserId = "<nil>"
+    if State.Session.Players and State.Session.Players[entityUuid] then
+        prevUserId = tostring(State.Session.Players[entityUuid].userId or "<nil>")
+    end
+    print(string.format("[Probe T=%s] UserReservedFor change %s: prev=%s new=%s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(entityUuid) or entityUuid),
+        prevUserId,
+        newUserId))
     State.setIsControllingDirectly()
-    local entityUuid = entity.Uuid.EntityUuid
     if State.Session.Players and State.Session.Players[entityUuid] then
         State.Session.Players[entityUuid].userId = entity.UserReservedFor.UserID
     end
@@ -178,6 +229,10 @@ end
 local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
+    print(string.format("[Probe T=%s] Osiris GainedControl targetGuid=%s -> %s",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(targetGuid),
+        tostring(targetUuid and M.Utils.getDisplayName(targetUuid) or "<nil>")))
     if targetUuid ~= nil then
         if targetUuid == Osi.GetHostCharacter() then
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
@@ -203,6 +258,9 @@ local function onGainedControl(targetGuid)
         end
         if State.Session.Players[targetUuid] then
             local targetUserId = Osi.GetReservedUserID(targetUuid)
+            print(string.format("[Probe T=%s] Listeners.onGainedControl targetUserId=%s",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(targetUserId)))
             if targetUserId then
                 State.Session.Players[targetUuid].isControllingDirectly = true
                 for playerUuid, player in pairs(State.Session.Players) do
@@ -214,6 +272,8 @@ local function onGainedControl(targetGuid)
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
             end
+            print(string.format("[Probe T=%s] Listeners.onGainedControl PostMessageToUser GainedControl",
+                tostring(Ext.Utils.MonotonicTime())))
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
@@ -496,6 +556,17 @@ local function onSpellCastFinishedEvent(cast, _, _)
         local casterUuid = cast.SpellCastState.Caster.Uuid.EntityUuid
         local requestUuid = cast.SpellCastState.SpellCastGuid
         local storyActionId = cast.ServerSpellCastState.StoryActionId
+        if State.Session.Players and State.Session.Players[casterUuid] then
+            local spellId = "<unknown>"
+            if cast.SpellCastState.SpellId and cast.SpellCastState.SpellId.OriginatorPrototype then
+                spellId = cast.SpellCastState.SpellId.OriginatorPrototype
+            end
+            print(string.format("[Probe T=%s] SpellCastFinishedEvent player=%s spell=%s outcome=%s",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(M.Utils.getDisplayName(casterUuid)),
+                tostring(spellId),
+                tostring(cast.SpellCastOutcome and cast.SpellCastOutcome.Result or "<nil>")))
+        end
         local actionInProgress = Actions.getActionInProgress(casterUuid, requestUuid)
         if actionInProgress then
             debugPrint("SpellCastFinishedEvent", M.Utils.getDisplayName(casterUuid), cast.SpellCastOutcome.Result)
@@ -738,6 +809,22 @@ local function startListeners()
     }
     State.Session.Listeners.DestroySpellSyncTargeting = {
         handle = Ext.Entity.OnDestroy("SpellSyncTargeting", onDestroySpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ProbeClientControlCreated = {
+        handle = Ext.Entity.OnCreateDeferred("ClientControl", onProbeClientControlCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ProbeClientControlDestroyed = {
+        handle = Ext.Entity.OnDestroy("ClientControl", onProbeClientControlDestroyed),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ProbeUserReservedForCreated = {
+        handle = Ext.Entity.OnCreateDeferred("UserReservedFor", onProbeUserReservedForCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ProbeUserReservedForDestroyed = {
+        handle = Ext.Entity.OnDestroy("UserReservedFor", onProbeUserReservedForDestroyed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UsingSpellOnTarget = {

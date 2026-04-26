@@ -26,6 +26,21 @@ local function calculateMeanInitiativeRoll()
     return math.floor(totalInitiativeRoll/numInitiativeRolls + 0.5)
 end
 
+-- Highest InitiativeRoll among non-player, non-helper combat participants.
+-- Used to keep party initiative just-above-enemy without arbitrary inflation.
+local function calculateMaxEnemyInitiativeRoll()
+    local maxRoll
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if not State.Session.Players[uuid] and not M.Utils.isCombatHelper(uuid) then
+            local roll = getInitiativeRoll(uuid)
+            if roll and (not maxRoll or roll > maxRoll) then
+                maxRoll = roll
+            end
+        end
+    end
+    return maxRoll
+end
+
 local function calculateActionInterval(initiative)
     if not initiative then
         return math.floor(1000*State.Settings.ActionInterval + 0.5)
@@ -38,6 +53,11 @@ end
 local function setInitiativeRoll(uuid, roll)
     local entity = Ext.Entity.Get(uuid)
     if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
+        local oldRoll = entity.CombatParticipant.InitiativeRoll
+        print(string.format("[Probe T=%s] setInitiativeRoll %s: %s -> %s",
+            tostring(Ext.Utils.MonotonicTime()),
+            tostring(M.Utils.getDisplayName(uuid)),
+            tostring(oldRoll), tostring(roll)))
         entity.CombatParticipant.InitiativeRoll = roll
         if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
             entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
@@ -47,16 +67,18 @@ local function setInitiativeRoll(uuid, roll)
     end
 end
 
+-- Compute the mean initiative once per combat (the first time it's called
+-- with no cached value) and store it. Subsequent calls are no-ops, so the
+-- value can be used as a stable baseline for offset-based bumping without
+-- the recursive inflation we'd see by recomputing each round.
 local function setPartyInitiativeRollToMean()
+    if State.Session.MeanInitiativeRoll then
+        return
+    end
     debugPrint("setting party init roll to mean...")
     local mean = calculateMeanInitiativeRoll()
     if mean then
         State.Session.MeanInitiativeRoll = mean
-        for uuid, _ in pairs(State.Session.Players) do
-            if Utils.isAliveAndCanFight(uuid) then
-                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
-            end
-        end
     end
 end
 
@@ -212,17 +234,39 @@ local function reorderByInitiativeRoll(doNotReplicate)
     end
 end
 
-local function bumpDirectlyControlledInitiativeRolls()
-    debugPrint("bumpDirectlyControlledInitiativeRolls")
-    if State.Session.MeanInitiativeRoll then
-        for uuid, player in pairs(State.Session.Players) do
-            if player.isControllingDirectly then
-                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll + 1)
-            else
-                setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
-            end
+-- Bump party initiative just above the highest enemy roll.  We set unconditionally every time (no max-with-current) so that when control
+-- moves between party members, the previously-controlled char drops from target+1 back down to target.
+local function bumpInitiativeRollsCore(intendedUuid)
+    local maxEnemy = calculateMaxEnemyInitiativeRoll()
+    if not maxEnemy then
+        return
+    end
+    local target = maxEnemy + 1
+    for uuid, _ in pairs(State.Session.Players) do
+        if uuid == intendedUuid then
+            setInitiativeRoll(uuid, target + 1)
+        else
+            setInitiativeRoll(uuid, target)
         end
     end
+end
+
+local function bumpDirectlyControlledInitiativeRolls()
+    debugPrint("bumpDirectlyControlledInitiativeRolls")
+    local controlledUuid
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            controlledUuid = uuid
+            break
+        end
+    end
+    bumpInitiativeRollsCore(controlledUuid)
+end
+
+-- Same as bumpDirectlyControlledInitiativeRolls, but uses an explicit uuid instead of reading isControllingDirectly.  Use this when we know the
+-- intended controlled char (e.g. pre-emptively at FTB entry) but the engine hasn't yet fired GainedControl to flip our state flags.
+local function bumpInitiativeRollsFor(intendedUuid)
+    bumpInitiativeRollsCore(intendedUuid)
 end
 
 -- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
@@ -306,12 +350,9 @@ local function setTurnActive(uuid)
     end
 end
 
--- Rebuild TurnOrder.Groups from Session.Players (controlled first). The
--- controlled character gets many single-member group copies at the front;
--- this mangling is what keeps the engine's turn cycle locked on players
--- ("persistent active turns") and stops control from drifting. Existing
--- enemy groups are preserved verbatim after the player block. After the
--- Replicate, a refresher combat helper is spawned so the topbar re-sorts.
+-- Rebuild TurnOrder.Groups from Session.Players (controlled first), splitting the consolidated party group into single-member groups so the controlled
+-- character occupies the first slot. Existing enemy groups are preserved verbatim after the player block.  After the Replicate, a refresher combat
+-- helper is spawned so the topbar re-sorts.
 local function setPlayerTurnsActive()
     local combatEntity = Utils.getCombatEntity()
     if not (combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups) then
@@ -336,10 +377,8 @@ local function setPlayerTurnsActive()
             break
         end
     end
-    -- Fallback: at round turnover the engine transiently deselects the
-    -- controlled character (ClientControl component removed), so no player
-    -- has isControllingDirectly=true when we run. Use the cached last-known
-    -- controlled uuid so the 10-copy mangling still targets the right char.
+    -- Fallback: at round turnover the engine transiently deselects the controlled character (ClientControl component removed), so no player
+    -- has isControllingDirectly=true when we run. Use the cached last-known controlled uuid so the player ordering still puts the right char first.
     if not controlledUuid and State.Session.LastControlledUuid
             and State.Session.Players[State.Session.LastControlledUuid] then
         controlledUuid = State.Session.LastControlledUuid
@@ -350,7 +389,6 @@ local function setPlayerTurnsActive()
             table.insert(otherUuids, uuid)
         end
     end
-    local CONTROLLED_COPIES = 10
     local groupsPlayers = {}
     local function addGroup(uuid)
         local entity = Ext.Entity.Get(uuid)
@@ -366,9 +404,7 @@ local function setPlayerTurnsActive()
         end
     end
     if controlledUuid then
-        for _ = 1, CONTROLLED_COPIES do
-            addGroup(controlledUuid)
-        end
+        addGroup(controlledUuid)
     end
     for _, uuid in ipairs(otherUuids) do
         addGroup(uuid)
@@ -387,6 +423,8 @@ local function setPlayerTurnsActive()
     end
     State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
         if entity and entity.CombatState and entity.CombatState.MyGuid then
+            print(string.format("[Probe T=%s] setPlayerTurnsActive listener fired, spawning refresher",
+                tostring(Ext.Utils.MonotonicTime())))
             Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
             local refresher = spawnCombatHelper(uuid, true)
             if refresher then
@@ -397,6 +435,10 @@ local function setPlayerTurnsActive()
             end
         end
     end, combatEntity)
+    print(string.format("[Probe T=%s] setPlayerTurnsActive Replicate(TurnOrder) controlled=%s numPlayerGroups=%d",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(controlledUuid and M.Utils.getDisplayName(controlledUuid) or "<nil>"),
+        numPlayerGroups))
     combatEntity:Replicate("TurnOrder")
 end
 
@@ -414,6 +456,7 @@ return {
     spawnCombatHelper = spawnCombatHelper,
     reorderByInitiativeRoll = reorderByInitiativeRoll,
     bumpDirectlyControlledInitiativeRolls = bumpDirectlyControlledInitiativeRolls,
+    bumpInitiativeRollsFor = bumpInitiativeRollsFor,
     stopListeners = stopListeners,
     setTurnActive = setTurnActive,
     setPlayerTurnsActive = setPlayerTurnsActive,

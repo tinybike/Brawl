@@ -130,11 +130,32 @@ local function nextCombatRound()
         State.Session.IsNextCombatRoundQueued = true
     elseif not Pause.isPartyInFTB() then
         -- Snapshot the currently-controlled character before the round turnover
-        -- mutations. The engine briefly deselects and rapidly cycles
-        -- onGainedControl events through other characters during the transition;
-        -- after a short delay, restore control to the snapshotted uuid.
-        local intendedControlled = State.Session.LastControlledUuid
+        -- mutations. Prefer a live ClientControl lookup over the cached
+        -- LastControlledUuid: the cache may be stale if setIsControllingDirectly
+        -- hasn't been called recently enough (e.g., after a prior unwanted
+        -- switch it'd point at the wrong char).
+        local intendedControlled
+        local controlEntities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl")
+        if controlEntities and controlEntities[1] and controlEntities[1].Uuid then
+            intendedControlled = controlEntities[1].Uuid.EntityUuid
+        end
+        if not intendedControlled then
+            intendedControlled = State.Session.LastControlledUuid
+        end
+        print("[SwitchRedirect] nextCombatRound snapshot intended=" .. tostring(intendedControlled))
+        -- Pre-emptive: re-affirm SelectCharacter for the intended character
+        -- right before the round-turnover mutations. If this lands before the
+        -- engine cycles, the client may stay locked on the intended char and
+        -- skip the visible flicker. (May or may not help depending on engine
+        -- ordering — testing.)
+        if intendedControlled then
+            print(string.format("[Probe T=%s] nextCombatRound BroadcastMessage SelectCharacter -> %s",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(M.Utils.getDisplayName(intendedControlled))))
+            Ext.ServerNet.BroadcastMessage("SelectCharacter", intendedControlled)
+        end
         Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
+        local replicatedCount = 0
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
             local entity = Ext.Entity.Get(uuid)
             if entity and entity.TurnBased then
@@ -150,27 +171,18 @@ local function nextCombatRound()
                     end
                 end
                 entity:Replicate("TurnBased")
+                replicatedCount = replicatedCount + 1
             end
         end
-        if intendedControlled then
-            Ext.Timer.WaitFor(500, function()
-                local currentControlled
-                if State.Session.Players then
-                    for uuid, player in pairs(State.Session.Players) do
-                        if player.isControllingDirectly then
-                            currentControlled = uuid
-                            break
-                        end
-                    end
-                end
-                if currentControlled and currentControlled ~= intendedControlled then
-                    print(string.format("[SwitchRedirect] round turnover drifted %s -> %s, restoring",
-                        tostring(M.Utils.getDisplayName(currentControlled)),
-                        tostring(M.Utils.getDisplayName(intendedControlled))))
-                    Ext.ServerNet.BroadcastMessage("SelectCharacter", intendedControlled)
-                end
-            end)
-        end
+        print(string.format("[Probe T=%s] nextCombatRound TurnBased replicate loop done, count=%d",
+            tostring(Ext.Utils.MonotonicTime()), replicatedCount))
+        -- Redirect window disabled for now — testing whether initiative jacking
+        -- alone prevents the engine's round-turnover switch (and whether the
+        -- redirect itself was the source of the visible flicker).
+        -- if intendedControlled then
+        --     State.Session.RoundTransitionIntent = intendedControlled
+        --     State.Session.RoundTransitionExpiresAt = Ext.Utils.MonotonicTime() + 300
+        -- end
     end
 end
 
@@ -219,19 +231,39 @@ end
 local function onCombatStarted(combatGuid)
     if not Utils.isToT() then
         State.uncapMovementDistances()
-        -- If enemies are already in the combat participants list (normal case),
-        -- initialize immediately.  Otherwise, onEnteredCombat will handle it.
+        -- If enemies are already in the combat participants list (normal case), initialize immediately.  Otherwise, onEnteredCombat will handle it.
         if hasEnemyBrawlers() then
             initializeCombat(combatGuid)
         end
     end
     -- TEMP: deterministic dump for control-switch investigation.
     Commands.dumpFullState("onCombatStarted " .. tostring(combatGuid))
+    -- Probe: subscribe to every TurnOrder change on the combat entity for the duration of this fight. Logs only — does not unsubscribe itself.
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity then
+        if State.Session.ProbeTurnOrderListener then
+            Ext.Entity.Unsubscribe(State.Session.ProbeTurnOrderListener)
+            State.Session.ProbeTurnOrderListener = nil
+        end
+        State.Session.ProbeTurnOrderListener = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
+            local groupCount = 0
+            local firstName = "<nil>"
+            if entity and entity.TurnOrder and entity.TurnOrder.Groups then
+                groupCount = #entity.TurnOrder.Groups
+                local g1 = entity.TurnOrder.Groups[1]
+                if g1 and g1.Members and g1.Members[1] and g1.Members[1].Entity
+                        and g1.Members[1].Entity.Uuid then
+                    firstName = M.Utils.getDisplayName(g1.Members[1].Entity.Uuid.EntityUuid)
+                end
+            end
+            print(string.format("[Probe T=%s] TurnOrder changed: groups=%d firstMember=%s",
+                tostring(Ext.Utils.MonotonicTime()), groupCount, tostring(firstName)))
+        end, combatEntity)
+    end
 end
 
 local function onCombatRoundStarted(combatGuid, round)
-    -- TEMP: dump BEFORE our setPlayerTurnsActive re-runs, to see what the
-    -- engine produced at round advance vs what we re-mangle into.
+    -- TEMP: dump BEFORE our setPlayerTurnsActive re-runs, to see what the engine produced at round advance vs what we re-mangle into.
     Commands.dumpFullState("onCombatRoundStarted round=" .. tostring(round) .. " PRE")
     if Pause.isPartyInFTB() then
         print("party is in FTB, pausing underlying combat", combatGuid, round)
@@ -258,16 +290,19 @@ local function onCombatRoundStarted(combatGuid, round)
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         Swarm.unsetTurnComplete(uuid)
     end
+    local crsReplicatedCount = 0
     for uuid, _ in pairs(State.Session.Players) do
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased then
             entity.TurnBased.RequestedEndTurn = false
-            -- Same rationale as in nextCombatRound: clear HadTurn so the
-            -- engine doesn't skip the controlled character's Groups entries.
+            -- Same rationale as in nextCombatRound: clear HadTurn so the engine doesn't skip the controlled character's Groups entries.
             entity.TurnBased.HadTurnInCombat = false
             entity:Replicate("TurnBased")
+            crsReplicatedCount = crsReplicatedCount + 1
         end
     end
+    print(string.format("[Probe T=%s] onCombatRoundStarted TurnBased replicate loop done, count=%d",
+        tostring(Ext.Utils.MonotonicTime()), crsReplicatedCount))
     startCombatRoundTimer(combatGuid)
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
         Pause.allEnterFTB()
@@ -283,6 +318,10 @@ end
 local function onCombatEnded(combatGuid)
     cancelCombatRoundTimer(combatGuid)
     TurnOrder.stopListeners(combatGuid)
+    if State.Session.ProbeTurnOrderListener then
+        Ext.Entity.Unsubscribe(State.Session.ProbeTurnOrderListener)
+        State.Session.ProbeTurnOrderListener = nil
+    end
     -- Defer stopping pulse actions + endBrawls together: the game may fire CombatEnded spuriously (e.g. during NPC-vs-NPC fights).
     -- If isInCombat is still true after the delay, the fight is ongoing and we leave pulses alone.
     Ext.Timer.WaitFor(1500, function()
@@ -311,10 +350,61 @@ local function onEnteredCombat(uuid)
             initializeCombat(combatGuid)
         end
     end
+    -- Keep party init above enemies as new combatants join. For a new player, invalidate the cached mean so it's recomputed from the new lineup. For
+    -- non-player non-helper entrants, just re-bump using current max enemy init (which now includes the joiner if their roll is higher).
+    if State.Session.Players[uuid] then
+        State.Session.MeanInitiativeRoll = nil
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    elseif not M.Utils.isCombatHelper(uuid) then
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    end
 end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
+    -- Round-turnover redirect: if we're inside the post-nextCombatRound window and the engine drifted control to a different character than
+    -- the snapshotted intent, broadcast SelectCharacter to restore.
+    if State.Session.RoundTransitionIntent
+            and uuid ~= State.Session.RoundTransitionIntent
+            and State.Session.RoundTransitionExpiresAt
+            and Ext.Utils.MonotonicTime() < State.Session.RoundTransitionExpiresAt then
+        local intended = State.Session.RoundTransitionIntent
+        print(string.format("[SwitchRedirect] drift %s -> %s, restoring",
+            tostring(M.Utils.getDisplayName(uuid)),
+            tostring(M.Utils.getDisplayName(intended))))
+        print(string.format("[Probe T=%s] SwitchRedirect BroadcastMessage SelectCharacter -> %s",
+            tostring(Ext.Utils.MonotonicTime()),
+            tostring(M.Utils.getDisplayName(intended))))
+        Ext.ServerNet.BroadcastMessage("SelectCharacter", intended)
+    end
+    -- FTB-entry confirmation window: when we entered FTB and broadcast SelectCharacter for the pre-pause controlled char, the engine often
+    -- defaults to the host character anyway. Re-assert until the engine confirms our intended char (or the window expires).
+    if State.Session.ExpectedControlledOnFTB
+            and State.Session.ExpectedControlledOnFTBExpiresAt
+            and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledOnFTBExpiresAt then
+        if uuid ~= State.Session.ExpectedControlledOnFTB then
+            local intended = State.Session.ExpectedControlledOnFTB
+            print(string.format("[Probe T=%s] FTB redirect: GainedControl %s != intended %s, re-asserting",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(M.Utils.getDisplayName(uuid)),
+                tostring(M.Utils.getDisplayName(intended))))
+            TurnOrder.bumpInitiativeRollsFor(intended)
+            local intendedUserId = State.Session.Players[intended] and State.Session.Players[intended].userId
+            if intendedUserId then
+                Ext.ServerNet.PostMessageToUser(intendedUserId, "SelectCharacter", intended)
+            else
+                Ext.ServerNet.BroadcastMessage("SelectCharacter", intended)
+            end
+        else
+            -- Right character confirmed; close the window.
+            print(string.format("[Probe T=%s] FTB redirect: confirmed %s, closing window",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(M.Utils.getDisplayName(uuid))))
+            State.Session.ExpectedControlledOnFTB = nil
+            State.Session.ExpectedControlledOnFTBExpiresAt = nil
+        end
+    end
     -- TEMP: log control-switch for unwanted-switch investigation.
     do
         local now = Ext.Utils.MonotonicTime()
@@ -359,6 +449,9 @@ local function onGainedControl(uuid)
         local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
         State.Session.PendingSelectCharOnLeftFTB = nil
         debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
+        print(string.format("[Probe T=%s] PendingSelectCharOnLeftFTB BroadcastMessage SelectCharacter -> %s",
+            tostring(Ext.Utils.MonotonicTime()),
+            tostring(M.Utils.getDisplayName(selectedUuid))))
         Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
     elseif State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
         State.Session.PendingSelectCharOnLeftFTB = nil
@@ -376,9 +469,18 @@ local function onGainedControl(uuid)
     if not State.Session.MeanInitiativeRoll then
        TurnOrder.setPartyInitiativeRollToMean()
     end
+    print(string.format("[Probe T=%s] onGainedControl pre-bump (uuid=%s)",
+        tostring(Ext.Utils.MonotonicTime()),
+        tostring(M.Utils.getDisplayName(uuid))))
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    print(string.format("[Probe T=%s] onGainedControl pre-reorder",
+        tostring(Ext.Utils.MonotonicTime())))
     TurnOrder.reorderByInitiativeRoll(true)
+    print(string.format("[Probe T=%s] onGainedControl pre-setPlayerTurnsActive",
+        tostring(Ext.Utils.MonotonicTime())))
     TurnOrder.setPlayerTurnsActive()
+    print(string.format("[Probe T=%s] onGainedControl handler done",
+        tostring(Ext.Utils.MonotonicTime())))
 end
 
 local function onSpellSyncTargeting(spellCastState)
@@ -474,8 +576,43 @@ local function onEnteredForceTurnBased(uuid)
     if State.Session.PendingSelectCharOnFTB then
         local selectedUuid = State.Session.PendingSelectCharOnFTB
         State.Session.PendingSelectCharOnFTB = nil
+        -- Probe: log every party member's init at the moment the FTB-ready handler runs, before we touch anything.  The engine wipes init to
+        -- -100 during FTB processing; this shows whether the wipe has already happened by the time we get here.
+        for partyUuid, _ in pairs(State.Session.Players) do
+            local entity = Ext.Entity.Get(partyUuid)
+            if entity and entity.CombatParticipant then
+                local userIdStr = "<no-component>"
+                if entity.UserReservedFor then
+                    userIdStr = tostring(entity.UserReservedFor.UserID)
+                end
+                print(string.format("[Probe T=%s] FTBready %s init=%s userReservedFor=%s",
+                    tostring(Ext.Utils.MonotonicTime()),
+                    tostring(M.Utils.getDisplayName(partyUuid)),
+                    tostring(entity.CombatParticipant.InitiativeRoll),
+                    userIdStr))
+            end
+        end
+        -- Pre-emptively bump init for the intended controlled char before the engine picks.  If the engine's FTB-entry control assignment
+        -- uses initiative as a tiebreaker, jacking the right char's init here may steer the engine to pick correctly the first time.
+        TurnOrder.bumpInitiativeRollsFor(selectedUuid)
         debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
-        Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+        local targetUserId = State.Session.Players[selectedUuid] and State.Session.Players[selectedUuid].userId
+        if targetUserId then
+            print(string.format("[Probe T=%s] PendingSelectCharOnFTB PostMessageToUser(user=%s) SelectCharacter -> %s",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(targetUserId),
+                tostring(M.Utils.getDisplayName(selectedUuid))))
+            Ext.ServerNet.PostMessageToUser(targetUserId, "SelectCharacter", selectedUuid)
+        else
+            print(string.format("[Probe T=%s] PendingSelectCharOnFTB no cached userId for %s, falling back to broadcast",
+                tostring(Ext.Utils.MonotonicTime()),
+                tostring(M.Utils.getDisplayName(selectedUuid))))
+            Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+        end
+        -- Open a confirmation window: until the engine fires GainedControl for this character (or the window expires), any GainedControl for
+        -- a different character is treated as the engine's wrong default pick and we re-assert.
+        State.Session.ExpectedControlledOnFTB = selectedUuid
+        State.Session.ExpectedControlledOnFTBExpiresAt = Ext.Utils.MonotonicTime() + 500
     end
 end
 
