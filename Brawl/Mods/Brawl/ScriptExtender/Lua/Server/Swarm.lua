@@ -850,7 +850,7 @@ local function onDied(uuid)
             Ext.Timer.Cancel(State.Session.SwarmBrawlerIndexDelay[uuid])
             State.Session.SwarmBrawlerIndexDelay[uuid] = nil
         end
-        M.Roster.handleDeath(M.Osi.GetRegion(uuid), uuid)
+        Roster.handleDeath(M.Osi.GetRegion(uuid), uuid)
     end
 end
 

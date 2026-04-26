@@ -26,6 +26,12 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
         end
         if okToAdd then
             local displayName = M.Utils.getDisplayName(entityUuid)
+            local entity = Ext.Entity.Get(entityUuid)
+            local existingBrawler = State.Session.Brawlers[level][entityUuid]
+            -- Preserve actionInterval from any existing brawler entry within this combat.  The first addBrawler call (at first EnteredCombat) computes
+            -- from the natural rolled init before our bumps fire; subsequent re-adds (level changes, party joins, etc.) would otherwise read the bumped InitiativeRoll.
+            local actionInterval = existingBrawler and existingBrawler.actionInterval
+                or TurnOrder.calculateActionInterval(TurnOrder.getInitiativeRoll(entityUuid))
             local brawler = {
                 uuid = entityUuid,
                 displayName = displayName,
@@ -34,11 +40,9 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                 isPaused = M.Osi.IsInForceTurnBasedMode(entityUuid) == 1,
                 archetype = State.getArchetype(entityUuid),
                 numExtraAttacks = getNumExtraAttacks(entityUuid),
-                actionInterval = TurnOrder.calculateActionInterval(TurnOrder.getInitiativeRoll(entityUuid)),
+                actionInterval = actionInterval,
                 auras = Spells.getAuras(entityUuid),
             }
-            local entity = Ext.Entity.Get(entityUuid)
-            local existingBrawler = State.Session.Brawlers[level][entityUuid]
             if existingBrawler and existingBrawler.actionResources then
                 brawler.actionResources = existingBrawler.actionResources
             else
