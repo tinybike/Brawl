@@ -747,6 +747,28 @@ local function getCurrentRegion()
     end
 end
 
+-- Sweep every character in the host's region and set CanJoinCombat=1.  Can fix old save files made with prior Brawl versions that left
+-- characters stuck at CanJoinCombat=0, which prevents them from being engaged.
+local function repairCanJoinCombatInRegion()
+    local region = M.Utils.getCurrentRegion()
+    if not region then
+        _P("repairCanJoinCombatInRegion: no current region")
+        return 0
+    end
+    local count = 0
+    for _, e in ipairs(Ext.Entity.GetAllEntitiesWithComponent("Uuid")) do
+        if e and e.Uuid then
+            local uuid = e.Uuid.EntityUuid
+            if uuid and M.Osi.IsCharacter(uuid) == 1 and M.Osi.GetRegion(uuid) == region then
+                Osi.SetCanJoinCombat(uuid, 1)
+                count = count + 1
+            end
+        end
+    end
+    _P("repairCanJoinCombatInRegion: set CanJoinCombat=1 on", count, "characters in", region)
+    return count
+end
+
 local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
@@ -839,6 +861,7 @@ return {
     checkDivineIntervention = checkDivineIntervention,
     getSpellNameBySlot = getSpellNameBySlot,
     getCurrentRegion = getCurrentRegion,
+    repairCanJoinCombatInRegion = repairCanJoinCombatInRegion,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
