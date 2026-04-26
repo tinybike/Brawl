@@ -505,8 +505,17 @@ local function setIsControllingDirectly()
                 resetPlayers()
             end
         end
+        Session.LastControlledUuid = Session.LastControlledUuid or {}
         for _, entity in ipairs(entities) do
-            Session.Players[entity.Uuid.EntityUuid].isControllingDirectly = true
+            local entityUuid = entity.Uuid.EntityUuid
+            Session.Players[entityUuid].isControllingDirectly = true
+            -- Cache per-user as a fallback when isControllingDirectly is transiently
+            -- false for everyone (e.g. round turnover deselects briefly).  Stored as
+            -- {[userId] = uuid}; in MP each user has their own last-controlled char.
+            local userId = entity.UserReservedFor and entity.UserReservedFor.UserID
+            if userId then
+                Session.LastControlledUuid[userId] = entityUuid
+            end
         end
     end
 end

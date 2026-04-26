@@ -1,6 +1,22 @@
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
 
+-- Send a SelectCharacter NetMessage to whichever user owns this character.
+-- Falls back to broadcast if we don't have a cached userId. Multiplayer-safe:
+-- avoids broadcasting a "select X" message to all clients (which would tell
+-- other users' clients to switch their own selection too).
+local function sendSelectCharacter(uuid)
+    if not uuid then
+        return
+    end
+    local userId = State.Session.Players[uuid] and State.Session.Players[uuid].userId
+    if userId then
+        Ext.ServerNet.PostMessageToUser(userId, "SelectCharacter", uuid)
+    else
+        Ext.ServerNet.BroadcastMessage("SelectCharacter", uuid)
+    end
+end
+
 local function getCombatRoundDuration()
     return State.Settings.CombatRoundDuration*1000
 end
@@ -124,11 +140,32 @@ end
 
 -- NB: is the wrapping timer getting paused correctly during pause?
 local function nextCombatRound()
-    debugPrint("nextCombatRound")
     State.Session.IsNextCombatRoundQueued = false
     if State.areAnyPlayersTargeting() then
         State.Session.IsNextCombatRoundQueued = true
     elseif not Pause.isPartyInFTB() then
+        -- Snapshot per-user currently-controlled chars before the round-turnover mutations.  Prefer live ClientControl entities; fall back to
+        -- the LastControlledUuid map for any user whose ClientControl is mid-flux.  Stored as {[userId] = uuid}.
+        local intendedByUser = {}
+        local controlEntities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl")
+        for _, entity in ipairs(controlEntities or {}) do
+            local userId = entity.UserReservedFor and entity.UserReservedFor.UserID
+            local entityUuid = entity.Uuid and entity.Uuid.EntityUuid
+            if userId and entityUuid then
+                intendedByUser[userId] = entityUuid
+            end
+        end
+        if State.Session.LastControlledUuid then
+            for userId, uuid in pairs(State.Session.LastControlledUuid) do
+                if not intendedByUser[userId] then
+                    intendedByUser[userId] = uuid
+                end
+            end
+        end
+        -- Pre-emptive: re-affirm SelectCharacter for each user's intended char right before the round-turnover mutations.
+        for _, intendedUuid in pairs(intendedByUser) do
+            sendSelectCharacter(intendedUuid)
+        end
         Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
             local entity = Ext.Entity.Get(uuid)
@@ -138,6 +175,7 @@ local function nextCombatRound()
                     entity.TurnBased.RequestedEndTurn = true
                     entity.TurnBased.TurnActionsCompleted = true
                 else
+                    entity.TurnBased.HadTurnInCombat = false
                     entity.TurnBased.RequestedEndTurn = true
                     if Utils.canAct(uuid) then
                         entity.TurnBased.IsActiveCombatTurn = true
@@ -194,8 +232,7 @@ end
 local function onCombatStarted(combatGuid)
     if not Utils.isToT() then
         State.uncapMovementDistances()
-        -- If enemies are already in the combat participants list (normal case),
-        -- initialize immediately.  Otherwise, onEnteredCombat will handle it.
+        -- If enemies are already in the combat participants list (normal case), initialize immediately.  Otherwise, onEnteredCombat will handle it.
         if hasEnemyBrawlers() then
             initializeCombat(combatGuid)
         end
@@ -232,6 +269,8 @@ local function onCombatRoundStarted(combatGuid, round)
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased then
             entity.TurnBased.RequestedEndTurn = false
+            -- Same rationale as in nextCombatRound: clear HadTurn so the engine doesn't skip the controlled character's Groups entries.
+            entity.TurnBased.HadTurnInCombat = false
             entity:Replicate("TurnBased")
         end
     end
@@ -277,24 +316,60 @@ local function onEnteredCombat(uuid)
             initializeCombat(combatGuid)
         end
     end
+    -- Keep party init above enemies as new combatants join. For a new player, invalidate the cached mean so it's recomputed from the new lineup. For
+    -- non-player non-helper entrants, just re-bump using current max enemy init (which now includes the joiner if their roll is higher).
+    if State.Session.Players[uuid] then
+        State.Session.MeanInitiativeRoll = nil
+        TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    elseif not M.Utils.isCombatHelper(uuid) then
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+    end
 end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
+    -- FTB-entry confirmation window: when we entered FTB and broadcast SelectCharacter for the pre-pause controlled char, the engine often
+    -- defaults to the host character anyway. Re-assert until the engine confirms our intended char (or the window expires).
+    if State.Session.ExpectedControlledOnFTB
+            and State.Session.ExpectedControlledOnFTBExpiresAt
+            and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledOnFTBExpiresAt then
+        local gainedUserId = Osi.GetReservedUserID(uuid)
+        local expectedForUser = gainedUserId and State.Session.ExpectedControlledOnFTB[gainedUserId]
+        if expectedForUser then
+            if uuid ~= expectedForUser then
+                TurnOrder.bumpInitiativeRollsFor(expectedForUser)
+                sendSelectCharacter(expectedForUser)
+            else
+                -- Right character confirmed for this user; clear their entry.  If all users' expectations have resolved, close the window entirely.
+                State.Session.ExpectedControlledOnFTB[gainedUserId] = nil
+                if not next(State.Session.ExpectedControlledOnFTB) then
+                    State.Session.ExpectedControlledOnFTB = nil
+                    State.Session.ExpectedControlledOnFTBExpiresAt = nil
+                end
+            end
+        end
+    end
     if not State.Settings.FullAuto then
         stopPulseAction(Roster.getBrawlerByUuid(uuid))
     end
-    -- If we have a pending post-unpause selection and the wrong character got control, override it
-    if State.Session.PendingSelectCharOnLeftFTB and uuid ~= State.Session.PendingSelectCharOnLeftFTB then
-        local selectedUuid = State.Session.PendingSelectCharOnLeftFTB
-        State.Session.PendingSelectCharOnLeftFTB = nil
-        debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
-        Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
-    elseif State.Session.PendingSelectCharOnLeftFTB and uuid == State.Session.PendingSelectCharOnLeftFTB then
-        State.Session.PendingSelectCharOnLeftFTB = nil
-        debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
-    end
     local userId = Osi.GetReservedUserID(uuid)
+    -- If we have a pending post-unpause selection for THIS user and the wrong char got control, override it.  Per-user map: {[userId] = uuid}.
+    if State.Session.PendingSelectCharOnLeftFTB and userId then
+        local pendingUuid = State.Session.PendingSelectCharOnLeftFTB[userId]
+        if pendingUuid then
+            if uuid ~= pendingUuid then
+                debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(pendingUuid))
+                sendSelectCharacter(pendingUuid)
+            else
+                debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
+            end
+            State.Session.PendingSelectCharOnLeftFTB[userId] = nil
+            if not next(State.Session.PendingSelectCharOnLeftFTB) then
+                State.Session.PendingSelectCharOnLeftFTB = nil
+            end
+        end
+    end
     for playerUuid, player in pairs(State.Session.Players) do
         if player.userId == userId and playerUuid ~= uuid then
             local brawler = Roster.getBrawlerByUuid(playerUuid)
@@ -401,11 +476,29 @@ local function onServerInterruptDecision()
 end
 
 local function onEnteredForceTurnBased(uuid)
-    if State.Session.PendingSelectCharOnFTB then
-        local selectedUuid = State.Session.PendingSelectCharOnFTB
+    if State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) then
+        local selectedByUser = State.Session.PendingSelectCharOnFTB
         State.Session.PendingSelectCharOnFTB = nil
-        debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(selectedUuid))
-        Ext.ServerNet.BroadcastMessage("SelectCharacter", selectedUuid)
+        -- Build the set of intended controlled chars across all users (one per user)
+        -- and bump their init pre-emptively.  The set form lets bumpInitiativeRollsFor
+        -- mark every per-user intended char as "controlled" in one pass.
+        local intendedSet = {}
+        for _, intendedUuid in pairs(selectedByUser) do
+            intendedSet[intendedUuid] = true
+        end
+        TurnOrder.bumpInitiativeRollsFor(intendedSet)
+        -- Send each user their own SelectCharacter and open a confirmation window so
+        -- if the engine's FTB-entry pick fires GainedControl for a different char
+        -- for that user, our redirect re-asserts.
+        local expiresAt = Ext.Utils.MonotonicTime() + 500
+        local expectedByUser = {}
+        for userId, intendedUuid in pairs(selectedByUser) do
+            debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(intendedUuid))
+            sendSelectCharacter(intendedUuid)
+            expectedByUser[userId] = intendedUuid
+        end
+        State.Session.ExpectedControlledOnFTB = expectedByUser
+        State.Session.ExpectedControlledOnFTBExpiresAt = expiresAt
     end
 end
 

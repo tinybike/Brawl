@@ -660,8 +660,8 @@ local function dumpBrawlerState(uuid, label)
     end
 end
 
-local function onDebugDumpSelected(_)
-    print("[DebugDump] ======== DUMP START ========")
+local function dumpFullState(label)
+    print("[DebugDump] ======== DUMP START (" .. tostring(label or "manual") .. ") ========")
     -- Dump the currently-controlled character first
     if State.Session.Players then
         for uuid, player in pairs(State.Session.Players) do
@@ -674,17 +674,26 @@ local function onDebugDumpSelected(_)
     -- Dump all brawlers
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         if not (State.Session.Players[uuid] and State.Session.Players[uuid].isControllingDirectly) then
-            local label = State.Session.Players[uuid] and "PLAYER" or "NPC"
-            dumpBrawlerState(uuid, label)
+            local label2 = State.Session.Players[uuid] and "PLAYER" or "NPC"
+            dumpBrawlerState(uuid, label2)
         end
     end
+    print("[DebugDump] -------- TurnOrder.Groups --------")
+    TurnOrder.showTurnOrderGroups()
+    print("[DebugDump] -------- TurnOrder.Groups2 --------")
+    TurnOrder.showTurnOrderGroups2()
     print("[DebugDump] ======== DUMP END ========")
+end
+
+local function onDebugDumpSelected(_)
+    dumpFullState("manual X")
 end
 
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
     disableMod = disableMod,
+    dumpFullState = dumpFullState,
     NetMessage = {
         DebugDumpSelected = onDebugDumpSelected,
         ModToggle = onModToggle,

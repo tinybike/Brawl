@@ -68,7 +68,7 @@ local function onResetCompleted()
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
--- New user joined (multiplayer)
+-- New user joined (multiplayer).  Also fires whenever UserReservedFor changes on any entity, including engine-driven reassignments at FTB entry.
 local function onUserReservedFor(entity, _, _)
     State.setIsControllingDirectly()
     local entityUuid = entity.Uuid.EntityUuid
