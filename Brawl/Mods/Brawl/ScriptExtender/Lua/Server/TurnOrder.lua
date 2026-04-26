@@ -54,10 +54,9 @@ local function setInitiativeRoll(uuid, roll)
     local entity = Ext.Entity.Get(uuid)
     if entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll then
         local oldRoll = entity.CombatParticipant.InitiativeRoll
-        print(string.format("[Probe T=%s] setInitiativeRoll %s: %s -> %s",
-            tostring(Ext.Utils.MonotonicTime()),
-            tostring(M.Utils.getDisplayName(uuid)),
-            tostring(oldRoll), tostring(roll)))
+        if oldRoll == roll then
+            return
+        end
         entity.CombatParticipant.InitiativeRoll = roll
         if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
             entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
@@ -234,16 +233,19 @@ local function reorderByInitiativeRoll(doNotReplicate)
     end
 end
 
--- Bump party initiative just above the highest enemy roll.  We set unconditionally every time (no max-with-current) so that when control
--- moves between party members, the previously-controlled char drops from target+1 back down to target.
-local function bumpInitiativeRollsCore(intendedUuid)
+-- Bump party initiative just above the highest enemy roll.  Every char marked isControllingDirectly (any user's selection) gets target+1, all other
+-- party chars get target.  The flat assignment is critical: when control moves, the previously-controlled char must actually drop from target+1 back
+-- to target, otherwise old + new sit tied at target+1 with no clear "first" for the engine.  Multiple users tied at target+1 is fine in MP since
+-- each user's GainedControl is a separate per-user event and users can't select each other's characters anyway.
+local function bumpInitiativeRolls(intendedSet)
     local maxEnemy = calculateMaxEnemyInitiativeRoll()
     if not maxEnemy then
         return
     end
     local target = maxEnemy + 1
-    for uuid, _ in pairs(State.Session.Players) do
-        if uuid == intendedUuid then
+    for uuid, player in pairs(State.Session.Players) do
+        local controlled = player.isControllingDirectly or (intendedSet and intendedSet[uuid])
+        if controlled then
             setInitiativeRoll(uuid, target + 1)
         else
             setInitiativeRoll(uuid, target)
@@ -253,20 +255,17 @@ end
 
 local function bumpDirectlyControlledInitiativeRolls()
     debugPrint("bumpDirectlyControlledInitiativeRolls")
-    local controlledUuid
-    for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly then
-            controlledUuid = uuid
-            break
-        end
-    end
-    bumpInitiativeRollsCore(controlledUuid)
+    bumpInitiativeRolls(nil)
 end
 
--- Same as bumpDirectlyControlledInitiativeRolls, but uses an explicit uuid instead of reading isControllingDirectly.  Use this when we know the
--- intended controlled char (e.g. pre-emptively at FTB entry) but the engine hasn't yet fired GainedControl to flip our state flags.
-local function bumpInitiativeRollsFor(intendedUuid)
-    bumpInitiativeRollsCore(intendedUuid)
+-- Use this when we know the intended controlled char (e.g. pre-emptively at FTB entry) but the engine hasn't yet fired GainedControl to flip
+-- our state flags.  Accepts either a single uuid string or a set table of {[uuid]=true} (preferred for MP where multiple users have intended chars).
+local function bumpInitiativeRollsFor(intended)
+    if type(intended) == "string" then
+        bumpInitiativeRolls({[intended] = true})
+    else
+        bumpInitiativeRolls(intended)
+    end
 end
 
 -- if a player is assigned 2+ characters, re-order them in the topbar so that the currently controlled one is first,
@@ -370,22 +369,29 @@ local function setPlayerTurnsActive()
             table.insert(groupsEnemies, group)
         end
     end
-    local controlledUuid
+    -- Collect all directly-controlled chars (in MP each user has their own).
+    local controlledSet = {}
+    local controlledList = {}
     for uuid, player in pairs(State.Session.Players) do
         if player.isControllingDirectly then
-            controlledUuid = uuid
-            break
+            controlledSet[uuid] = true
+            table.insert(controlledList, uuid)
         end
     end
     -- Fallback: at round turnover the engine transiently deselects the controlled character (ClientControl component removed), so no player
-    -- has isControllingDirectly=true when we run. Use the cached last-known controlled uuid so the player ordering still puts the right char first.
-    if not controlledUuid and State.Session.LastControlledUuid
-            and State.Session.Players[State.Session.LastControlledUuid] then
-        controlledUuid = State.Session.LastControlledUuid
+    -- has isControllingDirectly=true when we run.  Use the cached last-known controlled uuids (per-user) so the player ordering still puts
+    -- the right chars first.
+    if #controlledList == 0 and State.Session.LastControlledUuid then
+        for _, cachedUuid in pairs(State.Session.LastControlledUuid) do
+            if State.Session.Players[cachedUuid] and not controlledSet[cachedUuid] then
+                controlledSet[cachedUuid] = true
+                table.insert(controlledList, cachedUuid)
+            end
+        end
     end
     local otherUuids = {}
     for uuid, _ in pairs(State.Session.Players) do
-        if uuid ~= controlledUuid then
+        if not controlledSet[uuid] then
             table.insert(otherUuids, uuid)
         end
     end
@@ -403,8 +409,8 @@ local function setPlayerTurnsActive()
             })
         end
     end
-    if controlledUuid then
-        addGroup(controlledUuid)
+    for _, uuid in ipairs(controlledList) do
+        addGroup(uuid)
     end
     for _, uuid in ipairs(otherUuids) do
         addGroup(uuid)
@@ -423,8 +429,6 @@ local function setPlayerTurnsActive()
     end
     State.Session.TurnOrderListener[uuid] = Ext.Entity.Subscribe("TurnOrder", function (entity, _, _)
         if entity and entity.CombatState and entity.CombatState.MyGuid then
-            print(string.format("[Probe T=%s] setPlayerTurnsActive listener fired, spawning refresher",
-                tostring(Ext.Utils.MonotonicTime())))
             Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
             local refresher = spawnCombatHelper(uuid, true)
             if refresher then
@@ -435,10 +439,6 @@ local function setPlayerTurnsActive()
             end
         end
     end, combatEntity)
-    print(string.format("[Probe T=%s] setPlayerTurnsActive Replicate(TurnOrder) controlled=%s numPlayerGroups=%d",
-        tostring(Ext.Utils.MonotonicTime()),
-        tostring(controlledUuid and M.Utils.getDisplayName(controlledUuid) or "<nil>"),
-        numPlayerGroups))
     combatEntity:Replicate("TurnOrder")
 end
 
@@ -456,6 +456,7 @@ return {
     spawnCombatHelper = spawnCombatHelper,
     reorderByInitiativeRoll = reorderByInitiativeRoll,
     bumpDirectlyControlledInitiativeRolls = bumpDirectlyControlledInitiativeRolls,
+    bumpInitiativeRolls = bumpInitiativeRolls,
     bumpInitiativeRollsFor = bumpInitiativeRollsFor,
     stopListeners = stopListeners,
     setTurnActive = setTurnActive,

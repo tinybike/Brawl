@@ -74,13 +74,13 @@ local function allEnterFTB()
         end
         return
     end
-    -- Capture the currently controlled character BEFORE pulling anyone out of combat
-    -- (leaving combat triggers GainedControl which resets the selection)
-    local selectedUuidBeforePause = nil
+    -- Capture the currently controlled character per user BEFORE pulling anyone out of combat
+    -- (leaving combat triggers GainedControl which resets the selection).  In MP each user has
+    -- their own isControllingDirectly char; we want to restore each one independently.
+    local selectedBeforePause = {}  -- {[userId] = uuid}
     for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly then
-            selectedUuidBeforePause = uuid
-            break
+        if player.isControllingDirectly and player.userId then
+            selectedBeforePause[player.userId] = uuid
         end
     end
     local narrativeCombatLabel
@@ -139,11 +139,10 @@ local function allEnterFTB()
             end
         end
     end
-    -- Select the character the player was controlling before pause
-    -- Delay to let FTB fully initialize before switching
-    if selectedUuidBeforePause then
-        -- Wait for FTB to be ready, then reselect the character
-        State.Session.PendingSelectCharOnFTB = selectedUuidBeforePause
+    -- Restore each user's pre-pause selection once FTB is ready (consumed in
+    -- RT.onEnteredForceTurnBased).  Stored as {[userId] = uuid}.
+    if next(selectedBeforePause) then
+        State.Session.PendingSelectCharOnFTB = selectedBeforePause
     end
 end
 
@@ -162,12 +161,12 @@ local function allExitFTB()
         end
         return
     end
-    -- Capture who's selected BEFORE exiting FTB (leaving FTB reassigns control)
-    local selectedUuidDuringPause = nil
+    -- Capture per-user selection BEFORE exiting FTB (leaving FTB reassigns control).
+    -- {[userId] = uuid} — restored individually per user in RT.onGainedControl.
+    local selectedDuringPause = {}
     for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly then
-            selectedUuidDuringPause = uuid
-            break
+        if player.isControllingDirectly and player.userId then
+            selectedDuringPause[player.userId] = uuid
         end
     end
     -- Track which characters have queued movements before we start unpausing
@@ -239,8 +238,8 @@ local function allExitFTB()
         Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
     end
     TurnOrder.setPlayersSwarmGroup()
-    if selectedUuidDuringPause then
-        State.Session.PendingSelectCharOnLeftFTB = selectedUuidDuringPause
+    if next(selectedDuringPause) then
+        State.Session.PendingSelectCharOnLeftFTB = selectedDuringPause
     end
     if not combatGuid and State.Session.CombatHelper then
         combatGuid = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
