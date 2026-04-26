@@ -570,7 +570,7 @@ local function onLevelUnloading(level)
 end
 
 local function onFlagSet(flag, speaker, dialogInstance)
-    debugPrint("FlagSet", flag, speaker, dialogInstance)
+    print("FlagSet", flag, speaker, dialogInstance)
     if State.Session.TurnBasedSwarmMode then
         Swarm.Listeners.onFlagSet(flag)
     else
