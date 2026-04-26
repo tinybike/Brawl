@@ -611,6 +611,10 @@ singleCharacterTurn = function (brawler, brawlerIndex, swarmActors)
     if State.Session.Players[brawler.uuid] or M.State.isToTCombatHelper(brawler.uuid) or not M.Utils.canAct(brawler.uuid) then
         debugPrint("don't take turn", brawler.uuid, brawler.displayName)
         State.Session.SwarmTurnComplete[brawler.uuid] = true
+        -- For non-acting enemies (e.g., banished) we still need to signal the engine that their turn was "processed" so it advances per-turn status durations
+        if M.Osi.IsPartyMember(brawler.uuid, 1) == 0 then
+            setTurnComplete(brawler.uuid)
+        end
         return false
     end
     if M.Swarm.isControlledByDefaultAI(brawler.uuid) then
@@ -743,6 +747,7 @@ local function onCombatRoundStarted(round)
     end
     unsetAllEnemyTurnsComplete()
     TurnOrder.setPartyInitiativeRollToMean()
+    TurnOrder.equalizePartyInitiative()
     TurnOrder.bumpNpcInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll()
     -- Mark all players currently in combat as accounted for in the turn order,
@@ -773,6 +778,7 @@ local function onEnteredCombat(uuid)
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and not State.Session.SwarmTurnOrderPlayers[uuid] then
         debugPrint("onEnteredCombat: mid-round player join, recalculating turn order for", M.Utils.getDisplayName(uuid))
         TurnOrder.setPartyInitiativeRollToMean()
+        TurnOrder.equalizePartyInitiative()
         TurnOrder.bumpNpcInitiativeRolls()
         TurnOrder.reorderByInitiativeRoll()
         State.Session.SwarmTurnOrderPlayers[uuid] = true

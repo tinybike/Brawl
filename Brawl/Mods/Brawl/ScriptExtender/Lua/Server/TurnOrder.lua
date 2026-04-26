@@ -81,6 +81,20 @@ local function setPartyInitiativeRollToMean()
     end
 end
 
+-- Force every party member's InitiativeRoll to the cached mean.  Used in Swarm mode to keep all party members on the same TurnOrder.Groups team; without
+-- this, any party member whose natural d20 roll differs from the others ends up in their own single-member group/lumped with same-init NPCs, which manifests
+-- as that character never going active when the player phase begins.  Not used in RT mode (bumpInitiativeRolls there overwrites party init to maxEnemy+1).
+local function equalizePartyInitiative()
+    if not State.Session.MeanInitiativeRoll then
+        return
+    end
+    for uuid, _ in pairs(State.Session.Players) do
+        if Utils.isAliveAndCanFight(uuid) then
+            setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
+        end
+    end
+end
+
 local function bumpNpcInitiativeRoll(uuid)
     local initiativeRoll = getInitiativeRoll(uuid)
     if initiativeRoll then
@@ -447,6 +461,7 @@ return {
     calculateActionInterval = calculateActionInterval,
     setInitiativeRoll = setInitiativeRoll,
     setPartyInitiativeRollToMean = setPartyInitiativeRollToMean,
+    equalizePartyInitiative = equalizePartyInitiative,
     bumpNpcInitiativeRolls = bumpNpcInitiativeRolls,
     setPlayersSwarmGroup = setPlayersSwarmGroup,
     showAllInitiativeRolls = showAllInitiativeRolls,

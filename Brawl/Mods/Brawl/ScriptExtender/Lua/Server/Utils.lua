@@ -520,7 +520,13 @@ local function canAct(uuid)
         return false
     end
     for _, noActionStatus in ipairs(Constants.NO_ACTION_STATUSES) do
-        if M.Osi.HasActiveStatus(uuid, noActionStatus) == 1 then
+        local hit
+        if M.Utils.startsWith(noActionStatus, "SG_") then
+            hit = M.Osi.HasActiveStatusWithGroup(uuid, noActionStatus) == 1
+        else
+            hit = M.Osi.HasActiveStatus(uuid, noActionStatus) == 1
+        end
+        if hit then
             debugPrint(M.Utils.getDisplayName(uuid), "has a no action status", noActionStatus)
             return false
         end
@@ -666,6 +672,8 @@ local function isValidHostileTarget(uuid, targetUuid)
             if M.Utils.hasStatus(entity, "SANCTUARY") then
                 return false
             elseif M.Utils.hasStatus(entity, "INVULNERABLE") then
+                return false
+            elseif M.Utils.hasStatus(entity, "BANISHED") then
                 return false
             end
         end
