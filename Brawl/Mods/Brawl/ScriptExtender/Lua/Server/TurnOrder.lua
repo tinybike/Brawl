@@ -129,8 +129,15 @@ local function showAllInitiativeRolls()
     end
 end
 
+local function getCurrentCombatRound()
+    local combatEntity = Utils.getCombatEntity()
+    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
+        return combatEntity.TurnOrder.field_40
+    end
+end
+
 local function formatGroupStr(i, group)
-    local groupStr = tostring(i) .. " init=" .. tostring(group.Initiative) .. " IsPlayer=" .. tostring(group.IsPlayer)
+    local groupStr = tostring(i) .. " init=" .. tostring(group.Initiative) .. " IsPlayer=" .. tostring(group.IsPlayer) .. " Round=" .. tostring(group.Round) .. " Team=" .. tostring(group.Team)
     if group.Members and #group.Members > 0 then
         for j, member in ipairs(group.Members) do
             if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid then
@@ -152,6 +159,7 @@ end
 local function showTurnOrderGroups()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups then
+        print("currentCombatRound =", getCurrentCombatRound())
         for i, group in ipairs(combatEntity.TurnOrder.Groups) do
             print(formatGroupStr(i, group))
         end
@@ -161,16 +169,10 @@ end
 local function showTurnOrderGroups2()
     local combatEntity = Utils.getCombatEntity()
     if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups2 then
+        print("currentCombatRound =", getCurrentCombatRound())
         for i, group in ipairs(combatEntity.TurnOrder.Groups2) do
             print(formatGroupStr(i, group))
         end
-    end
-end
-
-local function getCurrentCombatRound()
-    local combatEntity = Utils.getCombatEntity()
-    if combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.field_40 then
-        return combatEntity.TurnOrder.field_40
     end
 end
 
@@ -372,15 +374,11 @@ local function setPlayerTurnsActive()
         return
     end
     local round, team
-    local groupsEnemies = {}
     for _, group in ipairs(combatEntity.TurnOrder.Groups) do
         if group.IsPlayer then
-            if not round then
-                round = group.Round
-                team = group.Team
-            end
-        else
-            table.insert(groupsEnemies, group)
+            round = group.Round
+            team = group.Team
+            break
         end
     end
     -- Collect all directly-controlled chars (in MP each user has their own).
@@ -429,13 +427,9 @@ local function setPlayerTurnsActive()
     for _, uuid in ipairs(otherUuids) do
         addGroup(uuid)
     end
-    local numPlayerGroups = #groupsPlayers
-    for i = 1, numPlayerGroups do
-        combatEntity.TurnOrder.Groups[i] = groupsPlayers[i]
-    end
-    for i = 1, #groupsEnemies do
-        combatEntity.TurnOrder.Groups[i + numPlayerGroups] = groupsEnemies[i]
-    end
+    -- Whole-table assignment: replaces Groups with EXACTLY the player single-member groups, no enemies, no duplicate ghost entries.
+    -- (Per-index writes leave behind duplicate-player ghosts in the slots originally held by enemies — see prior memory.)
+    combatEntity.TurnOrder.Groups = groupsPlayers
     local uuid = combatEntity.CombatState.MyGuid
     if State.Session.TurnOrderListener[uuid] then
         Ext.Entity.Unsubscribe(State.Session.TurnOrderListener[uuid])
@@ -454,6 +448,57 @@ local function setPlayerTurnsActive()
         end
     end, combatEntity)
     combatEntity:Replicate("TurnOrder")
+end
+
+-- Experimental: reorder Groups2 so the player group(s) come first, leaving enemy groups intact in their natural order after.
+-- Hypothesis: this gives the topbar/UI players-first ordering without mangling Groups, so the engine can cycle enemies
+-- naturally each round and fire TurnStarted on them (which is what ticks per-turn statuses like BANISHED/DAZED/HINDERED).
+local function setPlayersFirstInGroups2()
+    local combatEntity = Utils.getCombatEntity()
+    if not (combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups2) then
+        return
+    end
+    local groupsPlayers = {}
+    local groupsEnemies = {}
+    for _, group in ipairs(combatEntity.TurnOrder.Groups2) do
+        if group.IsPlayer then
+            table.insert(groupsPlayers, group)
+        else
+            table.insert(groupsEnemies, group)
+        end
+    end
+    local idx = 1
+    for _, g in ipairs(groupsPlayers) do
+        combatEntity.TurnOrder.Groups2[idx] = g
+        idx = idx + 1
+    end
+    for _, g in ipairs(groupsEnemies) do
+        combatEntity.TurnOrder.Groups2[idx] = g
+        idx = idx + 1
+    end
+    combatEntity:Replicate("TurnOrder")
+end
+
+local function dumpTurnOrderState(label)
+    print("[ROUND_DEBUG] ===== " .. tostring(label) .. " =====")
+    print("[ROUND_DEBUG] currentCombatRound =", getCurrentCombatRound())
+    local combatEntity = Utils.getCombatEntity()
+    if not combatEntity or not combatEntity.TurnOrder then
+        print("[ROUND_DEBUG] no combat entity / no TurnOrder")
+        return
+    end
+    if combatEntity.TurnOrder.Groups then
+        print("[ROUND_DEBUG] -- Groups --")
+        for i, group in ipairs(combatEntity.TurnOrder.Groups) do
+            print("[ROUND_DEBUG] " .. formatGroupStr(i, group))
+        end
+    end
+    if combatEntity.TurnOrder.Groups2 then
+        print("[ROUND_DEBUG] -- Groups2 --")
+        for i, group in ipairs(combatEntity.TurnOrder.Groups2) do
+            print("[ROUND_DEBUG] " .. formatGroupStr(i, group))
+        end
+    end
 end
 
 return {
@@ -476,4 +521,6 @@ return {
     stopListeners = stopListeners,
     setTurnActive = setTurnActive,
     setPlayerTurnsActive = setPlayerTurnsActive,
+    setPlayersFirstInGroups2 = setPlayersFirstInGroups2,
+    dumpTurnOrderState = dumpTurnOrderState,
 }
