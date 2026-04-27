@@ -69,7 +69,15 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                     State.Session.SwarmTurnComplete[entityUuid] = false
                     Osi.PROC_SelfHealing_Disable(entityUuid)
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
-                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = M.Utils.isPlayerTurnEnded(entityUuid)
+                    local newFlag = M.Utils.isPlayerTurnEnded(entityUuid)
+                    State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = newFlag
+                    print("[LATEJOIN] addBrawler player", displayName,
+                        "round=", TurnOrder.getCurrentCombatRound(),
+                        "RequestedEndTurn=", entity.TurnBased and tostring(entity.TurnBased.RequestedEndTurn) or "no-tb",
+                        "IsActiveCombatTurn=", entity.TurnBased and tostring(entity.TurnBased.IsActiveCombatTurn) or "no-tb",
+                        "HadTurnInCombat=", entity.TurnBased and tostring(entity.TurnBased.HadTurnInCombat) or "no-tb",
+                        "ActedThisRoundInCombat=", entity.TurnBased and tostring(entity.TurnBased.ActedThisRoundInCombat) or "no-tb",
+                        "newFlag=", tostring(newFlag))
                 end
             else
                 if Osi.IsPlayer(entityUuid) == 0 then
