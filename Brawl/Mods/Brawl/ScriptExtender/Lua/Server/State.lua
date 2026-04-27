@@ -25,6 +25,7 @@ local Settings = {
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
     ExcludeEnemyTiers = nil,
+    DisableEnemyAI = false,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")
@@ -116,6 +117,7 @@ local Session = {
     SwarmTurnIsBeforePlayer = nil,
     ExcludeEnemyTierIndex = Utils.getTierIndex(Settings.ExcludeEnemyTiers),
     CombatHelper = nil,
+    IsInDialog = false,
 }
 
 -- Persistent state

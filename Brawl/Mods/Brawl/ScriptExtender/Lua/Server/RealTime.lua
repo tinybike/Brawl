@@ -46,6 +46,10 @@ local function pulseAction(brawler)
         if not Utils.canAct(brawler.uuid) or brawler.isPaused or (State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto) then
             return
         end
+        -- Debug toggle: skip pulse actions for non-player brawlers when DisableEnemyAI is set.  Useful for status-tick testing without dying.
+        if State.Settings.DisableEnemyAI and M.Osi.IsPlayer(brawler.uuid) == 0 then
+            return
+        end
         -- NPC brawlers in the table should always be in combat with the combat helper. Safety net against stale brawlers.
         -- Players go out of IsInCombat during FTB/pause, so this gate is NPC-only.
         if M.Osi.IsPlayer(brawler.uuid) == 0 and M.Osi.IsInCombat(brawler.uuid) == 0 then
@@ -403,6 +407,7 @@ end
 
 local function onDialogStarted()
     debugPrint("DialogStarted")
+    State.Session.IsInDialog = true
     pauseCombatRoundTimers()
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         stopPulseAction(brawler)
@@ -412,6 +417,7 @@ end
 
 local function onDialogEnded()
     debugPrint("DialogEnded")
+    State.Session.IsInDialog = false
     resumeCombatRoundTimers()
     for uuid, brawler in pairs(M.Roster.getBrawlers()) do
         if not State.isPlayerControllingDirectly(uuid) then

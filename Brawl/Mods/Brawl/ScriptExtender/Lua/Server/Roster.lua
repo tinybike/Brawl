@@ -80,6 +80,9 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
                     if State.Settings.AutoPauseOnCombatStart then
                         brawler.isPaused = true
+                    elseif State.Session.IsInDialog then
+                        -- Don't start pulse actions for new combat entrants while a dialog/cutscene is in progress, otherwise turned-during-cutscene
+                        -- enemies start spellcasting mid-cutscene and interrupt it.
                     elseif State.Session.PulseActionTimers[entityUuid] == nil then
                         RT.Timers.startPulseAction(brawler, Constants.INITIAL_PULSE_ACTION_DELAY)
                     end
