@@ -85,6 +85,8 @@ end
 local function onCombatRoundStarted(combatGuid, round)
     debugPrint("CombatRoundStarted", combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
+    State.Session.ReactionInterruptCount = {}
+    State.Session.ReactionInterruptLoopDetected = {}
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
@@ -624,12 +626,44 @@ local function onServerInterruptUsed(entity, label, component)
     end
 end
 
+-- Engine-side reaction-interrupt loop circuit-breaker.  When an actor is mid-cast (we submitted a spell, the engine never fired the completion event)
+-- and a reaction triggers (e.g. attack-of-opportunity) the engine wants to fire the reaction but can't fully commit, so it spins on ReactionInterruptUsed,
+-- which can crash the game.  Force-fail the source's pending action(s) and end their turn so the engine can move forward.
+local function forceFailReactionInterruptLoop(uuid)
+    print("[REACTION_LOOP] threshold exceeded, force-failing", M.Utils.getDisplayName(uuid), uuid)
+    State.Session.ReactionInterruptLoopDetected[uuid] = true
+    local actions = State.Session.ActionsInProgress[uuid]
+    if actions and next(actions) then
+        for _, action in ipairs(actions) do
+            if action.onFailed then
+                action.onFailed("reaction interrupt loop")
+            end
+        end
+        State.Session.ActionsInProgress[uuid] = {}
+    end
+    if State.Session.ActionSequenceFailsafeTimer and State.Session.ActionSequenceFailsafeTimer[uuid] and State.Session.ActionSequenceFailsafeTimer[uuid].timer then
+        Ext.Timer.Cancel(State.Session.ActionSequenceFailsafeTimer[uuid].timer)
+        State.Session.ActionSequenceFailsafeTimer[uuid] = nil
+    end
+    if State.Settings.TurnBasedSwarmMode then
+        Swarm.setTurnComplete(uuid)
+    end
+end
+
 local function onReactionInterruptUsed(characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
     debugPrint("ReactionInterruptUsed", characterGuid, reactionInterruptPrototypeId, isAutoTriggered)
+    local uuid = M.Osi.GetUUID(characterGuid)
+    if uuid and not State.Session.ReactionInterruptLoopDetected[uuid] then
+        State.Session.ReactionInterruptCount[uuid] = (State.Session.ReactionInterruptCount[uuid] or 0) + 1
+        if State.Session.ReactionInterruptCount[uuid] > Constants.REACTION_INTERRUPT_LOOP_THRESHOLD then
+            forceFailReactionInterruptLoop(uuid)
+            return
+        end
+    end
     if State.Settings.TurnBasedSwarmMode then
-        Swarm.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
+        Swarm.Listeners.onReactionInterruptUsed(uuid, isAutoTriggered)
     else
-        RT.Listeners.onReactionInterruptUsed(M.Osi.GetUUID(characterGuid), isAutoTriggered)
+        RT.Listeners.onReactionInterruptUsed(uuid, isAutoTriggered)
     end
 end
 

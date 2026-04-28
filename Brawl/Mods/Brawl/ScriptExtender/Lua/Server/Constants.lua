@@ -439,6 +439,10 @@ Constants.ACTION_MAX_TIME = 6000
 Constants.MOVEMENT_MAX_TIME = 8000
 Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.ENEMY_TURN_FAILSAFE_TIMEOUT = 15000
+-- Circuit-breaker for engine-side ReactionInterruptUsed loops: if the same character emits more than this many reaction-interrupt events
+-- in a round, force-fail their pending action and end their turn. Threshold is well above any plausible legitimate count (one reaction
+-- per round normally; even with mod-granted extras, a few is the realistic max).
+Constants.REACTION_INTERRUPT_LOOP_THRESHOLD = 10
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
 Constants.MAX_MOVEMENT_RETRIES = 1
 Constants.OVERFLOW_DAMAGE_PENALTY = 0.4
