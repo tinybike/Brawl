@@ -71,7 +71,7 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                 elseif State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] == nil then
                     local newFlag = M.Utils.isPlayerTurnEnded(entityUuid)
                     State.Session.TurnBasedSwarmModePlayerTurnEnded[entityUuid] = newFlag
-                    print("[LATEJOIN] addBrawler player", displayName,
+                    debugPrint("[LATEJOIN] addBrawler player", displayName,
                         "round=", TurnOrder.getCurrentCombatRound(),
                         "RequestedEndTurn=", entity.TurnBased and tostring(entity.TurnBased.RequestedEndTurn) or "no-tb",
                         "IsActiveCombatTurn=", entity.TurnBased and tostring(entity.TurnBased.IsActiveCombatTurn) or "no-tb",

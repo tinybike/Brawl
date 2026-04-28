@@ -498,7 +498,7 @@ useRemainingActions = function (brawler, swarmTurnActiveInitial, swarmActors, ca
             end)
         end
         -- if State.Session.ActionsInProgress[brawler.uuid] and next(State.Session.ActionsInProgress[brawler.uuid]) then
-        --     print(brawler.displayName)
+        --     debugPrint(brawler.displayName)
         --     _D(State.Session.ActionsInProgress[brawler.uuid])
         --     error("we have a current AIP, what is this????")
         -- end
@@ -693,7 +693,7 @@ end
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
-        print("[LATEJOIN] checkAllPlayersFinishedTurns START round=", TurnOrder.getCurrentCombatRound())
+        debugPrint("[LATEJOIN] checkAllPlayersFinishedTurns START round=", TurnOrder.getCurrentCombatRound())
         for uuid, player in pairs(players) do
             if Utils.hasLoseControlStatus(uuid) then
                 State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
@@ -706,7 +706,7 @@ local function checkAllPlayersFinishedTurns()
                 end
             end
             local isBrawler = M.Roster.getBrawlerByUuid(uuid) ~= nil
-            print("[LATEJOIN] check", M.Utils.getDisplayName(uuid),
+            debugPrint("[LATEJOIN] check", M.Utils.getDisplayName(uuid),
                 "flag=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]),
                 "alive=", Utils.isAliveAndCanFight(uuid),
                 "loseControl=", Utils.hasLoseControlStatus(uuid),
@@ -716,11 +716,11 @@ local function checkAllPlayersFinishedTurns()
             -- swarm enemy turn from advancing. Also handles late joiners whose flag got stuck
             -- at false because the engine didn't slot them into this round's TurnOrder.
             if isBrawler and Utils.isAliveAndCanFight(uuid) and not State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] then
-                print("[LATEJOIN] checkAllPlayersFinishedTurns BLOCKED by", M.Utils.getDisplayName(uuid))
+                debugPrint("[LATEJOIN] checkAllPlayersFinishedTurns BLOCKED by", M.Utils.getDisplayName(uuid))
                 return false
             end
         end
-        print("[LATEJOIN] checkAllPlayersFinishedTurns ALL DONE")
+        debugPrint("[LATEJOIN] checkAllPlayersFinishedTurns ALL DONE")
         return true
     end
     return nil
@@ -780,7 +780,7 @@ local function onCombatRoundStarted(round)
             numTotalPlayers = numTotalPlayers + 1
         end
     end
-    print("[LATEJOIN] onCombatRoundStarted round=", round, "playersInBrawlers=", numPlayersInBrawlers, "totalPlayers=", numTotalPlayers)
+    debugPrint("[LATEJOIN] onCombatRoundStarted round=", round, "playersInBrawlers=", numPlayersInBrawlers, "totalPlayers=", numTotalPlayers)
     local enemyList, excludedEnemyList = getEnemyList(true)
     startSwarmTurn(enemyList, excludedEnemyList, true)
 end
@@ -799,7 +799,7 @@ end
 -- tracked in SwarmTurnOrderPlayers and skipped here to avoid redundant recalcs.
 local function onEnteredCombat(uuid)
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and not State.Session.SwarmTurnOrderPlayers[uuid] then
-        print("[LATEJOIN] Swarm.onEnteredCombat", M.Utils.getDisplayName(uuid),
+        debugPrint("[LATEJOIN] Swarm.onEnteredCombat", M.Utils.getDisplayName(uuid),
             "round=", TurnOrder.getCurrentCombatRound(),
             "flag=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]))
         TurnOrder.setPartyInitiativeRollToMean()
@@ -813,7 +813,7 @@ end
 local function onTurnStarted(uuid)
     debugPrint("ON TURN STARTED**********************************", M.Utils.getDisplayName(uuid))
     if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
-        print("[LATEJOIN] onTurnStarted player", M.Utils.getDisplayName(uuid),
+        debugPrint("[LATEJOIN] onTurnStarted player", M.Utils.getDisplayName(uuid),
             "round=", TurnOrder.getCurrentCombatRound(),
             "flag was=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]))
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = false
@@ -864,7 +864,7 @@ local function onTurnEnded(uuid)
             end
         end
         if M.Roster.getBrawlerByUuid(uuid) and M.Osi.IsPartyMember(uuid, 1) == 1 then
-            print("[LATEJOIN] onTurnEnded player", M.Utils.getDisplayName(uuid),
+            debugPrint("[LATEJOIN] onTurnEnded player", M.Utils.getDisplayName(uuid),
                 "round=", TurnOrder.getCurrentCombatRound())
             State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
             if checkAllPlayersFinishedTurns() then
