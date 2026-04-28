@@ -405,6 +405,19 @@ local function onDestroySpellSyncTargeting(cast, _, _)
     end
 end
 
+-- Capture the requestUuid of a registered action for this storyActionID, if there is one. Use `or` so that follow-up events sharing the same
+-- storyActionID (e.g. the Target_Counterspell_Success metaspell that fires after a successful counter) don't clobber the original cast's
+-- requestUuid -- the counterspell handler in onCastedSpell needs the original to look up and fail the right action precisely.
+local function captureStoryActionRequestUuid(storyActionID, casterUuid, spellName)
+    if State.Session.StoryActionIDs[storyActionID].requestUuid then
+        return
+    end
+    local action = Actions.getActionInProgressByName(casterUuid, spellName)
+    if action then
+        State.Session.StoryActionIDs[storyActionID].requestUuid = action.requestUuid
+    end
+end
+
 local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType, spellElement, storyActionID)
     local casterUuid = M.Osi.GetUUID(casterGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
@@ -416,6 +429,7 @@ local function onUsingSpellOnTarget(casterGuid, targetGuid, spellName, spellType
         State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
         State.Session.StoryActionIDs[storyActionID].spellName = spellName
         State.Session.StoryActionIDs[storyActionID].targetUuid = targetUuid
+        captureStoryActionRequestUuid(storyActionID, casterUuid, spellName)
         -- NB: what other instakill effects are there? Word of Bhaal, chasms...?
         -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
         --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
@@ -434,6 +448,7 @@ local function onUsingSpellOnZoneWithTarget(casterGuid, targetGuid, spellName, s
         State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
         State.Session.StoryActionIDs[storyActionID].spellName = spellName
         State.Session.StoryActionIDs[storyActionID].targetUuid = targetUuid
+        captureStoryActionRequestUuid(storyActionID, casterUuid, spellName)
         -- NB: what other instakill effects are there? Word of Bhaal, chasms...?
         -- if spellName == "Target_PowerWordKill" or spellName == "Target_ATT_PowerWordKill" then
         --     Leaderboard.updateDamage(casterUuid, targetUuid, Osi.GetHitpoints(targetUuid))
@@ -451,6 +466,7 @@ local function onUsingSpell(casterGuid, spellName, spellType, spellElement, stor
         end
         State.Session.StoryActionIDs[storyActionID].casterUuid = casterUuid
         State.Session.StoryActionIDs[storyActionID].spellName = spellName
+        captureStoryActionRequestUuid(storyActionID, casterUuid, spellName)
     end
 end
 
@@ -474,13 +490,14 @@ local function onCastedSpell(casterGuid, spellName, spellType, spellElement, sto
     end
     if M.Utils.isCounterspell(spellName) then
         local originalCastInfo = State.Session.StoryActionIDs[storyActionID]
-        debugPrint("got counterspelled!", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
-        if originalCastInfo and originalCastInfo.casterUuid then
-            local actionInProgress = Actions.getActionInProgressByName(casterUuid, spellName)
-            if actionInProgress then
-                actionInProgress.onFailed("counterspelled")
-                Actions.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.spellName)
+        if originalCastInfo and originalCastInfo.casterUuid and originalCastInfo.requestUuid then
+            debugPrint("got counterspelled!", spellName, originalCastInfo.spellName, M.Utils.getDisplayName(originalCastInfo.targetUuid), M.Utils.getDisplayName(originalCastInfo.casterUuid))
+            local originalAction = Actions.getActionInProgress(originalCastInfo.casterUuid, originalCastInfo.requestUuid)
+            if originalAction then
+                local onFailed = originalAction.onFailed
+                Actions.removeActionInProgress(originalCastInfo.casterUuid, originalCastInfo.requestUuid)
                 State.Session.StoryActionIDs[storyActionID] = {}
+                onFailed("counterspelled")
             end
         end
     end

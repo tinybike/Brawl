@@ -958,8 +958,12 @@ local function onServerInterruptUsed(entity, label, component)
 end
 
 local function onReactionInterruptUsed(uuid, isAutoTriggered)
+    -- pause/resume only pair with player-chosen interrupts; auto-triggered ones never paused, so don't resume
+    if isAutoTriggered ~= 0 then
+        return
+    end
     Movement.resumeTimers()
-    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and isAutoTriggered == 0 then
+    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 then
         resumeTimers()
     end
 end
