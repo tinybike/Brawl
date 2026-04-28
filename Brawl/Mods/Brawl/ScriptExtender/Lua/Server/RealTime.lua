@@ -282,14 +282,11 @@ local function onCombatRoundStarted(combatGuid, round)
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
         Pause.allEnterFTB()
     end
-    TurnOrder.dumpTurnOrderState("onCombatRoundStarted ENTRY round=" .. tostring(round))
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
     TurnOrder.setPartyInitiativeRollToMean()
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
-    TurnOrder.dumpTurnOrderState("PRE-setPlayerTurnsActive round=" .. tostring(round))
     TurnOrder.setPlayerTurnsActive()
-    TurnOrder.dumpTurnOrderState("POST-setPlayerTurnsActive round=" .. tostring(round))
     -- Engine doesn't fire TurnStarted on enemies in RT mode, so per-turn statuses on them never tick. Manually decrement
     -- CurrentLifeTime by one round's worth on each affected enemy status (skipping TickingWithSource ones, which already tick correctly).
     Spells.tickEnemyStatusDurations()

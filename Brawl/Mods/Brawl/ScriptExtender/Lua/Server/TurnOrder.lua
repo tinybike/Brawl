@@ -450,35 +450,6 @@ local function setPlayerTurnsActive()
     combatEntity:Replicate("TurnOrder")
 end
 
--- Experimental: reorder Groups2 so the player group(s) come first, leaving enemy groups intact in their natural order after.
--- Hypothesis: this gives the topbar/UI players-first ordering without mangling Groups, so the engine can cycle enemies
--- naturally each round and fire TurnStarted on them (which is what ticks per-turn statuses like BANISHED/DAZED/HINDERED).
-local function setPlayersFirstInGroups2()
-    local combatEntity = Utils.getCombatEntity()
-    if not (combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups2) then
-        return
-    end
-    local groupsPlayers = {}
-    local groupsEnemies = {}
-    for _, group in ipairs(combatEntity.TurnOrder.Groups2) do
-        if group.IsPlayer then
-            table.insert(groupsPlayers, group)
-        else
-            table.insert(groupsEnemies, group)
-        end
-    end
-    local idx = 1
-    for _, g in ipairs(groupsPlayers) do
-        combatEntity.TurnOrder.Groups2[idx] = g
-        idx = idx + 1
-    end
-    for _, g in ipairs(groupsEnemies) do
-        combatEntity.TurnOrder.Groups2[idx] = g
-        idx = idx + 1
-    end
-    combatEntity:Replicate("TurnOrder")
-end
-
 local function dumpTurnOrderState(label)
     print("[ROUND_DEBUG] ===== " .. tostring(label) .. " =====")
     print("[ROUND_DEBUG] currentCombatRound =", getCurrentCombatRound())
@@ -541,6 +512,5 @@ return {
     stopListeners = stopListeners,
     setTurnActive = setTurnActive,
     setPlayerTurnsActive = setPlayerTurnsActive,
-    setPlayersFirstInGroups2 = setPlayersFirstInGroups2,
     dumpTurnOrderState = dumpTurnOrderState,
 }

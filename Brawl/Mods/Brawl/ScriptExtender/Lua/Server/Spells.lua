@@ -527,7 +527,6 @@ local function tickEnemyStatusDurations()
                         end
                         if not hasTickingWithSource then
                             local newLifeTime = status.CurrentLifeTime - roundDurationSec
-                            print("[STATUS_TICK]", M.Utils.getDisplayName(uuid), status.StatusId, "old=", status.CurrentLifeTime, "new=", newLifeTime)
                             if newLifeTime <= 0 then
                                 -- Engine won't auto-remove statuses we've manually mutated; remove explicitly.
                                 Osi.RemoveStatus(uuid, status.StatusId)

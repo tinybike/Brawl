@@ -143,43 +143,17 @@ local function onLeftCombat(entityGuid, combatGuid)
     end
 end
 
--- Tracks last-seen TurnBased state per entity so we can log only the deltas.
-local lastTurnBasedState = {}
-
-local function logTurnBasedDelta(entity)
-    if not entity or not entity.Uuid or not entity.TurnBased then return end
-    local uuid = entity.Uuid.EntityUuid
-    local tb = entity.TurnBased
-    local now = string.format(
-        "IsActive=%s HadTurn=%s Acted=%s ActionsCompleted=%s RequestedEnd=%s CanAct=%s",
-        tostring(tb.IsActiveCombatTurn),
-        tostring(tb.HadTurnInCombat),
-        tostring(tb.ActedThisRoundInCombat),
-        tostring(tb.TurnActionsCompleted),
-        tostring(tb.RequestedEndTurn),
-        tostring(tb.CanActInCombat))
-    local prev = lastTurnBasedState[uuid]
-    if prev ~= now then
-        print("[TB_DELTA]", M.Utils.getDisplayName(uuid), uuid, now)
-        lastTurnBasedState[uuid] = now
-    end
-end
-
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
-    local uuid = M.Osi.GetUUID(entityGuid)
-    print("[TURN_STARTED]", M.Utils.getDisplayName(uuid), uuid, "round=", TurnOrder.getCurrentCombatRound())
     if State.Settings.TurnBasedSwarmMode then
-        Swarm.Listeners.onTurnStarted(uuid)
+        Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
     end
 end
 
 local function onTurnEnded(entityGuid)
     debugPrint("TurnEnded", entityGuid)
-    local uuid = M.Osi.GetUUID(entityGuid)
-    print("[TURN_ENDED]", M.Utils.getDisplayName(uuid), uuid, "round=", TurnOrder.getCurrentCombatRound())
     if State.Settings.TurnBasedSwarmMode then
-        Swarm.Listeners.onTurnEnded(uuid)
+        Swarm.Listeners.onTurnEnded(M.Osi.GetUUID(entityGuid))
     end
 end
 
@@ -246,18 +220,14 @@ local function onGainedControl(targetGuid)
 end
 
 local function onEnteredForceTurnBased(entityGuid)
-    local uuid = M.Osi.GetUUID(entityGuid)
-    print("[FTB_ENTER]", M.Utils.getDisplayName(uuid), uuid, "round=", TurnOrder.getCurrentCombatRound())
     if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onEnteredForceTurnBased(uuid)
+        RT.Listeners.onEnteredForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
 local function onLeftForceTurnBased(entityGuid)
-    local uuid = M.Osi.GetUUID(entityGuid)
-    print("[FTB_LEAVE]", M.Utils.getDisplayName(uuid), uuid, "round=", TurnOrder.getCurrentCombatRound())
     if not State.Settings.TurnBasedSwarmMode then
-        RT.Listeners.onLeftForceTurnBased(uuid)
+        RT.Listeners.onLeftForceTurnBased(M.Osi.GetUUID(entityGuid))
     end
 end
 
@@ -684,10 +654,6 @@ local function startListeners()
     }
     State.Session.Listeners.UserReservedFor = {
         handle = Ext.Entity.Subscribe("UserReservedFor", onUserReservedFor),
-        stop = Ext.Entity.Unsubscribe,
-    }
-    State.Session.Listeners.TurnBasedDelta = {
-        handle = Ext.Entity.Subscribe("TurnBased", function (entity, _, _) logTurnBasedDelta(entity) end),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.LevelGameplayStarted = {
