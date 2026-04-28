@@ -87,6 +87,18 @@ local function onCombatRoundStarted(combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     State.Session.ReactionInterruptCount = {}
     State.Session.ReactionInterruptLoopDetected = {}
+    -- Diagnostic-only: investigating an MP-only RT bug where a player ends up alone in their topbar after fleeing a fight (combat doesn't end)
+    debugPrint("[ROUND_GUIDS] CombatRoundStarted combatGuid=", combatGuid, "round=", round, "mode=", State.Settings.TurnBasedSwarmMode and "swarm" or "rt")
+    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
+        debugPrint("[ROUND_GUIDS]   brawler",
+            M.Utils.getDisplayName(brawlerUuid),
+            "uuid=", brawlerUuid,
+            "isPlayer=", State.Session.Players[brawlerUuid] ~= nil,
+            "isHelper=", M.Utils.isCombatHelper(brawlerUuid),
+            "alive=", M.Utils.isAliveAndCanFight(brawlerUuid),
+            "IsInCombat=", M.Osi.IsInCombat(brawlerUuid),
+            "CombatGuid=", M.Osi.CombatGetGuidFor(brawlerUuid))
+    end
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
