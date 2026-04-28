@@ -502,6 +502,47 @@ local function buildSpellTable()
     State.Session.SpellTableByName = spellTableByName
 end
 
+-- The engine doesn't fire TurnStarted on enemies in our RT mode, so per-turn-duration statuses on enemies (BANISHED, DAZED, HINDERED, PRONE, etc.)
+-- never tick down via the natural engine path.  Compensates by directly decrementing CurrentLifeTime on each affected enemy status once per RT round.
+-- Statuses with TickingWithSource are skipped; those tick correctly on the caster's turn (which fires TurnStarted reliably for players).
+-- (Thank you Focus!)
+local function tickEnemyStatusDurations()
+    local roundDurationSec = 6
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Osi.IsPartyMember(uuid, 1) == 0 and not M.Utils.isCombatHelper(uuid) then
+            local entity = Ext.Entity.Get(uuid)
+            local statusManager = entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager
+            if statusManager and statusManager.Statuses then
+                for _, status in ipairs(statusManager.Statuses) do
+                    if status.CurrentLifeTime and status.CurrentLifeTime > 0 then
+                        local stat = Ext.Stats.Get(status.StatusId)
+                        local hasTickingWithSource = false
+                        if stat and stat.StatusPropertyFlags then
+                            for _, flag in ipairs(stat.StatusPropertyFlags) do
+                                if flag == "TickingWithSource" then
+                                    hasTickingWithSource = true
+                                    break
+                                end
+                            end
+                        end
+                        if not hasTickingWithSource then
+                            local newLifeTime = status.CurrentLifeTime - roundDurationSec
+                            print("[STATUS_TICK]", M.Utils.getDisplayName(uuid), status.StatusId, "old=", status.CurrentLifeTime, "new=", newLifeTime)
+                            if newLifeTime <= 0 then
+                                -- Engine won't auto-remove statuses we've manually mutated; remove explicitly.
+                                Osi.RemoveStatus(uuid, status.StatusId)
+                            else
+                                status.CurrentLifeTime = newLifeTime
+                                status.RequestClientSync = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 local function resetSpellData()
     local modVars = Ext.Vars.GetModVariables(ModuleUUID)
     if modVars and modVars.SpellRequirements then
@@ -567,6 +608,7 @@ return {
     isCooldown = isCooldown,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
+    tickEnemyStatusDurations = tickEnemyStatusDurations,
     getAuras = getAuras,
     getRageAbility = getRageAbility,
     getSpellByName = getSpellByName,

@@ -143,6 +143,9 @@ local function act(brawler, bonusActionOnly, onSubmitted, onCompleted, onFailed)
     if not brawler or not brawler.uuid or not Utils.canAct(brawler.uuid) or Roster.isExcludedFromAI(brawler.uuid) then
         return onFailed("can't act or brawler not found")
     end
+    if State.Settings.DisableEnemyAI and M.Osi.IsPlayer(brawler.uuid) == 0 then
+        return onFailed("enemy AI disabled")
+    end
     -- NB: should this change depending on offensive/defensive tactics? should this be a setting to enable disable?
     --     should this generally be handled by the healing logic, instead of special-casing it here?
     if M.Utils.isPlayerOrAlly(brawler.uuid) and not bonusActionOnly then

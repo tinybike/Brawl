@@ -499,6 +499,26 @@ local function dumpTurnOrderState(label)
             print("[ROUND_DEBUG] " .. formatGroupStr(i, group))
         end
     end
+    -- Per-brawler TurnBased state. Helps identify which fields differ between entities that get TurnStarted vs those that don't.
+    print("[ROUND_DEBUG] -- TurnBased per brawler --")
+    for uuid, _ in pairs(M.Roster.getBrawlers()) do
+        local entity = Ext.Entity.Get(uuid)
+        local tb = entity and entity.TurnBased
+        if tb then
+            print("[ROUND_DEBUG]",
+                M.Utils.getDisplayName(uuid), uuid,
+                "isPlayer=" .. tostring(M.Osi.IsPartyMember(uuid, 1) == 1),
+                "IsActive=" .. tostring(tb.IsActiveCombatTurn),
+                "HadTurn=" .. tostring(tb.HadTurnInCombat),
+                "Acted=" .. tostring(tb.ActedThisRoundInCombat),
+                "ActionsCompleted=" .. tostring(tb.TurnActionsCompleted),
+                "RequestedEnd=" .. tostring(tb.RequestedEndTurn),
+                "CanAct=" .. tostring(tb.CanActInCombat),
+                "Team=" .. tostring(tb.CombatTeam))
+        else
+            print("[ROUND_DEBUG]", M.Utils.getDisplayName(uuid), uuid, "NO TurnBased")
+        end
+    end
 end
 
 return {

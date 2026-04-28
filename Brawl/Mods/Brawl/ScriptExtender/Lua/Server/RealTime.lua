@@ -290,6 +290,9 @@ local function onCombatRoundStarted(combatGuid, round)
     TurnOrder.dumpTurnOrderState("PRE-setPlayerTurnsActive round=" .. tostring(round))
     TurnOrder.setPlayerTurnsActive()
     TurnOrder.dumpTurnOrderState("POST-setPlayerTurnsActive round=" .. tostring(round))
+    -- Engine doesn't fire TurnStarted on enemies in RT mode, so per-turn statuses on them never tick. Manually decrement
+    -- CurrentLifeTime by one round's worth on each affected enemy status (skipping TickingWithSource ones, which already tick correctly).
+    Spells.tickEnemyStatusDurations()
 end
 
 local function onCombatEnded(combatGuid)

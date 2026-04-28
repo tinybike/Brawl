@@ -390,6 +390,7 @@ Constants.NO_ACTION_STATUSES = {
     "SG_Stunned",
     "SG_Unconscious",
 }
+
 Constants.UNUSABLE_NPC_SPELLS = {
     "Throw_Throw",
     "Target_Devour_Ghoul",
