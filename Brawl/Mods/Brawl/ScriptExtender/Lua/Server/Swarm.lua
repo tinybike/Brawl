@@ -864,8 +864,14 @@ local function onTurnEnded(uuid)
             end
         end
         if M.Roster.getBrawlerByUuid(uuid) and M.Osi.IsPartyMember(uuid, 1) == 1 then
-            debugPrint("[LATEJOIN] onTurnEnded player", M.Utils.getDisplayName(uuid),
-                "round=", TurnOrder.getCurrentCombatRound())
+            local prevFlag = State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]
+            debugPrint("[LATEJOIN] onTurnEnded player", M.Utils.getDisplayName(uuid), "round=", TurnOrder.getCurrentCombatRound(), "flag was=", tostring(prevFlag))
+            -- Stale-event guard: only `false` means a TurnStarted fired since the last startSwarmTurn reset.
+            -- Check for this so we don't trip ALL DONE and trigger the after-player swarm early.
+            if prevFlag ~= false then
+                debugPrint("[LATEJOIN] STALE onTurnEnded skipped for", M.Utils.getDisplayName(uuid))
+                return
+            end
             State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
             if checkAllPlayersFinishedTurns() then
                 local enemyList, excludedEnemyList = getEnemyList(false)
