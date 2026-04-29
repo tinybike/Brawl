@@ -5,7 +5,6 @@ Constants.DEBUG_LOGGING = false
 Constants.INITIAL_PULSE_ACTION_DELAY = 600
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
-Constants.BRAWL_FIZZLER_TIMEOUT = 30000 -- if 30 seconds elapse with no attacks or pauses, end the brawl
 Constants.LIE_ON_GROUND_TIMEOUT = 3500
 Constants.LEADERBOARD_UPDATE_TIMEOUT = 100
 Constants.COUNTDOWN_TURN_INTERVAL = 6000

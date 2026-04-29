@@ -287,9 +287,9 @@ local function onCombatRoundStarted(combatGuid, round)
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
-    -- Engine doesn't fire TurnStarted on enemies in RT mode, so per-turn statuses on them never tick. Manually decrement
-    -- CurrentLifeTime by one round's worth on each affected enemy status (skipping TickingWithSource ones, which already tick correctly).
-    Spells.tickEnemyStatusDurations()
+    -- Engine doesn't fire TurnStarted on enemies in RT mode, so any status whose tick-source is an enemy never ticks. Manually decrement
+    -- CurrentLifeTime by one round's worth on each such status. See Spells.tickStatusDurations for the full target/caster/TWS matrix.
+    Spells.tickStatusDurations()
 end
 
 local function onCombatEnded(combatGuid)

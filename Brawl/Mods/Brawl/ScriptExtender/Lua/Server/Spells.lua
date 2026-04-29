@@ -502,14 +502,12 @@ local function buildSpellTable()
     State.Session.SpellTableByName = spellTableByName
 end
 
--- The engine doesn't fire TurnStarted on enemies in our RT mode, so per-turn-duration statuses on enemies (BANISHED, DAZED, HINDERED, PRONE, etc.)
--- never tick down via the natural engine path.  Compensates by directly decrementing CurrentLifeTime on each affected enemy status once per RT round.
--- Statuses with TickingWithSource are skipped; those tick correctly on the caster's turn (which fires TurnStarted reliably for players).
+-- Engine doesn't fire TurnStarted on enemies in RT mode, so any status whose tick-source is an enemy never ticks down.
+-- Compensate by directly decrementing CurrentLifeTime on each such status once per RT round.
 -- (Thank you Focus!)
-local function tickEnemyStatusDurations()
-    local roundDurationSec = 6
+local function tickStatusDurations()
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
-        if M.Osi.IsPartyMember(uuid, 1) == 0 and not M.Utils.isCombatHelper(uuid) then
+        if not M.Utils.isCombatHelper(uuid) then
             local entity = Ext.Entity.Get(uuid)
             local statusManager = entity and entity.ServerCharacter and entity.ServerCharacter.StatusManager
             if statusManager and statusManager.Statuses then
@@ -525,10 +523,17 @@ local function tickEnemyStatusDurations()
                                 end
                             end
                         end
-                        if not hasTickingWithSource then
-                            local newLifeTime = status.CurrentLifeTime - roundDurationSec
+                        -- Tick-source is the caster if TWS, otherwise the target.  Engine ticks iff the tick-source is a player.
+                        local tickSourceIsPlayer
+                        if hasTickingWithSource then
+                            tickSourceIsPlayer = status.CauseGUID and M.Osi.IsPartyMember(status.CauseGUID, 1) == 1
+                        else
+                            tickSourceIsPlayer = M.Osi.IsPartyMember(uuid, 1) == 1
+                        end
+                        if not tickSourceIsPlayer then
+                            local newLifeTime = status.CurrentLifeTime - 6.0
                             if newLifeTime <= 0 then
-                                -- Engine won't auto-remove statuses we've manually mutated; remove explicitly.
+                                -- Manually remove statuses that we're mutating here
                                 Osi.RemoveStatus(uuid, status.StatusId)
                             else
                                 status.CurrentLifeTime = newLifeTime
@@ -607,7 +612,7 @@ return {
     isCooldown = isCooldown,
     buildSpellTable = buildSpellTable,
     resetSpellData = resetSpellData,
-    tickEnemyStatusDurations = tickEnemyStatusDurations,
+    tickStatusDurations = tickStatusDurations,
     getAuras = getAuras,
     getRageAbility = getRageAbility,
     getSpellByName = getSpellByName,
