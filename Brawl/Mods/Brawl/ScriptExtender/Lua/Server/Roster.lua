@@ -202,6 +202,7 @@ local function endBrawl(level)
     State.Session.StoryActionIDs = {}
     State.Session.SwarmTurnComplete = {}
     State.Session.ActionsInProgress = {}
+    State.Session.MeanInitiativeRoll = nil
     State.Session.ExtraAttacksRemaining = {}
     State.Session.FTBLockedIn = {}
     State.Session.MovementQueue = {}
