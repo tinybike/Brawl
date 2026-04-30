@@ -201,13 +201,13 @@ end
 
 local function getNumEnemiesRemaining(level)
     local numEnemiesRemaining = 0
+    local hostUuid = M.Osi.GetHostCharacter()
     for brawlerUuid, _ in pairs(Session.Brawlers[level]) do
-        -- Count any non-party brawler still in combat as "enemy remaining".
-        -- Using IsEnemy(host, uuid) would falsely end the brawl during
-        -- NPC-vs-NPC fights where surviving combatants aren't host-hostile.
         if not Session.Players[brawlerUuid]
                 and not M.Utils.isCombatHelper(brawlerUuid)
-                and M.Osi.IsInCombat(brawlerUuid) == 1 then
+                and M.Osi.IsInCombat(brawlerUuid) == 1
+                and M.Osi.IsAlly(hostUuid, brawlerUuid) == 0
+                and M.Osi.IsEnemy(hostUuid, brawlerUuid) == 1 then
             numEnemiesRemaining = numEnemiesRemaining + 1
         end
     end
