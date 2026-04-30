@@ -398,6 +398,13 @@ local function onClickPosition(data)
         local clickPosition = Ext.Json.Parse(data.Payload)
         if clickPosition then
             State.Session.LastClickPosition[playerUuid] = {position = clickPosition.position}
+            -- Don't process pending command-confirm clicks while paused (and clear awaiting target, if it's already set)
+            if M.Osi.IsInForceTurnBasedMode(playerUuid) == 1 then
+                if State.Session.AwaitingTarget[playerUuid] then
+                    setAwaitingTarget(playerUuid, false)
+                end
+                return
+            end
             local awaiting = State.Session.AwaitingTarget[playerUuid]
             if awaiting == "move_party" and clickPosition.position then
                 setAwaitingTarget(playerUuid, false)
@@ -509,6 +516,10 @@ local function onMoveParty(data)
             if data.Payload and data.Payload ~= "" then
                 local positionInfo = Ext.Json.Parse(data.Payload)
                 if positionInfo and positionInfo.position then
+                    -- Chord supersedes any pending AwaitingTarget so a stale primed command can't fire on the next click.
+                    if State.Session.AwaitingTarget[player.uuid] then
+                        setAwaitingTarget(player.uuid, false)
+                    end
                     executeMoveParty(player.uuid, positionInfo.position)
                 end
             else
