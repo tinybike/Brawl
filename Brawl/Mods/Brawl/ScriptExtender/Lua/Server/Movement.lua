@@ -216,8 +216,9 @@ local function moveToTargetUuid(uuid, targetUuid, override, onCompleted, onFaile
         clearOsirisQueue(uuid)
     end
     debugPrint("character move to", uuid, targetUuid, getMovementSpeed(uuid))
-    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), registerActiveMovement(uuid, nil, targetUuid, onCompleted, onFailed))
-    return true
+    local eventUuid = registerActiveMovement(uuid, nil, targetUuid, onCompleted, onFailed)
+    Osi.CharacterMoveTo(uuid, targetUuid, getMovementSpeed(uuid), eventUuid)
+    return eventUuid
 end
 
 local function moveToPosition(uuid, position, override, onCompleted, onFailed)
@@ -231,18 +232,10 @@ local function moveToPosition(uuid, position, override, onCompleted, onFailed)
     end
     -- debugPrint("character move to", uuid, position[1], position[2], position[3], getMovementSpeed(uuid))
     -- Osi.RequestPing(position[1], position[2], position[3], Osi.GetHostCharacter(), "")
-    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), registerActiveMovement(uuid, position, nil, onCompleted, onFailed))
+    local eventUuid = registerActiveMovement(uuid, position, nil, onCompleted, onFailed)
+    Osi.CharacterMoveToPosition(uuid, position[1], position[2], position[3], getMovementSpeed(uuid), eventUuid)
     -- _D(Ext.Entity.Get(uuid).ServerCharacter.OsirisController.Tasks)
-    return true
-end
-
-local function moveCompanionsToPlayer(playerUuid)
-    local players = State.Session.Players
-    for uuid, _ in pairs(players) do
-        if not State.isPlayerControllingDirectly(uuid) then
-            moveToTargetUuid(uuid, playerUuid, true)
-        end
-    end
+    return eventUuid
 end
 
 local function moveCompanionsToTargetUuid(targetUuid)
@@ -672,7 +665,6 @@ return {
     moveToPosition = moveToPosition,
     findPathToTargetUuid = findPathToTargetUuid,
     findPathToPosition = findPathToPosition,
-    moveCompanionsToPlayer = moveCompanionsToPlayer,
     moveCompanionsToPosition = moveCompanionsToPosition,
     moveCompanionsToTargetUuid = moveCompanionsToTargetUuid,
     calculateEnRouteCoords = calculateEnRouteCoords,

@@ -43,6 +43,14 @@ end
 
 local function pulseAction(brawler)
     if brawler and brawler.uuid then
+        -- If a "strict move" is happening (e.g., On Me, Move Party) then the pulse must not engage while a user-issued strict move is in flight.
+        -- Clears once the movement exits ActiveMovements (natural arrival, timeout, or force-clear).
+        if brawler.suppressPulseEventUuid then
+            if State.Session.ActiveMovements[brawler.suppressPulseEventUuid] then
+                return
+            end
+            brawler.suppressPulseEventUuid = nil
+        end
         if not Utils.canAct(brawler.uuid) or brawler.isPaused or (State.isPlayerControllingDirectly(brawler.uuid) and not State.Settings.FullAuto) then
             return
         end

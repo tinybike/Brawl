@@ -15,10 +15,10 @@ local function modStatusMessage(message)
     end)
 end
 
-local function setAwaitingTarget(uuid, isAwaitingTarget)
+local function setAwaitingTarget(uuid, awaitingTarget)
     if uuid ~= nil then
-        State.Session.AwaitingTarget[uuid] = isAwaitingTarget
-        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", (isAwaitingTarget == true) and "1" or "0")
+        State.Session.AwaitingTarget[uuid] = awaitingTarget
+        Ext.ServerNet.PostMessageToClient(uuid, "AwaitingTarget", awaitingTarget and "1" or "0")
     end
 end
 
@@ -268,6 +268,8 @@ local function lockCompanionsOnTarget(level, targetUuid)
                 if brawlersInLevel[uuid] and uuid ~= targetUuid then
                     brawlersInLevel[uuid].targetUuid = targetUuid
                     brawlersInLevel[uuid].lockedOnTarget = true
+                    -- New explicit attack-move overrides any in-flight strict-move suppression.
+                    brawlersInLevel[uuid].suppressPulseEventUuid = nil
                     debugPrint("Set target to", uuid, M.Utils.getDisplayName(uuid), targetUuid, M.Utils.getDisplayName(targetUuid))
                 end
             end
@@ -355,6 +357,40 @@ local function onAttackMyTarget(data)
     end
 end
 
+-- Strict click-to-move: every companion converges on the validated position with pulse-suppression in flight
+local function executeMoveParty(playerUuid, position)
+    M.Movement.findPathToPosition(playerUuid, position, function (err, validPosition)
+        if err then
+            return Utils.showNotification(playerUuid, err)
+        end
+        Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
+        local level = M.Osi.GetRegion(playerUuid)
+        local brawlersInLevel = level and State.Session.Brawlers[level]
+        for uuid, _ in pairs(State.Session.Players) do
+            if not State.isPlayerControllingDirectly(uuid) then
+                local brawler = brawlersInLevel and brawlersInLevel[uuid]
+                if brawler then
+                    brawler.lockedOnTarget = false
+                end
+                local companionUuid = uuid
+                local eventUuid = Movement.moveToPosition(uuid, validPosition, true, function ()
+                    local b = M.Roster.getBrawlerByUuid(companionUuid)
+                    if b then
+                        RT.Timers.stopPulseAction(b)
+                        RT.Timers.startPulseAction(b, 0)
+                    end
+                end)
+                if brawler and eventUuid then
+                    brawler.suppressPulseEventUuid = eventUuid
+                end
+            end
+        end
+        if not State.Settings.FullAuto then
+            Movement.moveToPosition(playerUuid, validPosition, true)
+        end
+    end)
+end
+
 local function onClickPosition(data)
     local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
     if player and player.uuid then
@@ -362,7 +398,11 @@ local function onClickPosition(data)
         local clickPosition = Ext.Json.Parse(data.Payload)
         if clickPosition then
             State.Session.LastClickPosition[playerUuid] = {position = clickPosition.position}
-            if State.Session.AwaitingTarget[playerUuid] and clickPosition.uuid then
+            local awaiting = State.Session.AwaitingTarget[playerUuid]
+            if awaiting == "move_party" and clickPosition.position then
+                setAwaitingTarget(playerUuid, false)
+                executeMoveParty(playerUuid, clickPosition.position)
+            elseif awaiting and clickPosition.uuid then
                 -- setAttackMoveTarget only actually engages companions on valid enemies;
                 -- regardless of validity, everyone (companions + active char) should still
                 -- move toward the clicked target.
@@ -371,13 +411,23 @@ local function onClickPosition(data)
                 if not State.Settings.FullAuto then
                     Movement.moveToTargetUuid(playerUuid, clickPosition.uuid, true)
                 end
-            elseif clickPosition.position and State.Session.AwaitingTarget[playerUuid] then
+            elseif clickPosition.position and awaiting then
                 M.Movement.findPathToPosition(playerUuid, clickPosition.position, function (err, validPosition)
                     if err then
                         return Utils.showNotification(playerUuid, err)
                     end
                     setAwaitingTarget(playerUuid, false)
                     allCompanionsDisableLockedOnTarget()
+                    -- Open-ground attack-move overrides any in-flight strict-move suppression.
+                    local level = M.Osi.GetRegion(playerUuid)
+                    local brawlersInLevel = level and State.Session.Brawlers[level]
+                    if brawlersInLevel then
+                        for uuid, _ in pairs(State.Session.Players) do
+                            if brawlersInLevel[uuid] then
+                                brawlersInLevel[uuid].suppressPulseEventUuid = nil
+                            end
+                        end
+                    end
                     Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
                     Movement.moveCompanionsToPosition(validPosition)
                     -- Also move the active character to the position
@@ -405,7 +455,32 @@ local function onOnMe(data)
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             Utils.applyOnMeTargetVfx(player.uuid)
-            Movement.moveCompanionsToPlayer(player.uuid)
+            -- Strict move: pulse must not engage en route.  Clear any prior locked-on so post-arrival the AI re-evaluates fresh rather than peeling
+            -- back to a stale lock.  Per-companion eventUuid tags the in-flight move so the suppression auto-clears when the move ends.
+            local level = M.Osi.GetRegion(player.uuid)
+            local brawlersInLevel = level and State.Session.Brawlers[level]
+            for uuid, _ in pairs(State.Session.Players) do
+                if not State.isPlayerControllingDirectly(uuid) then
+                    local brawler = brawlersInLevel and brawlersInLevel[uuid]
+                    if brawler then
+                        brawler.lockedOnTarget = false
+                    end
+                    -- onCompleted: stop the (suppressed, mid-cycle) pulse timer and restart it with delay 0, so the AI doesn't sit idle waiting
+                    -- for the next periodic tick.  finishMovement clears ActiveMovements[eventUuid] first, so the restarted pulse's suppression
+                    -- check falls through and AI.act runs.  Re-phases the periodic cadence to the arrival moment.
+                    local companionUuid = uuid
+                    local eventUuid = Movement.moveToTargetUuid(uuid, player.uuid, true, function ()
+                        local b = M.Roster.getBrawlerByUuid(companionUuid)
+                        if b then
+                            RT.Timers.stopPulseAction(b)
+                            RT.Timers.startPulseAction(b, 0)
+                        end
+                    end)
+                    if brawler and eventUuid then
+                        brawler.suppressPulseEventUuid = eventUuid
+                    end
+                end
+            end
         end
     end
 end
@@ -418,6 +493,27 @@ local function onAttackMove(data)
         local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
         if player and player.uuid and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
             setAwaitingTarget(player.uuid, true)
+        end
+    end
+end
+
+-- Empty payload = hotkey press (set AwaitingTarget, next click confirms)
+-- Position payload = chord/follow-up click (execute now)
+local function onMoveParty(data)
+    if State.Settings.TurnBasedSwarmMode and Utils.getCombatEntity() then
+        return false
+    end
+    if State.Session.Players then
+        local player = State.getPlayerByUserId(Utils.peerToUserId(data.UserID))
+        if player and player.uuid and M.Osi.IsInForceTurnBasedMode(player.uuid) == 0 then
+            if data.Payload and data.Payload ~= "" then
+                local positionInfo = Ext.Json.Parse(data.Payload)
+                if positionInfo and positionInfo.position then
+                    executeMoveParty(player.uuid, positionInfo.position)
+                end
+            else
+                setAwaitingTarget(player.uuid, "move_party")
+            end
         end
     end
 end
@@ -713,6 +809,7 @@ return {
         OnMe = onOnMe,
         AttackMyTarget = onAttackMyTarget,
         AttackMove = onAttackMove,
+        MoveParty = onMoveParty,
         RequestHeal = onRequestHeal,
         ChangeTactics = onChangeTactics,
     },

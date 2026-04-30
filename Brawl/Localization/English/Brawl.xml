@@ -73,9 +73,13 @@
     <content contentuid="h30cd0d71g52c2g4d40gb050gab864feb71ca" version="1">Hotkey to instruct your companions to attack your most recent target</content>
     <content contentuid="hbef77ddaga0a5g4588g8697g61d822610c6e" version="1">Attack My Target Hotkey</content>
     <content contentuid="h38f332f6gf4a0g425cg93degba52939be6db" version="1">Attack My Target Hotkey 2 (Optional)</content>
-    <content contentuid="hd7111993g8df4g4013gad20g0439cc4fe010" version="1">Hotkey to instruct your companions to move to a position (and attack, if an enemy is at this position)</content>
+    <content contentuid="hd7111993g8df4g4013gad20g0439cc4fe010" version="1">Hotkey to move your party to a position (or target unit), engaging enemies along the way. Works similarly to Attack-Move in real-time strategy games.</content>
     <content contentuid="hf8bbc7fdg03f2g4cf9g9132gf064a83d60b5" version="1">Attack-Move Hotkey</content>
     <content contentuid="h5c50e90bg939bg4f67g9b0cg8203649e4002" version="1">Attack-Move Hotkey 2 (Optional)</content>
+    <content contentuid="h37c4e338gef2cg4585gbbc9gb87adb464c75" version="1">Move Party Hotkey</content>
+    <content contentuid="h661f48fbg3094g4244g8177gc203f4c3eeb3" version="1">Hotkey to move your party to a position without engaging enemies en route. Works similarly to Right-Click-To-Move in real-time strategy games.</content>
+    <content contentuid="h77198d5dgbf30g4f25gbdb6g76f14027459e" version="1">Use LShift + Right-Mouse-Button click hotkey (default)</content>
+    <content contentuid="h7d01451bg72b8g4586g9652g317363367c61" version="1">Move Party Hotkey 2 (Optional)</content>
     <content contentuid="h3ebbf8aeg5b9bg4db7ga9a3ga26bd7d53ad8" version="1">Hotkey to instruct your companions to heal</content>
     <content contentuid="h0722b7b4g2ecdg461fga390ge6fb1c0c69ac" version="1">Request Heal Hotkey</content>
     <content contentuid="h0187e394gaba7g40d4g8241g24194438dd78" version="1">Request Heal Hotkey 2 (Optional)</content>

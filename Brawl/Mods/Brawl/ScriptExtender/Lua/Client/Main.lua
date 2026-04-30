@@ -9,6 +9,8 @@ local TargetFartherEnemyHotkey = {ScanCode = "PERIOD", Modifier = "NONE"}
 local OnMeHotkey = {ScanCode = "NUM_1", Modifier = "LAlt"}
 local AttackMyTargetHotkey = {ScanCode = "NUM_2", Modifier = "LAlt"}
 local AttackMoveHotkey = {ScanCode = "A", Modifier = "LAlt"}
+local MovePartyHotkey = {ScanCode = "NONE", Modifier = "NONE"}
+local MovePartyChordEnabled = true
 local RequestHealHotkey = {ScanCode = "E", Modifier = "LAlt"}
 local ChangeTacticsHotkey = {ScanCode = "C", Modifier = "LAlt"}
 local LeaderboardToggleHotkey = {ScanCode = "V", Modifier = "LCtrl"}
@@ -34,6 +36,7 @@ local ControllerTargetFartherEnemyHotkey = {"DPadRight", ""}
 local ControllerOnMeHotkey = {"", ""}
 local ControllerAttackMyTargetHotkey = {"", ""}
 local ControllerAttackMoveHotkey = {"", ""}
+local ControllerMovePartyHotkey = {"", ""}
 local ControllerRequestHealHotkey = {"", ""}
 local ControllerChangeTacticsHotkey = {"", ""}
 local ControllerLeaderboardToggleHotkey = {"", ""}
@@ -48,6 +51,7 @@ local ControllerTargetFartherEnemyHotkeyOverride = false
 local ControllerOnMeHotkeyOverride = false
 local ControllerAttackMyTargetHotkeyOverride = false
 local ControllerAttackMoveHotkeyOverride = false
+local ControllerMovePartyHotkeyOverride = false
 local ControllerRequestHealHotkeyOverride = false
 local ControllerChangeTacticsHotkeyOverride = false
 local ControllerActionButtonHotkeysOverride = {false, false, false, false, false, false, false, false, false}
@@ -64,6 +68,8 @@ if MCM then
     OnMeHotkey = MCM.Get("on_me_hotkey")
     AttackMyTargetHotkey = MCM.Get("attack_my_target_hotkey")
     AttackMoveHotkey = MCM.Get("attack_move_hotkey")
+    MovePartyHotkey = MCM.Get("move_party_hotkey")
+    MovePartyChordEnabled = MCM.Get("move_party_chord_enabled")
     RequestHealHotkey = MCM.Get("request_heal_hotkey")
     ChangeTacticsHotkey = MCM.Get("change_tactics_hotkey")
     LeaderboardToggleHotkey = MCM.Get("leaderboard_toggle_hotkey")
@@ -89,6 +95,7 @@ if MCM then
     ControllerOnMeHotkey = {MCM.Get("controller_on_me_hotkey"), MCM.Get("controller_on_me_hotkey_2")}
     ControllerAttackMyTargetHotkey = {MCM.Get("controller_attack_my_target_hotkey"), MCM.Get("controller_attack_my_target_hotkey_2")}
     ControllerAttackMoveHotkey = {MCM.Get("controller_attack_move_hotkey"), MCM.Get("controller_attack_move_hotkey_2")}
+    ControllerMovePartyHotkey = {MCM.Get("controller_move_party_hotkey"), MCM.Get("controller_move_party_hotkey_2")}
     ControllerRequestHealHotkey = {MCM.Get("controller_request_heal_hotkey"), MCM.Get("controller_request_heal_hotkey_2")}
     ControllerChangeTacticsHotkey = {MCM.Get("controller_change_tactics_hotkey"), MCM.Get("controller_change_tactics_hotkey_2")}
     ControllerLeaderboardToggleHotkey = {MCM.Get("controller_leaderboard_toggle_hotkey"), MCM.Get("controller_leaderboard_toggle_hotkey_2")}
@@ -114,6 +121,7 @@ if MCM then
     ControllerOnMeHotkeyOverride = MCM.Get("controller_on_me_hotkey_override")
     ControllerAttackMyTargetHotkeyOverride = MCM.Get("controller_attack_my_target_hotkey_override")
     ControllerAttackMoveHotkeyOverride = MCM.Get("controller_attack_move_hotkey_override")
+    ControllerMovePartyHotkeyOverride = MCM.Get("controller_move_party_hotkey_override")
     ControllerRequestHealHotkeyOverride = MCM.Get("controller_request_heal_hotkey_override")
     ControllerChangeTacticsHotkeyOverride = MCM.Get("controller_change_tactics_hotkey_override")
     ControllerLeaderboardToggleHotkeyOverride = MCM.Get("controller_leaderboard_toggle_hotkey_override")
@@ -149,6 +157,7 @@ local IsControllerButtonPressed = {
     TriggerLeft = false,
     TriggerRight = false,
 }
+local ModifiersHeld = {}  -- Modifier-key state tracking for mouse-chord bindings
 local LeaderboardWindow = nil
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
@@ -360,7 +369,17 @@ local function postCancelQueuedMovement()
     Ext.ClientNet.PostMessageToServer("CancelQueuedMovement", "")
 end
 
+-- Empty payload = hotkey press (server sets AwaitingTarget)
+-- Position payload = chord/follow-up click (server executes immediately)
+local function postMoveParty(positionInfo)
+    Ext.ClientNet.PostMessageToServer("MoveParty", positionInfo and Ext.Json.Stringify(positionInfo) or "")
+end
+
 local function onKeyInput(e)
+    -- Track modifier-key state for mouse-chord bindings
+    if e.Event == "KeyDown" or e.Event == "KeyUp" then
+        ModifiersHeld[e.Key] = (e.Event == "KeyDown")
+    end
     if e.Repeat == false and e.Event == "KeyDown" then
         local key = tostring(e.Key)
         local keybindingPressed = false
@@ -406,6 +425,10 @@ local function onKeyInput(e)
         end
         if isKeybindingPressed(e, AttackMoveHotkey) then
             postAttackMove()
+            keybindingPressed = true
+        end
+        if isKeybindingPressed(e, MovePartyHotkey) then
+            postMoveParty()
             keybindingPressed = true
         end
         if isKeybindingPressed(e, RequestHealHotkey) then
@@ -516,6 +539,12 @@ local function onControllerButtonPressed(button)
             override = true
         end
     end
+    if isControllerKeybindingPressed(ControllerMovePartyHotkey) then
+        postMoveParty()
+        if ControllerMovePartyHotkeyOverride then
+            override = true
+        end
+    end
     if isControllerKeybindingPressed(ControllerRequestHealHotkey) then
         postRequestHeal()
         if ControllerRequestHealHotkeyOverride then
@@ -577,7 +606,16 @@ end
 
 local function onMouseButtonInput(e)
     if e.Pressed then
-        if e.Button == 1 then
+        -- "Move Party" is hardcoded to LShift+Right Mouse Button click when MovePartyChordEnabled is set to true.
+        -- (Mouse events don't carry modifier info so use ModifiersHeld, tracked via the keyboard listener.)
+        if MovePartyChordEnabled and e.Button == 3 and (ModifiersHeld["LSHIFT"] or ModifiersHeld["RSHIFT"]) then
+            local positionInfo = getPositionInfo()
+            if positionInfo and positionInfo.position then
+                postMoveParty(positionInfo)
+            end
+            -- Override the default (cancel) right click behavior
+            e:PreventAction()
+        elseif e.Button == 1 then
             postClickPosition()
             if AwaitingTarget then
                 e:PreventAction()
@@ -862,6 +900,10 @@ local function onMCMSettingSaved(payload)
         AttackMyTargetHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "attack_move_hotkey" then
         AttackMoveHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "move_party_hotkey" then
+        MovePartyHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
+    elseif payload.settingId == "move_party_chord_enabled" then
+        MovePartyChordEnabled = payload.value
     elseif payload.settingId == "request_heal_hotkey" then
         RequestHealHotkey = {ScanCode = payload.value.ScanCode, Modifier = payload.value.Modifier}
     elseif payload.settingId == "change_tactics_hotkey" then
@@ -910,6 +952,10 @@ local function onMCMSettingSaved(payload)
         ControllerAttackMoveHotkey[1] = payload.value
     elseif payload.settingId == "controller_attack_move_hotkey_2" then
         ControllerAttackMoveHotkey[2] = payload.value
+    elseif payload.settingId == "controller_move_party_hotkey" then
+        ControllerMovePartyHotkey[1] = payload.value
+    elseif payload.settingId == "controller_move_party_hotkey_2" then
+        ControllerMovePartyHotkey[2] = payload.value
     elseif payload.settingId == "controller_request_heal_hotkey" then
         ControllerRequestHealHotkey[1] = payload.value
     elseif payload.settingId == "controller_request_heal_hotkey_2" then
@@ -944,6 +990,8 @@ local function onMCMSettingSaved(payload)
         ControllerAttackMyTargetHotkeyOverride = payload.value
     elseif payload.settingId == "controller_attack_move_hotkey_override" then
         ControllerAttackMoveHotkeyOverride = payload.value
+    elseif payload.settingId == "controller_move_party_hotkey_override" then
+        ControllerMovePartyHotkeyOverride = payload.value
     elseif payload.settingId == "controller_request_heal_hotkey_override" then
         ControllerRequestHealHotkeyOverride = payload.value
     elseif payload.settingId == "controller_change_tactics_hotkey_override" then
