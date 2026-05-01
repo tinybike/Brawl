@@ -399,6 +399,10 @@ local function onGainedControl(uuid)
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
+    -- Refresh the user's loadout HUD with the newly-controlled char's data.  Cheap to send even if HUD is closed (client just stashes it).
+    if userId then
+        Commands.postLoadoutsToUser(userId)
+    end
 end
 
 local function onSpellSyncTargeting(spellCastState)

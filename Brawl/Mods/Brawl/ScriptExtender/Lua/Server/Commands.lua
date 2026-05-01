@@ -593,6 +593,154 @@ local function onLeaderboardToggle(data)
     Leaderboard.showForUser(data.UserID)
 end
 
+-- Find the character a given user is currently controlling.
+local function getControlledForUser(userId)
+    if not State.Session.Players then return nil end
+    for uuid, player in pairs(State.Session.Players) do
+        if player.userId == userId and player.isControllingDirectly then
+            return uuid
+        end
+    end
+    return nil
+end
+
+-- Set the stored archetype override for any character (mod var + live brawler if present).  Empty string clears the override.
+local function setCharacterArchetype(uuid, archetype)
+    if not uuid then return end
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if modVars.PartyArchetypes == nil then modVars.PartyArchetypes = {} end
+    local partyArchetypes = modVars.PartyArchetypes
+    partyArchetypes[uuid] = archetype  -- "" means cleared
+    modVars.PartyArchetypes = partyArchetypes
+    local brawler = M.Roster.getBrawlerByUuid(uuid)
+    if brawler then
+        if archetype == "" or archetype == nil then
+            brawler.rage = nil
+            brawler.archetype = State.getArchetype(uuid)
+        else
+            brawler.rage = (archetype == "barbarian") and Spells.getRageAbility(uuid) or nil
+            brawler.archetype = archetype
+        end
+    end
+end
+
+local function getCharacterArchetype(uuid)
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    if not modVars.PartyArchetypes then return "" end
+    return modVars.PartyArchetypes[uuid] or ""
+end
+
+local function postLoadoutsToUser(userId)
+    local activeUuid = getControlledForUser(userId)
+    -- Party-order map: lower index = earlier in topbar.  Summons aren't in DB_PartyMembers so they get a high sentinel and sort after.
+    local partyOrder = {}
+    local partyMembers = Osi.DB_PartyMembers:Get(nil)
+    if partyMembers then
+        for i, row in ipairs(partyMembers) do
+            local uuid = M.Osi.GetUUID(row[1])
+            if uuid then partyOrder[uuid] = i end
+        end
+    end
+    local characters = {}
+    if State.Session.Players then
+        for uuid, player in pairs(State.Session.Players) do
+            -- MP scoping: each user only sees/edits the characters they own.  Summons inherit ReservedUserID from their summoner so they
+            -- naturally land in the correct user's bucket.
+            if player.userId == userId then
+                characters[#characters + 1] = {
+                    uuid = uuid,
+                    name = M.Utils.getDisplayName(uuid) or "",
+                    isSummon = M.Osi.IsSummon(uuid) == 1,
+                    isActive = uuid == activeUuid,
+                    archetype = getCharacterArchetype(uuid),
+                    loadouts = Reactions.getClientLoadoutsForCharacter(uuid),
+                    _order = partyOrder[uuid] or 9999,  -- sort key only, not sent
+                }
+            end
+        end
+    end
+    -- Party position first; summons (no party order) fall to the end and sort alpha among themselves.
+    table.sort(characters, function (a, b)
+        if a._order ~= b._order then return a._order < b._order end
+        return (a.name or "") < (b.name or "")
+    end)
+    for _, c in ipairs(characters) do c._order = nil end
+    -- Only the host edits the global summon mode; other users get isHost=false and the client hides those checkboxes.
+    local hostUuid = M.Osi.GetHostCharacter()
+    local hostUserId = hostUuid and State.Session.Players and State.Session.Players[hostUuid] and State.Session.Players[hostUuid].userId
+    local payload = {
+        characters = characters,
+        summonMode = Reactions.getSummonReactionMode(),
+        isHost = userId == hostUserId,
+    }
+    Ext.ServerNet.PostMessageToUser(userId, "Loadouts", Ext.Json.Stringify(payload))
+end
+
+local function onRequestLoadouts(data)
+    postLoadoutsToUser(Utils.peerToUserId(data.UserID))
+end
+
+-- Loadout-mutation payloads are JSON {characterUuid, index?}; index is nil for Save (which appends a new slot).
+local function parseLoadoutPayload(payloadStr)
+    if not payloadStr or payloadStr == "" then return nil end
+    local ok, parsed = pcall(Ext.Json.Parse, payloadStr)
+    if not ok or type(parsed) ~= "table" then return nil end
+    return parsed
+end
+
+-- MP ownership check: refuse mutations on characters not owned by the requesting user.
+local function userOwnsCharacter(userId, characterUuid)
+    return characterUuid
+        and State.Session.Players
+        and State.Session.Players[characterUuid]
+        and State.Session.Players[characterUuid].userId == userId
+end
+
+local function onSaveLoadout(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not userOwnsCharacter(userId, p.characterUuid) then return end
+    Reactions.saveLoadout(p.characterUuid)
+    postLoadoutsToUser(userId)
+end
+
+local function onLoadLoadout(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
+    Reactions.loadLoadout(p.characterUuid, p.index)
+    postLoadoutsToUser(userId)
+end
+
+local function onOverwriteLoadout(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
+    Reactions.overwriteLoadout(p.characterUuid, p.index)
+    postLoadoutsToUser(userId)
+end
+
+local function onDeleteLoadout(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
+    Reactions.deleteLoadout(p.characterUuid, p.index)
+    postLoadoutsToUser(userId)
+end
+
+local function onSetSummonReactionMode(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local mode = data.Payload
+    if mode ~= "manual" and mode ~= "all_on" and mode ~= "all_off" then return end
+    -- Host-only: silently drop attempts from other users.
+    local hostUuid = M.Osi.GetHostCharacter()
+    local hostUserId = hostUuid and State.Session.Players and State.Session.Players[hostUuid] and State.Session.Players[hostUuid].userId
+    if userId ~= hostUserId then return end
+    Reactions.setSummonReactionMode(mode)
+    Reactions.applySummonOverrideToAll()
+    postLoadoutsToUser(userId)
+end
+
 local function onMCMModEnabled(value)
     State.Settings.ModEnabled = value
     if State.Settings.ModEnabled then
@@ -641,21 +789,18 @@ local function onMCMFullAuto(value)
 end
 
 local function onMCMActiveCharacterArchetype(archetype)
-    local uuid = M.Osi.GetHostCharacter()
-    if uuid ~= nil and archetype ~= nil and archetype ~= "" then
-        local modVars = Ext.Vars.GetModVariables(ModuleUUID)
-        if modVars.PartyArchetypes == nil then
-            modVars.PartyArchetypes = {}
-        end
-        local partyArchetypes = modVars.PartyArchetypes
-        partyArchetypes[uuid] = archetype
-        modVars.PartyArchetypes = partyArchetypes
-        local brawler = M.Roster.getBrawlerByUuid(uuid)
-        if brawler ~= nil then
-            brawler.rage = (archetype == "barbarian") and Spells.getRageAbility(uuid) or nil
-            brawler.archetype = archetype
-        end
+    -- Legacy MCM hook still applies to the host character.
+    if archetype and archetype ~= "" then
+        setCharacterArchetype(M.Osi.GetHostCharacter(), archetype)
     end
+end
+
+local function onSetCharacterArchetype(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not p.archetype or not userOwnsCharacter(userId, p.characterUuid) then return end
+    setCharacterArchetype(p.characterUuid, p.archetype)
+    postLoadoutsToUser(userId)
 end
 
 local function onMCMMaxPartySize(maxPartySize)
@@ -801,6 +946,7 @@ return {
     enableMod = enableMod,
     disableMod = disableMod,
     dumpFullState = dumpFullState,
+    postLoadoutsToUser = postLoadoutsToUser,
     NetMessage = {
         DebugDumpSelected = onDebugDumpSelected,
         ModToggle = onModToggle,
@@ -809,6 +955,13 @@ return {
         QueueCompanionAIActions = onQueueCompanionAIActions,
         FullAutoToggle = onFullAutoToggle,
         LeaderboardToggle = onLeaderboardToggle,
+        RequestLoadouts = onRequestLoadouts,
+        SaveLoadout = onSaveLoadout,
+        LoadLoadout = onLoadLoadout,
+        OverwriteLoadout = onOverwriteLoadout,
+        DeleteLoadout = onDeleteLoadout,
+        SetSummonReactionMode = onSetSummonReactionMode,
+        SetCharacterArchetype = onSetCharacterArchetype,
         ExitFTB = function (_) Pause.allExitFTB() end,
         EnterFTB = function (_) Pause.allEnterFTB() end,
         ClickPosition = onClickPosition,
