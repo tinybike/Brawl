@@ -105,11 +105,17 @@ end
 -- Prepared spells: only meaningful for prepared casters (wizard/cleric/druid/paladin)
 local function snapshotPreparedSpells(uuid)
     local entity = Ext.Entity.Get(uuid)
-    if not entity or not entity.SpellBookPrepares or not entity.SpellBookPrepares.PreparedSpells then
+    if not entity then return nil end
+    local source
+    if entity.PlayerPrepareSpell and entity.PlayerPrepareSpell.Spells then
+        source = entity.PlayerPrepareSpell.Spells
+    elseif entity.SpellBookPrepares and entity.SpellBookPrepares.PreparedSpells then
+        source = entity.SpellBookPrepares.PreparedSpells
+    else
         return nil
     end
     local snapshot = {}
-    for i, spellMeta in ipairs(entity.SpellBookPrepares.PreparedSpells) do
+    for i, spellMeta in ipairs(source) do
         snapshot[i] = {
             OriginatorPrototype = spellMeta.OriginatorPrototype,
             ProgressionSource = spellMeta.ProgressionSource,
@@ -123,9 +129,15 @@ end
 local function applyPreparedSpells(uuid, snapshot)
     if not snapshot then return false end
     local entity = Ext.Entity.Get(uuid)
-    if not entity or not entity.SpellBookPrepares then return false end
-    entity.SpellBookPrepares.PreparedSpells = snapshot
-    entity:Replicate("SpellBookPrepares")
+    if not entity then return false end
+    if entity.PlayerPrepareSpell then
+        entity.PlayerPrepareSpell.Spells = snapshot
+        entity:Replicate("PlayerPrepareSpell")
+    end
+    if entity.SpellBookPrepares then
+        entity.SpellBookPrepares.PreparedSpells = snapshot
+        entity:Replicate("SpellBookPrepares")
+    end
     return true
 end
 
@@ -355,10 +367,10 @@ local function loadLoadout(characterUuid, index)
     local list = loadouts[characterUuid]
     if not list or not list[index] then return false end
     local slot = list[index]
-    if slot.reactions then applyReactions(characterUuid, slot.reactions) end
-    if slot.preparedSpells then applyPreparedSpells(characterUuid, slot.preparedSpells) end
-    if slot.hotbar then applyHotbar(characterUuid, slot.hotbar) end
     if slot.equipment then applyEquipment(characterUuid, slot.equipment) end
+    if slot.reactions then applyReactions(characterUuid, slot.reactions) end
+    if slot.hotbar then applyHotbar(characterUuid, slot.hotbar) end
+    if slot.preparedSpells then applyPreparedSpells(characterUuid, slot.preparedSpells) end
     return true
 end
 
