@@ -247,12 +247,53 @@ local function moveCompanionsToTargetUuid(targetUuid)
     end
 end
 
-local function moveCompanionsToPosition(position)
-    local players = State.Session.Players
-    for uuid, _ in pairs(players) do
-        if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
-            moveToPosition(uuid, position, true)
+-- Compute a forward unit vector in the xz-plane: travel direction from leaderUuid's current position to `destination`, falling back to the
+-- leader's facing direction when the travel distance is too small to be meaningful.
+local function computeForwardVector(leaderUuid, destination)
+    local fx, fz = 0, 1  -- arbitrary default
+    if not leaderUuid or not destination then return fx, fz end
+    local px, _, pz = M.Osi.GetPosition(leaderUuid)
+    if px and pz then
+        local dx, dz = destination[1] - px, destination[3] - pz
+        local distSq = dx*dx + dz*dz
+        if distSq > 0.25 then  -- > 0.5m, use travel vector
+            local d = math.sqrt(distSq)
+            return dx / d, dz / d
         end
+    end
+    local lfx, _, lfz = M.Utils.getForwardVector(leaderUuid)
+    if lfx and lfz then
+        local mag = math.sqrt(lfx*lfx + lfz*lfz)
+        if mag > 0.001 then return lfx / mag, lfz / mag end
+    end
+    return fx, fz
+end
+
+-- Generate the i'th of n companion offset positions, distributed in a semicircle BEHIND the leader's forward direction (so the leader appears
+-- at the front of the formation).  i is 1-based.  Returns {x, y, z}.
+local function getRearGuardPosition(center, fx, fz, i, n, radius)
+    local angle = math.pi/2 + math.pi * i / (n + 1)
+    -- Rotate (fx, fz) by `angle` around the y-axis to get the offset direction.
+    local ox = fx * math.cos(angle) - fz * math.sin(angle)
+    local oz = fx * math.sin(angle) + fz * math.cos(angle)
+    return {center[1] + radius * ox, center[2], center[3] + radius * oz}
+end
+
+-- Spread companions behind the leader instead of all piling onto the leader's destination.  Active char goes to the exact spot; companions
+-- distribute in a semicircle behind the leader's facing direction.  Engine handles unreachable offsets by moving the companion to the
+-- closest reachable point, so we don't bother validating each offset.
+local function moveCompanionsToPosition(position, leaderUuid)
+    local companions = {}
+    for uuid, _ in pairs(State.Session.Players) do
+        if not State.isPlayerControllingDirectly(uuid) or State.Settings.FullAuto then
+            companions[#companions + 1] = uuid
+        end
+    end
+    local n = #companions
+    if n == 0 then return end
+    local fx, fz = computeForwardVector(leaderUuid, position)
+    for i, uuid in ipairs(companions) do
+        moveToPosition(uuid, getRearGuardPosition(position, fx, fz, i, n, Constants.COMPANION_FORMATION_RADIUS), true)
     end
 end
 
@@ -666,6 +707,8 @@ return {
     findPathToTargetUuid = findPathToTargetUuid,
     findPathToPosition = findPathToPosition,
     moveCompanionsToPosition = moveCompanionsToPosition,
+    computeForwardVector = computeForwardVector,
+    getRearGuardPosition = getRearGuardPosition,
     moveCompanionsToTargetUuid = moveCompanionsToTargetUuid,
     calculateEnRouteCoords = calculateEnRouteCoords,
     moveToDistanceFromTarget = moveToDistanceFromTarget,

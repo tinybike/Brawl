@@ -366,23 +366,31 @@ local function executeMoveParty(playerUuid, position)
         Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
         local level = M.Osi.GetRegion(playerUuid)
         local brawlersInLevel = level and State.Session.Brawlers[level]
+        -- Collect companions and spread them in a semicircle behind the leader so the active char ends up at the front of the formation.
+        local companions = {}
         for uuid, _ in pairs(State.Session.Players) do
             if not State.isPlayerControllingDirectly(uuid) then
-                local brawler = brawlersInLevel and brawlersInLevel[uuid]
-                if brawler then
-                    brawler.lockedOnTarget = false
+                companions[#companions + 1] = uuid
+            end
+        end
+        local n = #companions
+        local fx, fz = Movement.computeForwardVector(playerUuid, validPosition)
+        for i, uuid in ipairs(companions) do
+            local brawler = brawlersInLevel and brawlersInLevel[uuid]
+            if brawler then
+                brawler.lockedOnTarget = false
+            end
+            local target = Movement.getRearGuardPosition(validPosition, fx, fz, i, n, Constants.COMPANION_FORMATION_RADIUS)
+            local companionUuid = uuid
+            local eventUuid = Movement.moveToPosition(uuid, target, true, function ()
+                local b = M.Roster.getBrawlerByUuid(companionUuid)
+                if b then
+                    RT.Timers.stopPulseAction(b)
+                    RT.Timers.startPulseAction(b, 0)
                 end
-                local companionUuid = uuid
-                local eventUuid = Movement.moveToPosition(uuid, validPosition, true, function ()
-                    local b = M.Roster.getBrawlerByUuid(companionUuid)
-                    if b then
-                        RT.Timers.stopPulseAction(b)
-                        RT.Timers.startPulseAction(b, 0)
-                    end
-                end)
-                if brawler and eventUuid then
-                    brawler.suppressPulseEventUuid = eventUuid
-                end
+            end)
+            if brawler and eventUuid then
+                brawler.suppressPulseEventUuid = eventUuid
             end
         end
         if not State.Settings.FullAuto then
@@ -436,7 +444,7 @@ local function onClickPosition(data)
                         end
                     end
                     Utils.applyAttackMoveTargetVfx(Utils.createDummyObject(validPosition))
-                    Movement.moveCompanionsToPosition(validPosition)
+                    Movement.moveCompanionsToPosition(validPosition, playerUuid)
                     -- Also move the active character to the position
                     if not State.Settings.FullAuto then
                         Movement.moveToPosition(playerUuid, validPosition, true)
