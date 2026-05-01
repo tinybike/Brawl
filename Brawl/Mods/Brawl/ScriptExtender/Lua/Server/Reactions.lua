@@ -92,8 +92,7 @@ local function applyAllReactionsTo(uuid, isEnabled, isAsk)
     return true
 end
 
--- Prepared spells: only meaningful for prepared casters (wizard/cleric/druid/paladin).  Non-preparers have no PreparedSpells array; we just
--- snapshot whatever's there (potentially empty) and skip apply if there's nothing to write.
+-- Prepared spells: only meaningful for prepared casters (wizard/cleric/druid/paladin)
 local function snapshotPreparedSpells(uuid)
     local entity = Ext.Entity.Get(uuid)
     if not entity or not entity.SpellBookPrepares or not entity.SpellBookPrepares.PreparedSpells then
@@ -120,6 +119,88 @@ local function applyPreparedSpells(uuid, snapshot)
     return true
 end
 
+-- Hotbar snapshot/apply
+local function snapshotHotbar(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity or not entity.HotbarContainer or not entity.HotbarContainer.Containers then
+        return nil
+    end
+    local snapshot = {ActiveContainer = entity.HotbarContainer.ActiveContainer, Containers = {}}
+    for containerName, bars in pairs(entity.HotbarContainer.Containers) do
+        local snapBars = {}
+        for barIdx, bar in ipairs(bars) do
+            local snapElements = {}
+            if bar.Elements then
+                for slotIdx, slot in ipairs(bar.Elements) do
+                    local snapSlot = {Slot = slot.Slot, IsNew = slot.IsNew, Passive = slot.Passive}
+                    if slot.SpellId and slot.SpellId.Prototype and slot.SpellId.Prototype ~= "" then
+                        snapSlot.SpellId = {
+                            Prototype = slot.SpellId.Prototype,
+                            OriginatorPrototype = slot.SpellId.OriginatorPrototype,
+                            ProgressionSource = slot.SpellId.ProgressionSource,
+                            Source = slot.SpellId.Source,
+                            SourceType = slot.SpellId.SourceType,
+                        }
+                    end
+                    if slot.Item then
+                        local itemUuid = slot.Item.Uuid and slot.Item.Uuid.EntityUuid
+                        if itemUuid then snapSlot.ItemUuid = itemUuid end
+                    end
+                    snapElements[slotIdx] = snapSlot
+                end
+            end
+            snapBars[barIdx] = {Index = bar.Index, Width = bar.Width, Height = bar.Height, Elements = snapElements}
+        end
+        snapshot.Containers[containerName] = snapBars
+    end
+    return snapshot
+end
+
+local function applyHotbar(uuid, snapshot)
+    if not snapshot or not snapshot.Containers then return false end
+    local entity = Ext.Entity.Get(uuid)
+    if not entity or not entity.HotbarContainer or not entity.HotbarContainer.Containers then return false end
+    for containerName, snapBars in pairs(snapshot.Containers) do
+        local liveBars = entity.HotbarContainer.Containers[containerName]
+        if liveBars then
+            for barIdx, snapBar in ipairs(snapBars) do
+                local liveBar = liveBars[barIdx]
+                if liveBar and snapBar.Elements then
+                    -- Build a whole new Elements array from the snapshot
+                    local newElements = {}
+                    for slotIdx, snapSlot in ipairs(snapBar.Elements) do
+                        local newSlot = {
+                            Slot = snapSlot.Slot,
+                            IsNew = snapSlot.IsNew or false,
+                            Passive = snapSlot.Passive or "",
+                        }
+                        if snapSlot.SpellId then
+                            newSlot.SpellId = {
+                                Prototype = snapSlot.SpellId.Prototype or "",
+                                OriginatorPrototype = snapSlot.SpellId.OriginatorPrototype or "",
+                                ProgressionSource = snapSlot.SpellId.ProgressionSource,
+                                Source = snapSlot.SpellId.Source,
+                                SourceType = snapSlot.SpellId.SourceType,
+                            }
+                        end
+                        if snapSlot.ItemUuid then
+                            local itemEntity = Ext.Entity.Get(snapSlot.ItemUuid)
+                            if itemEntity then newSlot.Item = itemEntity end
+                        end
+                        newElements[slotIdx] = newSlot
+                    end
+                    liveBar.Elements = newElements
+                end
+            end
+        end
+    end
+    if snapshot.ActiveContainer then
+        entity.HotbarContainer.ActiveContainer = snapshot.ActiveContainer
+    end
+    entity:Replicate("HotbarContainer")
+    return true
+end
+
 local function ensureLoadoutList(loadouts, characterUuid)
     if not loadouts[characterUuid] or type(loadouts[characterUuid]) ~= "table" then
         loadouts[characterUuid] = {}
@@ -131,17 +212,17 @@ local function getCurrentModeTag()
     return State.Settings.TurnBasedSwarmMode and "Swarm" or "Real-Time"
 end
 
--- Snapshot all currently-supported types into a single loadout payload.  Add new types here as they're built.
 local function buildLoadoutSnapshot(characterUuid)
     return {
         reactions = snapshotReactions(characterUuid),
         preparedSpells = snapshotPreparedSpells(characterUuid),
+        hotbar = snapshotHotbar(characterUuid),
     }
 end
 
 local function saveLoadout(characterUuid)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells then return false end
+    if not payload.reactions and not payload.preparedSpells and not payload.hotbar then return false end
     local loadouts = getCharacterLoadouts()
     local list = ensureLoadoutList(loadouts, characterUuid)
     table.insert(list, {
@@ -149,6 +230,7 @@ local function saveLoadout(characterUuid)
         mode = getCurrentModeTag(),
         reactions = payload.reactions,
         preparedSpells = payload.preparedSpells,
+        hotbar = payload.hotbar,
     })
     setCharacterLoadouts(loadouts)
     return true
@@ -156,12 +238,13 @@ end
 
 local function overwriteLoadout(characterUuid, index)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells then return false end
+    if not payload.reactions and not payload.preparedSpells and not payload.hotbar then return false end
     local loadouts = getCharacterLoadouts()
     local list = loadouts[characterUuid]
     if not list or not list[index] then return false end
     list[index].reactions = payload.reactions
     list[index].preparedSpells = payload.preparedSpells
+    list[index].hotbar = payload.hotbar
     list[index].mode = getCurrentModeTag()
     setCharacterLoadouts(loadouts)
     return true
@@ -174,6 +257,7 @@ local function loadLoadout(characterUuid, index)
     local slot = list[index]
     if slot.reactions then applyReactions(characterUuid, slot.reactions) end
     if slot.preparedSpells then applyPreparedSpells(characterUuid, slot.preparedSpells) end
+    if slot.hotbar then applyHotbar(characterUuid, slot.hotbar) end
     return true
 end
 
@@ -208,6 +292,7 @@ local function getClientLoadoutsForCharacter(characterUuid)
             mode = l.mode,
             hasReactions = l.reactions ~= nil,
             hasPreparedSpells = l.preparedSpells ~= nil,
+            hasHotbar = l.hotbar ~= nil,
         }
     end
     return out
