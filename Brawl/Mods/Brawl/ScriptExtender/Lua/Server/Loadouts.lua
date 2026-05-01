@@ -119,6 +119,40 @@ local function applyPreparedSpells(uuid, snapshot)
     return true
 end
 
+-- Equipment snapshot/apply via Osi
+local function snapshotEquipment(uuid)
+    local snapshot = {}
+    local any = false
+    for _, slot in ipairs(Constants.EQUIPMENT_SLOTS) do
+        local item = Osi.GetEquippedItem(uuid, slot)
+        if item and item ~= "" then
+            snapshot[slot] = item
+            any = true
+        end
+    end
+    if not any then return nil end
+    return snapshot
+end
+
+local function applyEquipment(uuid, snapshot)
+    if not snapshot then return false end
+    -- Unequip all current items in the tracked slots
+    for _, slot in ipairs(Constants.EQUIPMENT_SLOTS) do
+        local current = Osi.GetEquippedItem(uuid, slot)
+        if current and current ~= "" then
+            Osi.Unequip(uuid, current)
+        end
+    end
+    -- Equip saved items (only if they're in this character's inventory)
+    for _, slot in ipairs(Constants.EQUIPMENT_SLOTS) do
+        local saved = snapshot[slot]
+        if saved and Osi.GetInventoryOwner(saved) == uuid then
+            Osi.Equip(uuid, saved)
+        end
+    end
+    return true
+end
+
 -- Hotbar snapshot/apply
 local function snapshotHotbar(uuid)
     local entity = Ext.Entity.Get(uuid)
@@ -217,12 +251,13 @@ local function buildLoadoutSnapshot(characterUuid)
         reactions = snapshotReactions(characterUuid),
         preparedSpells = snapshotPreparedSpells(characterUuid),
         hotbar = snapshotHotbar(characterUuid),
+        equipment = snapshotEquipment(characterUuid),
     }
 end
 
 local function saveLoadout(characterUuid)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells and not payload.hotbar then return false end
+    if not payload.reactions and not payload.preparedSpells and not payload.hotbar and not payload.equipment then return false end
     local loadouts = getCharacterLoadouts()
     local list = ensureLoadoutList(loadouts, characterUuid)
     table.insert(list, {
@@ -231,6 +266,7 @@ local function saveLoadout(characterUuid)
         reactions = payload.reactions,
         preparedSpells = payload.preparedSpells,
         hotbar = payload.hotbar,
+        equipment = payload.equipment,
     })
     setCharacterLoadouts(loadouts)
     return true
@@ -238,13 +274,14 @@ end
 
 local function overwriteLoadout(characterUuid, index)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells and not payload.hotbar then return false end
+    if not payload.reactions and not payload.preparedSpells and not payload.hotbar and not payload.equipment then return false end
     local loadouts = getCharacterLoadouts()
     local list = loadouts[characterUuid]
     if not list or not list[index] then return false end
     list[index].reactions = payload.reactions
     list[index].preparedSpells = payload.preparedSpells
     list[index].hotbar = payload.hotbar
+    list[index].equipment = payload.equipment
     list[index].mode = getCurrentModeTag()
     setCharacterLoadouts(loadouts)
     return true
@@ -258,6 +295,7 @@ local function loadLoadout(characterUuid, index)
     if slot.reactions then applyReactions(characterUuid, slot.reactions) end
     if slot.preparedSpells then applyPreparedSpells(characterUuid, slot.preparedSpells) end
     if slot.hotbar then applyHotbar(characterUuid, slot.hotbar) end
+    if slot.equipment then applyEquipment(characterUuid, slot.equipment) end
     return true
 end
 
@@ -293,6 +331,7 @@ local function getClientLoadoutsForCharacter(characterUuid)
             hasReactions = l.reactions ~= nil,
             hasPreparedSpells = l.preparedSpells ~= nil,
             hasHotbar = l.hotbar ~= nil,
+            hasEquipment = l.equipment ~= nil,
         }
     end
     return out

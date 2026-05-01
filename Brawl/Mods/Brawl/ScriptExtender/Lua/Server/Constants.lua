@@ -455,5 +455,12 @@ Constants.COMBAT_HELPER = {
     handle = "h09f52fcdg7db3g44ddg91b1gb2b4d69ac32b",
     faction = "4be9261a-e481-8d9d-3528-f36956a19b17",
 }
+Constants.EQUIPMENT_SLOTS = {
+    "Amulet", "Boots", "Breast", "Cloak", "Gloves", "Helmet",
+    "Melee Main Weapon", "Melee Offhand Weapon",
+    "Ranged Main Weapon", "Ranged Offhand Weapon",
+    "Ring", "Ring2",
+    "Underwear", "VanityBody", "VanityBoots",
+}
 
 return Constants

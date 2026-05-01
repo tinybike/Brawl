@@ -661,7 +661,7 @@ local function postLoadoutsToUser(userId)
                     isSummon = M.Osi.IsSummon(uuid) == 1,
                     isActive = uuid == activeUuid,
                     archetype = getCharacterArchetype(uuid),
-                    loadouts = Reactions.getClientLoadoutsForCharacter(uuid),
+                    loadouts = Loadouts.getClientLoadoutsForCharacter(uuid),
                     _order = partyOrder[uuid] or 9999,  -- sort key only, not sent
                 }
             end
@@ -678,7 +678,7 @@ local function postLoadoutsToUser(userId)
     local hostUserId = hostUuid and State.Session.Players and State.Session.Players[hostUuid] and State.Session.Players[hostUuid].userId
     local payload = {
         characters = characters,
-        summonMode = Reactions.getSummonReactionMode(),
+        summonMode = Loadouts.getSummonReactionMode(),
         isHost = userId == hostUserId,
     }
     Ext.ServerNet.PostMessageToUser(userId, "Loadouts", Ext.Json.Stringify(payload))
@@ -708,7 +708,7 @@ local function onSaveLoadout(data)
     local userId = Utils.peerToUserId(data.UserID)
     local p = parseLoadoutPayload(data.Payload)
     if not p or not userOwnsCharacter(userId, p.characterUuid) then return end
-    Reactions.saveLoadout(p.characterUuid)
+    Loadouts.saveLoadout(p.characterUuid)
     postLoadoutsToUser(userId)
 end
 
@@ -716,7 +716,7 @@ local function onLoadLoadout(data)
     local userId = Utils.peerToUserId(data.UserID)
     local p = parseLoadoutPayload(data.Payload)
     if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
-    Reactions.loadLoadout(p.characterUuid, p.index)
+    Loadouts.loadLoadout(p.characterUuid, p.index)
     postLoadoutsToUser(userId)
 end
 
@@ -724,7 +724,7 @@ local function onOverwriteLoadout(data)
     local userId = Utils.peerToUserId(data.UserID)
     local p = parseLoadoutPayload(data.Payload)
     if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
-    Reactions.overwriteLoadout(p.characterUuid, p.index)
+    Loadouts.overwriteLoadout(p.characterUuid, p.index)
     postLoadoutsToUser(userId)
 end
 
@@ -732,7 +732,7 @@ local function onDeleteLoadout(data)
     local userId = Utils.peerToUserId(data.UserID)
     local p = parseLoadoutPayload(data.Payload)
     if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
-    Reactions.deleteLoadout(p.characterUuid, p.index)
+    Loadouts.deleteLoadout(p.characterUuid, p.index)
     postLoadoutsToUser(userId)
 end
 
@@ -744,8 +744,8 @@ local function onSetSummonReactionMode(data)
     local hostUuid = M.Osi.GetHostCharacter()
     local hostUserId = hostUuid and State.Session.Players and State.Session.Players[hostUuid] and State.Session.Players[hostUuid].userId
     if userId ~= hostUserId then return end
-    Reactions.setSummonReactionMode(mode)
-    Reactions.applySummonOverrideToAll()
+    Loadouts.setSummonReactionMode(mode)
+    Loadouts.applySummonOverrideToAll()
     postLoadoutsToUser(userId)
 end
 
