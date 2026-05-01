@@ -382,6 +382,10 @@ local function postSetSummonReactionMode(mode)
     Ext.ClientNet.PostMessageToServer("SetSummonReactionMode", mode)
 end
 
+local function postSetSharedCampChestAccess(value)
+    Ext.ClientNet.PostMessageToServer("SetSharedCampChestAccess", value and "1" or "0")
+end
+
 local function postSetCharacterArchetype(characterUuid, archetype)
     Ext.ClientNet.PostMessageToServer("SetCharacterArchetype", Ext.Json.Stringify({characterUuid = characterUuid, archetype = archetype}))
 end
@@ -852,6 +856,14 @@ local function refreshLoadoutsTab()
             postSetSummonReactionMode(c.Checked and "all_off" or "manual")
         end
         root:AddText("(If neither checked, summons use their own per-character loadouts.)")
+        root:AddSeparator()
+        root:AddSeparatorText("Multiplayer (host)")
+        local cbSharedChest = root:AddCheckbox("Shared camp chest access in multiplayer games")
+        cbSharedChest.Checked = data.sharedCampChestAccess == true
+        cbSharedChest.OnChange = function(c)
+            postSetSharedCampChestAccess(c.Checked)
+        end
+        root:AddText("(When loading equipment loadouts at camp, allow pulling items from any user's camp chest.)")
     end
 end
 

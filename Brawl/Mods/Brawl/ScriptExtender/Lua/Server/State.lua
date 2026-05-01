@@ -129,6 +129,7 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "MovementDistances", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "CharacterLoadouts", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SummonReactionMode", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "SharedCampChestAccess", {Server = true, Client = false, SyncToClient = false})
 
 local function getArchetype(uuid)
     local archetype

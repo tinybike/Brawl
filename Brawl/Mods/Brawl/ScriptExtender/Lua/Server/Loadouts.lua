@@ -51,6 +51,16 @@ local function setSummonReactionMode(mode)
     getModVars().SummonReactionMode = mode
 end
 
+-- Host-only toggle.  When on, applyEquipment's camp-chest fallback scans every camp chest at camp instead of only the user's own.  Lets MP
+-- players load loadouts referencing items in other users' chests, which BG3 normally hides via per-user chest access.
+local function getSharedCampChestAccess()
+    return getModVars().SharedCampChestAccess == true
+end
+
+local function setSharedCampChestAccess(value)
+    getModVars().SharedCampChestAccess = value and true or false
+end
+
 local function snapshotReactions(uuid)
     local entity = Ext.Entity.Get(uuid)
     if not entity or not entity.InterruptPreferences or not entity.InterruptPreferences.Preferences then
@@ -164,6 +174,14 @@ local function isInCampChest(itemUuid, chest)
     return false
 end
 
+-- Returns true if `itemUuid` is in any camp chest, used when the host has enabled SharedCampChestAccess.
+local function isInAnyCampChest(itemUuid)
+    for _, chest in ipairs(Ext.Entity.GetAllEntitiesWithComponent("CampChest")) do
+        if isInCampChest(itemUuid, chest) then return true end
+    end
+    return false
+end
+
 local function applyEquipment(uuid, snapshot)
     if not snapshot then return false end
     -- Unequip all current items in the tracked slots
@@ -173,13 +191,23 @@ local function applyEquipment(uuid, snapshot)
             Osi.Unequip(uuid, current)
         end
     end
-    -- Camp-chest fallback: if character is currently at camp, also accept items in their camp chest (Osi.Equip will pull from the chest)
-    local campChest = isInCamp(uuid) and findCampChest(uuid) or nil
+    -- Camp-chest fallback: if character is currently at camp, also accept items in their camp chest.  If shared access is on, accept items in
+    -- ANY camp chest at camp instead of just the user's own.
+    local atCamp = isInCamp(uuid)
+    local sharedAccess = getSharedCampChestAccess()
+    local userChest = atCamp and not sharedAccess and findCampChest(uuid) or nil
     for _, slot in ipairs(Constants.EQUIPMENT_SLOTS) do
         local saved = snapshot[slot]
         if saved then
             local inInventory = Osi.GetInventoryOwner(saved) == uuid
-            local inCampChest = campChest and isInCampChest(saved, campChest)
+            local inCampChest = false
+            if atCamp then
+                if sharedAccess then
+                    inCampChest = isInAnyCampChest(saved)
+                elseif userChest then
+                    inCampChest = isInCampChest(saved, userChest)
+                end
+            end
             if inInventory or inCampChest then
                 Osi.Equip(uuid, saved)
             end
@@ -403,6 +431,8 @@ return {
     getClientLoadoutsForCharacter = getClientLoadoutsForCharacter,
     getSummonReactionMode = getSummonReactionMode,
     setSummonReactionMode = setSummonReactionMode,
+    getSharedCampChestAccess = getSharedCampChestAccess,
+    setSharedCampChestAccess = setSharedCampChestAccess,
     applySummonOverrideTo = applySummonOverrideTo,
     applySummonOverrideToAll = applySummonOverrideToAll,
 }

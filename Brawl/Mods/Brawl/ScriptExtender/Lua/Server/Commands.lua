@@ -679,6 +679,7 @@ local function postLoadoutsToUser(userId)
     local payload = {
         characters = characters,
         summonMode = Loadouts.getSummonReactionMode(),
+        sharedCampChestAccess = Loadouts.getSharedCampChestAccess(),
         isHost = userId == hostUserId,
     }
     Ext.ServerNet.PostMessageToUser(userId, "Loadouts", Ext.Json.Stringify(payload))
@@ -746,6 +747,15 @@ local function onSetSummonReactionMode(data)
     if userId ~= hostUserId then return end
     Loadouts.setSummonReactionMode(mode)
     Loadouts.applySummonOverrideToAll()
+    postLoadoutsToUser(userId)
+end
+
+local function onSetSharedCampChestAccess(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local hostUuid = M.Osi.GetHostCharacter()
+    local hostUserId = hostUuid and State.Session.Players and State.Session.Players[hostUuid] and State.Session.Players[hostUuid].userId
+    if userId ~= hostUserId then return end
+    Loadouts.setSharedCampChestAccess(data.Payload == "1")
     postLoadoutsToUser(userId)
 end
 
@@ -969,6 +979,7 @@ return {
         OverwriteLoadout = onOverwriteLoadout,
         DeleteLoadout = onDeleteLoadout,
         SetSummonReactionMode = onSetSummonReactionMode,
+        SetSharedCampChestAccess = onSetSharedCampChestAccess,
         SetCharacterArchetype = onSetCharacterArchetype,
         ExitFTB = function (_) Pause.allExitFTB() end,
         EnterFTB = function (_) Pause.allEnterFTB() end,
