@@ -162,6 +162,8 @@ local LeaderboardWindow = nil
 local LoadoutsTabHandle = nil  -- IMGUI handle for the Loadouts TabItem (created once with the window)
 local LoadoutsContentHandle = nil  -- Child container inside the tab; destroyed + recreated each time data refreshes
 local LatestLoadoutsData = nil  -- Cached server payload for the Loadouts tab; rendered when tab/window opens or refreshed
+local LoadoutsExpandedByUuid = {}  -- Persisted expanded/collapsed state of each character's section, survives destroy/rebuild
+local LoadoutsLastActiveUuid = nil  -- Tracks active char so we can force-open the section on a switch
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -724,10 +726,14 @@ local function renderCharacterSection(parent, char)
     local headerLabel = char.name or "(unknown)"
     if char.isActive then headerLabel = headerLabel .. "  (Active)" end
     if char.isSummon then headerLabel = headerLabel .. "  [Summon]" end
-    local header = parent:AddCollapsingHeader(headerLabel .. "##" .. char.uuid)
-    header.DefaultOpen = char.isActive
+    local header = parent:AddTree(headerLabel .. "##" .. char.uuid)
+    header.CollapsingHeader = true
+    local capturedUuid = char.uuid
+    header.OnExpand = function() LoadoutsExpandedByUuid[capturedUuid] = true end
+    header.OnCollapse = function() LoadoutsExpandedByUuid[capturedUuid] = false end
+    header:SetOpen(LoadoutsExpandedByUuid[char.uuid] == true, "Always")
     -- Archetype dropdown (auto-detect when blank).  Label rendered as a separate Text + SameLine so it sits to the left of the combo.
-    header:AddText("Archetype:")
+    header:AddText("Archetype")
     local archetypeCombo = header:AddCombo("##archetype_" .. char.uuid)
     archetypeCombo.SameLine = true
     archetypeCombo.Options = ARCHETYPE_CHOICES
@@ -762,12 +768,35 @@ local function renderCharacterSection(parent, char)
     btnSave.OnClick = function() postSaveLoadout(char.uuid) end
 end
 
+-- Read the party-portrait order from PlayerPortraits.AssignedCharacters; same source the topbar uses.  Returns {[uuid] = index} for sorting.
+local function getPartyPortraitOrder()
+    local order = {}
+    local root = Ext.UI:GetRoot()
+    local content = root and root:Find("ContentRoot")
+    if not content or not content.Children then return order end
+    for _, child in ipairs(content.Children) do
+        if child.Name == "PlayerPortraits" then
+            local assigned = child.DataContext and child.DataContext.CurrentPlayer and child.DataContext.CurrentPlayer.AssignedCharacters
+            if assigned then
+                for i, ac in ipairs(assigned) do
+                    if ac.EntityUUID then order[ac.EntityUUID] = i end
+                end
+            end
+            break
+        end
+    end
+    return order
+end
+
 local function refreshLoadoutsTab()
     if not LoadoutsTabHandle then return end
+    local snapshotExpanded = {}
+    for k, v in pairs(LoadoutsExpandedByUuid) do snapshotExpanded[k] = v end
     if LoadoutsContentHandle then
         LoadoutsContentHandle:Destroy()
         LoadoutsContentHandle = nil
     end
+    LoadoutsExpandedByUuid = snapshotExpanded
     LoadoutsContentHandle = LoadoutsTabHandle:AddGroup("LoadoutsContent")
     local root = LoadoutsContentHandle
     local data = LatestLoadoutsData
@@ -775,7 +804,33 @@ local function refreshLoadoutsTab()
         root:AddText("Loading loadouts...")
         return
     end
+    local currentActiveUuid
+    for _, char in ipairs(data.characters or {}) do
+        if char.isActive then currentActiveUuid = char.uuid; break end
+    end
+    if currentActiveUuid and currentActiveUuid ~= LoadoutsLastActiveUuid then
+        LoadoutsExpandedByUuid[currentActiveUuid] = true
+    end
+    LoadoutsLastActiveUuid = currentActiveUuid
     if data.characters and #data.characters > 0 then
+        local portraitOrder = getPartyPortraitOrder()
+        local uiSortValid = next(portraitOrder) ~= nil
+        if uiSortValid then
+            for _, char in ipairs(data.characters) do
+                if not char.isSummon and not portraitOrder[char.uuid] then
+                    uiSortValid = false
+                    break
+                end
+            end
+        end
+        if uiSortValid then
+            table.sort(data.characters, function (a, b)
+                local ai = portraitOrder[a.uuid] or 9999
+                local bi = portraitOrder[b.uuid] or 9999
+                if ai ~= bi then return ai < bi end
+                return (a.name or "") < (b.name or "")
+            end)
+        end
         for _, char in ipairs(data.characters) do
             renderCharacterSection(root, char)
         end
