@@ -134,6 +134,36 @@ local function snapshotEquipment(uuid)
     return snapshot
 end
 
+local function isInCamp(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    return entity and entity.CampPresence ~= nil
+end
+
+local function findCampChest(characterUuid)
+    local userId = Osi.GetReservedUserID(characterUuid)
+    if not userId then return nil end
+    for _, chest in ipairs(Ext.Entity.GetAllEntitiesWithComponent("CampChest")) do
+        if chest.CampChest and chest.CampChest.UserID == userId then
+            return chest
+        end
+    end
+    return nil
+end
+
+local function isInCampChest(itemUuid, chest)
+    if not chest or not chest.InventoryOwner or not chest.InventoryOwner.Inventories then return false end
+    for _, invEntity in pairs(chest.InventoryOwner.Inventories) do
+        if invEntity and invEntity.InventoryContainer and invEntity.InventoryContainer.Items then
+            for _, slotData in pairs(invEntity.InventoryContainer.Items) do
+                if slotData.Item and slotData.Item.Uuid and slotData.Item.Uuid.EntityUuid == itemUuid then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function applyEquipment(uuid, snapshot)
     if not snapshot then return false end
     -- Unequip all current items in the tracked slots
@@ -143,11 +173,16 @@ local function applyEquipment(uuid, snapshot)
             Osi.Unequip(uuid, current)
         end
     end
-    -- Equip saved items (only if they're in this character's inventory)
+    -- Camp-chest fallback: if character is currently at camp, also accept items in their camp chest (Osi.Equip will pull from the chest)
+    local campChest = isInCamp(uuid) and findCampChest(uuid) or nil
     for _, slot in ipairs(Constants.EQUIPMENT_SLOTS) do
         local saved = snapshot[slot]
-        if saved and Osi.GetInventoryOwner(saved) == uuid then
-            Osi.Equip(uuid, saved)
+        if saved then
+            local inInventory = Osi.GetInventoryOwner(saved) == uuid
+            local inCampChest = campChest and isInCampChest(saved, campChest)
+            if inInventory or inCampChest then
+                Osi.Equip(uuid, saved)
+            end
         end
     end
     return true
