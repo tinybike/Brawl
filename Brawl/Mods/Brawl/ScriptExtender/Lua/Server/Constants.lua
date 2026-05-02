@@ -1,7 +1,7 @@
 local Constants = {}
 
 -- Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = true, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = false, Resources = false, Quests = false}
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = false
 Constants.INITIAL_PULSE_ACTION_DELAY = 600
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -436,11 +436,11 @@ Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
 Constants.ACTION_MAX_TIME = 6000
 Constants.MOVEMENT_MAX_TIME = 8000
+Constants.COMPANION_FORMATION_RADIUS = 2.0  -- meters; semicircle radius for the rear-guard arc behind the active char on attack-move / Move Party
 Constants.ACTION_ATTEMPT_LIMIT = 3
 Constants.ENEMY_TURN_FAILSAFE_TIMEOUT = 15000
 -- Circuit-breaker for engine-side ReactionInterruptUsed loops: if the same character emits more than this many reaction-interrupt events
--- in a round, force-fail their pending action and end their turn. Threshold is well above any plausible legitimate count (one reaction
--- per round normally; even with mod-granted extras, a few is the realistic max).
+-- in a round, force-fail their pending action and end their turn.
 Constants.REACTION_INTERRUPT_LOOP_THRESHOLD = 10
 Constants.MOVEMENT_INTERPOLATION_LIMIT = 10
 Constants.MAX_MOVEMENT_RETRIES = 1
@@ -454,6 +454,13 @@ Constants.COMBAT_HELPER = {
     templateId = "b4f5635b-2382-4fb2-ad0d-5be8b363e847",
     handle = "h09f52fcdg7db3g44ddg91b1gb2b4d69ac32b",
     faction = "4be9261a-e481-8d9d-3528-f36956a19b17",
+}
+Constants.EQUIPMENT_SLOTS = {
+    "Amulet", "Boots", "Breast", "Cloak", "Gloves", "Helmet",
+    "Melee Main Weapon", "Melee Offhand Weapon",
+    "Ranged Main Weapon", "Ranged Offhand Weapon",
+    "Ring", "Ring2",
+    "Underwear", "VanityBody", "VanityBoots",
 }
 
 return Constants

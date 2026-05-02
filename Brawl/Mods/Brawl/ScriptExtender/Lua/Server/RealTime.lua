@@ -344,27 +344,6 @@ end
 
 local function onGainedControl(uuid)
     debugPrint("onGainedControl", M.Utils.getDisplayName(uuid))
-    -- FTB-entry confirmation window: when we entered FTB and broadcast SelectCharacter for the pre-pause controlled char, the engine often
-    -- defaults to the host character anyway. Re-assert until the engine confirms our intended char (or the window expires).
-    if State.Session.ExpectedControlledOnFTB
-            and State.Session.ExpectedControlledOnFTBExpiresAt
-            and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledOnFTBExpiresAt then
-        local gainedUserId = Osi.GetReservedUserID(uuid)
-        local expectedForUser = gainedUserId and State.Session.ExpectedControlledOnFTB[gainedUserId]
-        if expectedForUser then
-            if uuid ~= expectedForUser then
-                TurnOrder.bumpInitiativeRollsFor(expectedForUser)
-                sendSelectCharacter(expectedForUser)
-            else
-                -- Right character confirmed for this user; clear their entry.  If all users' expectations have resolved, close the window entirely.
-                State.Session.ExpectedControlledOnFTB[gainedUserId] = nil
-                if not next(State.Session.ExpectedControlledOnFTB) then
-                    State.Session.ExpectedControlledOnFTB = nil
-                    State.Session.ExpectedControlledOnFTBExpiresAt = nil
-                end
-            end
-        end
-    end
     if not State.Settings.FullAuto then
         stopPulseAction(Roster.getBrawlerByUuid(uuid))
     end
@@ -399,6 +378,10 @@ local function onGainedControl(uuid)
     TurnOrder.bumpDirectlyControlledInitiativeRolls()
     TurnOrder.reorderByInitiativeRoll(true)
     TurnOrder.setPlayerTurnsActive()
+    -- Refresh the user's loadout HUD with the newly-controlled char's data.  Cheap to send even if HUD is closed (client just stashes it).
+    if userId then
+        Commands.postLoadoutsToUser(userId)
+    end
 end
 
 local function onSpellSyncTargeting(spellCastState)
@@ -518,8 +501,8 @@ local function onEnteredForceTurnBased(uuid)
             sendSelectCharacter(intendedUuid)
             expectedByUser[userId] = intendedUuid
         end
-        State.Session.ExpectedControlledOnFTB = expectedByUser
-        State.Session.ExpectedControlledOnFTBExpiresAt = expiresAt
+        State.Session.ExpectedControlled = expectedByUser
+        State.Session.ExpectedControlledExpiresAt = expiresAt
     end
 end
 
@@ -556,6 +539,7 @@ end
 return {
     joinCombat = joinCombat,
     nextCombatRound = nextCombatRound,
+    sendSelectCharacter = sendSelectCharacter,
     Timers = {
         stopPulseAction = stopPulseAction,
         stopAllPulseActions = stopAllPulseActions,

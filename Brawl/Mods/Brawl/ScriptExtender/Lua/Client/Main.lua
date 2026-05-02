@@ -159,6 +159,11 @@ local IsControllerButtonPressed = {
 }
 local ModifiersHeld = {}  -- Modifier-key state tracking for mouse-chord bindings
 local LeaderboardWindow = nil
+local LoadoutsTabHandle = nil  -- IMGUI handle for the Loadouts TabItem (created once with the window)
+local LoadoutsContentHandle = nil  -- Child container inside the tab; destroyed + recreated each time data refreshes
+local LatestLoadoutsData = nil  -- Cached server payload for the Loadouts tab; rendered when tab/window opens or refreshed
+local LoadoutsExpandedByUuid = {}  -- Persisted expanded/collapsed state of each character's section, survives destroy/rebuild
+local LoadoutsLastActiveUuid = nil  -- Tracks active char so we can force-open the section on a switch
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -353,6 +358,41 @@ local function postLeaderboardToggle()
     Ext.ClientNet.PostMessageToServer("LeaderboardToggle", "")
 end
 
+local function postRequestLoadouts()
+    Ext.ClientNet.PostMessageToServer("RequestLoadouts", "")
+end
+
+local function postSaveLoadout(characterUuid)
+    Ext.ClientNet.PostMessageToServer("SaveLoadout", Ext.Json.Stringify({characterUuid = characterUuid}))
+end
+
+local function postLoadLoadout(characterUuid, index)
+    Ext.ClientNet.PostMessageToServer("LoadLoadout", Ext.Json.Stringify({characterUuid = characterUuid, index = index}))
+end
+
+local function postOverwriteLoadout(characterUuid, index)
+    Ext.ClientNet.PostMessageToServer("OverwriteLoadout", Ext.Json.Stringify({characterUuid = characterUuid, index = index}))
+end
+
+local function postDeleteLoadout(characterUuid, index)
+    Ext.ClientNet.PostMessageToServer("DeleteLoadout", Ext.Json.Stringify({characterUuid = characterUuid, index = index}))
+end
+
+local function postSetSummonReactionMode(mode)
+    Ext.ClientNet.PostMessageToServer("SetSummonReactionMode", mode)
+end
+
+local function postSetSharedCampChestAccess(value)
+    Ext.ClientNet.PostMessageToServer("SetSharedCampChestAccess", value and "1" or "0")
+end
+
+local function postSetCharacterArchetype(characterUuid, archetype)
+    Ext.ClientNet.PostMessageToServer("SetCharacterArchetype", Ext.Json.Stringify({characterUuid = characterUuid, archetype = archetype}))
+end
+
+-- Mirrors the Choices list in MCM_blueprint.json's "active_character_archetype" entry.  Empty string = no override (auto-detect).
+local ARCHETYPE_CHOICES = {"", "melee", "mage", "ranged", "healer", "healer_melee", "melee_magic", "monk", "barbarian"}
+
 local function postControllerActionButton(actionButtonLabel)
     Ext.ClientNet.PostMessageToServer("ControllerActionButton", tostring(actionButtonLabel))
 end
@@ -445,6 +485,8 @@ local function onKeyInput(e)
                 LeaderboardWindow = nil
                 cellRefs.party = {}
                 cellRefs.enemy = {}
+                LoadoutsTabHandle = nil
+                LoadoutsContentHandle = nil
             else
                 postLeaderboardToggle()
             end
@@ -684,11 +726,154 @@ local function isPartyMember(uuid)
     return false
 end
 
+local function renderCharacterSection(parent, char)
+    local headerLabel = char.name or "(unknown)"
+    if char.isActive then headerLabel = headerLabel .. "  (Active)" end
+    if char.isSummon then headerLabel = headerLabel .. "  [Summon]" end
+    local header = parent:AddTree(headerLabel .. "##" .. char.uuid)
+    header.CollapsingHeader = true
+    local capturedUuid = char.uuid
+    header.OnExpand = function() LoadoutsExpandedByUuid[capturedUuid] = true end
+    header.OnCollapse = function() LoadoutsExpandedByUuid[capturedUuid] = false end
+    header:SetOpen(LoadoutsExpandedByUuid[char.uuid] == true, "Always")
+    -- Archetype dropdown (auto-detect when blank).  Label rendered as a separate Text + SameLine so it sits to the left of the combo.
+    header:AddText("Archetype")
+    local archetypeCombo = header:AddCombo("##archetype_" .. char.uuid)
+    archetypeCombo.SameLine = true
+    archetypeCombo.Options = ARCHETYPE_CHOICES
+    local currentIdx = -1
+    for i, v in ipairs(ARCHETYPE_CHOICES) do
+        if v == (char.archetype or "") then currentIdx = i - 1; break end
+    end
+    archetypeCombo.SelectedIndex = currentIdx
+    archetypeCombo.OnChange = function()
+        local newArchetype = ARCHETYPE_CHOICES[archetypeCombo.SelectedIndex + 1] or ""
+        postSetCharacterArchetype(char.uuid, newArchetype)
+    end
+    if char.loadouts and #char.loadouts > 0 then
+        for i, loadout in ipairs(char.loadouts) do
+            local label = loadout.name or ("Loadout " .. tostring(i))
+            if loadout.mode then label = label .. "  [" .. loadout.mode .. "]" end
+            header:AddText(label)
+            local btnLoad = header:AddButton("Load##" .. char.uuid .. "_" .. i)
+            btnLoad.SameLine = true
+            btnLoad.OnClick = function() postLoadLoadout(char.uuid, i) end
+            local btnOverwrite = header:AddButton("Save##overwrite_" .. char.uuid .. "_" .. i)
+            btnOverwrite.SameLine = true
+            btnOverwrite.OnClick = function() postOverwriteLoadout(char.uuid, i) end
+            local btnDelete = header:AddButton("Delete##" .. char.uuid .. "_" .. i)
+            btnDelete.SameLine = true
+            btnDelete.OnClick = function() postDeleteLoadout(char.uuid, i) end
+        end
+    else
+        header:AddText("No saved loadouts.")
+    end
+    local btnSave = header:AddButton("Save Loadout##" .. char.uuid)
+    btnSave.OnClick = function() postSaveLoadout(char.uuid) end
+end
+
+-- Read the party-portrait order from PlayerPortraits.AssignedCharacters; same source the topbar uses.  Returns {[uuid] = index} for sorting.
+local function getPartyPortraitOrder()
+    local order = {}
+    local root = Ext.UI:GetRoot()
+    local content = root and root:Find("ContentRoot")
+    if not content or not content.Children then return order end
+    for _, child in ipairs(content.Children) do
+        if child.Name == "PlayerPortraits" then
+            local assigned = child.DataContext and child.DataContext.CurrentPlayer and child.DataContext.CurrentPlayer.AssignedCharacters
+            if assigned then
+                for i, ac in ipairs(assigned) do
+                    if ac.EntityUUID then order[ac.EntityUUID] = i end
+                end
+            end
+            break
+        end
+    end
+    return order
+end
+
+local function refreshLoadoutsTab()
+    if not LoadoutsTabHandle then return end
+    local snapshotExpanded = {}
+    for k, v in pairs(LoadoutsExpandedByUuid) do snapshotExpanded[k] = v end
+    if LoadoutsContentHandle then
+        LoadoutsContentHandle:Destroy()
+        LoadoutsContentHandle = nil
+    end
+    LoadoutsExpandedByUuid = snapshotExpanded
+    LoadoutsContentHandle = LoadoutsTabHandle:AddGroup("LoadoutsContent")
+    local root = LoadoutsContentHandle
+    local data = LatestLoadoutsData
+    if not data then
+        root:AddText("Loading loadouts...")
+        return
+    end
+    local currentActiveUuid
+    for _, char in ipairs(data.characters or {}) do
+        if char.isActive then currentActiveUuid = char.uuid; break end
+    end
+    if currentActiveUuid and currentActiveUuid ~= LoadoutsLastActiveUuid then
+        LoadoutsExpandedByUuid[currentActiveUuid] = true
+    end
+    LoadoutsLastActiveUuid = currentActiveUuid
+    if data.characters and #data.characters > 0 then
+        local portraitOrder = getPartyPortraitOrder()
+        local uiSortValid = next(portraitOrder) ~= nil
+        if uiSortValid then
+            for _, char in ipairs(data.characters) do
+                if not char.isSummon and not portraitOrder[char.uuid] then
+                    uiSortValid = false
+                    break
+                end
+            end
+        end
+        if uiSortValid then
+            table.sort(data.characters, function (a, b)
+                local ai = portraitOrder[a.uuid] or 9999
+                local bi = portraitOrder[b.uuid] or 9999
+                if ai ~= bi then return ai < bi end
+                return (a.name or "") < (b.name or "")
+            end)
+        end
+        for _, char in ipairs(data.characters) do
+            renderCharacterSection(root, char)
+        end
+    else
+        root:AddText("No characters available.")
+    end
+    -- Summon override is host-only.  Non-host clients don't see these checkboxes.
+    if data.isHost then
+        root:AddSeparator()
+        root:AddSeparatorText("Summons (host)")
+        local cbAllOn = root:AddCheckbox("All summon reactions ON (autofire)")
+        cbAllOn.Checked = data.summonMode == "all_on"
+        cbAllOn.OnChange = function(c)
+            postSetSummonReactionMode(c.Checked and "all_on" or "manual")
+        end
+        local cbAllOff = root:AddCheckbox("All summon reactions OFF")
+        cbAllOff.Checked = data.summonMode == "all_off"
+        cbAllOff.OnChange = function(c)
+            postSetSummonReactionMode(c.Checked and "all_off" or "manual")
+        end
+        root:AddText("(If neither checked, summons use their own per-character loadouts.)")
+        root:AddSeparator()
+        root:AddSeparatorText("Multiplayer (host)")
+        local cbSharedChest = root:AddCheckbox("Shared camp chest access in multiplayer games")
+        cbSharedChest.Checked = data.sharedCampChestAccess == true
+        cbSharedChest.OnChange = function(c)
+            postSetSharedCampChestAccess(c.Checked)
+        end
+        root:AddText("(When loading equipment loadouts at camp, allow pulling items from any user's camp chest.)")
+    end
+end
+
 local function showLeaderboard(data)
     if LeaderboardWindow then
         LeaderboardWindow:Destroy()
         cellRefs.party = {}
         cellRefs.enemy = {}
+        LoadoutsTabHandle = nil
+        LoadoutsContentHandle = nil
     end
     local damageWidth, takenWidth, killsWidth, healingWidth, receivedWidth = #"Damage", #"Taken", #"Kills", #"Healing", #"Healed"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
@@ -708,13 +893,14 @@ local function showLeaderboard(data)
     local numColumns = 6
     local windowWidth = (nameWidth + damageWidth + takenWidth + killsWidth + healingWidth + receivedWidth)*8 + (numColumns - 1)*16 + 100
     local rowCount = 3 + partyCount + enemyCount
-    local windowHeight = rowCount*18 + 20
-    LeaderboardWindow = Ext.IMGUI.NewWindow("Leaderboard")
+    local windowHeight = rowCount*18 + 20 + 60  -- extra room for the tab bar
+    LeaderboardWindow = Ext.IMGUI.NewWindow("Brawl")
     LeaderboardWindow:SetSize({windowWidth, windowHeight})
     LeaderboardWindow.Closeable = true
     LeaderboardWindow.NoFocusOnAppearing = true
-    -- LeaderboardWindow:AddSeparatorText("Party Totals"):SetColor("Text", lightYellow)
-    local partyTable = LeaderboardWindow:AddTable("PartyTotals", numColumns)
+    local tabs = LeaderboardWindow:AddTabBar("BrawlTabs")
+    local leaderboardTab = tabs:AddTabItem("Leaderboard")
+    local partyTable = leaderboardTab:AddTable("PartyTotals", numColumns)
     cellRefs.partyTable = partyTable
     do
         local hdr = partyTable:AddRow()
@@ -744,19 +930,9 @@ local function showLeaderboard(data)
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
         cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
-    -- LeaderboardWindow:AddSeparatorText("Enemy Totals"):SetColor("Text", lightYellow)
-    LeaderboardWindow:AddSeparator()
-    local enemyTable = LeaderboardWindow:AddTable("EnemyTotals", numColumns)
+    leaderboardTab:AddSeparator()
+    local enemyTable = leaderboardTab:AddTable("EnemyTotals", numColumns)
     cellRefs.enemyTable = enemyTable
-    -- do
-    --     local hdr = enemyTable:AddRow()
-    --     hdr:AddCell():AddText("")
-    --     hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
-    --     hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
-    --     hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
-    --     hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
-    --     hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
-    -- end
     local enemy = {}
     for uuid, stats in pairs(data) do
         if not isPartyMember(uuid) then
@@ -776,6 +952,10 @@ local function showLeaderboard(data)
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
         cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
+    LoadoutsTabHandle = tabs:AddTabItem("Loadouts")
+    refreshLoadoutsTab()
+    -- Ask the server for current loadout data; response will trigger another refreshLoadoutsTab.
+    postRequestLoadouts()
 end
 
 local function updateLeaderboard(data)
@@ -863,6 +1043,9 @@ local function onNetMessage(data)
         if LeaderboardWindow then
             updateLeaderboard(Ext.Json.Parse(data.Payload))
         end
+    elseif data.Channel == "Loadouts" then
+        LatestLoadoutsData = Ext.Json.Parse(data.Payload)
+        refreshLoadoutsTab()
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
     -- elseif data.Channel == "NextCombatRound" then

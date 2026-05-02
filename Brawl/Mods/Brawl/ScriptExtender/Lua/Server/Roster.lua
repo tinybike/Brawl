@@ -109,6 +109,8 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                     end
                 end
             end
+            -- Summon reaction override: if a summon just joined the brawl and the global mode is set, apply the override now.  No-op otherwise.
+            Loadouts.applySummonOverrideTo(entityUuid)
         end
     end
 end

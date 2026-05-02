@@ -41,6 +41,18 @@ end
 
 local function onCombatStarted(combatGuid)
     debugPrint("CombatStarted", combatGuid)
+    -- Preserve each user's pre-combat selection: by the time CombatStarted fires "after", the engine may have already swapped control to the
+    -- highest-init character.  Capture the actual pre-combat controlled-char from LastControlledUuid (updated by setIsControllingDirectly), set
+    -- up an expectation window, and re-assert immediately.  onGainedControl will keep correcting wrong-char picks during the window.
+    if State.Session.LastControlledUuid and next(State.Session.LastControlledUuid) then
+        local expectedByUser = {}
+        for userId, uuid in pairs(State.Session.LastControlledUuid) do
+            expectedByUser[userId] = uuid
+            RT.sendSelectCharacter(uuid)
+        end
+        State.Session.ExpectedControlled = expectedByUser
+        State.Session.ExpectedControlledExpiresAt = Ext.Utils.MonotonicTime() + 3000
+    end
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatStarted()
     end
@@ -193,6 +205,29 @@ local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
     if targetUuid ~= nil then
+        -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
+        -- the window, redirect their client to the intended one.  Mode-agnostic; runs in both RT and Swarm.  RT-specific initiative bump only
+        -- happens in RT mode (Swarm doesn't use TurnOrder.Groups initiatives the same way).
+        if State.Session.ExpectedControlled
+                and State.Session.ExpectedControlledExpiresAt
+                and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt then
+            local gainedUserId = Osi.GetReservedUserID(targetUuid)
+            local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
+            if expectedForUser then
+                if targetUuid ~= expectedForUser then
+                    if not State.Settings.TurnBasedSwarmMode then
+                        TurnOrder.bumpInitiativeRollsFor(expectedForUser)
+                    end
+                    RT.sendSelectCharacter(expectedForUser)
+                else
+                    State.Session.ExpectedControlled[gainedUserId] = nil
+                    if not next(State.Session.ExpectedControlled) then
+                        State.Session.ExpectedControlled = nil
+                        State.Session.ExpectedControlledExpiresAt = nil
+                    end
+                end
+            end
+        end
         if targetUuid == Osi.GetHostCharacter() then
             local modVars = Ext.Vars.GetModVariables(ModuleUUID)
             local partyArchetypes = modVars.PartyArchetypes
