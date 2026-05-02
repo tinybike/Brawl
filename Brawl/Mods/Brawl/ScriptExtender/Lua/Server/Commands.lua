@@ -737,6 +737,14 @@ local function onDeleteLoadout(data)
     postLoadoutsToUser(userId)
 end
 
+local function onRenameLoadout(data)
+    local userId = Utils.peerToUserId(data.UserID)
+    local p = parseLoadoutPayload(data.Payload)
+    if not p or not p.index or not userOwnsCharacter(userId, p.characterUuid) then return end
+    Loadouts.renameLoadout(p.characterUuid, p.index, p.name or "")
+    postLoadoutsToUser(userId)
+end
+
 local function onSetSummonReactionMode(data)
     local userId = Utils.peerToUserId(data.UserID)
     local mode = data.Payload
@@ -964,6 +972,8 @@ return {
     enableMod = enableMod,
     disableMod = disableMod,
     dumpFullState = dumpFullState,
+    setCharacterArchetype = setCharacterArchetype,
+    getCharacterArchetype = getCharacterArchetype,
     postLoadoutsToUser = postLoadoutsToUser,
     NetMessage = {
         DebugDumpSelected = onDebugDumpSelected,
@@ -978,6 +988,7 @@ return {
         LoadLoadout = onLoadLoadout,
         OverwriteLoadout = onOverwriteLoadout,
         DeleteLoadout = onDeleteLoadout,
+        RenameLoadout = onRenameLoadout,
         SetSummonReactionMode = onSetSummonReactionMode,
         SetSharedCampChestAccess = onSetSharedCampChestAccess,
         SetCharacterArchetype = onSetCharacterArchetype,

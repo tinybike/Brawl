@@ -378,6 +378,10 @@ local function postDeleteLoadout(characterUuid, index)
     Ext.ClientNet.PostMessageToServer("DeleteLoadout", Ext.Json.Stringify({characterUuid = characterUuid, index = index}))
 end
 
+local function postRenameLoadout(characterUuid, index, name)
+    Ext.ClientNet.PostMessageToServer("RenameLoadout", Ext.Json.Stringify({characterUuid = characterUuid, index = index, name = name}))
+end
+
 local function postSetSummonReactionMode(mode)
     Ext.ClientNet.PostMessageToServer("SetSummonReactionMode", mode)
 end
@@ -752,11 +756,7 @@ local function renderCharacterSection(parent, char)
     end
     if char.loadouts and #char.loadouts > 0 then
         for i, loadout in ipairs(char.loadouts) do
-            local label = loadout.name or ("Loadout " .. tostring(i))
-            if loadout.mode then label = label .. "  [" .. loadout.mode .. "]" end
-            header:AddText(label)
             local btnLoad = header:AddButton("Load##" .. char.uuid .. "_" .. i)
-            btnLoad.SameLine = true
             btnLoad.OnClick = function() postLoadLoadout(char.uuid, i) end
             local btnOverwrite = header:AddButton("Save##overwrite_" .. char.uuid .. "_" .. i)
             btnOverwrite.SameLine = true
@@ -764,6 +764,10 @@ local function renderCharacterSection(parent, char)
             local btnDelete = header:AddButton("Delete##" .. char.uuid .. "_" .. i)
             btnDelete.SameLine = true
             btnDelete.OnClick = function() postDeleteLoadout(char.uuid, i) end
+            local nameInput = header:AddInputText("##loadoutname_" .. char.uuid .. "_" .. i, loadout.name or "")
+            nameInput.SameLine = true
+            nameInput.EnterReturnsTrue = true
+            nameInput.OnChange = function(c) postRenameLoadout(char.uuid, i, c.Text or "") end
         end
     else
         header:AddText("No saved loadouts.")

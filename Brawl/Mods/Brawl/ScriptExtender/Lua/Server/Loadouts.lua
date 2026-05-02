@@ -321,27 +321,94 @@ local function getCurrentModeTag()
     return State.Settings.TurnBasedSwarmMode and "Swarm" or "Real-Time"
 end
 
+local CLASS_SHORT_OVERRIDES = {Barbarian = "Barb", Bard = "Bard"}
+
+local function shortClassName(name)
+    return CLASS_SHORT_OVERRIDES[name] or string.sub(name, 1, 3)
+end
+
+-- e.g., "8 Pal/2 War/1 Wiz" (sorted highest level first, anything that fails to resolve via StaticData gets skipped)
+local function getClassesString(uuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity or not entity.Classes or not entity.Classes.Classes then return "" end
+    local entries = {}
+    for _, classInfo in ipairs(entity.Classes.Classes) do
+        local desc = classInfo.ClassUUID and Ext.StaticData.Get(classInfo.ClassUUID, "ClassDescription")
+        if desc and desc.Name and classInfo.Level and classInfo.Level > 0 then
+            entries[#entries + 1] = {level = classInfo.Level, short = shortClassName(desc.Name)}
+        end
+    end
+    table.sort(entries, function(a, b) return a.level > b.level end)
+    local parts = {}
+    for _, e in ipairs(entries) do parts[#parts + 1] = e.level .. " " .. e.short end
+    return table.concat(parts, "/")
+end
+
+local function formatNowTimestamp()
+    local clockStr = Ext.Timer.ClockTime()
+    local y, mo, d, h, mi = string.match(clockStr or "", "(%d+)-(%d+)-(%d+) (%d+):(%d+)")
+    if not y then return "" end
+    y, mo, d, h, mi = tonumber(y), tonumber(mo), tonumber(d), tonumber(h), tonumber(mi)
+    local hour12 = h % 12
+    if hour12 == 0 then hour12 = 12 end
+    local ampm = h >= 12 and "PM" or "AM"
+    return string.format("%d/%d/%d %d:%02d %s", mo, d, y, hour12, mi, ampm)
+end
+
+local function getDefaultLoadoutName(characterUuid)
+    local mode = getCurrentModeTag()
+    local classes = getClassesString(characterUuid)
+    local timestamp = formatNowTimestamp()
+    local parts = {mode}
+    if classes ~= "" then parts[#parts + 1] = classes end
+    if timestamp ~= "" then parts[#parts + 1] = timestamp end
+    return table.concat(parts, " | ")
+end
+
+local function snapshotArchetype(uuid)
+    local modVars = getModVars()
+    if not modVars.PartyArchetypes then return nil end
+    local arch = modVars.PartyArchetypes[uuid]
+    if arch == nil or arch == "" then return nil end
+    return arch
+end
+
+local function applyArchetype(uuid, archetype)
+    if not archetype or archetype == "" then return false end
+    if Commands and Commands.setCharacterArchetype then
+        Commands.setCharacterArchetype(uuid, archetype)
+        return true
+    end
+    return false
+end
+
 local function buildLoadoutSnapshot(characterUuid)
     return {
         reactions = snapshotReactions(characterUuid),
         preparedSpells = snapshotPreparedSpells(characterUuid),
         hotbar = snapshotHotbar(characterUuid),
         equipment = snapshotEquipment(characterUuid),
+        archetype = snapshotArchetype(characterUuid),
     }
+end
+
+local function payloadHasContent(p)
+    return p.reactions or p.preparedSpells or p.hotbar or p.equipment or p.archetype
 end
 
 local function saveLoadout(characterUuid)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells and not payload.hotbar and not payload.equipment then return false end
+    if not payloadHasContent(payload) then return false end
     local loadouts = getCharacterLoadouts()
     local list = ensureLoadoutList(loadouts, characterUuid)
     table.insert(list, {
-        name = "Loadout " .. tostring(#list + 1),
+        name = getDefaultLoadoutName(characterUuid),
         mode = getCurrentModeTag(),
         reactions = payload.reactions,
         preparedSpells = payload.preparedSpells,
         hotbar = payload.hotbar,
         equipment = payload.equipment,
+        archetype = payload.archetype,
     })
     setCharacterLoadouts(loadouts)
     return true
@@ -349,7 +416,7 @@ end
 
 local function overwriteLoadout(characterUuid, index)
     local payload = buildLoadoutSnapshot(characterUuid)
-    if not payload.reactions and not payload.preparedSpells and not payload.hotbar and not payload.equipment then return false end
+    if not payloadHasContent(payload) then return false end
     local loadouts = getCharacterLoadouts()
     local list = loadouts[characterUuid]
     if not list or not list[index] then return false end
@@ -357,6 +424,7 @@ local function overwriteLoadout(characterUuid, index)
     list[index].preparedSpells = payload.preparedSpells
     list[index].hotbar = payload.hotbar
     list[index].equipment = payload.equipment
+    list[index].archetype = payload.archetype
     list[index].mode = getCurrentModeTag()
     setCharacterLoadouts(loadouts)
     return true
@@ -371,6 +439,7 @@ local function loadLoadout(characterUuid, index)
     if slot.reactions then applyReactions(characterUuid, slot.reactions) end
     if slot.hotbar then applyHotbar(characterUuid, slot.hotbar) end
     if slot.preparedSpells then applyPreparedSpells(characterUuid, slot.preparedSpells) end
+    if slot.archetype then applyArchetype(characterUuid, slot.archetype) end
     return true
 end
 
@@ -379,12 +448,18 @@ local function deleteLoadout(characterUuid, index)
     local list = loadouts[characterUuid]
     if not list or not list[index] then return false end
     table.remove(list, index)
-    -- Renumber remaining default-named loadouts so the displayed numbering stays contiguous.
-    for i, l in ipairs(list) do
-        if l.name and l.name:match("^Loadout %d+$") then
-            l.name = "Loadout " .. tostring(i)
-        end
+    setCharacterLoadouts(loadouts)
+    return true
+end
+
+local function renameLoadout(characterUuid, index, newName)
+    local loadouts = getCharacterLoadouts()
+    local list = loadouts[characterUuid]
+    if not list or not list[index] then return false end
+    if type(newName) ~= "string" or newName == "" then
+        newName = getDefaultLoadoutName(characterUuid)
     end
+    list[index].name = newName
     setCharacterLoadouts(loadouts)
     return true
 end
@@ -407,6 +482,7 @@ local function getClientLoadoutsForCharacter(characterUuid)
             hasPreparedSpells = l.preparedSpells ~= nil,
             hasHotbar = l.hotbar ~= nil,
             hasEquipment = l.equipment ~= nil,
+            hasArchetype = l.archetype ~= nil,
         }
     end
     return out
@@ -439,6 +515,7 @@ return {
     overwriteLoadout = overwriteLoadout,
     loadLoadout = loadLoadout,
     deleteLoadout = deleteLoadout,
+    renameLoadout = renameLoadout,
     getLoadoutsForCharacter = getLoadoutsForCharacter,
     getClientLoadoutsForCharacter = getClientLoadoutsForCharacter,
     getSummonReactionMode = getSummonReactionMode,
