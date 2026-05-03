@@ -93,7 +93,10 @@ function Encounters.spawn(opts)
             print(string.format("[Encounters] enemy %d: no template", i))
         else
             local guid = Spawn.enemyAt(templateUuid, point, host, "enemy " .. i)
-            if guid then table.insert(guids, guid) end
+            if guid then
+                table.insert(guids, guid)
+                Tracking.add(guid)
+            end
         end
     end
 

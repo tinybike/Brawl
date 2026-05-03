@@ -100,12 +100,14 @@ function Compositions.compositionForLevel(playerLevel, difficultyOffset)
         table.insert(templates, bossPool[math.random(1, #bossPool)])
     end
 
-    -- Filler slots: a few levels below
+    -- Filler slots: a few levels below. ToTR's template pool is gappy at L4-L9; if the narrow
+    -- range yields only 1-2 templates we'd over-concentrate on tough mid-tiers (e.g. all displacer
+    -- beasts), so fall back to all-at-or-below for variety.
     local fillerMin = math.max(1, playerLevel - 5)
     local fillerMax = math.max(1, playerLevel - 2)
     local fillerPool = Compositions.templatesInRange(fillerMin, fillerMax)
-    if #fillerPool == 0 then
-        fillerPool = Compositions.templatesInRange(math.max(1, playerLevel - 8), playerLevel)
+    if #fillerPool < 3 then
+        fillerPool = Compositions.templatesInRange(1, math.max(1, playerLevel - 1))
     end
 
     for _ = 1, count - 1 do
