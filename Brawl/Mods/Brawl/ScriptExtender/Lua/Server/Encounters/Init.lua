@@ -124,3 +124,8 @@ function Encounters.spawnAtPlayer(opts)
         jitterM = opts.jitterM,
     })
 end
+
+Ext.RegisterNetListener("Encounters.SpawnAtPlayer", function(channel, payload, userId)
+    local difficultyOffset = tonumber(payload) or 0
+    Encounters.spawnAtPlayer({difficultyOffset = difficultyOffset})
+end)

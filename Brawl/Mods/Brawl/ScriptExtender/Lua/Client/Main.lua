@@ -960,6 +960,17 @@ local function showLeaderboard(data)
     refreshLoadoutsTab()
     -- Ask the server for current loadout data; response will trigger another refreshLoadoutsTab.
     postRequestLoadouts()
+
+    local encountersTab = tabs:AddTabItem("Encounters")
+    encountersTab:AddText("Spawn a level-appropriate enemy wave at your location."):SetColor("Text", mediumYellow)
+    local btnEasier = encountersTab:AddButton("Easier (-2)")
+    btnEasier.SameLine = true
+    btnEasier.OnClick = function() Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", "-2") end
+    local btnNormal = encountersTab:AddButton("Spawn")
+    btnNormal.SameLine = true
+    btnNormal.OnClick = function() Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", "0") end
+    local btnHarder = encountersTab:AddButton("Harder (+2)")
+    btnHarder.OnClick = function() Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", "2") end
 end
 
 local function updateLeaderboard(data)
