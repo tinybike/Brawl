@@ -6,7 +6,16 @@ function Spawn.enemyAt(templateUuid, point, host, label)
     if not templateUuid or templateUuid == "" then return nil end
     local guid = Osi.CreateAt(templateUuid, point[1], point[2], point[3], 0, 1, "")
     if not guid or guid == "" then
-        print("[Encounters] CreateAt failed at", label or "?")
+        local tmpl = Ext.Template and Ext.Template.GetTemplate and Ext.Template.GetTemplate(templateUuid)
+        if tmpl then
+            print(string.format("[Encounters] CreateAt failed at %s template=%s name=%s stats=%s parent=%s equip=%s",
+                label or "?", tostring(templateUuid),
+                tostring(tmpl.Name), tostring(tmpl.Stats),
+                tostring(tmpl.ParentTemplateId), tostring(tmpl.Equipment ~= "" and tmpl.Equipment or "(empty)")))
+        else
+            print(string.format("[Encounters] CreateAt failed at %s template=%s (Ext.Template.GetTemplate returned nil — template not registered)",
+                label or "?", tostring(templateUuid)))
+        end
         return nil
     end
     Osi.SetFaction(guid, ENEMY_FACTION)
