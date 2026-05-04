@@ -99,6 +99,17 @@ local function onCombatRoundStarted(combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     State.Session.ReactionInterruptCount = {}
     State.Session.ReactionInterruptLoopDetected = {}
+    debugPrint(string.format("[CAM_DBG] CombatRoundStarted round=%d", round or -1))
+    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
+        if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Osi.IsInCombat(brawlerUuid) == 1 then
+            local entity = Ext.Entity.Get(brawlerUuid)
+            local init = entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll or "?"
+            debugPrint(string.format("[CAM_DBG]   %s init=%s isPlayer=%s",
+                M.Utils.getDisplayName(brawlerUuid) or tostring(brawlerUuid),
+                tostring(init),
+                tostring(State.Session.Players[brawlerUuid] ~= nil)))
+        end
+    end
     -- Diagnostic-only: investigating an MP-only RT bug where a player ends up alone in their topbar after fleeing a fight (combat doesn't end)
     debugPrint("[ROUND_GUIDS] CombatRoundStarted combatGuid=", combatGuid, "round=", round, "mode=", State.Settings.TurnBasedSwarmMode and "swarm" or "rt")
     for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
@@ -171,6 +182,10 @@ end
 
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
+    local turnUuid = M.Osi.GetUUID(entityGuid)
+    debugPrint(string.format("[CAM_DBG] TurnStarted target=%s isPlayer=%s",
+        M.Utils.getDisplayName(turnUuid) or tostring(entityGuid),
+        tostring(turnUuid and State.Session.Players[turnUuid] ~= nil)))
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
     end

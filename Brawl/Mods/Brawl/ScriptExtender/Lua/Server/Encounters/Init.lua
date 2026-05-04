@@ -49,8 +49,6 @@ local function pickForSlot(level, slot)
     return Compositions.pickFillerForLevel(level)
 end
 
-local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
-
 local function makeHostileToAll(spawnedGuids, hostUuid, radius)
     radius = radius or 50
     local spawnedSet = {}
@@ -63,14 +61,11 @@ local function makeHostileToAll(spawnedGuids, hostUuid, radius)
                 and Osi.IsPartyMember(nearbyUuid, 1) ~= 1
                 and not Utils.isCombatHelper(nearbyUuid)
                 and Osi.IsDead(nearbyUuid) ~= 1 then
-            local npcFaction = Osi.GetFaction(nearbyUuid)
             for _, spawnedGuid in ipairs(spawnedGuids) do
-                if npcFaction and npcFaction ~= "" then
-                    Osi.SetHostileAndEnterCombat(ENEMY_FACTION, npcFaction, spawnedGuid, nearbyUuid)
-                else
-                    Osi.EnterCombat(spawnedGuid, nearbyUuid)
-                    Osi.EnterCombat(nearbyUuid, spawnedGuid)
-                end
+                Osi.SetRelationTemporaryHostile(spawnedGuid, nearbyUuid)
+                Osi.SetRelationTemporaryHostile(nearbyUuid, spawnedGuid)
+                Osi.EnterCombat(spawnedGuid, nearbyUuid)
+                Osi.EnterCombat(nearbyUuid, spawnedGuid)
                 engaged = engaged + 1
             end
         end
@@ -88,9 +83,10 @@ function Encounters.spawnAtPlayer(opts)
     local anchorCount = opts.anchorCount or math.max(3, math.min(count, 6))
     local radius = opts.radius or 14
     local jitterM = opts.jitterM or 2
+    local hostileToAll = opts.hostileToAll == true
 
     debugPrint(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots hostileToAll=%s",
-        level, effLevel, count, tostring(opts.hostileToAll == true)))
+        level, effLevel, count, tostring(hostileToAll)))
 
     local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
     if #anchors == 0 then
@@ -121,7 +117,7 @@ function Encounters.spawnAtPlayer(opts)
     debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, count))
     Spawn.ensureInCombat(guids, host)
 
-    if opts.hostileToAll and #guids > 0 then
+    if hostileToAll and #guids > 0 then
         Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids, host) end)
     end
 

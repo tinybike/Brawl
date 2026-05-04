@@ -1,7 +1,16 @@
 Spawn = Spawn or {}
 
 local debugPrint = Utils.debugPrint
-local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
+
+local function setHostileToParty(spawnedGuid)
+    for _, pm in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local pmUuid = pm[1]
+        if pmUuid then
+            Osi.SetRelationTemporaryHostile(spawnedGuid, pmUuid)
+            Osi.SetRelationTemporaryHostile(pmUuid, spawnedGuid)
+        end
+    end
+end
 
 function Spawn.enemyAt(templateUuid, point, host, label)
     if not templateUuid or templateUuid == "" then return nil end
@@ -19,9 +28,9 @@ function Spawn.enemyAt(templateUuid, point, host, label)
         end
         return nil
     end
-    Osi.SetFaction(guid, ENEMY_FACTION)
     Osi.SetCanJoinCombat(guid, 1)
     Osi.SetCanFight(guid, 1)
+    setHostileToParty(guid)
     if host then
         Osi.EnterCombat(host, guid)
         Osi.EnterCombat(guid, host)
@@ -45,14 +54,13 @@ function Spawn.ensureInCombat(guids, host, retriesLeft, delayMs)
     delayMs = delayMs or 2000
 
     Ext.Timer.WaitFor(delayMs, function()
-        local hostFaction = Osi.GetFaction(host)
-        if not hostFaction or hostFaction == "" then return end
-
         local stillNotInCombat = {}
         for _, guid in ipairs(guids) do
             if Osi.IsDead(guid) ~= 1 and Osi.IsInCombat(guid) ~= 1 then
                 Osi.SetVisible(guid, 1)
-                Osi.SetHostileAndEnterCombat(ENEMY_FACTION, hostFaction, guid, host)
+                setHostileToParty(guid)
+                Osi.EnterCombat(host, guid)
+                Osi.EnterCombat(guid, host)
                 table.insert(stillNotInCombat, guid)
             end
         end
