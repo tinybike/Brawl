@@ -47,6 +47,35 @@ local function pickForSlot(level, slot)
     return Compositions.pickFillerForLevel(level)
 end
 
+local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
+
+local function makeHostileToAll(spawnedGuids, hostUuid, radius)
+    radius = radius or 50
+    local spawnedSet = {}
+    for _, guid in ipairs(spawnedGuids) do spawnedSet[guid] = true end
+
+    local nearby = Utils.getNearby(hostUuid, radius)
+    local engaged = 0
+    for _, nearbyUuid in ipairs(nearby) do
+        if not spawnedSet[nearbyUuid]
+                and Osi.IsPartyMember(nearbyUuid, 1) ~= 1
+                and not Utils.isCombatHelper(nearbyUuid)
+                and Osi.IsDead(nearbyUuid) ~= 1 then
+            local npcFaction = Osi.GetFaction(nearbyUuid)
+            for _, spawnedGuid in ipairs(spawnedGuids) do
+                if npcFaction and npcFaction ~= "" then
+                    Osi.SetHostileAndEnterCombat(ENEMY_FACTION, npcFaction, spawnedGuid, nearbyUuid)
+                else
+                    Osi.EnterCombat(spawnedGuid, nearbyUuid)
+                    Osi.EnterCombat(nearbyUuid, spawnedGuid)
+                end
+                engaged = engaged + 1
+            end
+        end
+    end
+    print(string.format("[Encounters] hostileToAll: engaged %d pairs (%dm radius)", engaged, radius))
+end
+
 function Encounters.spawnAtPlayer(opts)
     opts = opts or {}
     local host = opts.host or Osi.GetHostCharacter()
@@ -58,8 +87,8 @@ function Encounters.spawnAtPlayer(opts)
     local radius = opts.radius or 14
     local jitterM = opts.jitterM or 2
 
-    print(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots",
-        level, effLevel, count))
+    print(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots hostileToAll=%s",
+        level, effLevel, count, tostring(opts.hostileToAll == true)))
 
     local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
     if #anchors == 0 then
@@ -89,10 +118,24 @@ function Encounters.spawnAtPlayer(opts)
 
     print(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, count))
     Spawn.ensureInCombat(guids, host)
+
+    if opts.hostileToAll and #guids > 0 then
+        Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids, host) end)
+    end
+
     return guids
 end
 
 Ext.RegisterNetListener("Encounters.SpawnAtPlayer", function(channel, payload, userId)
-    local difficultyOffset = tonumber(payload) or 0
-    Encounters.spawnAtPlayer({difficultyOffset = difficultyOffset})
+    local opts = {}
+    if payload and payload ~= "" then
+        local ok, parsed = pcall(Ext.Json.Parse, payload)
+        if ok and type(parsed) == "table" then
+            opts = parsed
+        else
+            -- Legacy/fallback: numeric payload was previously the difficultyOffset
+            opts = {difficultyOffset = tonumber(payload) or 0}
+        end
+    end
+    Encounters.spawnAtPlayer(opts)
 end)

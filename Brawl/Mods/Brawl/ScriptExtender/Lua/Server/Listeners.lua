@@ -48,7 +48,7 @@ local function onCombatStarted(combatGuid)
         local expectedByUser = {}
         for userId, uuid in pairs(State.Session.LastControlledUuid) do
             expectedByUser[userId] = uuid
-            RT.sendSelectCharacter(uuid)
+            RT.sendSelectCharacter(uuid, "Listeners.onCombatStarted")
         end
         State.Session.ExpectedControlled = expectedByUser
         State.Session.ExpectedControlledExpiresAt = Ext.Utils.MonotonicTime() + 3000
@@ -204,22 +204,29 @@ end
 local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
+    local windowActive = State.Session.ExpectedControlled
+        and State.Session.ExpectedControlledExpiresAt
+        and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt
+    print(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
+        M.Utils.getDisplayName(targetUuid) or tostring(targetUuid), tostring(windowActive and "active" or "expired/none")))
     if targetUuid ~= nil then
         -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
         -- the window, redirect their client to the intended one.  Mode-agnostic; runs in both RT and Swarm.  RT-specific initiative bump only
         -- happens in RT mode (Swarm doesn't use TurnOrder.Groups initiatives the same way).
-        if State.Session.ExpectedControlled
-                and State.Session.ExpectedControlledExpiresAt
-                and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt then
+        if windowActive then
             local gainedUserId = Osi.GetReservedUserID(targetUuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
+                    print(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                        M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
-                    RT.sendSelectCharacter(expectedForUser)
+                    RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
+                    print(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
+                        M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
                         State.Session.ExpectedControlled = nil

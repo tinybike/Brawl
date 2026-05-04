@@ -963,8 +963,13 @@ local function showLeaderboard(data)
 
     local encountersTab = tabs:AddTabItem("Encounters")
     encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    local cbHostileToAll = encountersTab:AddCheckbox("Hostile to all nearby NPCs (not just party)")
+    cbHostileToAll.Checked = false
     local btnSpawn = encountersTab:AddButton("Fight!")
-    btnSpawn.OnClick = function() Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", "0") end
+    btnSpawn.OnClick = function()
+        local payload = Ext.Json.Stringify({difficultyOffset = 0, hostileToAll = cbHostileToAll.Checked})
+        Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", payload)
+    end
 end
 
 local function updateLeaderboard(data)

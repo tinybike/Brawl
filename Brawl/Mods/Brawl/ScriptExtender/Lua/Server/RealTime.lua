@@ -5,11 +5,18 @@ local debugDump = Utils.debugDump
 -- Falls back to broadcast if we don't have a cached userId. Multiplayer-safe:
 -- avoids broadcasting a "select X" message to all clients (which would tell
 -- other users' clients to switch their own selection too).
-local function sendSelectCharacter(uuid)
+local function sendSelectCharacter(uuid, reason)
     if not uuid then
         return
     end
+    if Osi.IsDead(uuid) == 1 then
+        print(string.format("[CHAR_SWITCH] sendSelectCharacter SKIPPED (target dead) target=%s reason=%s",
+            M.Utils.getDisplayName(uuid) or tostring(uuid), reason or "?"))
+        return
+    end
     local userId = State.Session.Players[uuid] and State.Session.Players[uuid].userId
+    print(string.format("[CHAR_SWITCH] sendSelectCharacter target=%s userId=%s reason=%s",
+        M.Utils.getDisplayName(uuid) or tostring(uuid), tostring(userId), reason or "?"))
     if userId then
         Ext.ServerNet.PostMessageToUser(userId, "SelectCharacter", uuid)
     else
@@ -176,7 +183,7 @@ local function nextCombatRound()
         end
         -- Pre-emptive: re-affirm SelectCharacter for each user's intended char right before the round-turnover mutations.
         for _, intendedUuid in pairs(intendedByUser) do
-            sendSelectCharacter(intendedUuid)
+            sendSelectCharacter(intendedUuid, "RT.preRoundTurnover")
         end
         Ext.ServerNet.BroadcastMessage("NextCombatRound", "")
         for uuid, _ in pairs(M.Roster.getBrawlers()) do
@@ -354,7 +361,7 @@ local function onGainedControl(uuid)
         if pendingUuid then
             if uuid ~= pendingUuid then
                 debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(pendingUuid))
-                sendSelectCharacter(pendingUuid)
+                sendSelectCharacter(pendingUuid, "RT.onGainedControl-pendingFTB-mismatch")
             else
                 debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
             end
@@ -384,15 +391,22 @@ local function onGainedControl(uuid)
     end
 end
 
+local TARGETING_REACTION_LOCK_BOOST = "ActionResourceBlock(ReactionActionPoint)"
+local TARGETING_REACTION_LOCK_REASON = "BRAWL_TARGETING_REACTION_LOCK"
+
 local function onSpellSyncTargeting(spellCastState)
     if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
-        State.Session.PlayerTargetingSpellCast[spellCastState.Caster.Uuid.EntityUuid] = true
+        local uuid = spellCastState.Caster.Uuid.EntityUuid
+        State.Session.PlayerTargetingSpellCast[uuid] = true
+        Osi.AddBoosts(uuid, TARGETING_REACTION_LOCK_BOOST, TARGETING_REACTION_LOCK_REASON, uuid)
     end
 end
 
 local function onDestroySpellSyncTargeting(spellCastState)
     if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
-        State.Session.PlayerTargetingSpellCast[spellCastState.Caster.Uuid.EntityUuid] = nil
+        local uuid = spellCastState.Caster.Uuid.EntityUuid
+        State.Session.PlayerTargetingSpellCast[uuid] = nil
+        Osi.RemoveBoosts(uuid, TARGETING_REACTION_LOCK_BOOST, 0, TARGETING_REACTION_LOCK_REASON, uuid)
         if State.Session.IsNextCombatRoundQueued then
             nextCombatRound()
         end
@@ -498,7 +512,7 @@ local function onEnteredForceTurnBased(uuid)
         local expectedByUser = {}
         for userId, intendedUuid in pairs(selectedByUser) do
             debugPrint("FTB ready, sending SelectCharacter for", M.Utils.getDisplayName(intendedUuid))
-            sendSelectCharacter(intendedUuid)
+            sendSelectCharacter(intendedUuid, "RT.FTBReady")
             expectedByUser[userId] = intendedUuid
         end
         State.Session.ExpectedControlled = expectedByUser
