@@ -1,5 +1,7 @@
 SpawnPoints = SpawnPoints or {}
 
+local debugPrint = Utils.debugPrint
+
 function SpawnPoints.ringAround(originUuid, n, radius)
     n = n or 5
     radius = radius or 14
@@ -19,11 +21,11 @@ function SpawnPoints.ringAround(originUuid, n, radius)
             if point then table.insert(points, point) end
         end
         if #points > 0 then
-            print(string.format("[Encounters] ring: %d/%d anchors at radius %.1fm", #points, n, r))
+            debugPrint(string.format("[Encounters] ring: %d/%d anchors at radius %.1fm", #points, n, r))
             return points
         end
     end
 
-    print("[Encounters] ring: no valid anchors at any radius")
+    debugPrint("[Encounters] ring: no valid anchors at any radius")
     return {}
 end

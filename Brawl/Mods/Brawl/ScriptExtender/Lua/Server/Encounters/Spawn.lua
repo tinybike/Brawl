@@ -1,5 +1,6 @@
 Spawn = Spawn or {}
 
+local debugPrint = Utils.debugPrint
 local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
 
 function Spawn.enemyAt(templateUuid, point, host, label)
@@ -8,12 +9,12 @@ function Spawn.enemyAt(templateUuid, point, host, label)
     if not guid or guid == "" then
         local tmpl = Ext.Template and Ext.Template.GetTemplate and Ext.Template.GetTemplate(templateUuid)
         if tmpl then
-            print(string.format("[Encounters] CreateAt failed at %s template=%s name=%s stats=%s parent=%s equip=%s",
+            debugPrint(string.format("[Encounters] CreateAt failed at %s template=%s name=%s stats=%s parent=%s equip=%s",
                 label or "?", tostring(templateUuid),
                 tostring(tmpl.Name), tostring(tmpl.Stats),
                 tostring(tmpl.ParentTemplateId), tostring(tmpl.Equipment ~= "" and tmpl.Equipment or "(empty)")))
         else
-            print(string.format("[Encounters] CreateAt failed at %s template=%s (Ext.Template.GetTemplate returned nil — template not registered)",
+            debugPrint(string.format("[Encounters] CreateAt failed at %s template=%s (Ext.Template.GetTemplate returned nil — template not registered)",
                 label or "?", tostring(templateUuid)))
         end
         return nil
@@ -25,7 +26,7 @@ function Spawn.enemyAt(templateUuid, point, host, label)
         Osi.EnterCombat(host, guid)
         Osi.EnterCombat(guid, host)
     end
-    print(string.format("[Encounters] Spawned %s at %s (%.1f, %.1f, %.1f)",
+    debugPrint(string.format("[Encounters] Spawned %s at %s (%.1f, %.1f, %.1f)",
         guid, label or "?", point[1], point[2], point[3]))
     return guid
 end
@@ -61,7 +62,7 @@ function Spawn.ensureInCombat(guids, host, retriesLeft, delayMs)
         if retriesLeft > 0 then
             Spawn.ensureInCombat(stillNotInCombat, host, retriesLeft - 1, delayMs)
         else
-            print(string.format("[Encounters] %d enemies remained out of combat after retries", #stillNotInCombat))
+            debugPrint(string.format("[Encounters] %d enemies remained out of combat after retries", #stillNotInCombat))
         end
     end)
 end

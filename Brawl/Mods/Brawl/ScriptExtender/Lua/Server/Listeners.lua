@@ -207,7 +207,7 @@ local function onGainedControl(targetGuid)
     local windowActive = State.Session.ExpectedControlled
         and State.Session.ExpectedControlledExpiresAt
         and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt
-    print(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
+    debugPrint(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
         M.Utils.getDisplayName(targetUuid) or tostring(targetUuid), tostring(windowActive and "active" or "expired/none")))
     if targetUuid ~= nil then
         -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
@@ -218,14 +218,14 @@ local function onGainedControl(targetGuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
-                    print(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                    debugPrint(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
                         M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
                     RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
-                    print(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
+                    debugPrint(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
                         M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then

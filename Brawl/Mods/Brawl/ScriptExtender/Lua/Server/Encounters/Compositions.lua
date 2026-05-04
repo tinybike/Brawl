@@ -1,5 +1,6 @@
 Compositions = Compositions or {}
 
+local debugPrint = Utils.debugPrint
 local SOE_MOD_UUID = "a27fdbe3-4d1a-641d-d05f-1ba4ee529da8"
 
 local function soeLoaded()
@@ -23,7 +24,7 @@ local function buildTemplatesByLevel()
             kept = kept + 1
         end
     end
-    print(string.format("[Encounters] templates loaded: %d (skipped %d SoE-only; SoE detected=%s)",
+    debugPrint(string.format("[Encounters] templates loaded: %d (skipped %d SoE-only; SoE detected=%s)",
         kept, skipped, tostring(soe)))
     return byLevel
 end

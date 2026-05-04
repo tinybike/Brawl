@@ -1,8 +1,10 @@
 Encounters = Encounters or {}
 
+local debugPrint = Utils.debugPrint
+
 function Encounters.testSpawn(templateUuid, distance)
     if not templateUuid or templateUuid == "" then
-        print("[Encounters] testSpawn: templateUuid required")
+        debugPrint("[Encounters] testSpawn: templateUuid required")
         return
     end
     distance = distance or 5
@@ -11,7 +13,7 @@ function Encounters.testSpawn(templateUuid, distance)
     local px, py, pz = Osi.GetPosition(host)
     local point = Spawn.findValidNear({px + distance, py, pz + distance}, 5, host)
     if not point then
-        print("[Encounters] testSpawn: no valid position found near host")
+        debugPrint("[Encounters] testSpawn: no valid position found near host")
         return
     end
     return Spawn.enemyAt(templateUuid, point, host, "test")
@@ -19,7 +21,7 @@ end
 
 function Encounters.spawnWave(templateUuid, count, radius)
     if not templateUuid or templateUuid == "" then
-        print("[Encounters] spawnWave: templateUuid required")
+        debugPrint("[Encounters] spawnWave: templateUuid required")
         return
     end
     count = count or 5
@@ -28,7 +30,7 @@ function Encounters.spawnWave(templateUuid, count, radius)
     local host = Osi.GetHostCharacter()
     local points = SpawnPoints.ringAround(host, count, radius)
     if #points == 0 then
-        print("[Encounters] spawnWave: no valid spawn points generated")
+        debugPrint("[Encounters] spawnWave: no valid spawn points generated")
         return
     end
 
@@ -37,7 +39,7 @@ function Encounters.spawnWave(templateUuid, count, radius)
         local guid = Spawn.enemyAt(templateUuid, point, host, "anchor " .. i)
         if guid then table.insert(guids, guid) end
     end
-    print(string.format("[Encounters] spawnWave: spawned %d/%d enemies", #guids, count))
+    debugPrint(string.format("[Encounters] spawnWave: spawned %d/%d enemies", #guids, count))
     Spawn.ensureInCombat(guids, host)
     return guids
 end
@@ -73,7 +75,7 @@ local function makeHostileToAll(spawnedGuids, hostUuid, radius)
             end
         end
     end
-    print(string.format("[Encounters] hostileToAll: engaged %d pairs (%dm radius)", engaged, radius))
+    debugPrint(string.format("[Encounters] hostileToAll: engaged %d pairs (%dm radius)", engaged, radius))
 end
 
 function Encounters.spawnAtPlayer(opts)
@@ -87,12 +89,12 @@ function Encounters.spawnAtPlayer(opts)
     local radius = opts.radius or 14
     local jitterM = opts.jitterM or 2
 
-    print(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots hostileToAll=%s",
+    debugPrint(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots hostileToAll=%s",
         level, effLevel, count, tostring(opts.hostileToAll == true)))
 
     local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
     if #anchors == 0 then
-        print("[Encounters] spawnAtPlayer: no valid anchors generated")
+        debugPrint("[Encounters] spawnAtPlayer: no valid anchors generated")
         return
     end
 
@@ -106,7 +108,7 @@ function Encounters.spawnAtPlayer(opts)
 
         local templateUuid = pickForSlot(effLevel, slot)
         if not templateUuid then
-            print(string.format("[Encounters] slot %d: pool empty", slot))
+            debugPrint(string.format("[Encounters] slot %d: pool empty", slot))
         else
             local guid = Spawn.enemyAt(templateUuid, point, host, "enemy " .. slot)
             if guid then
@@ -116,7 +118,7 @@ function Encounters.spawnAtPlayer(opts)
         end
     end
 
-    print(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, count))
+    debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, count))
     Spawn.ensureInCombat(guids, host)
 
     if opts.hostileToAll and #guids > 0 then

@@ -1,5 +1,7 @@
 Loot = Loot or {}
 
+local debugPrint = Utils.debugPrint
+
 -- ToTR's exact rates from CombatMod/Constants.lua
 local LOOT_RATES = {
     Objects  = {Common = 40, Uncommon = 20, Rare = 10, VeryRare = 5,  Legendary = 2},
@@ -122,7 +124,7 @@ local function buildPools()
     local function fmt(b)
         return string.format("%d/%d/%d/%d/%d", #b.Common, #b.Uncommon, #b.Rare, #b.VeryRare, #b.Legendary)
     end
-    print(string.format("[Encounters] Loot pools (C/U/R/VR/L): Object=%s CombatObject=%s Weapon=%s Armor=%s",
+    debugPrint(string.format("[Encounters] Loot pools (C/U/R/VR/L): Object=%s CombatObject=%s Weapon=%s Armor=%s",
         fmt(pools.Object), fmt(pools.CombatObject), fmt(pools.Weapon), fmt(pools.Armor)))
 end
 
@@ -177,11 +179,11 @@ function Loot.dropOnKill(corpseGuid)
     if not x then return 0 end
     local rootTemplate = pickFromPoolUniform("Object")
     if not rootTemplate then
-        print("[Encounters] kill loot: Object pool empty")
+        debugPrint("[Encounters] kill loot: Object pool empty")
         return 0
     end
     if spawnItem(rootTemplate, x, y, z) then
-        print(string.format("[Encounters] kill loot dropped: %s", rootTemplate))
+        debugPrint(string.format("[Encounters] kill loot dropped: %s", rootTemplate))
         return 1
     end
     return 0
@@ -207,10 +209,10 @@ function Loot.dropEncounterPile(host, rolls)
         local rarity = pickRarity(LOOT_RATES[categoryRatesKey[category]])
         local rootTemplate = pickFromPool(category, rarity)
         if rootTemplate and spawnItem(rootTemplate, x, y, z) then
-            print(string.format("[Encounters] pile drop: %s %s %s", category, rarity, rootTemplate))
+            debugPrint(string.format("[Encounters] pile drop: %s %s %s", category, rarity, rootTemplate))
             dropped = dropped + 1
         end
     end
-    print(string.format("[Encounters] pile complete: %d/%d items", dropped, rolls))
+    debugPrint(string.format("[Encounters] pile complete: %d/%d items", dropped, rolls))
     return dropped
 end

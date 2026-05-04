@@ -10,12 +10,12 @@ local function sendSelectCharacter(uuid, reason)
         return
     end
     if Osi.IsDead(uuid) == 1 then
-        print(string.format("[CHAR_SWITCH] sendSelectCharacter SKIPPED (target dead) target=%s reason=%s",
+        debugPrint(string.format("[CHAR_SWITCH] sendSelectCharacter SKIPPED (target dead) target=%s reason=%s",
             M.Utils.getDisplayName(uuid) or tostring(uuid), reason or "?"))
         return
     end
     local userId = State.Session.Players[uuid] and State.Session.Players[uuid].userId
-    print(string.format("[CHAR_SWITCH] sendSelectCharacter target=%s userId=%s reason=%s",
+    debugPrint(string.format("[CHAR_SWITCH] sendSelectCharacter target=%s userId=%s reason=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid), tostring(userId), reason or "?"))
     if userId then
         Ext.ServerNet.PostMessageToUser(userId, "SelectCharacter", uuid)

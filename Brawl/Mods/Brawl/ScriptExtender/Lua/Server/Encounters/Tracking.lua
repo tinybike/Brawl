@@ -1,6 +1,8 @@
 Tracking = Tracking or {}
 Tracking.spawned = {}
 
+local debugPrint = Utils.debugPrint
+
 function Tracking.add(guid)
     if guid and guid ~= "" then Tracking.spawned[guid] = true end
 end
@@ -17,7 +19,7 @@ end
 
 local function onDied(entityGuid)
     local key = Osi.GetUUID(entityGuid)
-    print(string.format("[Encounters DEBUG] Died: raw=%s key=%s tracked=%s count=%d",
+    debugPrint(string.format("[Encounters DEBUG] Died: raw=%s key=%s tracked=%s count=%d",
         tostring(entityGuid), tostring(key),
         tostring(key and Tracking.spawned[key] ~= nil),
         Tracking.count()))
@@ -27,7 +29,7 @@ local function onDied(entityGuid)
     Tracking.spawned[key] = nil
 
     if Tracking.count() == 0 then
-        print("[Encounters] all encounter enemies down — dropping bonus pile")
+        debugPrint("[Encounters] all encounter enemies down — dropping bonus pile")
         Loot.dropEncounterPile()
     end
 end
