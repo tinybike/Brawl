@@ -192,11 +192,12 @@ end
 local function nextCombatRound()
     State.Session.IsNextCombatRoundQueued = false
     local targeting = State.areAnyPlayersTargeting()
+    local casting = State.isAnyDirectlyControlledCasting()
     local inFTB = Pause.isPartyInFTB()
-    debugPrint(string.format("nextCombatRound called: areAnyPlayersTargeting=%s isPartyInFTB=%s",
-        tostring(targeting), tostring(inFTB)))
-    if targeting then
-        debugPrint("  -> queued (player is targeting)")
+    debugPrint(string.format("nextCombatRound called: targeting=%s casting=%s inFTB=%s",
+        tostring(targeting), tostring(casting), tostring(inFTB)))
+    if targeting or casting then
+        debugPrint(string.format("  -> queued (%s)", targeting and "targeting" or "committed cast in flight"))
         State.Session.IsNextCombatRoundQueued = true
     elseif not inFTB then
         dumpInitsForLog("nextCombatRound START")
@@ -459,7 +460,39 @@ local function onDestroySpellSyncTargeting(spellCastState)
         State.Session.PlayerTargetingSpellCast[uuid] = nil
         Osi.RemoveBoosts(uuid, TARGETING_REACTION_LOCK_BOOST, 0, TARGETING_REACTION_LOCK_REASON, uuid)
         if State.Session.IsNextCombatRoundQueued then
-            nextCombatRound()
+            -- Defer one tick.  If targeting destroyed because of a click-to-commit, SpellCastState is created
+            -- right after; the deferred retry then sees the casting gate and re-queues correctly.  If it was
+            -- a cancel (right-click), no SpellCastState appears and the retry proceeds.
+            Ext.Timer.WaitFor(0, function ()
+                if State.Session.IsNextCombatRoundQueued then
+                    nextCombatRound()
+                end
+            end)
+        end
+    end
+end
+
+-- SpellCastState lifecycle covers the full commit-to-completion span of a cast (including the engine's
+-- move-into-range phase before a melee attack).  Track it per directly-controlled char so we can defer
+-- round turnover -- at turnover, RequestedEndTurn=true flushes pending action queues, which would
+-- otherwise cancel a queued attack mid-walk and not resume.
+local function onSpellCastStateCreated(spellCastState)
+    if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
+        local uuid = spellCastState.Caster.Uuid.EntityUuid
+        if State.isPlayerControllingDirectly(uuid) then
+            State.Session.PlayerCommittedCast[uuid] = true
+        end
+    end
+end
+
+local function onSpellCastStateDestroyed(spellCastState)
+    if spellCastState and spellCastState.Caster and spellCastState.Caster.Uuid.EntityUuid then
+        local uuid = spellCastState.Caster.Uuid.EntityUuid
+        if State.Session.PlayerCommittedCast[uuid] then
+            State.Session.PlayerCommittedCast[uuid] = nil
+            if State.Session.IsNextCombatRoundQueued then
+                nextCombatRound()
+            end
         end
     end
 end
@@ -632,6 +665,8 @@ return {
         onGainedControl = onGainedControl,
         onSpellSyncTargeting = onSpellSyncTargeting,
         onDestroySpellSyncTargeting = onDestroySpellSyncTargeting,
+        onSpellCastStateCreated = onSpellCastStateCreated,
+        onSpellCastStateDestroyed = onSpellCastStateDestroyed,
         onDialogStarted = onDialogStarted,
         onDialogEnded = onDialogEnded,
         onDied = onDied,

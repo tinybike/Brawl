@@ -456,6 +456,18 @@ local function onDestroySpellSyncTargeting(cast, _, _)
     end
 end
 
+local function onSpellCastStateCreated(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast and cast.SpellCastState then
+        RT.Listeners.onSpellCastStateCreated(cast.SpellCastState)
+    end
+end
+
+local function onSpellCastStateDestroyed(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast and cast.SpellCastState then
+        RT.Listeners.onSpellCastStateDestroyed(cast.SpellCastState)
+    end
+end
+
 -- Capture the requestUuid of a registered action for this storyActionID, if there is one. Use `or` so that follow-up events sharing the same
 -- storyActionID (e.g. the Target_Counterspell_Success metaspell that fires after a successful counter) don't clobber the original cast's
 -- requestUuid -- the counterspell handler in onCastedSpell needs the original to look up and fail the right action precisely.
@@ -838,6 +850,14 @@ local function startListeners()
     }
     State.Session.Listeners.DestroySpellSyncTargeting = {
         handle = Ext.Entity.OnDestroy("SpellSyncTargeting", onDestroySpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.SpellCastStateCreated = {
+        handle = Ext.Entity.OnCreateDeferred("SpellCastState", onSpellCastStateCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.SpellCastStateDestroyed = {
+        handle = Ext.Entity.OnDestroy("SpellCastState", onSpellCastStateDestroyed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UsingSpellOnTarget = {
