@@ -298,8 +298,10 @@ local function getPositionInfo()
     return nil
 end
 
-local function postPauseToggle()
-    if isInFTB(getDirectlyControlledCharacter()) then
+local function postPauseToggle(source)
+    local ctrl = getDirectlyControlledCharacter()
+    local inFTB = isInFTB(ctrl)
+    if inFTB then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     else
         Ext.ClientNet.PostMessageToServer("EnterFTB", "")
@@ -448,7 +450,19 @@ local function onKeyInput(e)
             keybindingPressed = true
         end
         if isKeybindingPressed(e, PauseToggleHotkey) then
-            postPauseToggle()
+            local mods = {}
+            if e.Modifiers then
+                for k, v in pairs(e.Modifiers) do
+                    -- Handle both array form {"LCtrl"} and hash form {LCtrl=true}
+                    if type(k) == "number" then
+                        table.insert(mods, tostring(v))
+                    elseif v then
+                        table.insert(mods, tostring(k))
+                    end
+                end
+            end
+            postPauseToggle(string.format("kbd e.Key=%s e.Modifiers=[%s] e.Event=%s e.Repeat=%s",
+                tostring(e.Key), table.concat(mods, ","), tostring(e.Event), tostring(e.Repeat)))
             keybindingPressed = true
         end
         if isKeybindingPressed(e, TargetCloserEnemyHotkey) then
@@ -502,11 +516,6 @@ local function onKeyInput(e)
                 keybindingPressed = true
             end
         end
-        -- TEMP DEBUG: X dumps state of currently-controlled character (for grey-out investigation)
-        if e.Key == "X" then
-            Ext.ClientNet.PostMessageToServer("DebugDumpSelected", "")
-            keybindingPressed = true
-        end
         if keybindingPressed then
             e:PreventAction()
         end
@@ -550,7 +559,7 @@ local function onControllerButtonPressed(button)
         end
     end
     if isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
-        postPauseToggle()
+        postPauseToggle("controller " .. tostring(ControllerPauseToggleHotkey[1] or "?"))
         if ControllerPauseToggleHotkeyOverride then
             override = true
         end
@@ -960,6 +969,16 @@ local function showLeaderboard(data)
     refreshLoadoutsTab()
     -- Ask the server for current loadout data; response will trigger another refreshLoadoutsTab.
     postRequestLoadouts()
+
+    local encountersTab = tabs:AddTabItem("Encounters")
+    encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    local cbHostileToAll = encountersTab:AddCheckbox("Hostile to all nearby NPCs (not just party)")
+    cbHostileToAll.Checked = false
+    local btnSpawn = encountersTab:AddButton("Fight!")
+    btnSpawn.OnClick = function()
+        local payload = Ext.Json.Stringify({difficultyOffset = 0, hostileToAll = cbHostileToAll.Checked})
+        Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", payload)
+    end
 end
 
 local function updateLeaderboard(data)

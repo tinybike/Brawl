@@ -184,7 +184,7 @@ local function isPugnacious(potentialEnemyUuid, uuid)
             return nil
         end
     end
-    return M.Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
+    return M.Osi.IsEnemy(uuid, potentialEnemyUuid) == 1
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
@@ -318,8 +318,16 @@ local function isCounterspell(spellName)
     return false
 end
 
-local function getToTEnemyTier(uuid)
-    if Mods.ToT.PersistentVars and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Enemies then
+-- Resolve enemy tier index for an entity.  Checks Brawl-Encounters spawned records first (no runtime
+-- dependency on Mods.ToT being loaded), then falls back to an active ToT scenario's enemy list.
+local function getEnemyTier(uuid)
+    if Encounters and Encounters.Tracking and Encounters.Tracking.spawned then
+        local rec = Encounters.Tracking.spawned[uuid]
+        if rec and rec.tier then
+            return M.Utils.getTierIndex(rec.tier)
+        end
+    end
+    if Mods.ToT and Mods.ToT.PersistentVars and Mods.ToT.PersistentVars.Scenario and Mods.ToT.PersistentVars.Scenario.Enemies then
         for _, enemyGroup in ipairs(Mods.ToT.PersistentVars.Scenario.Enemies) do
             for _, enemy in ipairs(enemyGroup) do
                 if enemy.GUID == uuid then
@@ -330,9 +338,9 @@ local function getToTEnemyTier(uuid)
     end
 end
 
-local function isToTExcludedEnemyTier(uuid)
-    if M.Utils.isToT() and State.Session.ExcludeEnemyTierIndex ~= nil then
-        local enemyTier = getToTEnemyTier(uuid)
+local function isExcludedEnemyTier(uuid)
+    if State.Session.ExcludeEnemyTierIndex ~= nil then
+        local enemyTier = getEnemyTier(uuid)
         if enemyTier and enemyTier >= State.Session.ExcludeEnemyTierIndex then
             return true
         end
@@ -562,11 +570,17 @@ local function isHostileTarget(uuid, targetUuid)
     if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
         isHostile = false
     elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
-    elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
-        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
-    elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
         isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+    elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+    elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
+        -- Brawl-spawned encounter enemies are never hostile to each other
+        local spawned = Encounters and Encounters.Tracking and Encounters.Tracking.spawned
+        if spawned and spawned[uuid] and spawned[targetUuid] then
+            isHostile = false
+        else
+            isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+        end
     else
         debugPrint(M.Utils.getDisplayName(uuid), "isHostileTarget: what happened here?", uuid, targetUuid, M.Utils.getDisplayName(targetUuid))
     end
@@ -865,8 +879,8 @@ return {
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
-    getToTEnemyTier = getToTEnemyTier,
-    isToTExcludedEnemyTier = isToTExcludedEnemyTier,
+    getEnemyTier = getEnemyTier,
+    isExcludedEnemyTier = isExcludedEnemyTier,
     isActiveCombatTurn = isActiveCombatTurn,
     getOriginatorPrototype = getOriginatorPrototype,
     contains = contains,

@@ -556,7 +556,7 @@ local function getWeightedTargets(brawler, potentialTargets, bonusActionOnly, he
                         ableToTarget = false
                     end
                     debugPrint(isHostile, ableToTarget, State.Session.ActiveCombatGroups[brawler.combatGroupId], State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid])
-                    if M.Utils.isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialTargetUuid] then
+                    if M.Utils.isToT() or ableToTarget or State.Session.ActiveCombatGroups[brawler.combatGroupId] then
                         local hasPathToTarget = nil
                         local casterEntity = Ext.Entity.Get(brawler.uuid)
                         local preparedSpells = casterEntity and casterEntity.SpellBookPrepares and casterEntity.SpellBookPrepares.PreparedSpells

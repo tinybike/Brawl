@@ -63,6 +63,7 @@ local function allEnterFTB()
     if State.Settings.TurnBasedSwarmMode then
         return
     end
+    debugPrint("allEnterFTB called")
     debugPrint("allEnterFTB")
     -- Out of combat: minimal FTB on party members, no pause machinery. Players
     -- can move around freely and the game's native FTB handles everything.
@@ -143,6 +144,11 @@ local function allEnterFTB()
     -- RT.onEnteredForceTurnBased).  Stored as {[userId] = uuid}.
     if next(selectedBeforePause) then
         State.Session.PendingSelectCharOnFTB = selectedBeforePause
+        local entries = {}
+        for uid, u in pairs(selectedBeforePause) do
+            table.insert(entries, string.format("%s→%s", tostring(uid), M.Utils.getDisplayName(u) or u))
+        end
+        debugPrint(string.format("PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
     end
 end
 
@@ -388,7 +394,7 @@ local function startSpellCastPrepareEndEventListener(entityUuid)
                             end
                         end
                     end
-                    print(string.format("[ReactionCheck] uuid=%s spell=%s inTable=%s isReaction=%s isBonusAction=%s hasReactionStatus=%s",
+                    debugPrint(string.format("[ReactionCheck] uuid=%s spell=%s inTable=%s isReaction=%s isBonusAction=%s hasReactionStatus=%s",
                         tostring(entityUuid), tostring(spellName),
                         tostring(spell ~= nil),
                         tostring(spell and spell.isReaction),
@@ -396,7 +402,7 @@ local function startSpellCastPrepareEndEventListener(entityUuid)
                         tostring(hasReactionStatus)))
                     -- Reactions (e.g. Divine Allegiance, Shield) can be engine-fired automatically; locking can strand the character greyed-out mid-reaction.
                     if (spell and spell.isReaction) or hasReactionStatus then
-                        print("[ReactionCheck]   -> skipping midActionLock")
+                        debugPrint("[ReactionCheck]   -> skipping midActionLock")
                         return
                     end
                     if State.Settings.NoFreezeOnBonusActionsDuringPause and spell and spell.isBonusAction and M.Osi.IsPartyMember(entityUuid, 1) == 1 then

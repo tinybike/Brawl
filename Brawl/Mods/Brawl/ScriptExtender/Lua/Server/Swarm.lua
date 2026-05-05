@@ -7,7 +7,7 @@ local useRemainingActions
 local useExtraAttacks
 
 local function isExcludedFromSwarmAI(uuid)
-    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isToTExcludedEnemyTier(uuid)
+    return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isExcludedEnemyTier(uuid)
 end
 
 local function isControlledByDefaultAI(uuid)

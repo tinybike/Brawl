@@ -48,7 +48,7 @@ local function onCombatStarted(combatGuid)
         local expectedByUser = {}
         for userId, uuid in pairs(State.Session.LastControlledUuid) do
             expectedByUser[userId] = uuid
-            RT.sendSelectCharacter(uuid)
+            RT.sendSelectCharacter(uuid, "Listeners.onCombatStarted")
         end
         State.Session.ExpectedControlled = expectedByUser
         State.Session.ExpectedControlledExpiresAt = Ext.Utils.MonotonicTime() + 3000
@@ -99,18 +99,7 @@ local function onCombatRoundStarted(combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     State.Session.ReactionInterruptCount = {}
     State.Session.ReactionInterruptLoopDetected = {}
-    -- Diagnostic-only: investigating an MP-only RT bug where a player ends up alone in their topbar after fleeing a fight (combat doesn't end)
-    debugPrint("[ROUND_GUIDS] CombatRoundStarted combatGuid=", combatGuid, "round=", round, "mode=", State.Settings.TurnBasedSwarmMode and "swarm" or "rt")
-    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
-        debugPrint("[ROUND_GUIDS]   brawler",
-            M.Utils.getDisplayName(brawlerUuid),
-            "uuid=", brawlerUuid,
-            "isPlayer=", State.Session.Players[brawlerUuid] ~= nil,
-            "isHelper=", M.Utils.isCombatHelper(brawlerUuid),
-            "alive=", M.Utils.isAliveAndCanFight(brawlerUuid),
-            "IsInCombat=", M.Osi.IsInCombat(brawlerUuid),
-            "CombatGuid=", M.Osi.CombatGetGuidFor(brawlerUuid))
-    end
+    debugPrint(string.format("CombatRoundStarted round=%d", round or -1))
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
@@ -171,6 +160,10 @@ end
 
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
+    local turnUuid = M.Osi.GetUUID(entityGuid)
+    debugPrint(string.format("TurnStarted target=%s isPlayer=%s",
+        M.Utils.getDisplayName(turnUuid) or tostring(entityGuid),
+        tostring(turnUuid and State.Session.Players[turnUuid] ~= nil)))
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onTurnStarted(M.Osi.GetUUID(entityGuid))
     end
@@ -204,22 +197,29 @@ end
 local function onGainedControl(targetGuid)
     debugPrint("GainedControl", targetGuid)
     local targetUuid = M.Osi.GetUUID(targetGuid)
+    local windowActive = State.Session.ExpectedControlled
+        and State.Session.ExpectedControlledExpiresAt
+        and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt
+    debugPrint(string.format("GainedControl target=%s window=%s",
+        M.Utils.getDisplayName(targetUuid) or tostring(targetUuid), tostring(windowActive and "active" or "expired/none")))
     if targetUuid ~= nil then
         -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
         -- the window, redirect their client to the intended one.  Mode-agnostic; runs in both RT and Swarm.  RT-specific initiative bump only
         -- happens in RT mode (Swarm doesn't use TurnOrder.Groups initiatives the same way).
-        if State.Session.ExpectedControlled
-                and State.Session.ExpectedControlledExpiresAt
-                and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt then
+        if windowActive then
             local gainedUserId = Osi.GetReservedUserID(targetUuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
+                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                        M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
-                    RT.sendSelectCharacter(expectedForUser)
+                    RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
+                    debugPrint(string.format("GainedControl match: %s — clearing expectation for userId=%s",
+                        M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
                         State.Session.ExpectedControlled = nil
@@ -259,6 +259,8 @@ local function onGainedControl(targetGuid)
                         player.isControllingDirectly = false
                     end
                 end
+                State.Session.LastGainedControlAt = State.Session.LastGainedControlAt or {}
+                State.Session.LastGainedControlAt[targetUserId] = Ext.Utils.MonotonicTime()
             end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
@@ -451,6 +453,18 @@ end
 local function onDestroySpellSyncTargeting(cast, _, _)
     if not State.Settings.TurnBasedSwarmMode then
         RT.Listeners.onDestroySpellSyncTargeting(cast.SpellCastState)
+    end
+end
+
+local function onSpellCastStateCreated(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast and cast.SpellCastState then
+        RT.Listeners.onSpellCastStateCreated(cast.SpellCastState)
+    end
+end
+
+local function onSpellCastStateDestroyed(cast, _, _)
+    if not State.Settings.TurnBasedSwarmMode and cast and cast.SpellCastState then
+        RT.Listeners.onSpellCastStateDestroyed(cast.SpellCastState)
     end
 end
 
@@ -836,6 +850,14 @@ local function startListeners()
     }
     State.Session.Listeners.DestroySpellSyncTargeting = {
         handle = Ext.Entity.OnDestroy("SpellSyncTargeting", onDestroySpellSyncTargeting),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.SpellCastStateCreated = {
+        handle = Ext.Entity.OnCreateDeferred("SpellCastState", onSpellCastStateCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.SpellCastStateDestroyed = {
+        handle = Ext.Entity.OnDestroy("SpellCastState", onSpellCastStateDestroyed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.UsingSpellOnTarget = {

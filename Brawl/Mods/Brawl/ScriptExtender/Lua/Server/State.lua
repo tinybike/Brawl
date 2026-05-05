@@ -67,6 +67,7 @@ local Session = {
     PlayerCurrentTarget = {},
     ActionsInProgress = {},
     PlayerTargetingSpellCast = {},
+    PlayerCommittedCast = {},
     IsNextCombatRoundQueued = false,
     MovementQueue = {},
     MovementResourceListeners = {},
@@ -172,6 +173,15 @@ local function areAnyPlayersTargeting()
             return true
         end
     end
+end
+
+-- True iff any directly-controlled player char has a spell cast committed and in flight (move-into-range or
+-- cast-in-progress phase).  Used to defer round turnover so the engine doesn't flush their queued action.
+local function isAnyDirectlyControlledCasting()
+    for uuid, _ in pairs(Session.PlayerCommittedCast or {}) do
+        return true
+    end
+    return false
 end
 
 local function checkForDownedOrDeadPlayers()
@@ -521,6 +531,13 @@ local function setIsControllingDirectly()
             -- {[userId] = uuid}; in MP each user has their own last-controlled char.
             local userId = entity.UserReservedFor and entity.UserReservedFor.UserID
             if userId then
+                local prev = Session.LastControlledUuid[userId]
+                if prev ~= entityUuid then
+                    debugPrint(string.format("LastControlledUuid[%s] %s -> %s",
+                        tostring(userId),
+                        tostring(prev and (M.Utils.getDisplayName(prev) or prev) or "nil"),
+                        tostring(M.Utils.getDisplayName(entityUuid) or entityUuid)))
+                end
                 Session.LastControlledUuid[userId] = entityUuid
             end
         end
@@ -574,6 +591,7 @@ end
 return {
     getArchetype = getArchetype,
     areAnyPlayersTargeting = areAnyPlayersTargeting,
+    isAnyDirectlyControlledCasting = isAnyDirectlyControlledCasting,
     checkForDownedOrDeadPlayers = checkForDownedOrDeadPlayers,
     isInCombat = isInCombat,
     areAnyPlayersBrawling = areAnyPlayersBrawling,
