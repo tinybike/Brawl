@@ -566,7 +566,13 @@ local function isHostileTarget(uuid, targetUuid)
     elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
         isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
     elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+        -- Brawl-spawned encounter enemies are never hostile to each other
+        local spawned = Encounters and Encounters.Tracking and Encounters.Tracking.spawned
+        if spawned and spawned[uuid] and spawned[targetUuid] then
+            isHostile = false
+        else
+            isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
+        end
     else
         debugPrint(M.Utils.getDisplayName(uuid), "isHostileTarget: what happened here?", uuid, targetUuid, M.Utils.getDisplayName(targetUuid))
     end

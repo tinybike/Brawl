@@ -301,8 +301,6 @@ end
 local function postPauseToggle(source)
     local ctrl = getDirectlyControlledCharacter()
     local inFTB = isInFTB(ctrl)
-    print(string.format("[FTB_DBG] CLIENT postPauseToggle source=%s ctrl=%s isInFTB=%s",
-        tostring(source or "?"), tostring(ctrl), tostring(inFTB)))
     if inFTB then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     else

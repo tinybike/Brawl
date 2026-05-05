@@ -1,34 +1,35 @@
-Tracking = Tracking or {}
-Tracking.spawned = {}
+Encounters = Encounters or {}
+Encounters.Tracking = Encounters.Tracking or {}
+Encounters.Tracking.spawned = {}
 
 local debugPrint = Utils.debugPrint
 
-function Tracking.add(guid)
-    if guid and guid ~= "" then Tracking.spawned[guid] = true end
+function Encounters.Tracking.add(guid)
+    if guid and guid ~= "" then Encounters.Tracking.spawned[guid] = true end
 end
 
-function Tracking.count()
+function Encounters.Tracking.count()
     local n = 0
-    for _ in pairs(Tracking.spawned) do n = n + 1 end
+    for _ in pairs(Encounters.Tracking.spawned) do n = n + 1 end
     return n
 end
 
-function Tracking.clear()
-    Tracking.spawned = {}
+function Encounters.Tracking.clear()
+    Encounters.Tracking.spawned = {}
 end
 
 local function onDied(entityGuid)
     local key = Osi.GetUUID(entityGuid)
     debugPrint(string.format("[Encounters DEBUG] Died: raw=%s key=%s tracked=%s count=%d",
         tostring(entityGuid), tostring(key),
-        tostring(key and Tracking.spawned[key] ~= nil),
-        Tracking.count()))
-    if not key or not Tracking.spawned[key] then return end
+        tostring(key and Encounters.Tracking.spawned[key] ~= nil),
+        Encounters.Tracking.count()))
+    if not key or not Encounters.Tracking.spawned[key] then return end
 
     Loot.dropOnKill(key)
-    Tracking.spawned[key] = nil
+    Encounters.Tracking.spawned[key] = nil
 
-    if Tracking.count() == 0 then
+    if Encounters.Tracking.count() == 0 then
         debugPrint("[Encounters] all encounter enemies down — dropping bonus pile")
         Loot.dropEncounterPile()
     end

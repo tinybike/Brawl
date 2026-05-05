@@ -2,7 +2,7 @@ Encounters = Encounters or {}
 
 local debugPrint = Utils.debugPrint
 
-function Encounters.testSpawn(templateUuid, distance)
+function Encounters.testSpawn(templateUuid, distance, peaceful)
     if not templateUuid or templateUuid == "" then
         debugPrint("[Encounters] testSpawn: templateUuid required")
         return
@@ -15,6 +15,14 @@ function Encounters.testSpawn(templateUuid, distance)
     if not point then
         debugPrint("[Encounters] testSpawn: no valid position found near host")
         return
+    end
+    if peaceful then
+        local guid = Osi.CreateAt(templateUuid, point[1], point[2], point[3], 0, 1, "")
+        if guid and guid ~= "" then
+            Osi.SetCanJoinCombat(guid, 1)
+            Osi.SetCanFight(guid, 1)
+        end
+        return guid
     end
     return Spawn.enemyAt(templateUuid, point, host, "test")
 end
@@ -109,7 +117,7 @@ function Encounters.spawnAtPlayer(opts)
             local guid = Spawn.enemyAt(templateUuid, point, host, "enemy " .. slot)
             if guid then
                 table.insert(guids, guid)
-                Tracking.add(guid)
+                Encounters.Tracking.add(guid)
             end
         end
     end

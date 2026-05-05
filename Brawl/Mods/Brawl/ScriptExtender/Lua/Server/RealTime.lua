@@ -10,12 +10,12 @@ local function sendSelectCharacter(uuid, reason)
         return
     end
     if Osi.IsDead(uuid) == 1 then
-        print(string.format("[CHAR_SWITCH] sendSelectCharacter SKIPPED (target dead) target=%s reason=%s",
+        debugPrint(string.format("sendSelectCharacter SKIPPED (target dead) target=%s reason=%s",
             M.Utils.getDisplayName(uuid) or tostring(uuid), reason or "?"))
         return
     end
     local userId = State.Session.Players[uuid] and State.Session.Players[uuid].userId
-    print(string.format("[CHAR_SWITCH] sendSelectCharacter target=%s userId=%s reason=%s",
+    debugPrint(string.format("sendSelectCharacter target=%s userId=%s reason=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid), tostring(userId), reason or "?"))
     if userId then
         Ext.ServerNet.PostMessageToUser(userId, "SelectCharacter", uuid)
@@ -100,10 +100,9 @@ local function stopAllPulseActionTimers()
 end
 
 local function pauseCombatRoundTimer(combatGuid)
-    print(string.format("[ROUND_DBG] pauseCombatRoundTimer combatGuid=%s timerWasSet=%s",
+    debugPrint(string.format("pauseCombatRoundTimer combatGuid=%s timerWasSet=%s",
         tostring(combatGuid),
         tostring(State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] ~= nil)))
-    print(debug.traceback("", 2))
     State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] then
         Ext.Timer.Pause(State.Session.CombatRoundTimer[combatGuid])
@@ -117,10 +116,9 @@ local function resumeCombatRoundTimer(combatGuid)
 end
 
 local function cancelCombatRoundTimer(combatGuid)
-    print(string.format("[ROUND_DBG] cancelCombatRoundTimer combatGuid=%s timerWasSet=%s",
+    debugPrint(string.format("cancelCombatRoundTimer combatGuid=%s timerWasSet=%s",
         tostring(combatGuid),
         tostring(State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] ~= nil)))
-    print(debug.traceback("", 2))
     State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and State.Session.CombatRoundTimer[combatGuid] then
         Ext.Timer.Cancel(State.Session.CombatRoundTimer[combatGuid])
@@ -129,8 +127,7 @@ local function cancelCombatRoundTimer(combatGuid)
 end
 
 local function pauseCombatRoundTimers()
-    print("[ROUND_DBG] pauseCombatRoundTimers (all)")
-    print(debug.traceback("", 2))
+    debugPrint("pauseCombatRoundTimers (all)")
     State.Session.IsNextCombatRoundQueued = false
     if State.Session.CombatRoundTimer and next(State.Session.CombatRoundTimer) then
         for combatGuid, timer in pairs(State.Session.CombatRoundTimer) do
@@ -189,17 +186,17 @@ local function dumpInitsForLog(tag)
             name, tostring(roll), tostring(rollMap),
             tostring(req), tostring(had), tostring(act), tostring(done)))
     end
-    print(string.format("[INIT_DBG] %s | %s", tag, table.concat(entries, " ; ")))
+    debugPrint(string.format("%s | %s", tag, table.concat(entries, " ; ")))
 end
 
 local function nextCombatRound()
     State.Session.IsNextCombatRoundQueued = false
     local targeting = State.areAnyPlayersTargeting()
     local inFTB = Pause.isPartyInFTB()
-    print(string.format("[ROUND_DBG] nextCombatRound called: areAnyPlayersTargeting=%s isPartyInFTB=%s",
+    debugPrint(string.format("nextCombatRound called: areAnyPlayersTargeting=%s isPartyInFTB=%s",
         tostring(targeting), tostring(inFTB)))
     if targeting then
-        print("[ROUND_DBG]   -> queued (player is targeting)")
+        debugPrint("  -> queued (player is targeting)")
         State.Session.IsNextCombatRoundQueued = true
     elseif not inFTB then
         dumpInitsForLog("nextCombatRound START")
@@ -228,7 +225,7 @@ local function nextCombatRound()
         for userId, intendedUuid in pairs(intendedByUser) do
             local lastClickAt = State.Session.LastGainedControlAt and State.Session.LastGainedControlAt[userId]
             if lastClickAt and (now - lastClickAt) < RECENT_CLICK_WINDOW_MS then
-                print(string.format("[CHAR_SWITCH] preRoundTurnover SKIP userId=%s (recent click %dms ago)",
+                debugPrint(string.format("preRoundTurnover SKIP userId=%s (recent click %dms ago)",
                     tostring(userId), now - lastClickAt))
             else
                 sendSelectCharacter(intendedUuid, "RT.preRoundTurnover")
@@ -261,7 +258,7 @@ local function startCombatRoundTimer(combatGuid)
     -- if not State.isInCombat() then
     --     Osi.PauseCombat(combatGuid)
     -- end
-    print(string.format("[ROUND_DBG] startCombatRoundTimer combatGuid=%s duration=%dms", tostring(combatGuid), getCombatRoundDuration()))
+    debugPrint(string.format("startCombatRoundTimer combatGuid=%s duration=%dms", tostring(combatGuid), getCombatRoundDuration()))
     cancelCombatRoundTimer(combatGuid)
     if not Utils.isToT() then
         State.Session.CombatRoundTimer[combatGuid] = Ext.Timer.WaitFor(getCombatRoundDuration(), nextCombatRound)
@@ -347,7 +344,7 @@ local function onCombatRoundStarted(combatGuid, round)
     end
     startCombatRoundTimer(combatGuid)
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
-        print("[FTB_DBG] RT.onCombatRoundStarted firing AutoPauseOnCombatStart (round=1) -> allEnterFTB")
+        debugPrint("RT.onCombatRoundStarted firing AutoPauseOnCombatStart (round=1) -> allEnterFTB")
         Pause.allEnterFTB()
     end
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
@@ -550,7 +547,7 @@ local function onServerInterruptDecision()
 end
 
 local function onEnteredForceTurnBased(uuid)
-    print(string.format("[FTB_DBG] onEnteredForceTurnBased: entity=%s pendingSet=%s",
+    debugPrint(string.format("onEnteredForceTurnBased: entity=%s pendingSet=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid),
         tostring(State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) ~= nil)))
     if State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) then

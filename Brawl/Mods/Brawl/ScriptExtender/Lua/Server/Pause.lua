@@ -63,7 +63,7 @@ local function allEnterFTB()
     if State.Settings.TurnBasedSwarmMode then
         return
     end
-    print(string.format("[FTB_DBG] allEnterFTB called  traceback=%s", tostring(debug.traceback("", 2))))
+    debugPrint("allEnterFTB called")
     debugPrint("allEnterFTB")
     -- Out of combat: minimal FTB on party members, no pause machinery. Players
     -- can move around freely and the game's native FTB handles everything.
@@ -148,7 +148,7 @@ local function allEnterFTB()
         for uid, u in pairs(selectedBeforePause) do
             table.insert(entries, string.format("%s→%s", tostring(uid), M.Utils.getDisplayName(u) or u))
         end
-        print(string.format("[FTB_DBG] PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
+        debugPrint(string.format("PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
     end
 end
 

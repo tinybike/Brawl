@@ -99,29 +99,7 @@ local function onCombatRoundStarted(combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     State.Session.ReactionInterruptCount = {}
     State.Session.ReactionInterruptLoopDetected = {}
-    print(string.format("[CAM_DBG] CombatRoundStarted round=%d", round or -1))
-    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
-        if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Osi.IsInCombat(brawlerUuid) == 1 then
-            local entity = Ext.Entity.Get(brawlerUuid)
-            local init = entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll or "?"
-            print(string.format("[CAM_DBG]   %s init=%s isPlayer=%s",
-                M.Utils.getDisplayName(brawlerUuid) or tostring(brawlerUuid),
-                tostring(init),
-                tostring(State.Session.Players[brawlerUuid] ~= nil)))
-        end
-    end
-    -- Diagnostic-only: investigating an MP-only RT bug where a player ends up alone in their topbar after fleeing a fight (combat doesn't end)
-    debugPrint("[ROUND_GUIDS] CombatRoundStarted combatGuid=", combatGuid, "round=", round, "mode=", State.Settings.TurnBasedSwarmMode and "swarm" or "rt")
-    for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
-        debugPrint("[ROUND_GUIDS]   brawler",
-            M.Utils.getDisplayName(brawlerUuid),
-            "uuid=", brawlerUuid,
-            "isPlayer=", State.Session.Players[brawlerUuid] ~= nil,
-            "isHelper=", M.Utils.isCombatHelper(brawlerUuid),
-            "alive=", M.Utils.isAliveAndCanFight(brawlerUuid),
-            "IsInCombat=", M.Osi.IsInCombat(brawlerUuid),
-            "CombatGuid=", M.Osi.CombatGetGuidFor(brawlerUuid))
-    end
+    debugPrint(string.format("CombatRoundStarted round=%d", round or -1))
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatRoundStarted(round)
     else
@@ -183,7 +161,7 @@ end
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
     local turnUuid = M.Osi.GetUUID(entityGuid)
-    print(string.format("[CAM_DBG] TurnStarted target=%s isPlayer=%s",
+    debugPrint(string.format("TurnStarted target=%s isPlayer=%s",
         M.Utils.getDisplayName(turnUuid) or tostring(entityGuid),
         tostring(turnUuid and State.Session.Players[turnUuid] ~= nil)))
     if State.Settings.TurnBasedSwarmMode then
@@ -222,7 +200,7 @@ local function onGainedControl(targetGuid)
     local windowActive = State.Session.ExpectedControlled
         and State.Session.ExpectedControlledExpiresAt
         and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt
-    print(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
+    debugPrint(string.format("GainedControl target=%s window=%s",
         M.Utils.getDisplayName(targetUuid) or tostring(targetUuid), tostring(windowActive and "active" or "expired/none")))
     if targetUuid ~= nil then
         -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
@@ -233,14 +211,14 @@ local function onGainedControl(targetGuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
-                    print(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
                         M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
                     RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
-                    print(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
+                    debugPrint(string.format("GainedControl match: %s — clearing expectation for userId=%s",
                         M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
