@@ -963,10 +963,6 @@ local function dumpFullState(label)
     print("[DebugDump] ======== DUMP END ========")
 end
 
-local function onDebugDumpSelected(_)
-    dumpFullState("manual X")
-end
-
 return {
     setAwaitingTarget = setAwaitingTarget,
     enableMod = enableMod,
@@ -976,7 +972,6 @@ return {
     getCharacterArchetype = getCharacterArchetype,
     postLoadoutsToUser = postLoadoutsToUser,
     NetMessage = {
-        DebugDumpSelected = onDebugDumpSelected,
         ModToggle = onModToggle,
         ModeToggle = onModeToggle,
         CompanionAIToggle = onCompanionAIToggle,

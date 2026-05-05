@@ -516,11 +516,6 @@ local function onKeyInput(e)
                 keybindingPressed = true
             end
         end
-        -- TEMP DEBUG: X dumps state of currently-controlled character (for grey-out investigation)
-        if e.Key == "X" then
-            Ext.ClientNet.PostMessageToServer("DebugDumpSelected", "")
-            keybindingPressed = true
-        end
         if keybindingPressed then
             e:PreventAction()
         end
