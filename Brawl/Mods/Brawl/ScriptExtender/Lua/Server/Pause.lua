@@ -394,7 +394,7 @@ local function startSpellCastPrepareEndEventListener(entityUuid)
                             end
                         end
                     end
-                    print(string.format("[ReactionCheck] uuid=%s spell=%s inTable=%s isReaction=%s isBonusAction=%s hasReactionStatus=%s",
+                    debugPrint(string.format("[ReactionCheck] uuid=%s spell=%s inTable=%s isReaction=%s isBonusAction=%s hasReactionStatus=%s",
                         tostring(entityUuid), tostring(spellName),
                         tostring(spell ~= nil),
                         tostring(spell and spell.isReaction),
@@ -402,7 +402,7 @@ local function startSpellCastPrepareEndEventListener(entityUuid)
                         tostring(hasReactionStatus)))
                     -- Reactions (e.g. Divine Allegiance, Shield) can be engine-fired automatically; locking can strand the character greyed-out mid-reaction.
                     if (spell and spell.isReaction) or hasReactionStatus then
-                        print("[ReactionCheck]   -> skipping midActionLock")
+                        debugPrint("[ReactionCheck]   -> skipping midActionLock")
                         return
                     end
                     if State.Settings.NoFreezeOnBonusActionsDuringPause and spell and spell.isBonusAction and M.Osi.IsPartyMember(entityUuid, 1) == 1 then
