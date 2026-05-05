@@ -52,11 +52,6 @@ function Encounters.spawnWave(templateUuid, count, radius)
     return guids
 end
 
-local function pickForSlot(level, slot)
-    if slot == 1 then return Compositions.pickBossForLevel(level) end
-    return Compositions.pickFillerForLevel(level)
-end
-
 local function makeHostileToAll(spawnedGuids, hostUuid, radius)
     radius = radius or 50
     local spawnedSet = {}
@@ -84,17 +79,24 @@ end
 function Encounters.spawnAtPlayer(opts)
     opts = opts or {}
     local host = opts.host or Osi.GetHostCharacter()
-    local level = opts.levelOverride or Compositions.hostLevel(host)
+    local playerLevel = opts.levelOverride or Compositions.hostLevel(host)
     local difficultyOffset = opts.difficultyOffset or 0
-    local effLevel = math.max(1, level + difficultyOffset)
-    local count = opts.count or Compositions.countForLevel(effLevel)
-    local anchorCount = opts.anchorCount or math.max(3, math.min(count, 6))
-    local radius = opts.radius or 14
-    local jitterM = opts.jitterM or 2
+    local effLevel = math.max(1, playerLevel + difficultyOffset)
+    local budget = opts.budget or Compositions.tierBudgetForPlayerLevel(effLevel)
     local hostileToAll = opts.hostileToAll == true
 
-    debugPrint(string.format("[Encounters] spawnAtPlayer: level %d (eff %d) → %d slots hostileToAll=%s",
-        level, effLevel, count, tostring(hostileToAll)))
+    local picks = Compositions.pickEncounterByTier(budget)
+    if #picks == 0 then
+        debugPrint("[Encounters] spawnAtPlayer: pickEncounterByTier returned no picks")
+        return
+    end
+
+    local anchorCount = opts.anchorCount or math.max(3, math.min(#picks, 6))
+    local radius = opts.radius or 14
+    local jitterM = opts.jitterM or 2
+
+    debugPrint(string.format("[Encounters] spawnAtPlayer: playerLevel=%d (eff=%d) budget=%d → %d picks hostileToAll=%s",
+        playerLevel, effLevel, budget, #picks, tostring(hostileToAll)))
 
     local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
     if #anchors == 0 then
@@ -103,26 +105,21 @@ function Encounters.spawnAtPlayer(opts)
     end
 
     local guids = {}
-    for slot = 1, count do
+    for slot, entry in ipairs(picks) do
         local anchorIdx = ((slot - 1) % #anchors) + 1
         local anchor = anchors[anchorIdx]
         local jx = anchor[1] + (math.random() * 2 - 1) * jitterM
         local jz = anchor[3] + (math.random() * 2 - 1) * jitterM
         local point = Spawn.findValidNear({jx, anchor[2], jz}, 3, host) or anchor
 
-        local templateUuid = pickForSlot(effLevel, slot)
-        if not templateUuid then
-            debugPrint(string.format("[Encounters] slot %d: pool empty", slot))
-        else
-            local guid = Spawn.enemyAt(templateUuid, point, host, "enemy " .. slot)
-            if guid then
-                table.insert(guids, guid)
-                Encounters.Tracking.add(guid)
-            end
+        local guid = Spawn.enemyAt(entry.uuid, point, host, string.format("enemy %d (%s)", slot, entry.tier))
+        if guid then
+            table.insert(guids, guid)
+            Encounters.Tracking.add(guid, entry.tier)
         end
     end
 
-    debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, count))
+    debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, #picks))
     Spawn.ensureInCombat(guids, host)
 
     if hostileToAll and #guids > 0 then

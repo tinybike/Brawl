@@ -189,30 +189,53 @@ function Loot.dropOnKill(corpseGuid)
     return 0
 end
 
+-- Roll a list of items first (no spawning), then trickle them in one at a time so the player gets a
+-- "loot raining down" effect.  Mirrors ToTR's Item.SpawnLoot pacing (~300ms interval, slightly faster
+-- with more items so a big pile doesn't take ages to finish).
 function Loot.dropEncounterPile(host, rolls)
     host = host or Osi.GetHostCharacter()
     rolls = rolls or 4
     local x, y, z = Osi.GetPosition(host)
     if not x then return 0 end
 
-    local dropped = 0
+    local picks = {}
     local lastCategory = nil
     local categoryRatesKey = {CombatObject = "Objects", Weapon = "Weapons", Armor = "Armor"}
-
     for _ = 1, rolls do
         local category = CATEGORY_MIX[math.random(#CATEGORY_MIX)]
         if category == lastCategory then
             category = CATEGORY_MIX[math.random(#CATEGORY_MIX)]
         end
         lastCategory = category
-
         local rarity = pickRarity(LOOT_RATES[categoryRatesKey[category]])
         local rootTemplate = pickFromPool(category, rarity)
-        if rootTemplate and spawnItem(rootTemplate, x, y, z) then
-            debugPrint(string.format("[Encounters] pile drop: %s %s %s", category, rarity, rootTemplate))
-            dropped = dropped + 1
+        if rootTemplate then
+            table.insert(picks, {rt = rootTemplate, category = category, rarity = rarity})
         end
     end
-    debugPrint(string.format("[Encounters] pile complete: %d/%d items", dropped, rolls))
-    return dropped
+
+    if #picks == 0 then
+        debugPrint("[Encounters] pile: no picks rolled (empty pools?)")
+        return 0
+    end
+
+    Utils.showNotification(host, "Encounter complete!", 4)
+
+    local interval = math.max(120, 300 - (#picks * 2))
+    local i = 0
+    local function step()
+        i = i + 1
+        if i > #picks then
+            debugPrint(string.format("[Encounters] pile complete: %d items", #picks))
+            return
+        end
+        local item = picks[i]
+        if spawnItem(item.rt, x, y, z) then
+            debugPrint(string.format("[Encounters] pile drop %d/%d: %s %s %s", i, #picks, item.category, item.rarity, item.rt))
+        end
+        Ext.Timer.WaitFor(interval, step)
+    end
+    -- Small lead-in delay so the notification lands before items start dropping.
+    Ext.Timer.WaitFor(800, step)
+    return #picks
 end

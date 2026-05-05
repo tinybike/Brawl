@@ -1,11 +1,14 @@
 Encounters = Encounters or {}
 Encounters.Tracking = Encounters.Tracking or {}
-Encounters.Tracking.spawned = {}
+Encounters.Tracking.spawned = {}             -- { [uuid] = { tier = "..." } }
+Encounters.Tracking.pendingPileScore = 0     -- accumulated tier value of slain tracked enemies
 
 local debugPrint = Utils.debugPrint
 
-function Encounters.Tracking.add(guid)
-    if guid and guid ~= "" then Encounters.Tracking.spawned[guid] = true end
+function Encounters.Tracking.add(guid, tier)
+    if guid and guid ~= "" then
+        Encounters.Tracking.spawned[guid] = { tier = tier }
+    end
 end
 
 function Encounters.Tracking.count()
@@ -16,22 +19,26 @@ end
 
 function Encounters.Tracking.clear()
     Encounters.Tracking.spawned = {}
+    Encounters.Tracking.pendingPileScore = 0
 end
 
 local function onDied(entityGuid)
     local key = Osi.GetUUID(entityGuid)
-    debugPrint(string.format("[Encounters DEBUG] Died: raw=%s key=%s tracked=%s count=%d",
-        tostring(entityGuid), tostring(key),
-        tostring(key and Encounters.Tracking.spawned[key] ~= nil),
-        Encounters.Tracking.count()))
-    if not key or not Encounters.Tracking.spawned[key] then return end
+    if not key then return end
+    local rec = Encounters.Tracking.spawned[key]
+    if not rec then return end
 
     Loot.dropOnKill(key)
+    Encounters.Tracking.pendingPileScore = Encounters.Tracking.pendingPileScore + Compositions.tierValue(rec.tier)
     Encounters.Tracking.spawned[key] = nil
+    debugPrint(string.format("[Encounters] tracked kill: %s tier=%s pileScore=%d remaining=%d",
+        tostring(key), tostring(rec.tier), Encounters.Tracking.pendingPileScore, Encounters.Tracking.count()))
 
     if Encounters.Tracking.count() == 0 then
-        debugPrint("[Encounters] all encounter enemies down — dropping bonus pile")
-        Loot.dropEncounterPile()
+        local rolls = Encounters.Tracking.pendingPileScore
+        Encounters.Tracking.pendingPileScore = 0
+        debugPrint(string.format("[Encounters] all encounter enemies down — pile rolls=%d", rolls))
+        Loot.dropEncounterPile(nil, rolls)
     end
 end
 
