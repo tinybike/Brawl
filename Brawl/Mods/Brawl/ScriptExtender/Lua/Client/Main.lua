@@ -298,8 +298,12 @@ local function getPositionInfo()
     return nil
 end
 
-local function postPauseToggle()
-    if isInFTB(getDirectlyControlledCharacter()) then
+local function postPauseToggle(source)
+    local ctrl = getDirectlyControlledCharacter()
+    local inFTB = isInFTB(ctrl)
+    print(string.format("[FTB_DBG] CLIENT postPauseToggle source=%s ctrl=%s isInFTB=%s",
+        tostring(source or "?"), tostring(ctrl), tostring(inFTB)))
+    if inFTB then
         Ext.ClientNet.PostMessageToServer("ExitFTB", "")
     else
         Ext.ClientNet.PostMessageToServer("EnterFTB", "")
@@ -448,7 +452,19 @@ local function onKeyInput(e)
             keybindingPressed = true
         end
         if isKeybindingPressed(e, PauseToggleHotkey) then
-            postPauseToggle()
+            local mods = {}
+            if e.Modifiers then
+                for k, v in pairs(e.Modifiers) do
+                    -- Handle both array form {"LCtrl"} and hash form {LCtrl=true}
+                    if type(k) == "number" then
+                        table.insert(mods, tostring(v))
+                    elseif v then
+                        table.insert(mods, tostring(k))
+                    end
+                end
+            end
+            postPauseToggle(string.format("kbd e.Key=%s e.Modifiers=[%s] e.Event=%s e.Repeat=%s",
+                tostring(e.Key), table.concat(mods, ","), tostring(e.Event), tostring(e.Repeat)))
             keybindingPressed = true
         end
         if isKeybindingPressed(e, TargetCloserEnemyHotkey) then
@@ -550,7 +566,7 @@ local function onControllerButtonPressed(button)
         end
     end
     if isControllerKeybindingPressed(ControllerPauseToggleHotkey) then
-        postPauseToggle()
+        postPauseToggle("controller " .. tostring(ControllerPauseToggleHotkey[1] or "?"))
         if ControllerPauseToggleHotkeyOverride then
             override = true
         end

@@ -521,6 +521,13 @@ local function setIsControllingDirectly()
             -- {[userId] = uuid}; in MP each user has their own last-controlled char.
             local userId = entity.UserReservedFor and entity.UserReservedFor.UserID
             if userId then
+                local prev = Session.LastControlledUuid[userId]
+                if prev ~= entityUuid then
+                    print(string.format("[CTRL_DBG] LastControlledUuid[%s] %s -> %s",
+                        tostring(userId),
+                        tostring(prev and (M.Utils.getDisplayName(prev) or prev) or "nil"),
+                        tostring(M.Utils.getDisplayName(entityUuid) or entityUuid)))
+                end
                 Session.LastControlledUuid[userId] = entityUuid
             end
         end

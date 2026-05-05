@@ -99,12 +99,12 @@ local function onCombatRoundStarted(combatGuid, round)
     Roster.addCombatParticipantsToBrawlers()
     State.Session.ReactionInterruptCount = {}
     State.Session.ReactionInterruptLoopDetected = {}
-    debugPrint(string.format("[CAM_DBG] CombatRoundStarted round=%d", round or -1))
+    print(string.format("[CAM_DBG] CombatRoundStarted round=%d", round or -1))
     for brawlerUuid, _ in pairs(M.Roster.getBrawlers()) do
         if M.Utils.isAliveAndCanFight(brawlerUuid) and M.Osi.IsInCombat(brawlerUuid) == 1 then
             local entity = Ext.Entity.Get(brawlerUuid)
             local init = entity and entity.CombatParticipant and entity.CombatParticipant.InitiativeRoll or "?"
-            debugPrint(string.format("[CAM_DBG]   %s init=%s isPlayer=%s",
+            print(string.format("[CAM_DBG]   %s init=%s isPlayer=%s",
                 M.Utils.getDisplayName(brawlerUuid) or tostring(brawlerUuid),
                 tostring(init),
                 tostring(State.Session.Players[brawlerUuid] ~= nil)))
@@ -183,7 +183,7 @@ end
 local function onTurnStarted(entityGuid)
     debugPrint("TurnStarted", entityGuid)
     local turnUuid = M.Osi.GetUUID(entityGuid)
-    debugPrint(string.format("[CAM_DBG] TurnStarted target=%s isPlayer=%s",
+    print(string.format("[CAM_DBG] TurnStarted target=%s isPlayer=%s",
         M.Utils.getDisplayName(turnUuid) or tostring(entityGuid),
         tostring(turnUuid and State.Session.Players[turnUuid] ~= nil)))
     if State.Settings.TurnBasedSwarmMode then
@@ -222,7 +222,7 @@ local function onGainedControl(targetGuid)
     local windowActive = State.Session.ExpectedControlled
         and State.Session.ExpectedControlledExpiresAt
         and Ext.Utils.MonotonicTime() < State.Session.ExpectedControlledExpiresAt
-    debugPrint(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
+    print(string.format("[CHAR_SWITCH] GainedControl target=%s window=%s",
         M.Utils.getDisplayName(targetUuid) or tostring(targetUuid), tostring(windowActive and "active" or "expired/none")))
     if targetUuid ~= nil then
         -- Expected-controlled reassertion window: set on FTB entry and on combat start.  If the engine picked a different char for a user during
@@ -233,14 +233,14 @@ local function onGainedControl(targetGuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
-                    debugPrint(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                    print(string.format("[CHAR_SWITCH] GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
                         M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
                     RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
-                    debugPrint(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
+                    print(string.format("[CHAR_SWITCH] GainedControl match: %s — clearing expectation for userId=%s",
                         M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
@@ -281,6 +281,8 @@ local function onGainedControl(targetGuid)
                         player.isControllingDirectly = false
                     end
                 end
+                State.Session.LastGainedControlAt = State.Session.LastGainedControlAt or {}
+                State.Session.LastGainedControlAt[targetUserId] = Ext.Utils.MonotonicTime()
             end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)

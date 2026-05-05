@@ -184,7 +184,7 @@ local function isPugnacious(potentialEnemyUuid, uuid)
             return nil
         end
     end
-    return M.Osi.IsEnemy(uuid, potentialEnemyUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[potentialEnemyUuid] ~= nil
+    return M.Osi.IsEnemy(uuid, potentialEnemyUuid) == 1
 end
 
 -- from https://github.com/Norbyte/bg3se/blob/main/Docs/API.md#helper-functions
@@ -562,9 +562,9 @@ local function isHostileTarget(uuid, targetUuid)
     if isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
         isHostile = false
     elseif isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
-        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[targetUuid] ~= nil
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
     elseif not isBrawlerPlayerOrAlly and isPotentialTargetPlayerOrAlly then
-        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1 or State.Session.IsAttackingOrBeingAttackedByPlayer[uuid] ~= nil
+        isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
     elseif not isBrawlerPlayerOrAlly and not isPotentialTargetPlayerOrAlly then
         isHostile = M.Osi.IsEnemy(uuid, targetUuid) == 1
     else
