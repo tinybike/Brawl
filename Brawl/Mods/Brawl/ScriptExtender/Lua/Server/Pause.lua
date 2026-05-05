@@ -158,6 +158,8 @@ local function allExitFTB()
     end
     debugPrint("allExitFTB")
     State.Session.PreExistingCastAtPause = {}
+    -- Manual unpause clears the APoCS cooldown so the next genuine combat-start can pause again.
+    State.Session.LastAPoCSFiredAt = nil
     -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
@@ -239,9 +241,13 @@ local function allExitFTB()
             end
         end
     end
-    -- Resume underlying combat
+    -- Resume underlying combat. Helper may have lost its combat (e.g. during APoCS-induced combat churn);
+    -- skip in that case rather than crashing on Osi.ResumeCombat(nil).
     if State.Session.CombatHelper then
-        Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
+        local helperCombat = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
+        if helperCombat then
+            Osi.ResumeCombat(helperCombat)
+        end
     end
     TurnOrder.setPlayersSwarmGroup()
     if next(selectedDuringPause) then

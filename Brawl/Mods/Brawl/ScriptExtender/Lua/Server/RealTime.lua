@@ -344,9 +344,31 @@ local function onCombatRoundStarted(combatGuid, round)
         end
     end
     startCombatRoundTimer(combatGuid)
+    -- APoCS gate. Two protections combined:
+    -- 1. Debounce: when player joins an in-progress fight (or pause induces combat churn), the engine produces
+    --    a storm of round==1 events with new GUIDs. Reset the timer on each fresh round==1; fire once the storm settles.
+    -- 2. Cooldown: after APoCS fires, the engine kills combat (everyone in FTB) and pulls party back out of FTB.
+    --    A new combat then spawns and fires its own round==1 — without the cooldown we'd re-fire APoCS endlessly.
+    --    Cooldown is reset by allExitFTB (manual unpause), so a genuine next-fight after the user unpauses still pauses again.
+    local APOCS_COOLDOWN_MS = 5000
     if State.Settings.AutoPauseOnCombatStart and round == 1 then
-        debugPrint("RT.onCombatRoundStarted firing AutoPauseOnCombatStart (round=1) -> allEnterFTB")
-        Pause.allEnterFTB()
+        local now = Ext.Utils.MonotonicTime()
+        local lastFired = State.Session.LastAPoCSFiredAt
+        if lastFired and (now - lastFired) < APOCS_COOLDOWN_MS then
+            debugPrint(string.format("APoCS in cooldown (%dms since last fire), skip", now - lastFired))
+        elseif not Pause.isPartyInFTB() then
+            if State.Session.PendingAPoCSTimer then
+                Ext.Timer.Cancel(State.Session.PendingAPoCSTimer)
+            end
+            State.Session.PendingAPoCSTimer = Ext.Timer.WaitFor(500, function()
+                State.Session.PendingAPoCSTimer = nil
+                if not Pause.isPartyInFTB() then
+                    debugPrint("APoCS firing after settle delay -> allEnterFTB")
+                    State.Session.LastAPoCSFiredAt = Ext.Utils.MonotonicTime()
+                    Pause.allEnterFTB()
+                end
+            end)
+        end
     end
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
     TurnOrder.setPartyInitiativeRollToMean()
