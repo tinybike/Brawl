@@ -101,6 +101,7 @@ local function disableMod(noNotify)
     if State.Settings.TurnBasedSwarmMode then
         State.removeBoostPlayerInitiatives()
     end
+    if Printer then Printer:Stop() end
     if not noNotify then
         modStatusMessage("Brawl Disabled")
     end
@@ -113,6 +114,7 @@ local function enableMod(noNotify)
     if level then
         Listeners.onStarted(level)
     end
+    if Printer then Printer:Start() end
     if not noNotify then
         modStatusMessage("Brawl Enabled")
     end
@@ -551,7 +553,6 @@ local function onRequestHeal(data)
         local player = State.getPlayerByUserId(userId)
         if player and player.uuid then
             State.Session.HealRequested[userId] = true
-            Roster.addPlayersInEnterCombatRangeToBrawlers(player.uuid)
             State.Session.HealRequestedTimer[userId] = Ext.Timer.WaitFor(9000, function ()
                 State.Session.HealRequested[userId] = false
             end)

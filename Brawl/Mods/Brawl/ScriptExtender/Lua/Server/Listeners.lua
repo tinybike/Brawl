@@ -1,4 +1,4 @@
--- ECSPrinter = require("Server/ECSPrinter.lua")
+ECSPrinter = require("Server/ECSPrinter.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
@@ -75,8 +75,7 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    -- Printer:Start()
-    -- SpellPrinter:Start()
+    if Printer then Printer:Start() end
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 

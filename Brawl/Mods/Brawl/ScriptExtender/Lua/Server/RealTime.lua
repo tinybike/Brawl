@@ -70,9 +70,6 @@ local function pulseAction(brawler)
         if M.Osi.IsPlayer(brawler.uuid) == 0 and M.Osi.IsInCombat(brawler.uuid) == 0 then
             return
         end
-        if not State.Settings.TurnBasedSwarmMode then
-            Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
-        end
         AI.act(brawler)
     end
 end
@@ -298,6 +295,13 @@ local function onStarted()
 end
 
 local function onCombatStarted(combatGuid)
+    -- Cancel any pending APoCS reset timer — a fresh combat-start within the 10s reset window means we're
+    -- mid-fight (combat-GUID flicker), not at the genuine end of the fight. Keep the flag set so we don't
+    -- re-fire APoCS on this new combat's round 1.
+    if State.Session.APoCSResetTimer then
+        Ext.Timer.Cancel(State.Session.APoCSResetTimer)
+        State.Session.APoCSResetTimer = nil
+    end
     if not Utils.isToT() then
         State.uncapMovementDistances()
         -- If enemies are already in the combat participants list (normal case), initialize immediately.  Otherwise, onEnteredCombat will handle it.
@@ -344,31 +348,57 @@ local function onCombatRoundStarted(combatGuid, round)
         end
     end
     startCombatRoundTimer(combatGuid)
-    -- APoCS gate. Two protections combined:
-    -- 1. Debounce: when player joins an in-progress fight (or pause induces combat churn), the engine produces
-    --    a storm of round==1 events with new GUIDs. Reset the timer on each fresh round==1; fire once the storm settles.
-    -- 2. Cooldown: after APoCS fires, the engine kills combat (everyone in FTB) and pulls party back out of FTB.
-    --    A new combat then spawns and fires its own round==1 — without the cooldown we'd re-fire APoCS endlessly.
-    --    Cooldown is reset by allExitFTB (manual unpause), so a genuine next-fight after the user unpauses still pauses again.
-    local APOCS_COOLDOWN_MS = 5000
-    if State.Settings.AutoPauseOnCombatStart and round == 1 then
-        local now = Ext.Utils.MonotonicTime()
-        local lastFired = State.Session.LastAPoCSFiredAt
-        if lastFired and (now - lastFired) < APOCS_COOLDOWN_MS then
-            debugPrint(string.format("APoCS in cooldown (%dms since last fire), skip", now - lastFired))
-        elseif not Pause.isPartyInFTB() then
-            if State.Session.PendingAPoCSTimer then
-                Ext.Timer.Cancel(State.Session.PendingAPoCSTimer)
+    -- APoCS at round==1 fires too early — engine isn't done (characters still drawing weapons / finalizing
+    -- combat entry; allEnterFTB at this stage kills the underlying combat). Wait for the engine's stream of
+    -- CombatJoining component destroys to quiet down (per-character weapon-draw / combat-entry finalization).
+    -- 500ms debounce after the last destroy. APoCSScheduled flag stays true after firing — only the genuine
+    -- end-of-fight reset in onCombatEnded clears it (prevents see-saw across new combat GUIDs).
+    -- APoCS fires on the Combat Helper's first BoostChangedEvent post-round-1. Empirically this fires right
+    -- at the engine's "combat startup is done" moment — characters have finished joining, weapons drawn,
+    -- helper's boosts have been finalized. OnCreateDeferred fires on the tick AFTER the event is created,
+    -- which puts us safely past the settling chaos. Scoped to the combat helper entity so we don't catch
+    -- random boost changes from spells/buffs elsewhere. 5s safety fallback in case the event never fires.
+    if State.Settings.AutoPauseOnCombatStart and round == 1 and not State.Session.APoCSScheduled then
+        State.Session.APoCSScheduled = true
+        local startMs = Ext.Utils.MonotonicTime()
+        local fireAPoCS
+        fireAPoCS = function()
+            if State.Session.APoCSDebounceTimer then
+                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+                State.Session.APoCSDebounceTimer = nil
             end
-            State.Session.PendingAPoCSTimer = Ext.Timer.WaitFor(500, function()
-                State.Session.PendingAPoCSTimer = nil
-                if not Pause.isPartyInFTB() then
-                    debugPrint("APoCS firing after settle delay -> allEnterFTB")
-                    State.Session.LastAPoCSFiredAt = Ext.Utils.MonotonicTime()
-                    Pause.allEnterFTB()
-                end
-            end)
+            if State.Session.APoCSJoinEventHandle then
+                Ext.Entity.Unsubscribe(State.Session.APoCSJoinEventHandle)
+                State.Session.APoCSJoinEventHandle = nil
+            end
+            if not Pause.isPartyInFTB() then
+                debugPrint(string.format("[+%dms] APoCS firing (helper BoostChangedEvent) -> allEnterFTB", Ext.Utils.MonotonicTime() - startMs))
+                Pause.allEnterFTB()
+            end
         end
+        debugPrint(string.format("[+0ms] APoCS scheduled at round 1, waiting for combat-helper BoostChangedEvent"))
+        State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(5000, fireAPoCS)
+        -- Listen unscoped because the engine spawns a fresh combat helper entity per combat GUID during the
+        -- splinter chaos. State.Session.CombatHelper updates to the current one as combats churn. We filter
+        -- in the callback to only debounce on events fired by the current helper.
+        -- Listen for Unsheath state replications. The engine fires this for each character one frame after they
+        -- finish their combat-entry weapon-draw (i.e. after esv::unsheath::CombatJoiningComponent destroys).
+        -- The LAST Unsheath replication in the trace is the engine-finalized "all characters drawn weapons" moment.
+        -- Concern: Unsheath also replicates outside combat startup (manual sheath/unsheath, spell casts). Mitigation:
+        -- the round-1 settling window has no player actions yet (paused) and no NPC turns processed, so during this
+        -- window the only firings are combat-entry related. After our debounce fires we unsubscribe.
+        State.Session.APoCSJoinEventHandle = Ext.Entity.Subscribe("Unsheath", function(entity)
+            local who = "?"
+            if entity and entity.Uuid and entity.Uuid.EntityUuid then
+                who = M.Utils.getDisplayName(entity.Uuid.EntityUuid) or entity.Uuid.EntityUuid
+            end
+            debugPrint(string.format("[+%dms] APoCS: Unsheath replicate on %s -> resetting debounce",
+                Ext.Utils.MonotonicTime() - startMs, who))
+            if State.Session.APoCSDebounceTimer then
+                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+            end
+            State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(500, fireAPoCS)
+        end)
     end
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
     TurnOrder.setPartyInitiativeRollToMean()
@@ -390,6 +420,26 @@ local function onCombatEnded(combatGuid)
         if not State.isInCombat() then
             stopAllPulseActions()
             State.endBrawls()
+        end
+    end)
+    -- APoCS flag reset: schedule a 10s timer. If a new CombatStarted fires before it expires (combat-GUID
+    -- flicker mid-fight), onCombatStarted cancels the timer. Only a sustained 10s no-combat window resets
+    -- the flag, signaling the fight is genuinely over and the next combat-start can re-arm APoCS.
+    if State.Session.APoCSResetTimer then
+        Ext.Timer.Cancel(State.Session.APoCSResetTimer)
+    end
+    State.Session.APoCSResetTimer = Ext.Timer.WaitFor(10000, function()
+        State.Session.APoCSResetTimer = nil
+        if not State.isInCombat() then
+            State.Session.APoCSScheduled = false
+            if State.Session.APoCSDebounceTimer then
+                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+                State.Session.APoCSDebounceTimer = nil
+            end
+            if State.Session.APoCSJoinEventHandle then
+                Ext.Entity.Unsubscribe(State.Session.APoCSJoinEventHandle)
+                State.Session.APoCSJoinEventHandle = nil
+            end
         end
     end)
 end

@@ -25,7 +25,7 @@ local Settings = {
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
     ExcludeEnemyTiers = nil,
-    DisableEnemyAI = false,
+    DisableEnemyAI = true,
 }
 if MCM then
     Settings.ModEnabled = MCM.Get("mod_enabled")

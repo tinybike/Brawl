@@ -158,8 +158,9 @@ local function allExitFTB()
     end
     debugPrint("allExitFTB")
     State.Session.PreExistingCastAtPause = {}
-    -- Manual unpause clears the APoCS cooldown so the next genuine combat-start can pause again.
-    State.Session.LastAPoCSFiredAt = nil
+    -- Don't reset APoCSScheduled here. Manual unpause doesn't mean the fight is over — the engine often
+    -- spawns a fresh combat GUID mid-fight, which would re-trigger APoCS if we cleared the flag now.
+    -- Reset is handled in RT.onCombatEnded once all party members are confirmed out of combat for a few seconds.
     -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
