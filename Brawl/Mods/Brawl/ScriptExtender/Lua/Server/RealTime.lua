@@ -311,6 +311,32 @@ local function onCombatStarted(combatGuid)
     end
 end
 
+-- Fire APoCS now: cleanup pending debounce timer and pause the party. Idempotent — safe to call multiple times.
+-- Driven by either the 5s safety timer (set in onCombatRoundStarted) OR the client's APoCSCameraReady net message
+-- (which fires when the ecl::camera::CombatTargetComponent entity is created — the engine's "combat fully settled"
+-- moment, a few frames after the unsheath::CombatJoining components are destroyed).
+local function fireAPoCSNow()
+    local elapsed = State.Session.APoCSStartMs and (Ext.Utils.MonotonicTime() - State.Session.APoCSStartMs) or 0
+    if State.Session.APoCSDebounceTimer then
+        Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+        State.Session.APoCSDebounceTimer = nil
+    end
+    if not Pause.isPartyInFTB() then
+        debugPrint(string.format("[+%dms] APoCS firing -> allEnterFTB", elapsed))
+        Pause.allEnterFTB()
+    end
+end
+
+-- Net-message handler for the client's camera-ready signal. The client (Client/Main.lua) subscribes to
+-- CameraArriveWatcher OnCreateDeferred and pings the server whenever it fires. We only act if APoCS is
+-- currently waiting (debounce timer pending) — once fired, the timer is nil and subsequent signals (e.g.
+-- camera-arrival on cinematic moves, mid-fight target switches) are harmless no-ops.
+local function onAPoCSCameraReady()
+    if State.Session.APoCSDebounceTimer then
+        fireAPoCSNow()
+    end
+end
+
 local function onCombatRoundStarted(combatGuid, round)
     if Pause.isPartyInFTB() then
         print("party is in FTB, pausing underlying combat", combatGuid, round)
@@ -360,44 +386,22 @@ local function onCombatRoundStarted(combatGuid, round)
     -- random boost changes from spells/buffs elsewhere. 5s safety fallback in case the event never fires.
     if State.Settings.AutoPauseOnCombatStart and round == 1 and not State.Session.APoCSScheduled then
         State.Session.APoCSScheduled = true
-        local startMs = Ext.Utils.MonotonicTime()
-        local fireAPoCS
-        fireAPoCS = function()
-            if State.Session.APoCSDebounceTimer then
-                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
-                State.Session.APoCSDebounceTimer = nil
+        State.Session.APoCSStartMs = Ext.Utils.MonotonicTime()
+        debugPrint("[+0ms] APoCS scheduled at round 1, waiting for client camera-ready signal")
+        -- 5s safety fallback in case the client camera signal never arrives.
+        State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(5000, fireAPoCSNow)
+        -- 1s cap on the addBrawler pre-pause: in normal fights APoCS fires within ~500ms (camera signal) so
+        -- pre-paused NPCs barely sit idle. In pathological NPC-on-NPC late-joins we hit the 5s safety, and
+        -- pre-paused NPCs would stand frozen for the full 5s — looks silly in dungeons full of warring NPC
+        -- factions. Unfreeze and start pulses for any pre-paused NPCs after 1s if APoCS still hasn't fired.
+        Ext.Timer.WaitFor(1000, function()
+            if Pause.isPartyInFTB() or State.Session.IsInDialog then return end
+            for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+                if brawler.isPaused and not State.Session.Players[uuid] then
+                    brawler.isPaused = false
+                    startPulseAction(brawler, 0)
+                end
             end
-            if State.Session.APoCSJoinEventHandle then
-                Ext.Entity.Unsubscribe(State.Session.APoCSJoinEventHandle)
-                State.Session.APoCSJoinEventHandle = nil
-            end
-            if not Pause.isPartyInFTB() then
-                debugPrint(string.format("[+%dms] APoCS firing (helper BoostChangedEvent) -> allEnterFTB", Ext.Utils.MonotonicTime() - startMs))
-                Pause.allEnterFTB()
-            end
-        end
-        debugPrint(string.format("[+0ms] APoCS scheduled at round 1, waiting for combat-helper BoostChangedEvent"))
-        State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(5000, fireAPoCS)
-        -- Listen unscoped because the engine spawns a fresh combat helper entity per combat GUID during the
-        -- splinter chaos. State.Session.CombatHelper updates to the current one as combats churn. We filter
-        -- in the callback to only debounce on events fired by the current helper.
-        -- Listen for Unsheath state replications. The engine fires this for each character one frame after they
-        -- finish their combat-entry weapon-draw (i.e. after esv::unsheath::CombatJoiningComponent destroys).
-        -- The LAST Unsheath replication in the trace is the engine-finalized "all characters drawn weapons" moment.
-        -- Concern: Unsheath also replicates outside combat startup (manual sheath/unsheath, spell casts). Mitigation:
-        -- the round-1 settling window has no player actions yet (paused) and no NPC turns processed, so during this
-        -- window the only firings are combat-entry related. After our debounce fires we unsubscribe.
-        State.Session.APoCSJoinEventHandle = Ext.Entity.Subscribe("Unsheath", function(entity)
-            local who = "?"
-            if entity and entity.Uuid and entity.Uuid.EntityUuid then
-                who = M.Utils.getDisplayName(entity.Uuid.EntityUuid) or entity.Uuid.EntityUuid
-            end
-            debugPrint(string.format("[+%dms] APoCS: Unsheath replicate on %s -> resetting debounce",
-                Ext.Utils.MonotonicTime() - startMs, who))
-            if State.Session.APoCSDebounceTimer then
-                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
-            end
-            State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(500, fireAPoCS)
         end)
     end
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
@@ -423,24 +427,22 @@ local function onCombatEnded(combatGuid)
         end
     end)
     -- APoCS flag reset: schedule a 10s timer. If a new CombatStarted fires before it expires (combat-GUID
-    -- flicker mid-fight), onCombatStarted cancels the timer. Only a sustained 10s no-combat window resets
-    -- the flag, signaling the fight is genuinely over and the next combat-start can re-arm APoCS.
+    -- flicker mid-fight), onCombatStarted cancels the timer. We deliberately do NOT gate the reset on
+    -- State.isInCombat() at expiry — that gate breaks the late-join NPC-on-NPC scenario where the engine
+    -- churns combat GUIDs (see-saw) and host's IsInCombat stays true through the transition. cancel-on-
+    -- CombatStarted alone is sufficient protection against mid-fight flicker (the new GUID's CombatStarted
+    -- fires sub-second after the old one's CombatEnded, well within the 10s window).
     if State.Session.APoCSResetTimer then
         Ext.Timer.Cancel(State.Session.APoCSResetTimer)
     end
     State.Session.APoCSResetTimer = Ext.Timer.WaitFor(10000, function()
         State.Session.APoCSResetTimer = nil
-        if not State.isInCombat() then
-            State.Session.APoCSScheduled = false
-            if State.Session.APoCSDebounceTimer then
-                Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
-                State.Session.APoCSDebounceTimer = nil
-            end
-            if State.Session.APoCSJoinEventHandle then
-                Ext.Entity.Unsubscribe(State.Session.APoCSJoinEventHandle)
-                State.Session.APoCSJoinEventHandle = nil
-            end
+        State.Session.APoCSScheduled = false
+        if State.Session.APoCSDebounceTimer then
+            Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+            State.Session.APoCSDebounceTimer = nil
         end
+        State.Session.APoCSStartMs = nil
     end)
 end
 
@@ -728,6 +730,7 @@ return {
         cancelCombatRoundTimers = cancelCombatRoundTimers,
         startCombatRoundTimer = startCombatRoundTimer,
     },
+    onAPoCSCameraReady = onAPoCSCameraReady,
     Listeners = {
         onStarted = onStarted,
         onCombatStarted = onCombatStarted,

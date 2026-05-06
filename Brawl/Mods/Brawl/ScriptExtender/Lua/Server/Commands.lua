@@ -114,7 +114,7 @@ local function enableMod(noNotify)
     if level then
         Listeners.onStarted(level)
     end
-    if Printer then Printer:Start() end
+    -- if Printer then Printer:Start() end
     if not noNotify then
         modStatusMessage("Brawl Enabled")
     end
@@ -990,6 +990,7 @@ return {
         SetCharacterArchetype = onSetCharacterArchetype,
         ExitFTB = function (_) Pause.allExitFTB() end,
         EnterFTB = function (_) Pause.allEnterFTB() end,
+        APoCSCameraReady = function (_) RT.onAPoCSCameraReady() end,
         ClickPosition = onClickPosition,
         CancelQueuedMovement = onCancelQueuedMovement,
         ActionButton = function (data) onActionButton(data, false) end,

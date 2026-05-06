@@ -86,7 +86,12 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
-                    if State.Settings.AutoPauseOnCombatStart then
+                    -- Pre-pause is only correct for fresh combat entries before APoCS has fired (so the brawler doesn't
+                    -- act in the brief CombatStarted→APoCS window). Once APoCS has been scheduled this combat, any
+                    -- subsequent addBrawler is a re-add — pre-pausing here silently marks the brawler paused, the
+                    -- pulse skips, and the companion stands idle (e.g. PendingLeftCombat re-add at FTB exit, or
+                    -- CompanionAI toggle).
+                    if State.Settings.AutoPauseOnCombatStart and not State.Session.APoCSScheduled then
                         brawler.isPaused = true
                     elseif State.Session.IsInDialog then
                         -- Don't start pulse actions for new combat entrants while a dialog/cutscene is in progress, otherwise turned-during-cutscene
@@ -173,6 +178,14 @@ local function addCombatParticipantsToBrawlers()
 end
 
 local function endBrawl(level)
+    -- Don't tear down brawl state while the party is paused. The engine's IsInCombat flag flickers during
+    -- combat-GUID churn (notably the late-join NPC-on-NPC see-saw), and our 1.5s deferred timer in
+    -- RT.onCombatEnded uses that flag — it can spuriously decide we're out of combat and call endBrawls
+    -- mid-pause, breaking FTB. State cleanup at unpause time is safe (allExitFTB processes PendingLeftCombat).
+    if M.Pause.isPartyInFTB() then
+        debugPrint("endBrawl skipped (party in FTB)", level)
+        return
+    end
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then

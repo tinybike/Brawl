@@ -1230,6 +1230,17 @@ local function onSessionLoaded()
     Ext.Events.ControllerAxisInput:Subscribe(onControllerAxisInput)
     Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)
     Ext.Events.NetMessage:Subscribe(onNetMessage)
+    -- APoCS settling signal: the engine creates a CameraArriveWatcher entity (transient/OneFrame-style — Created
+    -- and Destroyed within the same frame) when the combat camera locks onto its target, which is right after
+    -- the engine has fully settled into combat (turns started, helpers in combat, etc.). Diagnostic showed it
+    -- fires once per fight a fraction of a second after CombatRoundStarted. Server-side OnCreateDeferred can't
+    -- see ecl::camera::* components, so we listen here and ping the server.
+    -- Note: CameraArriveWatcher could also fire on non-combat camera arrivals (cinematic moves, etc.). The
+    -- server-side handler gates on the APoCS debounce timer being live, so spurious fires outside combat are
+    -- harmless no-ops.
+    Ext.Entity.OnCreateDeferred("CameraArriveWatcher", function(entity)
+        Ext.ClientNet.PostMessageToServer("APoCSCameraReady", "")
+    end)
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)

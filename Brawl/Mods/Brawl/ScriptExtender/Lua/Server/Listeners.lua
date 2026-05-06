@@ -75,7 +75,7 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    if Printer then Printer:Start() end
+    -- if Printer then Printer:Start() end
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -146,9 +146,17 @@ local function onLeftCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid and M.Roster.getBrawlerByUuid(uuid) then
         if M.Pause.isPartyInFTB() then
-            -- Defer removal until FTB exits
-            State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
-            State.Session.PendingLeftCombat[uuid] = true
+            -- Defer removal until FTB exits, but skip party members — during APoCS+pathological-NPC-on-NPC
+            -- the engine flickers party FTB membership across the ghost-combat see-saw, generating LeftCombat
+            -- events for players. If we remove them from the roster here, allExitFTB processes the deferral
+            -- and strips them. The post-unpause CombatRoundStarted's addCombatParticipantsToBrawlers iterates
+            -- the active combat's participants — which often doesn't include the players in this scenario —
+            -- so they never get re-added → no pulse → companions stand still. brawler.isPaused already gates
+            -- pulse during FTB, so keeping party members in the roster through FTB is safe.
+            if M.Osi.IsPartyMember(uuid, 1) ~= 1 then
+                State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
+                State.Session.PendingLeftCombat[uuid] = true
+            end
         else
             local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
             Roster.removeBrawler(level, uuid)
@@ -267,6 +275,38 @@ local function onGainedControl(targetGuid)
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
+end
+
+-- Diagnostic: log ClientControl component create/destroy. Engine sometimes silently moves ClientControl
+-- between party members (turn cycling, etc.) without firing the Osiris GainedControl event, which corrupts
+-- our "currently selected" tracking and surfaces as the unwanted-switching bug at pause time.
+local function dumpClientControlSnapshot(label)
+    local entities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl") or {}
+    local entries = {}
+    for _, entity in ipairs(entities) do
+        local euuid = entity.Uuid and entity.Uuid.EntityUuid or "?"
+        local userId = entity.UserReservedFor and entity.UserReservedFor.UserID or "?"
+        table.insert(entries, string.format("%s(user=%s)", M.Utils.getDisplayName(euuid) or euuid, tostring(userId)))
+    end
+    debugPrint(string.format("[ClientControl] %s | currently held by %d: %s",
+        label, #entities, table.concat(entries, ", ")))
+end
+
+local function onClientControlCreated(entity)
+    local t = Ext.Utils.MonotonicTime()
+    local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+    local userId = entity and entity.UserReservedFor and entity.UserReservedFor.UserID or "?"
+    debugPrint(string.format("[ClientControl] [%dms] CREATE entity=%s user=%s",
+        t, M.Utils.getDisplayName(euuid) or euuid, tostring(userId)))
+    dumpClientControlSnapshot("post-create")
+end
+
+local function onClientControlDestroyed(entity)
+    local t = Ext.Utils.MonotonicTime()
+    local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+    debugPrint(string.format("[ClientControl] [%dms] DESTROY entity=%s",
+        t, M.Utils.getDisplayName(euuid) or euuid))
+    dumpClientControlSnapshot("post-destroy")
 end
 
 local function onEnteredForceTurnBased(entityGuid)
@@ -881,6 +921,14 @@ local function startListeners()
     -- }
     State.Session.Listeners.SpellCastFinishedEvent = {
         handle = Ext.Entity.OnCreateDeferred("SpellCastFinishedEvent", onSpellCastFinishedEvent),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ClientControlCreated = {
+        handle = Ext.Entity.OnCreateDeferred("ClientControl", onClientControlCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ClientControlDestroyed = {
+        handle = Ext.Entity.OnDestroy("ClientControl", onClientControlDestroyed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.DialogStarted = {
