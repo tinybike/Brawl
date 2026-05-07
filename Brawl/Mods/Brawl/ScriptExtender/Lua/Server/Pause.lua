@@ -150,6 +150,16 @@ local function allEnterFTB()
         end
         debugPrint(string.format("PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
     end
+    -- During-pause selection tracking; allExitFTB filters unpause-cycle GainedControls via 200ms recency.
+    State.Session.FTBSelectionTrack = {}
+    local trackInitAt = Ext.Utils.MonotonicTime()
+    for uid, u in pairs(selectedBeforePause) do
+        State.Session.FTBSelectionTrack[uid] = {
+            current = u,
+            currentAt = trackInitAt,
+            previous = nil,
+        }
+    end
 end
 
 local function allExitFTB()
@@ -158,6 +168,7 @@ local function allExitFTB()
     end
     debugPrint("allExitFTB")
     State.Session.PreExistingCastAtPause = {}
+    -- APoCSScheduled cleared by RT.onCombatEnded only -- manual unpause shouldn't re-arm on mid-fight combat-GUID flicker.
     -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
@@ -167,14 +178,33 @@ local function allExitFTB()
         end
         return
     end
-    -- Capture per-user selection BEFORE exiting FTB (leaving FTB reassigns control).
-    -- {[userId] = uuid} — restored individually per user in RT.onGainedControl.
+    -- Capture per-user selection BEFORE exiting FTB; if last during-pause GainedControl is within
+    -- LATE_SELECTION_WINDOW_MS, treat it as an unpause-induced engine cycle and use previous instead.
     local selectedDuringPause = {}
-    for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly and player.userId then
-            selectedDuringPause[player.userId] = uuid
+    local LATE_SELECTION_WINDOW_MS = 200
+    local nowMs = Ext.Utils.MonotonicTime()
+    if State.Session.FTBSelectionTrack and next(State.Session.FTBSelectionTrack) then
+        for userId, track in pairs(State.Session.FTBSelectionTrack) do
+            local age = nowMs - (track.currentAt or 0)
+            if age < LATE_SELECTION_WINDOW_MS and track.previous then
+                selectedDuringPause[userId] = track.previous
+                debugPrint(string.format(
+                    "[allExitFTB] late selection (%dms ago) for userId=%s - using previous (%s) instead of current (%s)",
+                    age, tostring(userId),
+                    M.Utils.getDisplayName(track.previous) or track.previous,
+                    M.Utils.getDisplayName(track.current) or track.current))
+            elseif track.current then
+                selectedDuringPause[userId] = track.current
+            end
+        end
+    else
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly and player.userId then
+                selectedDuringPause[player.userId] = uuid
+            end
         end
     end
+    State.Session.FTBSelectionTrack = nil
     -- Track which characters have queued movements before we start unpausing
     local hasQueuedMovement = {}
     for uuid, _ in pairs(State.Session.MovementQueue) do
@@ -207,7 +237,7 @@ local function allExitFTB()
             RT.Timers.startPulseAction(brawler, 0)
         end
     end
-    -- Unpause all party members (skip dead/downed — they never entered FTB via allEnterFTB)
+    -- Unpause all party members (skip dead/downed - they never entered FTB via allEnterFTB)
     for uuid, _ in pairs(State.Session.Players) do
         if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
             unlock(Ext.Entity.Get(uuid))
@@ -239,9 +269,13 @@ local function allExitFTB()
             end
         end
     end
-    -- Resume underlying combat
+    -- Resume underlying combat. Helper may have lost its combat (e.g. during APoCS-induced combat churn);
+    -- skip in that case rather than crashing on Osi.ResumeCombat(nil).
     if State.Session.CombatHelper then
-        Osi.ResumeCombat(M.Osi.CombatGetGuidFor(State.Session.CombatHelper))
+        local helperCombat = M.Osi.CombatGetGuidFor(State.Session.CombatHelper)
+        if helperCombat then
+            Osi.ResumeCombat(helperCombat)
+        end
     end
     TurnOrder.setPlayersSwarmGroup()
     if next(selectedDuringPause) then

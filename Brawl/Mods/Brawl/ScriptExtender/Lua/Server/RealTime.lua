@@ -70,9 +70,6 @@ local function pulseAction(brawler)
         if M.Osi.IsPlayer(brawler.uuid) == 0 and M.Osi.IsInCombat(brawler.uuid) == 0 then
             return
         end
-        if not State.Settings.TurnBasedSwarmMode then
-            Roster.addPlayersInEnterCombatRangeToBrawlers(brawler.uuid)
-        end
         AI.act(brawler)
     end
 end
@@ -220,7 +217,7 @@ local function nextCombatRound()
             end
         end
         -- Pre-emptive: re-affirm SelectCharacter for each user's intended char right before the round-turnover mutations.  Skip for users with a
-        -- recent GainedControl (within RECENT_CLICK_WINDOW_MS) — their click is fresh and we shouldn't override it; let the engine settle naturally.
+        -- recent GainedControl (within RECENT_CLICK_WINDOW_MS) - their click is fresh and we shouldn't override it; let the engine settle naturally.
         local now = Ext.Utils.MonotonicTime()
         local RECENT_CLICK_WINDOW_MS = 500
         for userId, intendedUuid in pairs(intendedByUser) do
@@ -298,12 +295,39 @@ local function onStarted()
 end
 
 local function onCombatStarted(combatGuid)
+    -- Cancel any pending APoCS reset timer - a fresh combat-start within the 10s reset window means we're
+    -- mid-fight (combat-GUID flicker), not at the genuine end of the fight. Keep the flag set so we don't
+    -- re-fire APoCS on this new combat's round 1.
+    if State.Session.APoCSResetTimer then
+        Ext.Timer.Cancel(State.Session.APoCSResetTimer)
+        State.Session.APoCSResetTimer = nil
+    end
     if not Utils.isToT() then
         State.uncapMovementDistances()
         -- If enemies are already in the combat participants list (normal case), initialize immediately.  Otherwise, onEnteredCombat will handle it.
         if hasEnemyBrawlers() then
             initializeCombat(combatGuid)
         end
+    end
+end
+
+-- Idempotent: cancels debounce + pauses party. Driven by 5s safety OR client's APoCSCameraReady net message.
+local function fireAPoCSNow()
+    local elapsed = State.Session.APoCSStartMs and (Ext.Utils.MonotonicTime() - State.Session.APoCSStartMs) or 0
+    if State.Session.APoCSDebounceTimer then
+        Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+        State.Session.APoCSDebounceTimer = nil
+    end
+    if not Pause.isPartyInFTB() then
+        debugPrint(string.format("[+%dms] APoCS firing -> allEnterFTB", elapsed))
+        Pause.allEnterFTB()
+    end
+end
+
+-- Net-message handler for client's APoCSCameraReady. Gated on APoCSDebounceTimer to ignore non-combat camera arrivals.
+local function onAPoCSCameraReady()
+    if State.Session.APoCSDebounceTimer then
+        fireAPoCSNow()
     end
 end
 
@@ -344,9 +368,23 @@ local function onCombatRoundStarted(combatGuid, round)
         end
     end
     startCombatRoundTimer(combatGuid)
-    if State.Settings.AutoPauseOnCombatStart and round == 1 then
-        debugPrint("RT.onCombatRoundStarted firing AutoPauseOnCombatStart (round=1) -> allEnterFTB")
-        Pause.allEnterFTB()
+    -- APoCS at round 1: wait for client camera-ready signal (or 5s safety) before firing pause.
+    -- APoCSScheduled stays true after firing; cleared only by onCombatEnded so combat-GUID flicker doesn't re-fire.
+    if State.Settings.AutoPauseOnCombatStart and round == 1 and not State.Session.APoCSScheduled then
+        State.Session.APoCSScheduled = true
+        State.Session.APoCSStartMs = Ext.Utils.MonotonicTime()
+        debugPrint("[+0ms] APoCS scheduled at round 1, waiting for client camera-ready signal")
+        State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(5000, fireAPoCSNow)
+        -- 1s cap on pre-paused NPCs: avoids them standing frozen during the 5s safety in pathological NPC-on-NPC late-joins.
+        Ext.Timer.WaitFor(1000, function()
+            if Pause.isPartyInFTB() or State.Session.IsInDialog then return end
+            for uuid, brawler in pairs(M.Roster.getBrawlers()) do
+                if brawler.isPaused and not State.Session.Players[uuid] then
+                    brawler.isPaused = false
+                    startPulseAction(brawler, 0)
+                end
+            end
+        end)
     end
     -- Re-mangle TurnOrder.Groups to maintain the persistent-active-turns state and keep the currently-controlled character at the front of the topbar
     TurnOrder.setPartyInitiativeRollToMean()
@@ -369,6 +407,24 @@ local function onCombatEnded(combatGuid)
             stopAllPulseActions()
             State.endBrawls()
         end
+    end)
+    -- APoCS flag reset: schedule a 10s timer. If a new CombatStarted fires before it expires (combat-GUID
+    -- flicker mid-fight), onCombatStarted cancels the timer. We deliberately do NOT gate the reset on
+    -- State.isInCombat() at expiry - that gate breaks the late-join NPC-on-NPC scenario where the engine
+    -- churns combat GUIDs (see-saw) and host's IsInCombat stays true through the transition. cancel-on-
+    -- CombatStarted alone is sufficient protection against mid-fight flicker (the new GUID's CombatStarted
+    -- fires sub-second after the old one's CombatEnded, well within the 10s window).
+    if State.Session.APoCSResetTimer then
+        Ext.Timer.Cancel(State.Session.APoCSResetTimer)
+    end
+    State.Session.APoCSResetTimer = Ext.Timer.WaitFor(10000, function()
+        State.Session.APoCSResetTimer = nil
+        State.Session.APoCSScheduled = false
+        if State.Session.APoCSDebounceTimer then
+            Ext.Timer.Cancel(State.Session.APoCSDebounceTimer)
+            State.Session.APoCSDebounceTimer = nil
+        end
+        State.Session.APoCSStartMs = nil
     end)
 end
 
@@ -557,7 +613,7 @@ end
 
 local function onReactionInterruptUsed(uuid, isAutoTriggered)
     -- onReactionInterruptActionNeeded pauses unconditionally for any party-member reaction prompt
-    -- (including auto-triggered ones — it has no isAutoTriggered signal at that point), so we MUST
+    -- (including auto-triggered ones - it has no isAutoTriggered signal at that point), so we MUST
     -- resume unconditionally here. Skipping resume for auto-triggered reactions left the round
     -- timer permanently paused, which prevented nextCombatRound from firing and caused unwanted
     -- control switches at the next round-start (engine picks wrong group when ReqEndTurn flags
@@ -583,6 +639,16 @@ local function onEnteredForceTurnBased(uuid)
     debugPrint(string.format("onEnteredForceTurnBased: entity=%s pendingSet=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid),
         tostring(State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) ~= nil)))
+    -- Fix partial mid-round TurnBased state per party member; without this the engine can stall on env-turn transition.
+    if M.Osi.IsPartyMember(uuid, 1) == 1 then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased then
+            entity.TurnBased.IsActiveCombatTurn = true
+            entity.TurnBased.HadTurnInCombat = false
+            entity.TurnBased.RequestedEndTurn = false
+            entity:Replicate("TurnBased")
+        end
+    end
     if State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) then
         local selectedByUser = State.Session.PendingSelectCharOnFTB
         State.Session.PendingSelectCharOnFTB = nil
@@ -656,6 +722,7 @@ return {
         cancelCombatRoundTimers = cancelCombatRoundTimers,
         startCombatRoundTimer = startCombatRoundTimer,
     },
+    onAPoCSCameraReady = onAPoCSCameraReady,
     Listeners = {
         onStarted = onStarted,
         onCombatStarted = onCombatStarted,

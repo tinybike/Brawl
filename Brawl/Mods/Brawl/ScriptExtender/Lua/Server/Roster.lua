@@ -86,7 +86,8 @@ local function addBrawler(entityUuid, replaceExistingBrawler)
                 end
                 State.Session.Brawlers[level][entityUuid] = brawler
                 if M.Osi.IsInForceTurnBasedMode(M.Osi.GetHostCharacter()) == 0 then
-                    if State.Settings.AutoPauseOnCombatStart then
+                    -- Only pre-pause fresh entries (pre-APoCS); re-adds after APoCS would silently freeze the brawler.
+                    if State.Settings.AutoPauseOnCombatStart and not State.Session.APoCSScheduled then
                         brawler.isPaused = true
                     elseif State.Session.IsInDialog then
                         -- Don't start pulse actions for new combat entrants while a dialog/cutscene is in progress, otherwise turned-during-cutscene
@@ -173,6 +174,11 @@ local function addCombatParticipantsToBrawlers()
 end
 
 local function endBrawl(level)
+    -- Skip during pause -- IsInCombat flicker during NPC-on-NPC see-saw can otherwise tear down state mid-FTB
+    if M.Pause.isPartyInFTB() then
+        debugPrint("endBrawl skipped (party in FTB)", level)
+        return
+    end
     debugPrint("endBrawl", level)
     local brawlersInLevel = State.Session.Brawlers[level]
     if brawlersInLevel then

@@ -57,6 +57,8 @@ local function setInitiativeRoll(uuid, roll)
         if oldRoll == roll then
             return
         end
+        debugPrint(string.format("[setInitiativeRoll] %s %d -> %d (replicating CombatState + CombatParticipant)",
+            M.Utils.getDisplayName(uuid) or uuid, oldRoll, roll))
         entity.CombatParticipant.InitiativeRoll = roll
         if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
             entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = roll
@@ -256,9 +258,21 @@ end
 local function bumpInitiativeRolls(intendedSet)
     local maxEnemy = calculateMaxEnemyInitiativeRoll()
     if not maxEnemy then
+        debugPrint("[bumpInitiativeRolls] skipped (no enemy init found)")
         return
     end
     local target = maxEnemy + 1
+    -- Diagnostic: each setInitiativeRoll below replicates CombatState -- engine may reassign ClientControl
+    local controllingNames = {}
+    for uuid, player in pairs(State.Session.Players) do
+        if player.isControllingDirectly then
+            table.insert(controllingNames, M.Utils.getDisplayName(uuid) or uuid)
+        end
+    end
+    debugPrint(string.format("[bumpInitiativeRolls] maxEnemy=%d target=%d (controlling=%s, intendedSet=%s)",
+        maxEnemy, target,
+        #controllingNames > 0 and table.concat(controllingNames, ",") or "<none>",
+        intendedSet and "explicit" or "nil"))
     for uuid, player in pairs(State.Session.Players) do
         local controlled = player.isControllingDirectly or (intendedSet and intendedSet[uuid])
         if controlled then
@@ -428,7 +442,7 @@ local function setPlayerTurnsActive()
         addGroup(uuid)
     end
     -- Whole-table assignment: replaces Groups with EXACTLY the player single-member groups, no enemies, no duplicate ghost entries.
-    -- (Per-index writes leave behind duplicate-player ghosts in the slots originally held by enemies — see prior memory.)
+    -- (Per-index writes leave behind duplicate-player ghosts in the slots originally held by enemies - see prior memory.)
     combatEntity.TurnOrder.Groups = groupsPlayers
     local uuid = combatEntity.CombatState.MyGuid
     if State.Session.TurnOrderListener[uuid] then

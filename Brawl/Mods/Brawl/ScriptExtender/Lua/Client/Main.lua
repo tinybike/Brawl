@@ -1230,6 +1230,21 @@ local function onSessionLoaded()
     Ext.Events.ControllerAxisInput:Subscribe(onControllerAxisInput)
     Ext.Events.MouseButtonInput:Subscribe(onMouseButtonInput)
     Ext.Events.NetMessage:Subscribe(onNetMessage)
+    -- APoCS settling signal: ecl::camera component is client-only, so listen here and ping server.
+    Ext.Entity.OnCreateDeferred("CameraArriveWatcher", function(entity)
+        Ext.ClientNet.PostMessageToServer("APoCSCameraReady", "")
+    end)
+    -- Diagnostic mirror of server-side ClientControl logging.
+    Ext.Entity.OnCreateDeferred("ClientControl", function(entity)
+        local t = Ext.Utils.MonotonicTime()
+        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+        print(string.format("[Brawl/Client] [%dms] ClientControl CREATE entity=%s", t, tostring(euuid)))
+    end)
+    Ext.Entity.OnDestroy("ClientControl", function(entity)
+        local t = Ext.Utils.MonotonicTime()
+        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+        print(string.format("[Brawl/Client] [%dms] ClientControl DESTROY entity=%s", t, tostring(euuid)))
+    end)
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)

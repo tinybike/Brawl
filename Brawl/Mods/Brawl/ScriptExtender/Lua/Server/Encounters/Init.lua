@@ -2,6 +2,64 @@ Encounters = Encounters or {}
 
 local debugPrint = Utils.debugPrint
 
+-- Vanilla "Evil_NPC" faction. Applied AFTER the engine has merged the spawn-time splinter combats into the host's combat
+-- (see applyFactionWhenMerged). Applying it earlier triggers proximity-aggro that splinters combat groups, which causes a
+-- start/stop loop under AutoPauseOnCombatStart. Persistent faction is what keeps spawned enemies hostile across camp/rest.
+local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
+
+local function applyFactionWhenMerged(guids, host)
+    if not guids or #guids == 0 or not host then return end
+
+    local done = false
+    local handle = nil
+
+    local function applyFaction()
+        local applied = 0
+        for _, g in ipairs(guids) do
+            if Osi.IsDead(g) ~= 1 then
+                Osi.SetFaction(g, ENEMY_FACTION)
+                applied = applied + 1
+            end
+        end
+        debugPrint(string.format("[Encounters] SetFaction applied to %d/%d spawned enemies", applied, #guids))
+    end
+
+    local function isMerged()
+        local hostCombat = Osi.CombatGetGuidFor(host)
+        if not hostCombat or hostCombat == "" then return false end
+        for _, g in ipairs(guids) do
+            if Osi.IsDead(g) ~= 1 and Osi.CombatGetGuidFor(g) ~= hostCombat then
+                return false
+            end
+        end
+        return true
+    end
+
+    local function tryFinish()
+        if done then return end
+        if isMerged() then
+            done = true
+            if handle then Ext.Osiris.UnregisterListener(handle); handle = nil end
+            applyFaction()
+        end
+    end
+
+    tryFinish()
+    if done then return end
+
+    handle = Ext.Osiris.RegisterListener("CombatEnded", 1, "after", tryFinish)
+
+    -- Safety cap: 30s. Apply anyway so persistent hostility still kicks in even if the engine never merged
+    -- (e.g. genuine multi-combat scenario). At worst we re-trigger a tiny splinter, which by then is harmless.
+    Ext.Timer.WaitFor(30000, function()
+        if done then return end
+        done = true
+        if handle then Ext.Osiris.UnregisterListener(handle); handle = nil end
+        debugPrint("[Encounters] applyFactionWhenMerged timeout (30s) — applying anyway")
+        applyFaction()
+    end)
+end
+
 function Encounters.testSpawn(templateUuid, distance, peaceful)
     if not templateUuid or templateUuid == "" then
         debugPrint("[Encounters] testSpawn: templateUuid required")
@@ -121,6 +179,7 @@ function Encounters.spawnAtPlayer(opts)
 
     debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, #picks))
     Spawn.ensureInCombat(guids, host)
+    applyFactionWhenMerged(guids, host)
 
     if hostileToAll and #guids > 0 then
         Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids, host) end)

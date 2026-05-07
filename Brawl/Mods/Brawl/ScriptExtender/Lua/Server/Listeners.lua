@@ -1,4 +1,4 @@
--- ECSPrinter = require("Server/ECSPrinter.lua")
+ECSPrinter = require("Server/ECSPrinter.lua")
 
 local debugPrint = Utils.debugPrint
 local debugDump = Utils.debugDump
@@ -75,8 +75,7 @@ end
 
 local function onResetCompleted()
     debugPrint("ResetCompleted")
-    -- Printer:Start()
-    -- SpellPrinter:Start()
+    -- if Printer then Printer:Start() end
     onStarted(Osi.GetRegion(Osi.GetHostCharacter()))
 end
 
@@ -147,9 +146,11 @@ local function onLeftCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid and M.Roster.getBrawlerByUuid(uuid) then
         if M.Pause.isPartyInFTB() then
-            -- Defer removal until FTB exits
-            State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
-            State.Session.PendingLeftCombat[uuid] = true
+            -- Defer non-player removals until FTB exits; party members get spurious LeftCombat during see-saw, skip them.
+            if M.Osi.IsPartyMember(uuid, 1) ~= 1 then
+                State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
+                State.Session.PendingLeftCombat[uuid] = true
+            end
         else
             local level = M.Osi.GetRegion(M.Osi.GetHostCharacter())
             Roster.removeBrawler(level, uuid)
@@ -211,15 +212,14 @@ local function onGainedControl(targetGuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
-                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s - correcting",
                         M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
                     RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
-                    debugPrint(string.format("GainedControl match: %s — clearing expectation for userId=%s",
-                        M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
+                    debugPrint(string.format("GainedControl match: %s - clearing expectation for userId=%s", M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
                         State.Session.ExpectedControlled = nil
@@ -261,6 +261,17 @@ local function onGainedControl(targetGuid)
                 end
                 State.Session.LastGainedControlAt = State.Session.LastGainedControlAt or {}
                 State.Session.LastGainedControlAt[targetUserId] = Ext.Utils.MonotonicTime()
+                -- Feed the during-pause selection tracker (consumed by allExitFTB recency heuristic).
+                if State.Session.FTBSelectionTrack and M.Pause.isPartyInFTB() then
+                    local prior = State.Session.FTBSelectionTrack[targetUserId]
+                    if not prior or prior.current ~= targetUuid then
+                        State.Session.FTBSelectionTrack[targetUserId] = {
+                            current = targetUuid,
+                            currentAt = Ext.Utils.MonotonicTime(),
+                            previous = prior and prior.current or nil,
+                        }
+                    end
+                end
             end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
@@ -268,6 +279,36 @@ local function onGainedControl(targetGuid)
             Ext.ServerNet.PostMessageToUser(targetUserId, "GainedControl", targetUuid)
         end
     end
+end
+
+-- Diagnostic: ClientControl create/destroy logging -- the engine can move CC silently without firing GainedControl
+local function dumpClientControlSnapshot(label)
+    local entities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl") or {}
+    local entries = {}
+    for _, entity in ipairs(entities) do
+        local euuid = entity.Uuid and entity.Uuid.EntityUuid or "?"
+        local userId = entity.UserReservedFor and entity.UserReservedFor.UserID or "?"
+        table.insert(entries, string.format("%s(user=%s)", M.Utils.getDisplayName(euuid) or euuid, tostring(userId)))
+    end
+    debugPrint(string.format("[ClientControl] %s | currently held by %d: %s",
+        label, #entities, table.concat(entries, ", ")))
+end
+
+local function onClientControlCreated(entity)
+    local t = Ext.Utils.MonotonicTime()
+    local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+    local userId = entity and entity.UserReservedFor and entity.UserReservedFor.UserID or "?"
+    debugPrint(string.format("[ClientControl] [%dms] CREATE entity=%s user=%s",
+        t, M.Utils.getDisplayName(euuid) or euuid, tostring(userId)))
+    dumpClientControlSnapshot("post-create")
+end
+
+local function onClientControlDestroyed(entity)
+    local t = Ext.Utils.MonotonicTime()
+    local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
+    debugPrint(string.format("[ClientControl] [%dms] DESTROY entity=%s",
+        t, M.Utils.getDisplayName(euuid) or euuid))
+    dumpClientControlSnapshot("post-destroy")
 end
 
 local function onEnteredForceTurnBased(entityGuid)
@@ -882,6 +923,14 @@ local function startListeners()
     -- }
     State.Session.Listeners.SpellCastFinishedEvent = {
         handle = Ext.Entity.OnCreateDeferred("SpellCastFinishedEvent", onSpellCastFinishedEvent),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ClientControlCreated = {
+        handle = Ext.Entity.OnCreateDeferred("ClientControl", onClientControlCreated),
+        stop = Ext.Entity.Unsubscribe,
+    }
+    State.Session.Listeners.ClientControlDestroyed = {
+        handle = Ext.Entity.OnDestroy("ClientControl", onClientControlDestroyed),
         stop = Ext.Entity.Unsubscribe,
     }
     State.Session.Listeners.DialogStarted = {
