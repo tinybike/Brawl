@@ -488,17 +488,6 @@ local function onGainedControl(uuid)
             if uuid ~= pendingUuid then
                 debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(pendingUuid))
                 sendSelectCharacter(pendingUuid, "RT.onGainedControl-pendingFTB-mismatch")
-                -- Forcibly remove the stray ClientControl. Engine sometimes leaves the duplicate
-                -- entity alive (multi-holder state) and fires a delayed GainedControl on it ~2-3s
-                -- later — slipping past the redirect (which clears below). Without this, the second
-                -- engine cycle wins and we get an unwanted Tressie→Astarion-style switch mid-RT.
-                local strayEntity = Ext.Entity.Get(uuid)
-                if strayEntity and strayEntity.ClientControl then
-                    local ok, result = pcall(function() return strayEntity:RemoveComponentImmediate("ClientControl") end)
-                    debugPrint(string.format("[stray ClientControl destroy] %s: %s",
-                        M.Utils.getDisplayName(uuid) or uuid,
-                        ok and ("returned=" .. tostring(result)) or ("err=" .. tostring(result))))
-                end
             else
                 debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
             end
@@ -668,6 +657,24 @@ local function onEnteredForceTurnBased(uuid)
     debugPrint(string.format("onEnteredForceTurnBased: entity=%s pendingSet=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid),
         tostring(State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) ~= nil)))
+    -- Fix mid-round-cycle TurnBased state on party members entering FTB. If pause hits mid-round (some
+    -- party members already finished their turn-segment, others mid-flight), the engine carries that
+    -- partial state into FTB: HadTurnInCombat=true on chars who acted, IsActiveCombatTurn=true on
+    -- chars still mid-turn. Engine then can't cleanly transition party-turn → env-turn and stalls in
+    -- the rare "stuck environmental turn" pathology. Forcing all party to {IsActive=true, HadTurn=false,
+    -- ReqEndTurn=false} at FTB-entry time gives the engine a clean party-active state to layer FTB on,
+    -- and matches the visual intent (all 4 portraits "larged" during pause).
+    -- Run AFTER the engine's FTB transition (via this listener) rather than synchronously inside
+    -- allEnterFTB — engine-side mutations during Osi.ForceTurnBasedMode would overwrite our pre-writes.
+    if M.Osi.IsPartyMember(uuid, 1) == 1 then
+        local entity = Ext.Entity.Get(uuid)
+        if entity and entity.TurnBased then
+            entity.TurnBased.IsActiveCombatTurn = true
+            entity.TurnBased.HadTurnInCombat = false
+            entity.TurnBased.RequestedEndTurn = false
+            entity:Replicate("TurnBased")
+        end
+    end
     if State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) then
         local selectedByUser = State.Session.PendingSelectCharOnFTB
         State.Session.PendingSelectCharOnFTB = nil
