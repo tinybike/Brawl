@@ -262,10 +262,7 @@ local function bumpInitiativeRolls(intendedSet)
         return
     end
     local target = maxEnemy + 1
-    -- Diagnostic: log what we're about to bump to and which char is currently isControllingDirectly. Each
-    -- setInitiativeRoll call below replicates CombatState + CombatParticipant — the engine reacts and may
-    -- reassign ClientControl. Correlate this log with subsequent [ClientControl] CREATE/DESTROY events to
-    -- catch unwanted-switch triggers that flow through this path (rather than through refresher spawns).
+    -- Diagnostic: each setInitiativeRoll below replicates CombatState -- engine may reassign ClientControl
     local controllingNames = {}
     for uuid, player in pairs(State.Session.Players) do
         if player.isControllingDirectly then
@@ -445,7 +442,7 @@ local function setPlayerTurnsActive()
         addGroup(uuid)
     end
     -- Whole-table assignment: replaces Groups with EXACTLY the player single-member groups, no enemies, no duplicate ghost entries.
-    -- (Per-index writes leave behind duplicate-player ghosts in the slots originally held by enemies — see prior memory.)
+    -- (Per-index writes leave behind duplicate-player ghosts in the slots originally held by enemies - see prior memory.)
     combatEntity.TurnOrder.Groups = groupsPlayers
     local uuid = combatEntity.CombatState.MyGuid
     if State.Session.TurnOrderListener[uuid] then

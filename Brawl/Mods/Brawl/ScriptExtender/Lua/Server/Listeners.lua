@@ -146,13 +146,7 @@ local function onLeftCombat(entityGuid, combatGuid)
     local uuid = M.Osi.GetUUID(entityGuid)
     if uuid and M.Roster.getBrawlerByUuid(uuid) then
         if M.Pause.isPartyInFTB() then
-            -- Defer removal until FTB exits, but skip party members — during APoCS+pathological-NPC-on-NPC
-            -- the engine flickers party FTB membership across the ghost-combat see-saw, generating LeftCombat
-            -- events for players. If we remove them from the roster here, allExitFTB processes the deferral
-            -- and strips them. The post-unpause CombatRoundStarted's addCombatParticipantsToBrawlers iterates
-            -- the active combat's participants — which often doesn't include the players in this scenario —
-            -- so they never get re-added → no pulse → companions stand still. brawler.isPaused already gates
-            -- pulse during FTB, so keeping party members in the roster through FTB is safe.
+            -- Defer non-player removals until FTB exits; party members get spurious LeftCombat during see-saw, skip them.
             if M.Osi.IsPartyMember(uuid, 1) ~= 1 then
                 State.Session.PendingLeftCombat = State.Session.PendingLeftCombat or {}
                 State.Session.PendingLeftCombat[uuid] = true
@@ -218,15 +212,14 @@ local function onGainedControl(targetGuid)
             local expectedForUser = gainedUserId and State.Session.ExpectedControlled[gainedUserId]
             if expectedForUser then
                 if targetUuid ~= expectedForUser then
-                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s — correcting",
+                    debugPrint(string.format("GainedControl mismatch: expected=%s got=%s userId=%s - correcting",
                         M.Utils.getDisplayName(expectedForUser), M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     if not State.Settings.TurnBasedSwarmMode then
                         TurnOrder.bumpInitiativeRollsFor(expectedForUser)
                     end
                     RT.sendSelectCharacter(expectedForUser, "Listeners.onGainedControl-windowMismatch")
                 else
-                    debugPrint(string.format("GainedControl match: %s — clearing expectation for userId=%s",
-                        M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
+                    debugPrint(string.format("GainedControl match: %s - clearing expectation for userId=%s", M.Utils.getDisplayName(targetUuid), tostring(gainedUserId)))
                     State.Session.ExpectedControlled[gainedUserId] = nil
                     if not next(State.Session.ExpectedControlled) then
                         State.Session.ExpectedControlled = nil
@@ -268,8 +261,7 @@ local function onGainedControl(targetGuid)
                 end
                 State.Session.LastGainedControlAt = State.Session.LastGainedControlAt or {}
                 State.Session.LastGainedControlAt[targetUserId] = Ext.Utils.MonotonicTime()
-                -- Track per-user selection during FTB pause so allExitFTB can apply the recency
-                -- heuristic (filter unpause-cycle GainedControls from real user clicks).
+                -- Feed the during-pause selection tracker (consumed by allExitFTB recency heuristic).
                 if State.Session.FTBSelectionTrack and M.Pause.isPartyInFTB() then
                     local prior = State.Session.FTBSelectionTrack[targetUserId]
                     if not prior or prior.current ~= targetUuid then
@@ -289,9 +281,7 @@ local function onGainedControl(targetGuid)
     end
 end
 
--- Diagnostic: log ClientControl component create/destroy. Engine sometimes silently moves ClientControl
--- between party members (turn cycling, etc.) without firing the Osiris GainedControl event, which corrupts
--- our "currently selected" tracking and surfaces as the unwanted-switching bug at pause time.
+-- Diagnostic: ClientControl create/destroy logging -- the engine can move CC silently without firing GainedControl
 local function dumpClientControlSnapshot(label)
     local entities = Ext.Entity.GetAllEntitiesWithComponent("ClientControl") or {}
     local entries = {}

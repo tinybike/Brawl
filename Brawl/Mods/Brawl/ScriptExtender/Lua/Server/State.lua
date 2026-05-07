@@ -526,9 +526,7 @@ local function setIsControllingDirectly()
         for _, entity in ipairs(entities) do
             local entityUuid = entity.Uuid.EntityUuid
             Session.Players[entityUuid].isControllingDirectly = true
-            -- Cache per-user as a fallback when isControllingDirectly is transiently
-            -- false for everyone (e.g. round turnover deselects briefly).  Stored as
-            -- {[userId] = uuid}; in MP each user has their own last-controlled char.
+            -- Per-user fallback for round-turnover deselect window.
             local userId = entity.UserReservedFor and entity.UserReservedFor.UserID
             if userId then
                 local prev = Session.LastControlledUuid[userId]

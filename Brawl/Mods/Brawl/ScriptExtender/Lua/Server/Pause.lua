@@ -150,10 +150,7 @@ local function allEnterFTB()
         end
         debugPrint(string.format("PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
     end
-    -- Track per-user character selection through the pause. allExitFTB uses this with a recency
-    -- heuristic to filter "engine cycled CC at unpause time" events (which fire as part of FTB-exit
-    -- processing, not user clicks). Without this, allExitFTB inherits the corrupted CC state and
-    -- redirects post-unpause to the wrong char.
+    -- During-pause selection tracking; allExitFTB filters unpause-cycle GainedControls via 200ms recency.
     State.Session.FTBSelectionTrack = {}
     local trackInitAt = Ext.Utils.MonotonicTime()
     for uid, u in pairs(selectedBeforePause) do
@@ -171,9 +168,7 @@ local function allExitFTB()
     end
     debugPrint("allExitFTB")
     State.Session.PreExistingCastAtPause = {}
-    -- Don't reset APoCSScheduled here. Manual unpause doesn't mean the fight is over — the engine often
-    -- spawns a fresh combat GUID mid-fight, which would re-trigger APoCS if we cleared the flag now.
-    -- Reset is handled in RT.onCombatEnded once all party members are confirmed out of combat for a few seconds.
+    -- APoCSScheduled cleared by RT.onCombatEnded only -- manual unpause shouldn't re-arm on mid-fight combat-GUID flicker.
     -- Out of combat: minimal FTB exit on party members, mirroring allEnterFTB.
     if next(M.Roster.getBrawlers()) == nil then
         for uuid, _ in pairs(State.Session.Players) do
@@ -183,13 +178,8 @@ local function allExitFTB()
         end
         return
     end
-    -- Capture per-user selection BEFORE exiting FTB (leaving FTB reassigns control).
-    -- {[userId] = uuid} — restored individually per user in RT.onGainedControl.
-    -- Prefer the during-FTB tracking with a recency heuristic: if the most recent GainedControl
-    -- happened within LATE_SELECTION_WINDOW_MS of allExitFTB, treat it as an unpause-induced engine
-    -- cycle rather than a user click and use the previous tracked selection. Without this, an engine
-    -- ClientControl reassignment fired between the user's unpause keypress and our capture would be
-    -- inherited as the "selection" and surface as an unwanted post-unpause character switch.
+    -- Capture per-user selection BEFORE exiting FTB; if last during-pause GainedControl is within
+    -- LATE_SELECTION_WINDOW_MS, treat it as an unpause-induced engine cycle and use previous instead.
     local selectedDuringPause = {}
     local LATE_SELECTION_WINDOW_MS = 200
     local nowMs = Ext.Utils.MonotonicTime()
@@ -199,7 +189,7 @@ local function allExitFTB()
             if age < LATE_SELECTION_WINDOW_MS and track.previous then
                 selectedDuringPause[userId] = track.previous
                 debugPrint(string.format(
-                    "[allExitFTB] late selection (%dms ago) for userId=%s — using previous (%s) instead of current (%s)",
+                    "[allExitFTB] late selection (%dms ago) for userId=%s - using previous (%s) instead of current (%s)",
                     age, tostring(userId),
                     M.Utils.getDisplayName(track.previous) or track.previous,
                     M.Utils.getDisplayName(track.current) or track.current))
@@ -247,7 +237,7 @@ local function allExitFTB()
             RT.Timers.startPulseAction(brawler, 0)
         end
     end
-    -- Unpause all party members (skip dead/downed — they never entered FTB via allEnterFTB)
+    -- Unpause all party members (skip dead/downed - they never entered FTB via allEnterFTB)
     for uuid, _ in pairs(State.Session.Players) do
         if M.Osi.IsDead(uuid) == 0 and not M.Utils.isDowned(uuid) then
             unlock(Ext.Entity.Get(uuid))

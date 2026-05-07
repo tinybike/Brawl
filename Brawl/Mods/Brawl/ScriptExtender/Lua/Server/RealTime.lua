@@ -217,7 +217,7 @@ local function nextCombatRound()
             end
         end
         -- Pre-emptive: re-affirm SelectCharacter for each user's intended char right before the round-turnover mutations.  Skip for users with a
-        -- recent GainedControl (within RECENT_CLICK_WINDOW_MS) — their click is fresh and we shouldn't override it; let the engine settle naturally.
+        -- recent GainedControl (within RECENT_CLICK_WINDOW_MS) - their click is fresh and we shouldn't override it; let the engine settle naturally.
         local now = Ext.Utils.MonotonicTime()
         local RECENT_CLICK_WINDOW_MS = 500
         for userId, intendedUuid in pairs(intendedByUser) do
@@ -295,7 +295,7 @@ local function onStarted()
 end
 
 local function onCombatStarted(combatGuid)
-    -- Cancel any pending APoCS reset timer — a fresh combat-start within the 10s reset window means we're
+    -- Cancel any pending APoCS reset timer - a fresh combat-start within the 10s reset window means we're
     -- mid-fight (combat-GUID flicker), not at the genuine end of the fight. Keep the flag set so we don't
     -- re-fire APoCS on this new combat's round 1.
     if State.Session.APoCSResetTimer then
@@ -311,10 +311,7 @@ local function onCombatStarted(combatGuid)
     end
 end
 
--- Fire APoCS now: cleanup pending debounce timer and pause the party. Idempotent — safe to call multiple times.
--- Driven by either the 5s safety timer (set in onCombatRoundStarted) OR the client's APoCSCameraReady net message
--- (which fires when the ecl::camera::CombatTargetComponent entity is created — the engine's "combat fully settled"
--- moment, a few frames after the unsheath::CombatJoining components are destroyed).
+-- Idempotent: cancels debounce + pauses party. Driven by 5s safety OR client's APoCSCameraReady net message.
 local function fireAPoCSNow()
     local elapsed = State.Session.APoCSStartMs and (Ext.Utils.MonotonicTime() - State.Session.APoCSStartMs) or 0
     if State.Session.APoCSDebounceTimer then
@@ -327,10 +324,7 @@ local function fireAPoCSNow()
     end
 end
 
--- Net-message handler for the client's camera-ready signal. The client (Client/Main.lua) subscribes to
--- CameraArriveWatcher OnCreateDeferred and pings the server whenever it fires. We only act if APoCS is
--- currently waiting (debounce timer pending) — once fired, the timer is nil and subsequent signals (e.g.
--- camera-arrival on cinematic moves, mid-fight target switches) are harmless no-ops.
+-- Net-message handler for client's APoCSCameraReady. Gated on APoCSDebounceTimer to ignore non-combat camera arrivals.
 local function onAPoCSCameraReady()
     if State.Session.APoCSDebounceTimer then
         fireAPoCSNow()
@@ -374,26 +368,14 @@ local function onCombatRoundStarted(combatGuid, round)
         end
     end
     startCombatRoundTimer(combatGuid)
-    -- APoCS at round==1 fires too early — engine isn't done (characters still drawing weapons / finalizing
-    -- combat entry; allEnterFTB at this stage kills the underlying combat). Wait for the engine's stream of
-    -- CombatJoining component destroys to quiet down (per-character weapon-draw / combat-entry finalization).
-    -- 500ms debounce after the last destroy. APoCSScheduled flag stays true after firing — only the genuine
-    -- end-of-fight reset in onCombatEnded clears it (prevents see-saw across new combat GUIDs).
-    -- APoCS fires on the Combat Helper's first BoostChangedEvent post-round-1. Empirically this fires right
-    -- at the engine's "combat startup is done" moment — characters have finished joining, weapons drawn,
-    -- helper's boosts have been finalized. OnCreateDeferred fires on the tick AFTER the event is created,
-    -- which puts us safely past the settling chaos. Scoped to the combat helper entity so we don't catch
-    -- random boost changes from spells/buffs elsewhere. 5s safety fallback in case the event never fires.
+    -- APoCS at round 1: wait for client camera-ready signal (or 5s safety) before firing pause.
+    -- APoCSScheduled stays true after firing; cleared only by onCombatEnded so combat-GUID flicker doesn't re-fire.
     if State.Settings.AutoPauseOnCombatStart and round == 1 and not State.Session.APoCSScheduled then
         State.Session.APoCSScheduled = true
         State.Session.APoCSStartMs = Ext.Utils.MonotonicTime()
         debugPrint("[+0ms] APoCS scheduled at round 1, waiting for client camera-ready signal")
-        -- 5s safety fallback in case the client camera signal never arrives.
         State.Session.APoCSDebounceTimer = Ext.Timer.WaitFor(5000, fireAPoCSNow)
-        -- 1s cap on the addBrawler pre-pause: in normal fights APoCS fires within ~500ms (camera signal) so
-        -- pre-paused NPCs barely sit idle. In pathological NPC-on-NPC late-joins we hit the 5s safety, and
-        -- pre-paused NPCs would stand frozen for the full 5s — looks silly in dungeons full of warring NPC
-        -- factions. Unfreeze and start pulses for any pre-paused NPCs after 1s if APoCS still hasn't fired.
+        -- 1s cap on pre-paused NPCs: avoids them standing frozen during the 5s safety in pathological NPC-on-NPC late-joins.
         Ext.Timer.WaitFor(1000, function()
             if Pause.isPartyInFTB() or State.Session.IsInDialog then return end
             for uuid, brawler in pairs(M.Roster.getBrawlers()) do
@@ -428,7 +410,7 @@ local function onCombatEnded(combatGuid)
     end)
     -- APoCS flag reset: schedule a 10s timer. If a new CombatStarted fires before it expires (combat-GUID
     -- flicker mid-fight), onCombatStarted cancels the timer. We deliberately do NOT gate the reset on
-    -- State.isInCombat() at expiry — that gate breaks the late-join NPC-on-NPC scenario where the engine
+    -- State.isInCombat() at expiry - that gate breaks the late-join NPC-on-NPC scenario where the engine
     -- churns combat GUIDs (see-saw) and host's IsInCombat stays true through the transition. cancel-on-
     -- CombatStarted alone is sufficient protection against mid-fight flicker (the new GUID's CombatStarted
     -- fires sub-second after the old one's CombatEnded, well within the 10s window).
@@ -631,7 +613,7 @@ end
 
 local function onReactionInterruptUsed(uuid, isAutoTriggered)
     -- onReactionInterruptActionNeeded pauses unconditionally for any party-member reaction prompt
-    -- (including auto-triggered ones — it has no isAutoTriggered signal at that point), so we MUST
+    -- (including auto-triggered ones - it has no isAutoTriggered signal at that point), so we MUST
     -- resume unconditionally here. Skipping resume for auto-triggered reactions left the round
     -- timer permanently paused, which prevented nextCombatRound from firing and caused unwanted
     -- control switches at the next round-start (engine picks wrong group when ReqEndTurn flags
@@ -657,15 +639,7 @@ local function onEnteredForceTurnBased(uuid)
     debugPrint(string.format("onEnteredForceTurnBased: entity=%s pendingSet=%s",
         M.Utils.getDisplayName(uuid) or tostring(uuid),
         tostring(State.Session.PendingSelectCharOnFTB and next(State.Session.PendingSelectCharOnFTB) ~= nil)))
-    -- Fix mid-round-cycle TurnBased state on party members entering FTB. If pause hits mid-round (some
-    -- party members already finished their turn-segment, others mid-flight), the engine carries that
-    -- partial state into FTB: HadTurnInCombat=true on chars who acted, IsActiveCombatTurn=true on
-    -- chars still mid-turn. Engine then can't cleanly transition party-turn → env-turn and stalls in
-    -- the rare "stuck environmental turn" pathology. Forcing all party to {IsActive=true, HadTurn=false,
-    -- ReqEndTurn=false} at FTB-entry time gives the engine a clean party-active state to layer FTB on,
-    -- and matches the visual intent (all 4 portraits "larged" during pause).
-    -- Run AFTER the engine's FTB transition (via this listener) rather than synchronously inside
-    -- allEnterFTB — engine-side mutations during Osi.ForceTurnBasedMode would overwrite our pre-writes.
+    -- Fix partial mid-round TurnBased state per party member; without this the engine can stall on env-turn transition.
     if M.Osi.IsPartyMember(uuid, 1) == 1 then
         local entity = Ext.Entity.Get(uuid)
         if entity and entity.TurnBased then
