@@ -150,6 +150,19 @@ local function allEnterFTB()
         end
         debugPrint(string.format("PendingSelectCharOnFTB SET in allEnterFTB: %s", table.concat(entries, ", ")))
     end
+    -- Track per-user character selection through the pause. allExitFTB uses this with a recency
+    -- heuristic to filter "engine cycled CC at unpause time" events (which fire as part of FTB-exit
+    -- processing, not user clicks). Without this, allExitFTB inherits the corrupted CC state and
+    -- redirects post-unpause to the wrong char.
+    State.Session.FTBSelectionTrack = {}
+    local trackInitAt = Ext.Utils.MonotonicTime()
+    for uid, u in pairs(selectedBeforePause) do
+        State.Session.FTBSelectionTrack[uid] = {
+            current = u,
+            currentAt = trackInitAt,
+            previous = nil,
+        }
+    end
 end
 
 local function allExitFTB()
@@ -172,12 +185,36 @@ local function allExitFTB()
     end
     -- Capture per-user selection BEFORE exiting FTB (leaving FTB reassigns control).
     -- {[userId] = uuid} — restored individually per user in RT.onGainedControl.
+    -- Prefer the during-FTB tracking with a recency heuristic: if the most recent GainedControl
+    -- happened within LATE_SELECTION_WINDOW_MS of allExitFTB, treat it as an unpause-induced engine
+    -- cycle rather than a user click and use the previous tracked selection. Without this, an engine
+    -- ClientControl reassignment fired between the user's unpause keypress and our capture would be
+    -- inherited as the "selection" and surface as an unwanted post-unpause character switch.
     local selectedDuringPause = {}
-    for uuid, player in pairs(State.Session.Players) do
-        if player.isControllingDirectly and player.userId then
-            selectedDuringPause[player.userId] = uuid
+    local LATE_SELECTION_WINDOW_MS = 200
+    local nowMs = Ext.Utils.MonotonicTime()
+    if State.Session.FTBSelectionTrack and next(State.Session.FTBSelectionTrack) then
+        for userId, track in pairs(State.Session.FTBSelectionTrack) do
+            local age = nowMs - (track.currentAt or 0)
+            if age < LATE_SELECTION_WINDOW_MS and track.previous then
+                selectedDuringPause[userId] = track.previous
+                debugPrint(string.format(
+                    "[allExitFTB] late selection (%dms ago) for userId=%s — using previous (%s) instead of current (%s)",
+                    age, tostring(userId),
+                    M.Utils.getDisplayName(track.previous) or track.previous,
+                    M.Utils.getDisplayName(track.current) or track.current))
+            elseif track.current then
+                selectedDuringPause[userId] = track.current
+            end
+        end
+    else
+        for uuid, player in pairs(State.Session.Players) do
+            if player.isControllingDirectly and player.userId then
+                selectedDuringPause[player.userId] = uuid
+            end
         end
     end
+    State.Session.FTBSelectionTrack = nil
     -- Track which characters have queued movements before we start unpausing
     local hasQueuedMovement = {}
     for uuid, _ in pairs(State.Session.MovementQueue) do

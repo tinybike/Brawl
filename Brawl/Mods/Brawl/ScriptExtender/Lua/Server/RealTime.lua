@@ -488,6 +488,17 @@ local function onGainedControl(uuid)
             if uuid ~= pendingUuid then
                 debugPrint("Wrong char gained control, sending SelectCharacter for", M.Utils.getDisplayName(pendingUuid))
                 sendSelectCharacter(pendingUuid, "RT.onGainedControl-pendingFTB-mismatch")
+                -- Forcibly remove the stray ClientControl. Engine sometimes leaves the duplicate
+                -- entity alive (multi-holder state) and fires a delayed GainedControl on it ~2-3s
+                -- later — slipping past the redirect (which clears below). Without this, the second
+                -- engine cycle wins and we get an unwanted Tressie→Astarion-style switch mid-RT.
+                local strayEntity = Ext.Entity.Get(uuid)
+                if strayEntity and strayEntity.ClientControl then
+                    local ok, result = pcall(function() return strayEntity:RemoveComponentImmediate("ClientControl") end)
+                    debugPrint(string.format("[stray ClientControl destroy] %s: %s",
+                        M.Utils.getDisplayName(uuid) or uuid,
+                        ok and ("returned=" .. tostring(result)) or ("err=" .. tostring(result))))
+                end
             else
                 debugPrint("Correct char gained control", M.Utils.getDisplayName(uuid))
             end

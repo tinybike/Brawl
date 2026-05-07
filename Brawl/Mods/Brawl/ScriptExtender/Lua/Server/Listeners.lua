@@ -268,6 +268,18 @@ local function onGainedControl(targetGuid)
                 end
                 State.Session.LastGainedControlAt = State.Session.LastGainedControlAt or {}
                 State.Session.LastGainedControlAt[targetUserId] = Ext.Utils.MonotonicTime()
+                -- Track per-user selection during FTB pause so allExitFTB can apply the recency
+                -- heuristic (filter unpause-cycle GainedControls from real user clicks).
+                if State.Session.FTBSelectionTrack and M.Pause.isPartyInFTB() then
+                    local prior = State.Session.FTBSelectionTrack[targetUserId]
+                    if not prior or prior.current ~= targetUuid then
+                        State.Session.FTBSelectionTrack[targetUserId] = {
+                            current = targetUuid,
+                            currentAt = Ext.Utils.MonotonicTime(),
+                            previous = prior and prior.current or nil,
+                        }
+                    end
+                end
             end
             if not State.Settings.TurnBasedSwarmMode then
                 RT.Listeners.onGainedControl(targetUuid)
