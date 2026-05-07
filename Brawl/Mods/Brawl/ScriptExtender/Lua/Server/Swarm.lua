@@ -156,9 +156,6 @@ local function unsetTurnComplete(uuid)
 end
 
 local function getEnemyList(isBeforePlayer)
-    if isBeforePlayer and State.Settings.PlayersGoFirst then
-        return {}
-    end
     local enemyList = {}
     local excludedEnemyList = {}
     local combatEntity = Utils.getCombatEntity()
@@ -727,9 +724,6 @@ local function checkAllPlayersFinishedTurns()
 end
 
 local function onStarted()
-    if State.Settings.PlayersGoFirst then
-        State.boostPlayerInitiatives()
-    end
     State.recapMovementDistances()
 end
 
@@ -905,9 +899,6 @@ end
 
 local function onCharacterJoinedParty(uuid)
     if uuid then
-        if State.Settings.PlayersGoFirst then
-            State.boostPlayerInitiative(uuid)
-        end
         State.recapMovementDistances()
         State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = Utils.isPlayerTurnEnded(uuid)
     end

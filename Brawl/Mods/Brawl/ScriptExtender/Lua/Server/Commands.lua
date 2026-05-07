@@ -98,9 +98,6 @@ local function disableMod(noNotify)
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
     Movement.removeAllDashSpeedBoosts()
-    if State.Settings.TurnBasedSwarmMode then
-        State.removeBoostPlayerInitiatives()
-    end
     if Printer then Printer:Stop() end
     if not noNotify then
         modStatusMessage("Brawl Disabled")
@@ -841,14 +838,10 @@ local function onMCMTurnBasedSwarmMode(value)
         RT.Timers.stopAllPulseActionTimers()
         Movement.removeAllDashSpeedBoosts()
         State.endBrawls()
-        if State.Settings.PlayersGoFirst then
-            State.boostPlayerInitiatives()
-        end
         State.recapMovementDistances()
         Swarm.resetChunkState()
         modStatusMessage("Swarm Mode")
     else
-        State.removeBoostPlayerInitiatives()
         State.uncapMovementDistances()
         State.disableDynamicCombatCamera()
         disableMod(true)
@@ -863,15 +856,6 @@ local function onModeToggle(data)
         MCM.Set("turn_based_swarm_mode", toggle)
     end
     onMCMTurnBasedSwarmMode(toggle)
-end
-
-local function onMCMPlayersGoFirst(value)
-    State.Settings.PlayersGoFirst = value
-    if State.Settings.PlayersGoFirst then
-        State.boostPlayerInitiatives()
-    else
-        State.removeBoostPlayerInitiatives()
-    end
 end
 
 local function onMCMExcludeEnemyTiers(excludeEnemyTier)
@@ -1023,7 +1007,6 @@ return {
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
         leaderboard_enabled = function (v) State.Settings.LeaderboardEnabled = v end,
         no_freeze_on_bonus_actions_during_pause = function (v) State.Settings.NoFreezeOnBonusActionsDuringPause = v end,
-        players_go_first = onMCMPlayersGoFirst,
         swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
         swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
         autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,
