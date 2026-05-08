@@ -164,6 +164,10 @@ local LoadoutsContentHandle = nil  -- Child container inside the tab; destroyed 
 local LatestLoadoutsData = nil  -- Cached server payload for the Loadouts tab; rendered when tab/window opens or refreshed
 local LoadoutsExpandedByUuid = {}  -- Persisted expanded/collapsed state of each character's section, survives destroy/rebuild
 local LoadoutsLastActiveUuid = nil  -- Tracks active char so we can force-open the section on a switch
+local AutoSpawnEncounterCheckbox = nil  -- IMGUI handle for the auto-spawn-on-combat-start checkbox (refreshed when server replies)
+local AutoSpawnEncounterState = false  -- Cached server-side state; primes the checkbox on UI rebuild before the server replies
+local HostileToAllEncounterCheckbox = nil  -- IMGUI handle for the hostile-to-all checkbox
+local HostileToAllEncounterState = false  -- Cached server-side state for hostile-to-all default
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -971,14 +975,28 @@ local function showLeaderboard(data)
     postRequestLoadouts()
 
     local encountersTab = tabs:AddTabItem("Encounters")
-    encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    local cbAutoSpawn = encountersTab:AddCheckbox("Spawn an encounter at the beginning of every fight")
+    cbAutoSpawn.Checked = AutoSpawnEncounterState
+    cbAutoSpawn.OnChange = function()
+        AutoSpawnEncounterState = cbAutoSpawn.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnOnCombatStart", tostring(cbAutoSpawn.Checked))
+    end
+    AutoSpawnEncounterCheckbox = cbAutoSpawn
     local cbHostileToAll = encountersTab:AddCheckbox("Hostile to all nearby NPCs (not just party)")
-    cbHostileToAll.Checked = false
+    cbHostileToAll.Checked = HostileToAllEncounterState
+    cbHostileToAll.OnChange = function()
+        HostileToAllEncounterState = cbHostileToAll.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetHostileToAll", tostring(cbHostileToAll.Checked))
+    end
+    HostileToAllEncounterCheckbox = cbHostileToAll
     local btnSpawn = encountersTab:AddButton("Fight!")
     btnSpawn.OnClick = function()
         local payload = Ext.Json.Stringify({difficultyOffset = 0, hostileToAll = cbHostileToAll.Checked})
         Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", payload)
     end
+    encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnState", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestHostileToAllState", "")
 end
 
 local function updateLeaderboard(data)
@@ -1069,6 +1087,16 @@ local function onNetMessage(data)
     elseif data.Channel == "Loadouts" then
         LatestLoadoutsData = Ext.Json.Parse(data.Payload)
         refreshLoadoutsTab()
+    elseif data.Channel == "Encounters.AutoSpawnState" then
+        AutoSpawnEncounterState = (data.Payload == "true")
+        if AutoSpawnEncounterCheckbox then
+            pcall(function() AutoSpawnEncounterCheckbox.Checked = AutoSpawnEncounterState end)
+        end
+    elseif data.Channel == "Encounters.HostileToAllState" then
+        HostileToAllEncounterState = (data.Payload == "true")
+        if HostileToAllEncounterCheckbox then
+            pcall(function() HostileToAllEncounterCheckbox.Checked = HostileToAllEncounterState end)
+        end
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
     -- elseif data.Channel == "NextCombatRound" then

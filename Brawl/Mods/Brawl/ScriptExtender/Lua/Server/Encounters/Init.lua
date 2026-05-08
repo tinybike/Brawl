@@ -2,10 +2,45 @@ Encounters = Encounters or {}
 
 local debugPrint = Utils.debugPrint
 
+local function getAutoSpawnOnCombatStart()
+    return Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterOnCombatStart == true
+end
+
+local function setAutoSpawnOnCombatStart(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterOnCombatStart = (enabled == true)
+end
+
+local function getHostileToAllEncounter()
+    return Ext.Vars.GetModVariables(ModuleUUID).HostileToAllEncounter == true
+end
+
+local function setHostileToAllEncounter(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).HostileToAllEncounter = (enabled == true)
+end
+
+Encounters.getAutoSpawnOnCombatStart = getAutoSpawnOnCombatStart
+Encounters.setAutoSpawnOnCombatStart = setAutoSpawnOnCombatStart
+Encounters.getHostileToAllEncounter = getHostileToAllEncounter
+Encounters.setHostileToAllEncounter = setHostileToAllEncounter
+
 -- Vanilla "Evil_NPC" faction. Applied AFTER the engine has merged the spawn-time splinter combats into the host's combat
 -- (see applyFactionWhenMerged). Applying it earlier triggers proximity-aggro that splinters combat groups, which causes a
 -- start/stop loop under AutoPauseOnCombatStart. Persistent faction is what keeps spawned enemies hostile across camp/rest.
+-- Exception: hostileToAll spawns set faction immediately (see applyFactionImmediately call site) -- the merge wait
+-- never resolves for hostile-to-all (no CombatEnded fires within 30s) and the late timeout-driven SetFaction breaks
+-- the SetRelationTemporaryHostile we set on bystanders, dropping them out of combat after round 1.
 local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
+
+local function applyFactionImmediately(guids)
+    local applied = 0
+    for _, g in ipairs(guids) do
+        if Osi.IsDead(g) ~= 1 then
+            Osi.SetFaction(g, ENEMY_FACTION)
+            applied = applied + 1
+        end
+    end
+    debugPrint(string.format("[Encounters] hostileToAll: SetFaction applied immediately to %d/%d", applied, #guids))
+end
 
 local function applyFactionWhenMerged(guids, host)
     if not guids or #guids == 0 or not host then return end
@@ -110,28 +145,42 @@ function Encounters.spawnWave(templateUuid, count, radius)
     return guids
 end
 
-local function makeHostileToAll(spawnedGuids, hostUuid, radius)
-    radius = radius or 50
+-- Engine's engagement range is flat 7m. Used as the per-spawned-enemy search radius for hostile-to-all bystander pull-in.
+local ENGAGEMENT_RANGE_M = 7
+
+local function makeHostileToAll(spawnedGuids)
     local spawnedSet = {}
     for _, guid in ipairs(spawnedGuids) do spawnedSet[guid] = true end
 
-    local nearby = Utils.getNearby(hostUuid, radius)
-    local engaged = 0
-    for _, nearbyUuid in ipairs(nearby) do
-        if not spawnedSet[nearbyUuid]
-                and Osi.IsPartyMember(nearbyUuid, 1) ~= 1
-                and not Utils.isCombatHelper(nearbyUuid)
-                and Osi.IsDead(nearbyUuid) ~= 1 then
-            for _, spawnedGuid in ipairs(spawnedGuids) do
-                Osi.SetRelationTemporaryHostile(spawnedGuid, nearbyUuid)
-                Osi.SetRelationTemporaryHostile(nearbyUuid, spawnedGuid)
-                Osi.EnterCombat(spawnedGuid, nearbyUuid)
-                Osi.EnterCombat(nearbyUuid, spawnedGuid)
-                engaged = engaged + 1
+    -- Collect bystanders within engagement range of any spawned enemy. Per-enemy proximity (not host-centered)
+    -- so we don't drag in NPCs that are nowhere near the actual fight.
+    local bystanderSet = {}
+    for _, spawnedGuid in ipairs(spawnedGuids) do
+        for _, candidateUuid in ipairs(Utils.getNearby(spawnedGuid, ENGAGEMENT_RANGE_M)) do
+            if not spawnedSet[candidateUuid]
+                    and not bystanderSet[candidateUuid]
+                    and Osi.IsPartyMember(candidateUuid, 1) ~= 1
+                    and not Utils.isCombatHelper(candidateUuid)
+                    and Osi.IsDead(candidateUuid) ~= 1 then
+                bystanderSet[candidateUuid] = true
             end
         end
     end
-    debugPrint(string.format("[Encounters] hostileToAll: engaged %d pairs (%dm radius)", engaged, radius))
+
+    local bystanderCount = 0
+    for _ in pairs(bystanderSet) do bystanderCount = bystanderCount + 1 end
+
+    local engaged = 0
+    for bystanderUuid in pairs(bystanderSet) do
+        for _, spawnedGuid in ipairs(spawnedGuids) do
+            Osi.SetRelationTemporaryHostile(spawnedGuid, bystanderUuid)
+            Osi.SetRelationTemporaryHostile(bystanderUuid, spawnedGuid)
+            Osi.EnterCombat(spawnedGuid, bystanderUuid)
+            Osi.EnterCombat(bystanderUuid, spawnedGuid)
+            engaged = engaged + 1
+        end
+    end
+    debugPrint(string.format("[Encounters] hostileToAll: %d bystanders, %d pairs engaged", bystanderCount, engaged))
 end
 
 function Encounters.spawnAtPlayer(opts)
@@ -143,20 +192,25 @@ function Encounters.spawnAtPlayer(opts)
     local budget = opts.budget or Compositions.tierBudgetForPlayerLevel(effLevel)
     local hostileToAll = opts.hostileToAll == true
 
+    -- Suppress the next CombatStarted-triggered auto-spawn, so user-initiated spawns don't recursively trigger another auto-spawn.
+    Encounters.SuppressNextAutoSpawn = true
+
     local picks = Compositions.pickEncounterByTier(budget)
     if #picks == 0 then
         debugPrint("[Encounters] spawnAtPlayer: pickEncounterByTier returned no picks")
         return
     end
 
-    local anchorCount = opts.anchorCount or math.max(3, math.min(#picks, 6))
-    local radius = opts.radius or 14
-    local jitterM = opts.jitterM or 2
+    -- One anchor per pick so no two enemies share a spawn position. Each anchor's distance is randomized in [minRadius, maxRadius].
+    local anchorCount = opts.anchorCount or math.max(3, #picks)
+    local maxRadius = opts.maxRadius or opts.radius or 11
+    local minRadius = opts.minRadius or 5
+    local jitterM = opts.jitterM or 0
 
     debugPrint(string.format("[Encounters] spawnAtPlayer: playerLevel=%d (eff=%d) budget=%d → %d picks hostileToAll=%s",
         playerLevel, effLevel, budget, #picks, tostring(hostileToAll)))
 
-    local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
+    local anchors = SpawnPoints.ringAround(host, anchorCount, maxRadius, minRadius)
     if #anchors == 0 then
         debugPrint("[Encounters] spawnAtPlayer: no valid anchors generated")
         return
@@ -179,10 +233,12 @@ function Encounters.spawnAtPlayer(opts)
 
     debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, #picks))
     Spawn.ensureInCombat(guids, host)
-    applyFactionWhenMerged(guids, host)
 
     if hostileToAll and #guids > 0 then
-        Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids, host) end)
+        applyFactionImmediately(guids)
+        Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids) end)
+    else
+        applyFactionWhenMerged(guids, host)
     end
 
     return guids
@@ -200,4 +256,34 @@ Ext.RegisterNetListener("Encounters.SpawnAtPlayer", function(channel, payload, u
         end
     end
     Encounters.spawnAtPlayer(opts)
+end)
+
+Ext.RegisterNetListener("Encounters.SetAutoSpawnOnCombatStart", function(channel, payload, userId)
+    setAutoSpawnOnCombatStart(payload == "true")
+    debugPrint(string.format("[Encounters] AutoSpawnOnCombatStart = %s", tostring(getAutoSpawnOnCombatStart())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnState", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnState", tostring(getAutoSpawnOnCombatStart()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetHostileToAll", function(channel, payload, userId)
+    setHostileToAllEncounter(payload == "true")
+    debugPrint(string.format("[Encounters] HostileToAllEncounter = %s", tostring(getHostileToAllEncounter())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestHostileToAllState", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.HostileToAllState", tostring(getHostileToAllEncounter()))
+end)
+
+-- Auto-spawn an encounter at the start of any natural fight (one that wasn't initiated via the Encounters menu).
+-- Encounters.spawnAtPlayer sets SuppressNextAutoSpawn before its own EnterCombat fires, so user-initiated spawns
+-- consume the flag here and skip the recursive auto-spawn. Auto-spawn honors the persisted hostile-to-all toggle.
+Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function(combatGuid)
+    if Encounters.SuppressNextAutoSpawn then
+        Encounters.SuppressNextAutoSpawn = false
+        return
+    end
+    if not getAutoSpawnOnCombatStart() then return end
+    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter()})
 end)

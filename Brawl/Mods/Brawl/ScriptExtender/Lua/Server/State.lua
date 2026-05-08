@@ -132,6 +132,8 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "CharacterLoadouts", {Server = true, Cl
 Ext.Vars.RegisterModVariable(ModuleUUID, "SummonReactionMode", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SharedCampChestAccess", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "NaturalInitiative", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "AutoSpawnEncounterOnCombatStart", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "HostileToAllEncounter", {Server = true, Client = false, SyncToClient = false})
 
 local function getArchetype(uuid)
     local archetype
