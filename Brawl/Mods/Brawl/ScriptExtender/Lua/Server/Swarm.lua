@@ -230,11 +230,15 @@ end
 
 local function unsetAllEnemyTurnsComplete()
     debugPrint("unsetAllEnemyTurnsComplete")
+    local count = 0
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
+            debugPrint("[ROUND_DEBUG] unsetTurnComplete iter:", M.Utils.getDisplayName(uuid), uuid)
             unsetTurnComplete(uuid)
+            count = count + 1
         end
     end
+    debugPrint("[ROUND_DEBUG] unsetAllEnemyTurnsComplete iterated", count, "non-player brawlers")
     resetChunkState()
 end
 
@@ -856,7 +860,9 @@ local function onCombatRoundStarted(round)
             end
         end
     end
+    TurnOrder.dumpTurnOrderState(string.format("Swarm.onCombatRoundStarted round=%d BEFORE unsetAllEnemyTurnsComplete", round or -1))
     unsetAllEnemyTurnsComplete()
+    TurnOrder.dumpTurnOrderState(string.format("Swarm.onCombatRoundStarted round=%d AFTER unsetAllEnemyTurnsComplete", round or -1))
     TurnOrder.setPartyInitiativeRollToMean()
     if State.Session.SwarmCurrentRoundMode then
         TurnOrder.equalizePartyInitiative()
@@ -887,6 +893,11 @@ local function onCombatRoundStarted(round)
         startSwarmTurn(enemyList, excludedEnemyList, true)
     else
         State.Session.PerPlayerSlots = buildSwarmSlots()
+        debugPrint("[ROUND_DEBUG] buildSwarmSlots produced", #State.Session.PerPlayerSlots, "slots")
+        for i, slot in ipairs(State.Session.PerPlayerSlots) do
+            debugPrint("[ROUND_DEBUG]   slot", i, slot.kind, "#"..#slot.uuids,
+                slot.uuids[1] and M.Utils.getDisplayName(slot.uuids[1]) or "<empty>")
+        end
         State.Session.PerPlayerCursor = 0
         advancePerPlayerSlotCursor()
     end
