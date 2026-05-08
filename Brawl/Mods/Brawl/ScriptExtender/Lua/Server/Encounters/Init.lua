@@ -23,12 +23,8 @@ Encounters.setAutoSpawnOnCombatStart = setAutoSpawnOnCombatStart
 Encounters.getHostileToAllEncounter = getHostileToAllEncounter
 Encounters.setHostileToAllEncounter = setHostileToAllEncounter
 
--- Vanilla "Evil_NPC" faction. Applied AFTER the engine has merged the spawn-time splinter combats into the host's combat
--- (see applyFactionWhenMerged). Applying it earlier triggers proximity-aggro that splinters combat groups, which causes a
--- start/stop loop under AutoPauseOnCombatStart. Persistent faction is what keeps spawned enemies hostile across camp/rest.
--- Exception: hostileToAll spawns set faction immediately (see applyFactionImmediately call site) -- the merge wait
--- never resolves for hostile-to-all (no CombatEnded fires within 30s) and the late timeout-driven SetFaction breaks
--- the SetRelationTemporaryHostile we set on bystanders, dropping them out of combat after round 1.
+-- Vanilla "Evil_NPC" faction. Normally applied via applyFactionWhenMerged (deferred to avoid splinter/autopause loop);
+-- hostileToAll spawns apply it immediately because the merge wait never resolves and the late SetFaction breaks bystander hostility.
 local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
 
 local function applyFactionImmediately(guids)
@@ -145,15 +141,12 @@ function Encounters.spawnWave(templateUuid, count, radius)
     return guids
 end
 
--- Engine's engagement range is flat 7m. Used as the per-spawned-enemy search radius for hostile-to-all bystander pull-in.
-local ENGAGEMENT_RANGE_M = 7
+local ENGAGEMENT_RANGE_M = 7  -- engine's flat engagement range; per-enemy search radius for hostile-to-all pull-in
 
 local function makeHostileToAll(spawnedGuids)
     local spawnedSet = {}
     for _, guid in ipairs(spawnedGuids) do spawnedSet[guid] = true end
 
-    -- Collect bystanders within engagement range of any spawned enemy. Per-enemy proximity (not host-centered)
-    -- so we don't drag in NPCs that are nowhere near the actual fight.
     local bystanderSet = {}
     for _, spawnedGuid in ipairs(spawnedGuids) do
         for _, candidateUuid in ipairs(Utils.getNearby(spawnedGuid, ENGAGEMENT_RANGE_M)) do
@@ -192,7 +185,7 @@ function Encounters.spawnAtPlayer(opts)
     local budget = opts.budget or Compositions.tierBudgetForPlayerLevel(effLevel)
     local hostileToAll = opts.hostileToAll == true
 
-    -- Suppress the next CombatStarted-triggered auto-spawn, so user-initiated spawns don't recursively trigger another auto-spawn.
+    -- One-shot suppress so user-initiated spawns don't trigger the auto-spawn-on-CombatStart hook recursively.
     Encounters.SuppressNextAutoSpawn = true
 
     local picks = Compositions.pickEncounterByTier(budget)
@@ -201,8 +194,7 @@ function Encounters.spawnAtPlayer(opts)
         return
     end
 
-    -- One anchor per pick so no two enemies share a spawn position. Each anchor's distance is randomized in [minRadius, maxRadius].
-    local anchorCount = opts.anchorCount or math.max(3, #picks)
+    local anchorCount = opts.anchorCount or math.max(3, #picks)  -- one anchor per pick, no shared spawn positions
     local maxRadius = opts.maxRadius or opts.radius or 11
     local minRadius = opts.minRadius or 5
     local jitterM = opts.jitterM or 0
@@ -276,9 +268,7 @@ Ext.RegisterNetListener("Encounters.RequestHostileToAllState", function(channel,
     Ext.ServerNet.PostMessageToUser(userId, "Encounters.HostileToAllState", tostring(getHostileToAllEncounter()))
 end)
 
--- Auto-spawn an encounter at the start of any natural fight (one that wasn't initiated via the Encounters menu).
--- Encounters.spawnAtPlayer sets SuppressNextAutoSpawn before its own EnterCombat fires, so user-initiated spawns
--- consume the flag here and skip the recursive auto-spawn. Auto-spawn honors the persisted hostile-to-all toggle.
+-- Auto-spawn on natural fights (skipped for menu-initiated ones via SuppressNextAutoSpawn).
 Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function(combatGuid)
     if Encounters.SuppressNextAutoSpawn then
         Encounters.SuppressNextAutoSpawn = false

@@ -100,11 +100,7 @@ local function cacheNaturalInitiativeIfMissing(uuid)
 end
 
 local function restoreNaturalInitiative()
-    local cache = getNaturalInitiativeCache()
-    local count = 0
-    for _ in pairs(cache) do count = count + 1 end
-    debugPrint("[restoreNaturalInitiative] called, cache size =", count)
-    for uuid, roll in pairs(cache) do
+    for uuid, roll in pairs(getNaturalInitiativeCache()) do
         if isValidInitRoll(roll) and Utils.isAliveAndCanFight(uuid) then
             setInitiativeRoll(uuid, roll)
         end

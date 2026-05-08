@@ -15,7 +15,7 @@ local function initialize()
     end
 end
 
--- Always send so the Brawl Menu opens regardless of the LeaderboardEnabled setting
+-- Always send: opens the Brawl Menu (Loadouts/Encounters tabs) regardless of LeaderboardEnabled. Payload includes enabled state for the tab UI.
 local function showForUser(userId)
     Ext.ServerNet.PostMessageToUser(userId, "Leaderboard", Ext.Json.Stringify({
         enabled = State.Settings.LeaderboardEnabled == true,

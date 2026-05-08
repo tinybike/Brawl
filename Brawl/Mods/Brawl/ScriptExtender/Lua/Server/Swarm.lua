@@ -230,15 +230,11 @@ end
 
 local function unsetAllEnemyTurnsComplete()
     debugPrint("unsetAllEnemyTurnsComplete")
-    local count = 0
     for uuid, _ in pairs(M.Roster.getBrawlers()) do
         if M.Osi.IsPartyMember(uuid, 1) == 0 then
-            debugPrint("[ROUND_DEBUG] unsetTurnComplete iter:", M.Utils.getDisplayName(uuid), uuid)
             unsetTurnComplete(uuid)
-            count = count + 1
         end
     end
-    debugPrint("[ROUND_DEBUG] unsetAllEnemyTurnsComplete iterated", count, "non-player brawlers")
     resetChunkState()
 end
 
@@ -259,10 +255,11 @@ local function unsetEnemyTurnsComplete(uuids)
 end
 
 
+-- Skip dead entries: a corpse never fires TurnEnded, so its SwarmTurnComplete=false would stall the swarm.
 local function checkSwarmTurnComplete(swarmActors)
     if swarmActors then
         for _, uuid in ipairs(swarmActors) do
-            if not State.Session.SwarmTurnComplete[uuid] then
+            if not State.Session.SwarmTurnComplete[uuid] and Osi.IsDead(uuid) == 0 then
                 debugPrint(M.Utils.getDisplayName(uuid), "swarm turn not complete", uuid)
                 return false
             end
@@ -304,7 +301,7 @@ local function resetSwarmTurnComplete(swarmActors)
     if State.Session.SwarmCurrentRoundMode == false and advancePerPlayerSlotCursor then
         advancePerPlayerSlotCursor()
     elseif State.Session.SwarmCurrentRoundMode == true and State.Session.SwarmTurnIsBeforePlayer == false then
-        -- End of true-mode round. If next round will be false, restore now so engine sees naturals at next round-start.
+        -- True->false transition: restore naturals at end-of-round so engine sees them for next round's Groups.
         if not State.Settings.PlayersGoTogether then
             TurnOrder.restoreNaturalInitiative()
         end
@@ -750,14 +747,28 @@ local function buildSwarmSlots()
     return slots
 end
 
--- enemyRun: fire swarm AI on the batch. playerTeam: no-op; engine handles team turn naturally.
+-- enemyRun: fire swarm AI on alive members. playerTeam: no-op (engine drives). Dead-filter prevents cursor stall on slots where members died mid-round.
 local function fireSwarmSlot(slot)
     if slot.kind == "enemyRun" then
         if not slot.uuids or #slot.uuids == 0 then
             return advancePerPlayerSlotCursor()
         end
-        unsetEnemyTurnsComplete(slot.uuids)
-        startSwarmTurn(slot.uuids, {}, false)
+        local alive, skipped = {}, {}
+        for _, uuid in ipairs(slot.uuids) do
+            if Osi.IsDead(uuid) == 0 and M.Roster.getBrawlerByUuid(uuid) then
+                table.insert(alive, uuid)
+            else
+                table.insert(skipped, M.Utils.getDisplayName(uuid) or uuid)
+            end
+        end
+        if #skipped > 0 then
+            debugPrint(string.format("fireSwarmSlot enemyRun: skipped %d dead/missing (%s)", #skipped, table.concat(skipped, ", ")))
+        end
+        if #alive == 0 then
+            return advancePerPlayerSlotCursor()
+        end
+        unsetEnemyTurnsComplete(alive)
+        startSwarmTurn(alive, {}, false)
     end
 end
 
@@ -767,7 +778,6 @@ advancePerPlayerSlotCursor = function ()
     local slot = State.Session.PerPlayerSlots[State.Session.PerPlayerCursor]
     if not slot then
         debugPrint("Swarm slots exhausted")
-        -- End of false-mode round. Restore so engine sees naturals at next round-start.
         TurnOrder.restoreNaturalInitiative()
         return
     end
@@ -860,9 +870,7 @@ local function onCombatRoundStarted(round)
             end
         end
     end
-    TurnOrder.dumpTurnOrderState(string.format("Swarm.onCombatRoundStarted round=%d BEFORE unsetAllEnemyTurnsComplete", round or -1))
     unsetAllEnemyTurnsComplete()
-    TurnOrder.dumpTurnOrderState(string.format("Swarm.onCombatRoundStarted round=%d AFTER unsetAllEnemyTurnsComplete", round or -1))
     TurnOrder.setPartyInitiativeRollToMean()
     if State.Session.SwarmCurrentRoundMode then
         TurnOrder.equalizePartyInitiative()
@@ -893,11 +901,6 @@ local function onCombatRoundStarted(round)
         startSwarmTurn(enemyList, excludedEnemyList, true)
     else
         State.Session.PerPlayerSlots = buildSwarmSlots()
-        debugPrint("[ROUND_DEBUG] buildSwarmSlots produced", #State.Session.PerPlayerSlots, "slots")
-        for i, slot in ipairs(State.Session.PerPlayerSlots) do
-            debugPrint("[ROUND_DEBUG]   slot", i, slot.kind, "#"..#slot.uuids,
-                slot.uuids[1] and M.Utils.getDisplayName(slot.uuids[1]) or "<empty>")
-        end
         State.Session.PerPlayerCursor = 0
         advancePerPlayerSlotCursor()
     end
@@ -1001,8 +1004,7 @@ local function onTurnEnded(uuid)
             State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
             if State.Session.SwarmCurrentRoundMode then
                 if checkAllPlayersFinishedTurns() then
-                    -- All players ended in true-mode. If next round will be false, write naturals now (earliest hook before round-end)
-                    -- so engine sees them when it evaluates Groups for the next round.
+                    -- True->false toggle: earliest hook to restore naturals before engine eval's next round's Groups.
                     if not State.Settings.PlayersGoTogether then
                         TurnOrder.restoreNaturalInitiative()
                     end

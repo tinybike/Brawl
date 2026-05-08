@@ -2,8 +2,7 @@ SpawnPoints = SpawnPoints or {}
 
 local debugPrint = Utils.debugPrint
 
--- If minRadius is provided, each anchor's radius is randomized in [minRadius, maxRadius] so the encounter
--- isn't all on one ring. Otherwise behaves as a fixed-radius ring with fallback shrink attempts.
+-- minRadius optional: with it, each anchor gets a random radius in [minRadius, maxRadius]; without, fixed ring with fallback shrinks.
 function SpawnPoints.ringAround(originUuid, n, maxRadius, minRadius)
     n = n or 5
     maxRadius = maxRadius or 14

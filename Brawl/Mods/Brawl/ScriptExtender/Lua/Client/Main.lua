@@ -164,10 +164,10 @@ local LoadoutsContentHandle = nil  -- Child container inside the tab; destroyed 
 local LatestLoadoutsData = nil  -- Cached server payload for the Loadouts tab; rendered when tab/window opens or refreshed
 local LoadoutsExpandedByUuid = {}  -- Persisted expanded/collapsed state of each character's section, survives destroy/rebuild
 local LoadoutsLastActiveUuid = nil  -- Tracks active char so we can force-open the section on a switch
-local AutoSpawnEncounterCheckbox = nil  -- IMGUI handle for the auto-spawn-on-combat-start checkbox (refreshed when server replies)
-local AutoSpawnEncounterState = false  -- Cached server-side state; primes the checkbox on UI rebuild before the server replies
-local HostileToAllEncounterCheckbox = nil  -- IMGUI handle for the hostile-to-all checkbox
-local HostileToAllEncounterState = false  -- Cached server-side state for hostile-to-all default
+local AutoSpawnEncounterCheckbox = nil  -- handle, refreshed when server replies
+local AutoSpawnEncounterState = false  -- cache, primes checkbox before server reply
+local HostileToAllEncounterCheckbox = nil
+local HostileToAllEncounterState = false
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -942,8 +942,7 @@ local function showLeaderboard(payload)
             party[#party + 1] = {uuid = uuid, stats = stats}
         end
     end
-    -- Sort party by sidebar/portrait order so the leaderboard mirrors the in-game party order.
-    -- Falls back to damageDone for any party members not in the portrait list (rare/edge cases).
+    -- Match in-game sidebar order; fall back to damageDone for party members missing from the portrait list.
     local portraitOrder = getPartyPortraitOrder()
     table.sort(party, function (a, b)
         local ai = portraitOrder[a.uuid]
