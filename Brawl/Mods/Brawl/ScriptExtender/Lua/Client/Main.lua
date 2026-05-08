@@ -173,6 +173,7 @@ local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
 local lightBlue = {0.6, 0.8, 1, 1}
 local lightRed = {1, 0.8, 0.8, 1}
+local mediumGrey = {0.5, 0.5, 0.5, 0.7}
 
 -- Keybinding stuff from https://github.com/AtilioA/BG3-MCM & modified/re-used with permission
 
@@ -884,7 +885,7 @@ local function refreshLoadoutsTab()
     end
 end
 
-local function showLeaderboard(data)
+local function showLeaderboard(payload)
     if LeaderboardWindow then
         LeaderboardWindow:Destroy()
         cellRefs.party = {}
@@ -892,6 +893,8 @@ local function showLeaderboard(data)
         LoadoutsTabHandle = nil
         LoadoutsContentHandle = nil
     end
+    local data = payload.board or {}
+    local leaderboardEnabled = payload.enabled == true
     local damageWidth, takenWidth, killsWidth, healingWidth, receivedWidth = #"Damage", #"Taken", #"Kills", #"Healing", #"Healed"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
@@ -921,30 +924,51 @@ local function showLeaderboard(data)
     cellRefs.partyTable = partyTable
     do
         local hdr = partyTable:AddRow()
-        hdr:AddCell():AddText("")
+        local btnToggle = hdr:AddCell():AddButton(leaderboardEnabled and "Disable" or "Enable")
+        btnToggle.OnClick = function()
+            Ext.ClientNet.PostMessageToServer("LeaderboardSetEnabled", tostring(not leaderboardEnabled))
+        end
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
     end
+    local nameColor = leaderboardEnabled and lightBlue or mediumGrey
+    local enemyNameColor = leaderboardEnabled and lightRed or mediumGrey
     local party = {}
     for uuid, stats in pairs(data) do
         if isPartyMember(uuid) then
             party[#party + 1] = {uuid = uuid, stats = stats}
         end
     end
+    -- Sort party by sidebar/portrait order so the leaderboard mirrors the in-game party order.
+    -- Falls back to damageDone for any party members not in the portrait list (rare/edge cases).
+    local portraitOrder = getPartyPortraitOrder()
     table.sort(party, function (a, b)
+        local ai = portraitOrder[a.uuid]
+        local bi = portraitOrder[b.uuid]
+        if ai and bi then return ai < bi end
+        if ai then return true end
+        if bi then return false end
         return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
     end)
+    local function applyDisabledColor(cell)
+        if not leaderboardEnabled then cell:SetColor("Text", mediumGrey) end
+    end
     for _, e in ipairs(party) do
         local row = partyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightBlue)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", nameColor)
         local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
         local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        applyDisabledColor(dmgCell)
+        applyDisabledColor(takenCell)
+        applyDisabledColor(killsCell)
+        applyDisabledColor(healCell)
+        applyDisabledColor(recvCell)
         cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
     leaderboardTab:AddSeparator()
@@ -961,12 +985,17 @@ local function showLeaderboard(data)
     end)
     for _, e in ipairs(enemy) do
         local row = enemyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightRed)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", enemyNameColor)
         local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
         local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        applyDisabledColor(dmgCell)
+        applyDisabledColor(takenCell)
+        applyDisabledColor(killsCell)
+        applyDisabledColor(healCell)
+        applyDisabledColor(recvCell)
         cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
     LoadoutsTabHandle = tabs:AddTabItem("Loadouts")

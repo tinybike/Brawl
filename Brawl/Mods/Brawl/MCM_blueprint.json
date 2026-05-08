@@ -43,7 +43,7 @@
                             "Name": "Enable Leaderboard",
                             "Type": "checkbox",
                             "Default": true,
-                            "Description": "If enabled, you can display a pop-up window containing some statistics for the current fight (in Swarm Mode) or for the session (Real-Time). Press LCtrl+V (default keybinding) to show the window.",
+                            "Description": "If enabled, the Leaderboard tab in the Brawl Menu will track and display combat statistics.",
                             "Handles": {"DescriptionHandle": "h596542ebg6439g4409gbda9gec8bd00a3cec", "NameHandle": "h03c50509g3720g4948g815ag0c331e6220cc"}
                         }, {
                             "Id": "full_auto",

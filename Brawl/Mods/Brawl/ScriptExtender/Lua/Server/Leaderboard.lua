@@ -15,10 +15,12 @@ local function initialize()
     end
 end
 
+-- Always send so the Brawl Menu opens regardless of the LeaderboardEnabled setting
 local function showForUser(userId)
-    if State.Settings.LeaderboardEnabled then
-        Ext.ServerNet.PostMessageToUser(userId, "Leaderboard", Ext.Json.Stringify(State.Session.Leaderboard))
-    end
+    Ext.ServerNet.PostMessageToUser(userId, "Leaderboard", Ext.Json.Stringify({
+        enabled = State.Settings.LeaderboardEnabled == true,
+        board = State.Session.Leaderboard,
+    }))
 end
 
 local function postDataToClients()

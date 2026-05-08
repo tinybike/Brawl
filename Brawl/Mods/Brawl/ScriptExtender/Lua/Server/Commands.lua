@@ -599,6 +599,13 @@ local function onLeaderboardToggle(data)
     Leaderboard.showForUser(data.UserID)
 end
 
+local function onLeaderboardSetEnabled(data)
+    local enabled = (data.Payload == "true")
+    State.Settings.LeaderboardEnabled = enabled
+    MCM.Set("leaderboard_enabled", enabled)
+    Leaderboard.showForUser(data.UserID)
+end
+
 -- Find the character a given user is currently controlling.
 local function getControlledForUser(userId)
     if not State.Session.Players then return nil end
@@ -963,6 +970,7 @@ return {
         QueueCompanionAIActions = onQueueCompanionAIActions,
         FullAutoToggle = onFullAutoToggle,
         LeaderboardToggle = onLeaderboardToggle,
+        LeaderboardSetEnabled = onLeaderboardSetEnabled,
         RequestLoadouts = onRequestLoadouts,
         SaveLoadout = onSaveLoadout,
         LoadLoadout = onLoadLoadout,
