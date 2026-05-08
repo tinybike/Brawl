@@ -169,6 +169,13 @@
                     "SectionName": "Swarm Mode Combat Features (Host)",
                     "Settings": [
                         {
+                            "Id": "players_go_together",
+                            "Name": "Players Go Together",
+                            "Type": "checkbox",
+                            "Default": true,
+                            "Description": "If checked, all party members share the party's average initiative roll and take their turns at the same time.",
+                            "Handles": {"DescriptionHandle": "hfb753aafg5c7cg4ca0g81dbga2e927d2b997", "NameHandle": "h20d0e0f9g329ag4df5g8f4cg0399d02c302e"}
+                        }, {
                             "Id": "swarm_turn_timeout",
                             "Name": "Enemy Turn Time Limit (Seconds)",
                             "Type": "slider_float",

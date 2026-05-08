@@ -5,6 +5,8 @@ local startChunk
 local singleCharacterTurn
 local useRemainingActions
 local useExtraAttacks
+local advancePerPlayerSlotCursor
+local isCurrentPlayerTeamSlotFinished
 
 local function isExcludedFromSwarmAI(uuid)
     return (M.Osi.GetActiveArchetype(uuid) == "dragon") or M.Utils.isExcludedEnemyTier(uuid)
@@ -295,6 +297,14 @@ local function resetSwarmTurnComplete(swarmActors)
     State.Session.ActionsInProgress = {}
     State.Session.SwarmTurnActive = false
     State.Session.SwarmActors = nil
+    if State.Session.SwarmCurrentRoundMode == false and advancePerPlayerSlotCursor then
+        advancePerPlayerSlotCursor()
+    elseif State.Session.SwarmCurrentRoundMode == true and State.Session.SwarmTurnIsBeforePlayer == false then
+        -- End of true-mode round. If next round will be false, restore now so engine sees naturals at next round-start.
+        if not State.Settings.PlayersGoTogether then
+            TurnOrder.restoreNaturalInitiative()
+        end
+    end
 end
 
 local function isChunkDone(chunkIndex)
@@ -687,6 +697,99 @@ local function startSwarmTurn(swarmActors, nonSwarmActors, isBeforePlayer)
     end
 end
 
+-- PlayersGoTogether=false: walk Groups and build a slot list with two kinds: "playerTeam" (player group, possibly multi-member)
+-- and "enemyRun" (one or more consecutive enemy groups merged into one swarm batch)
+local function buildSwarmSlots()
+    local slots = {}
+    local currentEnemyRun = nil
+    local combatEntity = Utils.getCombatEntity()
+    if not (combatEntity and combatEntity.TurnOrder and combatEntity.TurnOrder.Groups) then
+        return slots
+    end
+    for _, group in ipairs(combatEntity.TurnOrder.Groups) do
+        if group.IsPlayer then
+            if currentEnemyRun and #currentEnemyRun > 0 then
+                table.insert(slots, {kind = "enemyRun", uuids = currentEnemyRun})
+            end
+            currentEnemyRun = nil
+            local teamUuids = {}
+            if group.Members then
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity.Uuid then
+                        local uuid = member.Entity.Uuid.EntityUuid
+                        if M.Osi.IsPartyMember(uuid, 1) == 1 then
+                            table.insert(teamUuids, uuid)
+                        end
+                    end
+                end
+            end
+            if #teamUuids > 0 then
+                table.insert(slots, {kind = "playerTeam", uuids = teamUuids})
+            end
+        else
+            if not currentEnemyRun then currentEnemyRun = {} end
+            if group.Members then
+                for _, member in ipairs(group.Members) do
+                    if member.Entity and member.Entity.Uuid then
+                        local uuid = member.Entity.Uuid.EntityUuid
+                        if M.Osi.IsCharacter(uuid) == 1 then
+                            table.insert(currentEnemyRun, uuid)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if currentEnemyRun and #currentEnemyRun > 0 then
+        table.insert(slots, {kind = "enemyRun", uuids = currentEnemyRun})
+    end
+    return slots
+end
+
+-- enemyRun: fire swarm AI on the batch. playerTeam: no-op; engine handles team turn naturally.
+local function fireSwarmSlot(slot)
+    if slot.kind == "enemyRun" then
+        if not slot.uuids or #slot.uuids == 0 then
+            return advancePerPlayerSlotCursor()
+        end
+        unsetEnemyTurnsComplete(slot.uuids)
+        startSwarmTurn(slot.uuids, {}, false)
+    end
+end
+
+advancePerPlayerSlotCursor = function ()
+    if not State.Session.PerPlayerSlots then return end
+    State.Session.PerPlayerCursor = (State.Session.PerPlayerCursor or 0) + 1
+    local slot = State.Session.PerPlayerSlots[State.Session.PerPlayerCursor]
+    if not slot then
+        debugPrint("Swarm slots exhausted")
+        -- End of false-mode round. Restore so engine sees naturals at next round-start.
+        TurnOrder.restoreNaturalInitiative()
+        return
+    end
+    debugPrint("Swarm advance to slot", State.Session.PerPlayerCursor, slot.kind, "#"..#slot.uuids)
+    fireSwarmSlot(slot)
+    -- Engine may have fired this playerTeam's TurnStarted/TurnEnded earlier during a prior enemyRun's
+    -- swarm processing (engine doesn't wait for Brawl). If members already ended, advance immediately.
+    if slot.kind == "playerTeam" and isCurrentPlayerTeamSlotFinished() then
+        advancePerPlayerSlotCursor()
+    end
+end
+
+-- Returns true when every player in the currently-active playerTeam slot has ended their turn.
+isCurrentPlayerTeamSlotFinished = function ()
+    if not State.Session.PerPlayerSlots then return false end
+    local slot = State.Session.PerPlayerSlots[State.Session.PerPlayerCursor or 0]
+    if not slot or slot.kind ~= "playerTeam" then return false end
+    for _, uuid in ipairs(slot.uuids) do
+        if not State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]
+                and Utils.isAliveAndCanFight(uuid) then
+            return false
+        end
+    end
+    return true
+end
+
 local function checkAllPlayersFinishedTurns()
     local players = State.Session.Players
     if players then
@@ -734,6 +837,8 @@ end
 
 local function onCombatRoundStarted(round)
     debugPrint("onCombatRoundStarted", round)
+    -- Lock the mode for this round; toggle takes effect on the NEXT CombatRoundStarted.
+    State.Session.SwarmCurrentRoundMode = State.Settings.PlayersGoTogether
     cancelTimers()
     State.Session.SwarmTurnActive = false
     State.Session.QueuedCompanionAIAction = {}
@@ -753,9 +858,11 @@ local function onCombatRoundStarted(round)
     end
     unsetAllEnemyTurnsComplete()
     TurnOrder.setPartyInitiativeRollToMean()
-    TurnOrder.equalizePartyInitiative()
-    TurnOrder.bumpNpcInitiativeRolls()
-    TurnOrder.reorderByInitiativeRoll()
+    if State.Session.SwarmCurrentRoundMode then
+        TurnOrder.equalizePartyInitiative()
+        TurnOrder.bumpNpcInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll()
+    end
     -- Mark all players currently in combat as accounted for in the turn order,
     -- so mid-round joiners can be detected in onEnteredCombat.
     State.Session.SwarmTurnOrderPlayers = {}
@@ -775,13 +882,23 @@ local function onCombatRoundStarted(round)
         end
     end
     debugPrint("[LATEJOIN] onCombatRoundStarted round=", round, "playersInBrawlers=", numPlayersInBrawlers, "totalPlayers=", numTotalPlayers)
-    local enemyList, excludedEnemyList = getEnemyList(true)
-    startSwarmTurn(enemyList, excludedEnemyList, true)
+    if State.Session.SwarmCurrentRoundMode then
+        local enemyList, excludedEnemyList = getEnemyList(true)
+        startSwarmTurn(enemyList, excludedEnemyList, true)
+    else
+        State.Session.PerPlayerSlots = buildSwarmSlots()
+        State.Session.PerPlayerCursor = 0
+        advancePerPlayerSlotCursor()
+    end
 end
 
 local function onCombatEnded()
     State.Session.SwarmTurnComplete = {}
     State.Session.SwarmTurnOrderPlayers = {}
+    State.Session.PerPlayerSlots = nil
+    State.Session.PerPlayerCursor = 0
+    State.Session.SwarmCurrentRoundMode = nil
+    TurnOrder.clearAllNaturalInitiative()
     cancelTimers()
     Leaderboard.dumpToConsole()
     Leaderboard.postDataToClients(true)
@@ -797,9 +914,13 @@ local function onEnteredCombat(uuid)
             "round=", TurnOrder.getCurrentCombatRound(),
             "flag=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]))
         TurnOrder.setPartyInitiativeRollToMean()
-        TurnOrder.equalizePartyInitiative()
-        TurnOrder.bumpNpcInitiativeRolls()
-        TurnOrder.reorderByInitiativeRoll()
+        if State.Session.SwarmCurrentRoundMode then
+            TurnOrder.equalizePartyInitiative()
+            TurnOrder.bumpNpcInitiativeRolls()
+            TurnOrder.reorderByInitiativeRoll()
+        else
+            TurnOrder.restoreNaturalInitiative()
+        end
         State.Session.SwarmTurnOrderPlayers[uuid] = true
     end
 end
@@ -867,10 +988,22 @@ local function onTurnEnded(uuid)
                 return
             end
             State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid] = true
-            if checkAllPlayersFinishedTurns() then
-                local enemyList, excludedEnemyList = getEnemyList(false)
-                unsetEnemyTurnsComplete(enemyList)
-                startSwarmTurn(enemyList, excludedEnemyList, false)
+            if State.Session.SwarmCurrentRoundMode then
+                if checkAllPlayersFinishedTurns() then
+                    -- All players ended in true-mode. If next round will be false, write naturals now (earliest hook before round-end)
+                    -- so engine sees them when it evaluates Groups for the next round.
+                    if not State.Settings.PlayersGoTogether then
+                        TurnOrder.restoreNaturalInitiative()
+                    end
+                    local enemyList, excludedEnemyList = getEnemyList(false)
+                    unsetEnemyTurnsComplete(enemyList)
+                    startSwarmTurn(enemyList, excludedEnemyList, false)
+                end
+            else
+                -- False mode: advance only when every member of the current playerTeam slot has ended.
+                if isCurrentPlayerTeamSlotFinished() then
+                    advancePerPlayerSlotCursor()
+                end
             end
         end
     end

@@ -1234,17 +1234,6 @@ local function onSessionLoaded()
     Ext.Entity.OnCreateDeferred("CameraArriveWatcher", function(entity)
         Ext.ClientNet.PostMessageToServer("APoCSCameraReady", "")
     end)
-    -- Diagnostic mirror of server-side ClientControl logging.
-    Ext.Entity.OnCreateDeferred("ClientControl", function(entity)
-        local t = Ext.Utils.MonotonicTime()
-        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
-        print(string.format("[Brawl/Client] [%dms] ClientControl CREATE entity=%s", t, tostring(euuid)))
-    end)
-    Ext.Entity.OnDestroy("ClientControl", function(entity)
-        local t = Ext.Utils.MonotonicTime()
-        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
-        print(string.format("[Brawl/Client] [%dms] ClientControl DESTROY entity=%s", t, tostring(euuid)))
-    end)
 end
 
 Ext.Events.SessionLoaded:Subscribe(onSessionLoaded)

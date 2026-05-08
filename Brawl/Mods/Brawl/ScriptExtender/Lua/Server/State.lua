@@ -20,6 +20,7 @@ local Settings = {
     TurnBasedSwarmMode = false,
     LeaderboardEnabled = true,
     NoFreezeOnBonusActionsDuringPause = false,
+    PlayersGoTogether = true,
     SwarmTurnTimeout = 30.0,
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
@@ -44,6 +45,7 @@ if MCM then
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
     Settings.LeaderboardEnabled = MCM.Get("leaderboard_enabled")
     Settings.NoFreezeOnBonusActionsDuringPause = MCM.Get("no_freeze_on_bonus_actions_during_pause")
+    Settings.PlayersGoTogether = MCM.Get("players_go_together")
     Settings.SwarmTurnTimeout = MCM.Get("swarm_turn_timeout")
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
@@ -129,6 +131,7 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Clie
 Ext.Vars.RegisterModVariable(ModuleUUID, "CharacterLoadouts", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SummonReactionMode", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SharedCampChestAccess", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "NaturalInitiative", {Server = true, Client = false, SyncToClient = false})
 
 local function getArchetype(uuid)
     local archetype

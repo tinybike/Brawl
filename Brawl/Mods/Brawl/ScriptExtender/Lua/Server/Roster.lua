@@ -175,7 +175,7 @@ end
 
 local function endBrawl(level)
     -- Skip during pause -- IsInCombat flicker during NPC-on-NPC see-saw can otherwise tear down state mid-FTB
-    if M.Pause.isPartyInFTB() then
+    if M.Pause and M.Pause.isPartyInFTB() then
         debugPrint("endBrawl skipped (party in FTB)", level)
         return
     end
@@ -211,6 +211,7 @@ local function endBrawl(level)
     State.Session.SwarmTurnComplete = {}
     State.Session.ActionsInProgress = {}
     State.Session.MeanInitiativeRoll = nil
+    TurnOrder.clearAllNaturalInitiative()
     State.Session.ExtraAttacksRemaining = {}
     State.Session.FTBLockedIn = {}
     State.Session.MovementQueue = {}

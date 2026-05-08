@@ -487,13 +487,16 @@ local function onGainedControl(uuid)
             end
         end
     end
-    if not State.Session.MeanInitiativeRoll then
-       TurnOrder.setPartyInitiativeRollToMean()
+    -- Gate init/turn-order maintenance on actually-in-combat
+    if State.isInCombat() then
+        if not State.Session.MeanInitiativeRoll then
+            TurnOrder.setPartyInitiativeRollToMean()
+        end
+        TurnOrder.bumpDirectlyControlledInitiativeRolls()
+        TurnOrder.reorderByInitiativeRoll(true)
+        TurnOrder.setPlayerTurnsActive()
     end
-    TurnOrder.bumpDirectlyControlledInitiativeRolls()
-    TurnOrder.reorderByInitiativeRoll(true)
-    TurnOrder.setPlayerTurnsActive()
-    -- Refresh the user's loadout HUD with the newly-controlled char's data.  Cheap to send even if HUD is closed (client just stashes it).
+    -- Refresh the user's loadout HUD with the newly-controlled char's data
     if userId then
         Commands.postLoadoutsToUser(userId)
     end
