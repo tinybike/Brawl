@@ -169,18 +169,19 @@ local function getEnemyList(isBeforePlayer)
                 playerGroupFound = true
             elseif group.Members and #group.Members > 0 then
                 for _, member in ipairs(group.Members) do
-                    if member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid and M.Osi.IsCharacter(member.Entity.Uuid.EntityUuid) == 1 then
+                    local uuid = member.Entity and member.Entity.Uuid and member.Entity.Uuid.EntityUuid
+                    if uuid and M.Osi.IsCharacter(uuid) == 1 and M.Roster.getBrawlerByUuid(uuid) and Osi.IsDead(uuid) == 0 then
                         if isBeforePlayer then
                             if playerGroupFound then
-                                table.insert(excludedEnemyList, member.Entity.Uuid.EntityUuid)
+                                table.insert(excludedEnemyList, uuid)
                             else
-                                table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                                table.insert(enemyList, uuid)
                             end
                         else
                             if playerGroupFound then
-                                table.insert(enemyList, member.Entity.Uuid.EntityUuid)
+                                table.insert(enemyList, uuid)
                             else
-                                table.insert(excludedEnemyList, member.Entity.Uuid.EntityUuid)
+                                table.insert(excludedEnemyList, uuid)
                             end
                         end
                     end
@@ -915,7 +916,7 @@ local function onCombatEnded()
     TurnOrder.clearAllNaturalInitiative()
     cancelTimers()
     Leaderboard.dumpToConsole()
-    Leaderboard.postDataToClients(true)
+    Leaderboard.postDataToClients()
 end
 
 -- When a player character joins combat mid-round (e.g. late entrance into an

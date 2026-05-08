@@ -841,6 +841,7 @@ end
 
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
+    State.Session.SwarmCurrentRoundMode = nil  -- clear stale per-round cache when toggling modes mid-game
     if value == true then
         RT.Timers.stopAllPulseActionTimers()
         Movement.removeAllDashSpeedBoosts()

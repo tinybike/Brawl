@@ -206,11 +206,11 @@
                             "Handles": {"DescriptionHandle": "hc0055a4eg3a8eg4736g89d3gdc6b9f0bf36f", "NameHandle": "hf6e63658g1ccfg4abdgab30g7ee2f50b9a70"}
                         }, {
                             "Id": "exclude_enemy_tiers",
-                            "Name": "Exclude Enemy Tiers (Trials of Tav)",
+                            "Name": "Exclude Enemy Tiers",
                             "Type": "enum",
                             "Default": "mythical",
                             "Options": {"Choices": ["", "mid", "high", "ultra", "epic", "legendary", "mythical", "divine", "avatar"]},
-                            "Description": "If set, Trials of Tav enemies at or above this tier will be excluded from the Swarm AI's control.  This setting has no effect outside of Trials of Tav.",
+                            "Description": "If set, Trials of Tav or Encounters enemies at or above this tier will be excluded from the Swarm AI's control.",
                             "Handles": {"DescriptionHandle": "h3f63d446g7bdbg4319gb303g5d46c7e1931b", "NameHandle": "hf76b56ddga5e1g4be3gb8ecg609570a29828"}
                         }
                     ]

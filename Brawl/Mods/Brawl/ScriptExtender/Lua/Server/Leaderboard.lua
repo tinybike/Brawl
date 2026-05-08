@@ -52,7 +52,7 @@ local function updateKills(uuid)
         State.Session.Leaderboard[uuid].name = State.Session.Leaderboard[uuid].name or (M.Utils.getDisplayName(uuid) or "")
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills or 0
         State.Session.Leaderboard[uuid].kills = State.Session.Leaderboard[uuid].kills + 1
-        postDataToClients(true)
+        postDataToClients()
     end
 end
 
@@ -69,7 +69,7 @@ local function updateHealing(healerUuid, targetUuid, amount)
             amount = -amount
         end
         State.Session.Leaderboard[healerUuid].healingDone = State.Session.Leaderboard[healerUuid].healingDone + amount
-        postDataToClients(true)
+        postDataToClients()
     end
 end
 
@@ -88,7 +88,7 @@ local function updateDamage(attackerUuid, defenderUuid, amount)
             end
             State.Session.Leaderboard[attackerUuid].damageDone = State.Session.Leaderboard[attackerUuid].damageDone + amount
         end
-        postDataToClients(true)
+        postDataToClients()
     end
 end
 

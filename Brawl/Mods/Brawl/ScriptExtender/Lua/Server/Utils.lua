@@ -783,6 +783,29 @@ local function repairCanJoinCombatInRegion()
     return count
 end
 
+-- Force-reset every party member's CombatParticipant.InitiativeRoll to the "not yet rolled" sentinel (-100).
+-- For salvaging old saves where stuck/garbage init values (-99 etc) are persisting across combats. Engine re-rolls on next combat.
+local function resetPartyInitiatives()
+    local count = 0
+    for _, pm in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local pmUuid = pm[1]
+        if pmUuid then
+            local entity = Ext.Entity.Get(pmUuid)
+            if entity and entity.CombatParticipant then
+                entity.CombatParticipant.InitiativeRoll = -100
+                if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+                    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = -100
+                    entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+                end
+                entity:Replicate("CombatParticipant")
+                count = count + 1
+            end
+        end
+    end
+    _P("resetPartyInitiatives: reset", count, "party member init rolls to -100")
+    return count
+end
+
 local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
@@ -876,6 +899,7 @@ return {
     getSpellNameBySlot = getSpellNameBySlot,
     getCurrentRegion = getCurrentRegion,
     repairCanJoinCombatInRegion = repairCanJoinCombatInRegion,
+    resetPartyInitiatives = resetPartyInitiatives,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,

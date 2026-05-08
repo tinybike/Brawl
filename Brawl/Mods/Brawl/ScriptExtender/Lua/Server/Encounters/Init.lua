@@ -185,9 +185,6 @@ function Encounters.spawnAtPlayer(opts)
     local budget = opts.budget or Compositions.tierBudgetForPlayerLevel(effLevel)
     local hostileToAll = opts.hostileToAll == true
 
-    -- One-shot suppress so user-initiated spawns don't trigger the auto-spawn-on-CombatStart hook recursively.
-    Encounters.SuppressNextAutoSpawn = true
-
     local picks = Compositions.pickEncounterByTier(budget)
     if #picks == 0 then
         debugPrint("[Encounters] spawnAtPlayer: pickEncounterByTier returned no picks")
@@ -207,6 +204,12 @@ function Encounters.spawnAtPlayer(opts)
         debugPrint("[Encounters] spawnAtPlayer: no valid anchors generated")
         return
     end
+
+    -- One-shot suppress so the resulting CombatStarted doesn't recursively trigger auto-spawn.
+    -- Set after early-returns so failed spawns don't strand the flag. Safety timer auto-clears if no CombatStarted fires
+    -- (e.g. user already in combat -> EnterCombat extends existing combat without firing CombatStarted).
+    Encounters.SuppressNextAutoSpawn = true
+    Ext.Timer.WaitFor(5000, function() Encounters.SuppressNextAutoSpawn = false end)
 
     local guids = {}
     for slot, entry in ipairs(picks) do
@@ -246,6 +249,11 @@ Ext.RegisterNetListener("Encounters.SpawnAtPlayer", function(channel, payload, u
             -- Legacy/fallback: numeric payload was previously the difficultyOffset
             opts = {difficultyOffset = tonumber(payload) or 0}
         end
+    end
+    -- MP: spawn at the requesting user's controlled character, not always the host's
+    if not opts.host then
+        local player = State.getPlayerByUserId(Utils.peerToUserId(userId))
+        if player and player.uuid then opts.host = player.uuid end
     end
     Encounters.spawnAtPlayer(opts)
 end)
