@@ -32,8 +32,14 @@ function Spawn.enemyAt(templateUuid, point, host, label)
     Osi.SetCanFight(guid, 1)
     setHostileToParty(guid)
     if host then
-        Osi.EnterCombat(host, guid)
-        Osi.EnterCombat(guid, host)
+        -- joinCombat into host's existing combat (precise merge); EnterCombat only when starting fresh.
+        local hostCombatGuid = Osi.CombatGetGuidFor(host)
+        if hostCombatGuid and hostCombatGuid ~= "" then
+            Utils.joinCombat(guid, hostCombatGuid)
+        else
+            Osi.EnterCombat(host, guid)
+            Osi.EnterCombat(guid, host)
+        end
     end
     debugPrint(string.format("[Encounters] Spawned %s at %s (%.1f, %.1f, %.1f)",
         guid, label or "?", point[1], point[2], point[3]))
@@ -55,12 +61,17 @@ function Spawn.ensureInCombat(guids, host, retriesLeft, delayMs)
 
     Ext.Timer.WaitFor(delayMs, function()
         local stillNotInCombat = {}
+        local hostCombatGuid = Osi.CombatGetGuidFor(host)
         for _, guid in ipairs(guids) do
             if Osi.IsDead(guid) ~= 1 and Osi.IsInCombat(guid) ~= 1 then
                 Osi.SetVisible(guid, 1)
                 setHostileToParty(guid)
-                Osi.EnterCombat(host, guid)
-                Osi.EnterCombat(guid, host)
+                if hostCombatGuid and hostCombatGuid ~= "" then
+                    Utils.joinCombat(guid, hostCombatGuid)
+                else
+                    Osi.EnterCombat(host, guid)
+                    Osi.EnterCombat(guid, host)
+                end
                 table.insert(stillNotInCombat, guid)
             end
         end

@@ -112,7 +112,7 @@ local function onCombatEnded(combatGuid)
     State.Session.StoryActionIDs = {}
     State.Session.MeanInitiativeRoll = nil
     TurnOrder.clearAllNaturalInitiative()
-    Encounters.Tracking.removeSurvivorsAndClear()
+    Encounters.Tracking.clear()
     Movement.removeAllDashSpeedBoosts()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatEnded()

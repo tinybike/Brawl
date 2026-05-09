@@ -924,19 +924,61 @@ end
 -- into the swarm turn order correctly. Players present at round start are
 -- tracked in SwarmTurnOrderPlayers and skipped here to avoid redundant recalcs.
 local function onEnteredCombat(uuid)
-    if uuid and M.Osi.IsPartyMember(uuid, 1) == 1 and not State.Session.SwarmTurnOrderPlayers[uuid] then
-        debugPrint("[LATEJOIN] Swarm.onEnteredCombat", M.Utils.getDisplayName(uuid),
-            "round=", TurnOrder.getCurrentCombatRound(),
-            "flag=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]))
-        TurnOrder.setPartyInitiativeRollToMean()
-        if State.Session.SwarmCurrentRoundMode then
-            TurnOrder.equalizePartyInitiative()
-            TurnOrder.bumpNpcInitiativeRolls()
-            TurnOrder.reorderByInitiativeRoll()
-        else
-            TurnOrder.restoreNaturalInitiative()
+    if not uuid then return end
+    if M.Osi.IsPartyMember(uuid, 1) == 1 then
+        if not State.Session.SwarmTurnOrderPlayers[uuid] then
+            debugPrint("[LATEJOIN] Swarm.onEnteredCombat", M.Utils.getDisplayName(uuid),
+                "round=", TurnOrder.getCurrentCombatRound(),
+                "flag=", tostring(State.Session.TurnBasedSwarmModePlayerTurnEnded[uuid]))
+            TurnOrder.setPartyInitiativeRollToMean()
+            if State.Session.SwarmCurrentRoundMode then
+                TurnOrder.equalizePartyInitiative()
+                TurnOrder.bumpNpcInitiativeRolls()
+                TurnOrder.reorderByInitiativeRoll()
+            else
+                TurnOrder.restoreNaturalInitiative()
+            end
+            State.Session.SwarmTurnOrderPlayers[uuid] = true
         end
-        State.Session.SwarmTurnOrderPlayers[uuid] = true
+        return
+    end
+    -- Non-party late-entrant in false mode: append to current/next enemyRun so Brawl AI handles them, not Larian.
+    if State.Session.SwarmCurrentRoundMode == false and State.Session.PerPlayerSlots then
+        if Osi.IsDead(uuid) ~= 0 then return end
+        if not M.Roster.getBrawlerByUuid(uuid) then return end
+        local cursor = State.Session.PerPlayerCursor or 0
+        local targetSlot, targetIdx = nil, nil
+        for i = math.max(1, cursor), #State.Session.PerPlayerSlots do
+            local slot = State.Session.PerPlayerSlots[i]
+            if slot and slot.kind == "enemyRun" then
+                targetSlot, targetIdx = slot, i
+                break
+            end
+        end
+        if not targetSlot then
+            -- No upcoming enemyRun; append a new one at end.
+            targetSlot = {kind = "enemyRun", uuids = {}}
+            table.insert(State.Session.PerPlayerSlots, targetSlot)
+            targetIdx = #State.Session.PerPlayerSlots
+        end
+        for _, existing in ipairs(targetSlot.uuids) do
+            if existing == uuid then return end  -- dedup
+        end
+        table.insert(targetSlot.uuids, uuid)
+        debugPrint(string.format("[LATEJOIN] non-party %s appended to slot %d (#%d members)",
+            M.Utils.getDisplayName(uuid) or uuid, targetIdx, #targetSlot.uuids))
+        -- If we're currently firing this slot, also add to active SwarmActors and fire singleCharacterTurn so Brawl AI runs for them.
+        if State.Session.SwarmTurnActive and State.Session.SwarmActors and targetIdx == cursor then
+            local brawler = M.Roster.getBrawlerByUuid(uuid)
+            if brawler then
+                table.insert(State.Session.SwarmActors, uuid)
+                State.Session.SwarmTurnComplete[uuid] = false
+                local chunkIndex = State.Session.CurrentChunkIndex or 1
+                State.Session.BrawlerChunks[chunkIndex] = State.Session.BrawlerChunks[chunkIndex] or {}
+                State.Session.BrawlerChunks[chunkIndex][uuid] = brawler
+                singleCharacterTurn(brawler, 0, State.Session.SwarmActors)  -- idx=0: fire immediately, no stagger
+            end
+        end
     end
 end
 

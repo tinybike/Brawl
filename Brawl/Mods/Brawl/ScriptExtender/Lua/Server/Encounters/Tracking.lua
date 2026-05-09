@@ -22,18 +22,17 @@ function Encounters.Tracking.clear()
     Encounters.Tracking.pendingPileScore = 0
 end
 
--- On combat end: remove any surviving Brawl-spawned entities and clear tracking. Prevents corpse/survivor
--- buildup from repeated spawns. Loot from kills already dropped in onDied; survivors (player fled) get culled.
-function Encounters.Tracking.removeSurvivorsAndClear()
+-- Remove any surviving Brawl-spawned entities. Called on long rest. NOT on combat-end (would nuke fresh spawns).
+function Encounters.Tracking.removeAllSurvivors()
     local removed = 0
     for uuid, _ in pairs(Encounters.Tracking.spawned) do
-        if uuid and uuid ~= "" and Osi.IsDead(uuid) ~= 1 then
+        if uuid and uuid ~= "" and Osi.IsDead(uuid) == 0 then
             Utils.remove(uuid)
             removed = removed + 1
         end
     end
     if removed > 0 then
-        debugPrint(string.format("[Encounters] removeSurvivorsAndClear: removed %d surviving spawned entities", removed))
+        debugPrint(string.format("[Encounters] removeAllSurvivors: removed %d", removed))
     end
     Encounters.Tracking.clear()
 end

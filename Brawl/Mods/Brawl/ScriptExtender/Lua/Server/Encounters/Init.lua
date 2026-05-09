@@ -205,9 +205,7 @@ function Encounters.spawnAtPlayer(opts)
         return
     end
 
-    -- One-shot suppress so the resulting CombatStarted doesn't recursively trigger auto-spawn.
-    -- Set after early-returns so failed spawns don't strand the flag. Safety timer auto-clears if no CombatStarted fires
-    -- (e.g. user already in combat -> EnterCombat extends existing combat without firing CombatStarted).
+    -- Suppress the resulting CombatStarted from re-triggering auto-spawn. Timer auto-clears if no event fires.
     Encounters.SuppressNextAutoSpawn = true
     Ext.Timer.WaitFor(5000, function() Encounters.SuppressNextAutoSpawn = false end)
 
@@ -276,12 +274,27 @@ Ext.RegisterNetListener("Encounters.RequestHostileToAllState", function(channel,
     Ext.ServerNet.PostMessageToUser(userId, "Encounters.HostileToAllState", tostring(getHostileToAllEncounter()))
 end)
 
--- Auto-spawn on natural fights (skipped for menu-initiated ones via SuppressNextAutoSpawn).
-Ext.Osiris.RegisterListener("CombatStarted", 1, "after", function(combatGuid)
+-- Auto-spawn fires once per combat on the first party-member EnteredCombat (NPC-on-NPC fights don't trigger).
+Encounters.AutoSpawnedCombats = Encounters.AutoSpawnedCombats or {}
+
+Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", function(entityGuid, combatGuid)
+    if not getAutoSpawnOnCombatStart() then return end
+    if Encounters.AutoSpawnedCombats[combatGuid] then return end
+    if Osi.IsPartyMember(entityGuid, 1) ~= 1 then return end
     if Encounters.SuppressNextAutoSpawn then
         Encounters.SuppressNextAutoSpawn = false
+        Encounters.AutoSpawnedCombats[combatGuid] = true
         return
     end
-    if not getAutoSpawnOnCombatStart() then return end
-    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter()})
+    Encounters.AutoSpawnedCombats[combatGuid] = true
+    local host = M.Osi.GetUUID(entityGuid) or Osi.GetHostCharacter()
+    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+end)
+
+Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function(combatGuid)
+    Encounters.AutoSpawnedCombats[combatGuid] = nil
+end)
+
+Ext.Osiris.RegisterListener("LongRestFinished", 0, "after", function()
+    Encounters.Tracking.removeAllSurvivors()
 end)

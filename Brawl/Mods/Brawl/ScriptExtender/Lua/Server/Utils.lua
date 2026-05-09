@@ -626,6 +626,26 @@ local function getCombatEntity()
     end
 end
 
+-- Add uuid to a specific combat via ServerEnterRequest, bypassing Osi.EnterCombat's create-or-merge ambiguity.
+-- combatGuid optional; without it, joins the first combat entity (Brawl's primary tracked combat).
+local function joinCombat(uuid, combatGuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity then return false end
+    if M.Osi.CanJoinCombat(uuid) ~= 1 then return false end
+    local candidates = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+    if not candidates then return false end
+    for _, ce in ipairs(candidates) do
+        if ce.ServerEnterRequest and ce.ServerEnterRequest.EnterRequests then
+            local match = combatGuid == nil or (ce.CombatState and ce.CombatState.MyGuid == combatGuid)
+            if match then
+                ce.ServerEnterRequest.EnterRequests[entity] = true
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function hasStatus(entity, targetStatus)
     if entity and entity.StatusContainer and entity.StatusContainer.Statuses then
         for _, status in pairs(entity.StatusContainer.Statuses) do
@@ -887,6 +907,7 @@ return {
     getFTBEntity = getFTBEntity,
     getNarrativeCombatLabel = getNarrativeCombatLabel,
     getCombatEntity = getCombatEntity,
+    joinCombat = joinCombat,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
     getAbility = getAbility,
