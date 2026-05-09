@@ -212,7 +212,7 @@ local function endBrawl(level)
     State.Session.ActionsInProgress = {}
     State.Session.MeanInitiativeRoll = nil
     TurnOrder.clearAllNaturalInitiative()
-    Encounters.Tracking.clear()
+    Encounters.Tracking.pruneDead()
     State.Session.ExtraAttacksRemaining = {}
     State.Session.FTBLockedIn = {}
     State.Session.MovementQueue = {}

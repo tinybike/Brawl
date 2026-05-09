@@ -18,10 +18,56 @@ local function setHostileToAllEncounter(enabled)
     Ext.Vars.GetModVariables(ModuleUUID).HostileToAllEncounter = (enabled == true)
 end
 
+local function getAutoSpawnPerRoundEnabled()
+    return Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundEnabled == true
+end
+
+local function setAutoSpawnPerRoundEnabled(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundEnabled = (enabled == true)
+end
+
+local function getAutoSpawnPerRoundChance()
+    local v = Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundChance
+    if type(v) ~= "number" then return 5 end
+    return math.max(0, math.min(100, math.floor(v)))
+end
+
+local function setAutoSpawnPerRoundChance(value)
+    local n = tonumber(value) or 0
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundChance = math.max(0, math.min(100, math.floor(n)))
+end
+
+local function getRandomEncountersInWildEnabled()
+    return Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildEnabled == true
+end
+
+local function setRandomEncountersInWildEnabled(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildEnabled = (enabled == true)
+end
+
+local function getRandomEncountersInWildChance()
+    local v = Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildChance
+    if type(v) ~= "number" then return 1 end
+    return math.max(0, math.min(100, math.floor(v)))
+end
+
+local function setRandomEncountersInWildChance(value)
+    local n = tonumber(value) or 0
+    Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildChance = math.max(0, math.min(100, math.floor(n)))
+end
+
 Encounters.getAutoSpawnOnCombatStart = getAutoSpawnOnCombatStart
 Encounters.setAutoSpawnOnCombatStart = setAutoSpawnOnCombatStart
 Encounters.getHostileToAllEncounter = getHostileToAllEncounter
 Encounters.setHostileToAllEncounter = setHostileToAllEncounter
+Encounters.getAutoSpawnPerRoundEnabled = getAutoSpawnPerRoundEnabled
+Encounters.setAutoSpawnPerRoundEnabled = setAutoSpawnPerRoundEnabled
+Encounters.getAutoSpawnPerRoundChance = getAutoSpawnPerRoundChance
+Encounters.setAutoSpawnPerRoundChance = setAutoSpawnPerRoundChance
+Encounters.getRandomEncountersInWildEnabled = getRandomEncountersInWildEnabled
+Encounters.setRandomEncountersInWildEnabled = setRandomEncountersInWildEnabled
+Encounters.getRandomEncountersInWildChance = getRandomEncountersInWildChance
+Encounters.setRandomEncountersInWildChance = setRandomEncountersInWildChance
 
 -- Vanilla "Evil_NPC" faction. Normally applied via applyFactionWhenMerged (deferred to avoid splinter/autopause loop);
 -- hostileToAll spawns apply it immediately because the merge wait never resolves and the late SetFaction breaks bystander hostility.
@@ -274,6 +320,42 @@ Ext.RegisterNetListener("Encounters.RequestHostileToAllState", function(channel,
     Ext.ServerNet.PostMessageToUser(userId, "Encounters.HostileToAllState", tostring(getHostileToAllEncounter()))
 end)
 
+Ext.RegisterNetListener("Encounters.SetAutoSpawnPerRoundEnabled", function(channel, payload, userId)
+    setAutoSpawnPerRoundEnabled(payload == "true")
+    debugPrint(string.format("[Encounters] AutoSpawnPerRoundEnabled = %s", tostring(getAutoSpawnPerRoundEnabled())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnPerRoundEnabled", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnPerRoundEnabledState", tostring(getAutoSpawnPerRoundEnabled()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetAutoSpawnPerRoundChance", function(channel, payload, userId)
+    setAutoSpawnPerRoundChance(payload)
+    debugPrint(string.format("[Encounters] AutoSpawnPerRoundChance = %d", getAutoSpawnPerRoundChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnPerRoundChance", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnPerRoundChanceState", tostring(getAutoSpawnPerRoundChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetRandomEncountersInWildEnabled", function(channel, payload, userId)
+    setRandomEncountersInWildEnabled(payload == "true")
+    debugPrint(string.format("[Encounters] RandomEncountersInWildEnabled = %s", tostring(getRandomEncountersInWildEnabled())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestRandomEncountersInWildEnabled", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.RandomEncountersInWildEnabledState", tostring(getRandomEncountersInWildEnabled()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetRandomEncountersInWildChance", function(channel, payload, userId)
+    setRandomEncountersInWildChance(payload)
+    debugPrint(string.format("[Encounters] RandomEncountersInWildChance = %d", getRandomEncountersInWildChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestRandomEncountersInWildChance", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.RandomEncountersInWildChanceState", tostring(getRandomEncountersInWildChance()))
+end)
+
 -- Auto-spawn fires once per combat on the first party-member EnteredCombat (NPC-on-NPC fights don't trigger).
 Encounters.AutoSpawnedCombats = Encounters.AutoSpawnedCombats or {}
 
@@ -298,3 +380,77 @@ end)
 Ext.Osiris.RegisterListener("LongRestFinished", 0, "after", function()
     Encounters.Tracking.removeAllSurvivors()
 end)
+
+-- Per-round dice roll: at every CombatRoundStarted of the host's combat, X% chance to spawn an encounter.
+Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", function(combatGuid, round)
+    if not getAutoSpawnPerRoundEnabled() then return end
+    local chance = getAutoSpawnPerRoundChance()
+    if chance <= 0 then return end
+    local host = Osi.GetHostCharacter()
+    if not host then return end
+    if Osi.CombatGetGuidFor(host) ~= combatGuid then return end  -- only the host's combat
+    if math.random(1, 100) > chance then return end
+    debugPrint(string.format("[Encounters] per-round roll succeeded (chance=%d%%, round=%s) -- spawning", chance, tostring(round)))
+    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+end)
+
+-- Wilderness random encounter: poll host position, accumulate distance walked, roll every 5m, only if no peaceful NPC within 30m.
+local WILD_TICK_MS = 10000
+local WILD_METERS_PER_ROLL = 20
+local WILD_RADIUS_M = 30
+local WILD_TELEPORT_THRESHOLD_M = 50
+local wildLastPos = nil
+local wildDistanceAccum = 0
+
+local function isInWilderness(host)
+    local nearby = Utils.getNearby(host, WILD_RADIUS_M)
+    for _, uuid in ipairs(nearby) do
+        if uuid ~= host
+                and Osi.IsPartyMember(uuid, 1) ~= 1
+                and not Utils.isCombatHelper(uuid)
+                and Osi.IsEnemy(host, uuid) == 0 then
+            return false  -- a peaceful non-party character is nearby = not wild
+        end
+    end
+    return true
+end
+
+local function wildernessTick()
+    Ext.Timer.WaitFor(WILD_TICK_MS, wildernessTick)
+    if not getRandomEncountersInWildEnabled() then
+        wildLastPos = nil
+        wildDistanceAccum = 0
+        return
+    end
+    local host = Osi.GetHostCharacter()
+    if not host then return end
+    if Osi.IsInCombat(host) == 1 then
+        wildLastPos = nil
+        wildDistanceAccum = 0
+        return
+    end
+    local px, py, pz = Osi.GetPosition(host)
+    if not px then return end
+    if wildLastPos then
+        local dx = px - wildLastPos[1]
+        local dy = py - wildLastPos[2]
+        local dz = pz - wildLastPos[3]
+        local d = math.sqrt(dx*dx + dy*dy + dz*dz)
+        if d > 0 and d < WILD_TELEPORT_THRESHOLD_M then  -- ignore teleports / level loads
+            wildDistanceAccum = wildDistanceAccum + d
+        end
+    end
+    wildLastPos = {px, py, pz}
+    while wildDistanceAccum >= WILD_METERS_PER_ROLL do
+        wildDistanceAccum = wildDistanceAccum - WILD_METERS_PER_ROLL
+        local chance = getRandomEncountersInWildChance()
+        if chance > 0 and isInWilderness(host) and math.random(1, 100) <= chance then
+            debugPrint(string.format("[Encounters] wilderness roll succeeded (chance=%d%%) -- spawning", chance))
+            wildDistanceAccum = 0
+            Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+            return
+        end
+    end
+end
+
+Ext.Timer.WaitFor(WILD_TICK_MS, wildernessTick)

@@ -8,6 +8,7 @@ local debugPrint = Utils.debugPrint
 function Encounters.Tracking.add(guid, tier)
     if guid and guid ~= "" then
         Encounters.Tracking.spawned[guid] = { tier = tier }
+        debugPrint(string.format("[Encounters] Tracking.add: %s tier=%s (count=%d)", tostring(guid), tostring(tier), Encounters.Tracking.count()))
     end
 end
 
@@ -20,6 +21,46 @@ end
 function Encounters.Tracking.clear()
     Encounters.Tracking.spawned = {}
     Encounters.Tracking.pendingPileScore = 0
+end
+
+-- Credit a tracked kill: drop kill-loot, accumulate pile score, drop pile if count -> 0.
+-- Idempotent against double-call: returns early if uuid no longer in `spawned`.
+local function creditKill(uuid)
+    local rec = Encounters.Tracking.spawned[uuid]
+    if not rec then return end
+    Loot.dropOnKill(uuid)
+    Encounters.Tracking.pendingPileScore = Encounters.Tracking.pendingPileScore + Compositions.tierValue(rec.tier)
+    Encounters.Tracking.spawned[uuid] = nil
+    debugPrint(string.format("[Encounters] tracked kill: %s tier=%s pileScore=%d remaining=%d",
+        tostring(uuid), tostring(rec.tier), Encounters.Tracking.pendingPileScore, Encounters.Tracking.count()))
+    if Encounters.Tracking.count() == 0 then
+        local rolls = Encounters.Tracking.pendingPileScore
+        Encounters.Tracking.pendingPileScore = 0
+        debugPrint(string.format("[Encounters] all encounter enemies down -- pile rolls=%d", rolls))
+        Loot.dropEncounterPile(nil, rolls)
+    end
+end
+
+-- Only purge DEAD entries; alive spawns (fled, mid-fight, just-spawned during a brief combat-end flicker) persist.
+-- Credits dead entries as kills so endBrawl racing ahead of the Died event still drops the pile.
+function Encounters.Tracking.pruneDead()
+    local removed = 0
+    local deadUuids = {}
+    for uuid, _ in pairs(Encounters.Tracking.spawned) do
+        if not uuid or uuid == "" then
+            Encounters.Tracking.spawned[uuid] = nil
+            removed = removed + 1
+        elseif Osi.IsDead(uuid) == 1 then
+            deadUuids[#deadUuids + 1] = uuid
+        end
+    end
+    for _, uuid in ipairs(deadUuids) do
+        creditKill(uuid)
+        removed = removed + 1
+    end
+    if removed > 0 then
+        debugPrint(string.format("[Encounters] pruneDead: removed %d", removed))
+    end
 end
 
 -- Remove any surviving Brawl-spawned entities. Called on long rest. NOT on combat-end (would nuke fresh spawns).
@@ -40,21 +81,7 @@ end
 local function onDied(entityGuid)
     local key = Osi.GetUUID(entityGuid)
     if not key then return end
-    local rec = Encounters.Tracking.spawned[key]
-    if not rec then return end
-
-    Loot.dropOnKill(key)
-    Encounters.Tracking.pendingPileScore = Encounters.Tracking.pendingPileScore + Compositions.tierValue(rec.tier)
-    Encounters.Tracking.spawned[key] = nil
-    debugPrint(string.format("[Encounters] tracked kill: %s tier=%s pileScore=%d remaining=%d",
-        tostring(key), tostring(rec.tier), Encounters.Tracking.pendingPileScore, Encounters.Tracking.count()))
-
-    if Encounters.Tracking.count() == 0 then
-        local rolls = Encounters.Tracking.pendingPileScore
-        Encounters.Tracking.pendingPileScore = 0
-        debugPrint(string.format("[Encounters] all encounter enemies down — pile rolls=%d", rolls))
-        Loot.dropEncounterPile(nil, rolls)
-    end
+    creditKill(key)
 end
 
 Ext.Osiris.RegisterListener("Died", 1, "after", onDied)

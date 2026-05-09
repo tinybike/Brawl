@@ -168,6 +168,14 @@ local AutoSpawnEncounterCheckbox = nil  -- handle, refreshed when server replies
 local AutoSpawnEncounterState = false  -- cache, primes checkbox before server reply
 local HostileToAllEncounterCheckbox = nil
 local HostileToAllEncounterState = false
+local AutoSpawnPerRoundCheckbox = nil
+local AutoSpawnPerRoundState = false
+local AutoSpawnPerRoundChanceInput = nil
+local AutoSpawnPerRoundChance = 5
+local WildEncountersCheckbox = nil
+local WildEncountersState = false
+local WildEncountersChanceInput = nil
+local WildEncountersChance = 1
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -1010,6 +1018,42 @@ local function showLeaderboard(payload)
         Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnOnCombatStart", tostring(cbAutoSpawn.Checked))
     end
     AutoSpawnEncounterCheckbox = cbAutoSpawn
+    local cbPerRound = encountersTab:AddCheckbox("Chance to spawn an encounter every round")
+    cbPerRound.Checked = AutoSpawnPerRoundState
+    cbPerRound.OnChange = function()
+        AutoSpawnPerRoundState = cbPerRound.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnPerRoundEnabled", tostring(cbPerRound.Checked))
+    end
+    AutoSpawnPerRoundCheckbox = cbPerRound
+    local chanceInput = encountersTab:AddInputText("##perRoundChance", tostring(AutoSpawnPerRoundChance) .. "%")
+    chanceInput.SameLine = true
+    chanceInput.EnterReturnsTrue = true
+    chanceInput.OnChange = function(c)
+        local n = tonumber((c.Text or ""):match("%d+")) or 0
+        if n < 0 then n = 0 elseif n > 100 then n = 100 end
+        AutoSpawnPerRoundChance = n
+        c.Text = tostring(n) .. "%"
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnPerRoundChance", tostring(n))
+    end
+    AutoSpawnPerRoundChanceInput = chanceInput
+    local cbWild = encountersTab:AddCheckbox("Chance to spawn random encounters in the wild (per ~20m walked)")
+    cbWild.Checked = WildEncountersState
+    cbWild.OnChange = function()
+        WildEncountersState = cbWild.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetRandomEncountersInWildEnabled", tostring(cbWild.Checked))
+    end
+    WildEncountersCheckbox = cbWild
+    local wildChanceInput = encountersTab:AddInputText("##wildChance", tostring(WildEncountersChance) .. "%")
+    wildChanceInput.SameLine = true
+    wildChanceInput.EnterReturnsTrue = true
+    wildChanceInput.OnChange = function(c)
+        local n = tonumber((c.Text or ""):match("%d+")) or 0
+        if n < 0 then n = 0 elseif n > 100 then n = 100 end
+        WildEncountersChance = n
+        c.Text = tostring(n) .. "%"
+        Ext.ClientNet.PostMessageToServer("Encounters.SetRandomEncountersInWildChance", tostring(n))
+    end
+    WildEncountersChanceInput = wildChanceInput
     local cbHostileToAll = encountersTab:AddCheckbox("Hostile to all nearby NPCs (not just party)")
     cbHostileToAll.Checked = HostileToAllEncounterState
     cbHostileToAll.OnChange = function()
@@ -1025,6 +1069,10 @@ local function showLeaderboard(payload)
     encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
     Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnState", "")
     Ext.ClientNet.PostMessageToServer("Encounters.RequestHostileToAllState", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnPerRoundEnabled", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnPerRoundChance", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestRandomEncountersInWildEnabled", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestRandomEncountersInWildChance", "")
 end
 
 local function updateLeaderboard(data)
@@ -1124,6 +1172,28 @@ local function onNetMessage(data)
         HostileToAllEncounterState = (data.Payload == "true")
         if HostileToAllEncounterCheckbox then
             pcall(function() HostileToAllEncounterCheckbox.Checked = HostileToAllEncounterState end)
+        end
+    elseif data.Channel == "Encounters.AutoSpawnPerRoundEnabledState" then
+        AutoSpawnPerRoundState = (data.Payload == "true")
+        if AutoSpawnPerRoundCheckbox then
+            pcall(function() AutoSpawnPerRoundCheckbox.Checked = AutoSpawnPerRoundState end)
+        end
+    elseif data.Channel == "Encounters.AutoSpawnPerRoundChanceState" then
+        local n = tonumber(data.Payload) or 5
+        AutoSpawnPerRoundChance = n
+        if AutoSpawnPerRoundChanceInput then
+            pcall(function() AutoSpawnPerRoundChanceInput.Text = tostring(n) .. "%" end)
+        end
+    elseif data.Channel == "Encounters.RandomEncountersInWildEnabledState" then
+        WildEncountersState = (data.Payload == "true")
+        if WildEncountersCheckbox then
+            pcall(function() WildEncountersCheckbox.Checked = WildEncountersState end)
+        end
+    elseif data.Channel == "Encounters.RandomEncountersInWildChanceState" then
+        local n = tonumber(data.Payload) or 1
+        WildEncountersChance = n
+        if WildEncountersChanceInput then
+            pcall(function() WildEncountersChanceInput.Text = tostring(n) .. "%" end)
         end
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
