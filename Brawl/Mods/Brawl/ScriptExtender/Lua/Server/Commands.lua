@@ -842,6 +842,11 @@ end
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
     State.Session.SwarmCurrentRoundMode = nil  -- clear stale per-round cache when toggling modes mid-game
+    -- Mode switch can transiently end/restart engine combat; suppress autospawn that resulting EnteredCombat would otherwise trigger.
+    if Encounters then
+        Encounters.SuppressNextAutoSpawn = true
+        Ext.Timer.WaitFor(5000, function() Encounters.SuppressNextAutoSpawn = false end)
+    end
     if value == true then
         RT.Timers.stopAllPulseActionTimers()
         Movement.removeAllDashSpeedBoosts()
