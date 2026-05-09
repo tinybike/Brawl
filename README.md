@@ -56,13 +56,18 @@ The Loadouts tab is a sort of wardrobe interface for your characters, where you 
 
 #### Encounters
 
-The Encounters tab is an experimental feature that lets you spawn an enemy encounter. Press the "Fight!" button to trigger a "Trials of Tav"-style encounter, without pulling you out of the campaign. It uses the full Trials of Tav Reloaded enemy pool, and rewards you from the ToTR loot pool afterwards.
+The Encounters tab is an experimental feature that lets you spawn an enemy encounter. Press the "Fight!" button to trigger a "Trials of Tav"-style encounter, without pulling you out of the campaign. It uses pulls from the Trials of Tav Reloaded enemy pool, and rewards you from the ToTR loot pool afterwards.
 
-![](https://i.imgur.com/Hlu5xZN.png)
+![](https://i.imgur.com/PrenAp5.png)
 
-Spawning an encounter does *not* require you to have Trials of Tav installed. If you have [Spells of Exandria](https://www.nexusmods.com/baldursgate3/mods/18441) installed, the encounters will sometimes use things from it.
+- If "Spawn an encounter at the beginning of every fight" is checked, then at the beginning of each combat, an encounter will spawn, in addition to the enemies already in the combat. Fights that are triggered via the Encounters menu will *not* spawn additional encounters with this option.
+- If "Chance to spawn an encounter each round" is checked, there will be a 5% chance (or whatever you set it to) that a fresh encounter will spawn at the beginning of each combat round. This can be checked and unchecked mid-combat.
+- If "Chance to spawn random encounters in the wild (per ~20m walked)" is checked, there will be a 5% chance (or whatever you have it set to) that a random encounter will trigger roughly every 20 meters walked, as long as there are no friendly NPCs nearby.
+- If "Hostile to all NPCs (not just party)" is checked, then the spawned enemies will be hostile towards neutral NPCs and towards other non-spawned enemies.
 
-[![Encounters](https://img.youtube.com/vi/ptw9MVcDQ7k/0.jpg)](https://www.youtube.com/watch?v=ptw9MVcDQ7k)
+If you have [Spells of Exandria](https://www.nexusmods.com/baldursgate3/mods/18441) installed, the encounters will sometimes use things from it. (Note: spawning an encounter does *not* require you to have Trials of Tav installed.)
+
+[![Encounters](https://img.youtube.com/vi/3mLu3DN3_rg/0.jpg)](https://www.youtube.com/watch?v=3mLu3DN3_rg)
 
 ### Controlling Your Party in Real-Time: Commands
 
