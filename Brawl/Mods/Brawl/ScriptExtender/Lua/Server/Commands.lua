@@ -98,9 +98,6 @@ local function disableMod(noNotify)
     State.Settings.ModEnabled = false
     Listeners.stopListeners()
     Movement.removeAllDashSpeedBoosts()
-    if State.Settings.TurnBasedSwarmMode then
-        State.removeBoostPlayerInitiatives()
-    end
     if Printer then Printer:Stop() end
     if not noNotify then
         modStatusMessage("Brawl Disabled")
@@ -602,6 +599,13 @@ local function onLeaderboardToggle(data)
     Leaderboard.showForUser(data.UserID)
 end
 
+local function onLeaderboardSetEnabled(data)
+    local enabled = (data.Payload == "true")
+    State.Settings.LeaderboardEnabled = enabled
+    MCM.Set("leaderboard_enabled", enabled)
+    Leaderboard.showForUser(data.UserID)
+end
+
 -- Find the character a given user is currently controlling.
 local function getControlledForUser(userId)
     if not State.Session.Players then return nil end
@@ -837,18 +841,20 @@ end
 
 local function onMCMTurnBasedSwarmMode(value)
     State.Settings.TurnBasedSwarmMode = value
+    State.Session.SwarmCurrentRoundMode = nil  -- clear stale per-round cache when toggling modes mid-game
+    -- Mode switch can transiently end/restart engine combat; suppress autospawn that resulting EnteredCombat would otherwise trigger.
+    if Encounters then
+        Encounters.SuppressNextAutoSpawn = true
+        Ext.Timer.WaitFor(5000, function() Encounters.SuppressNextAutoSpawn = false end)
+    end
     if value == true then
         RT.Timers.stopAllPulseActionTimers()
         Movement.removeAllDashSpeedBoosts()
         State.endBrawls()
-        if State.Settings.PlayersGoFirst then
-            State.boostPlayerInitiatives()
-        end
         State.recapMovementDistances()
         Swarm.resetChunkState()
         modStatusMessage("Swarm Mode")
     else
-        State.removeBoostPlayerInitiatives()
         State.uncapMovementDistances()
         State.disableDynamicCombatCamera()
         disableMod(true)
@@ -863,15 +869,6 @@ local function onModeToggle(data)
         MCM.Set("turn_based_swarm_mode", toggle)
     end
     onMCMTurnBasedSwarmMode(toggle)
-end
-
-local function onMCMPlayersGoFirst(value)
-    State.Settings.PlayersGoFirst = value
-    if State.Settings.PlayersGoFirst then
-        State.boostPlayerInitiatives()
-    else
-        State.removeBoostPlayerInitiatives()
-    end
 end
 
 local function onMCMExcludeEnemyTiers(excludeEnemyTier)
@@ -979,6 +976,7 @@ return {
         QueueCompanionAIActions = onQueueCompanionAIActions,
         FullAutoToggle = onFullAutoToggle,
         LeaderboardToggle = onLeaderboardToggle,
+        LeaderboardSetEnabled = onLeaderboardSetEnabled,
         RequestLoadouts = onRequestLoadouts,
         SaveLoadout = onSaveLoadout,
         LoadLoadout = onLoadLoadout,
@@ -1023,7 +1021,7 @@ return {
         turn_based_swarm_mode = onMCMTurnBasedSwarmMode,
         leaderboard_enabled = function (v) State.Settings.LeaderboardEnabled = v end,
         no_freeze_on_bonus_actions_during_pause = function (v) State.Settings.NoFreezeOnBonusActionsDuringPause = v end,
-        players_go_first = onMCMPlayersGoFirst,
+        players_go_together = function (v) State.Settings.PlayersGoTogether = v end,
         swarm_turn_timeout = function (v) State.Settings.SwarmTurnTimeout = v end,
         swarm_chunk_size = function (v) State.Settings.SwarmChunkSize = v end,
         autotrigger_swarm_mode_companion_ai = function (v) State.Settings.AutotriggerSwarmModeCompanionAI = v end,

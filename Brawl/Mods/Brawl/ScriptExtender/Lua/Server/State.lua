@@ -20,7 +20,7 @@ local Settings = {
     TurnBasedSwarmMode = false,
     LeaderboardEnabled = true,
     NoFreezeOnBonusActionsDuringPause = false,
-    PlayersGoFirst = false,
+    PlayersGoTogether = true,
     SwarmTurnTimeout = 30.0,
     SwarmChunkSize = 20,
     AutotriggerSwarmModeCompanionAI = false,
@@ -45,7 +45,7 @@ if MCM then
     Settings.TurnBasedSwarmMode = MCM.Get("turn_based_swarm_mode")
     Settings.LeaderboardEnabled = MCM.Get("leaderboard_enabled")
     Settings.NoFreezeOnBonusActionsDuringPause = MCM.Get("no_freeze_on_bonus_actions_during_pause")
-    Settings.PlayersGoFirst = MCM.Get("players_go_first")
+    Settings.PlayersGoTogether = MCM.Get("players_go_together")
     Settings.SwarmTurnTimeout = MCM.Get("swarm_turn_timeout")
     Settings.SwarmChunkSize = MCM.Get("swarm_chunk_size")
     Settings.AutotriggerSwarmModeCompanionAI = MCM.Get("autotrigger_swarm_mode_companion_ai")
@@ -131,6 +131,13 @@ Ext.Vars.RegisterModVariable(ModuleUUID, "PartyArchetypes", {Server = true, Clie
 Ext.Vars.RegisterModVariable(ModuleUUID, "CharacterLoadouts", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SummonReactionMode", {Server = true, Client = false, SyncToClient = false})
 Ext.Vars.RegisterModVariable(ModuleUUID, "SharedCampChestAccess", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "NaturalInitiative", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "AutoSpawnEncounterOnCombatStart", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "HostileToAllEncounter", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "AutoSpawnEncounterPerRoundEnabled", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "AutoSpawnEncounterPerRoundChance", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "RandomEncountersInWildEnabled", {Server = true, Client = false, SyncToClient = false})
+Ext.Vars.RegisterModVariable(ModuleUUID, "RandomEncountersInWildChance", {Server = true, Client = false, SyncToClient = false})
 
 local function getArchetype(uuid)
     local archetype
@@ -542,40 +549,6 @@ local function setIsControllingDirectly()
     end
 end
 
-local function removeBoostPlayerInitiatives()
-    local players = Session.Players
-    if players then
-        for uuid, _ in pairs(players) do
-            Osi.RemoveBoosts(uuid, Constants.PLAYER_INITIATIVE_BOOST, 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
-        end
-    end
-end
-
-local function boostPlayerInitiative(uuid)
-    debugPrint("Boosting player initiative", uuid)
-    Osi.AddBoosts(uuid, Constants.PLAYER_INITIATIVE_BOOST, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
-end
-
-local function removeBoostAllyInitiative(uuid)
-    debugPrint("Removing boost ally initiative", uuid)
-    Osi.RemoveBoosts(uuid, Constants.ALLY_INITIATIVE_BOOST, 0, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
-end
-
-local function boostAllyInitiative(uuid)
-    debugPrint("Boosting ally initiative", uuid)
-    Osi.AddBoosts(uuid, Constants.ALLY_INITIATIVE_BOOST, "BRAWL_TURN_BASED_SWARM_INITIATIVE_BOOST", uuid)
-end
-
-local function boostPlayerInitiatives()
-    -- removeBoostPlayerInitiatives()
-    local players = Session.Players
-    if players then
-        for playerUuid, _ in pairs(players) do
-            boostPlayerInitiative(playerUuid)
-        end
-    end
-end
-
 local function endBrawls()
     local hostCharacter = M.Osi.GetHostCharacter()
     if hostCharacter then
@@ -613,11 +586,6 @@ return {
     setupPlayer = setupPlayer,
     resetPlayers = resetPlayers,
     setIsControllingDirectly = setIsControllingDirectly,
-    removeBoostPlayerInitiatives = removeBoostPlayerInitiatives,
-    boostPlayerInitiatives = boostPlayerInitiatives,
-    boostPlayerInitiative = boostPlayerInitiative,
-    removeBoostAllyInitiative = removeBoostAllyInitiative,
-    boostAllyInitiative = boostAllyInitiative,
     endBrawls = endBrawls,
     Settings = Settings,
     Session = Session,

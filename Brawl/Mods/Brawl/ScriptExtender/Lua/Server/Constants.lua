@@ -1,7 +1,7 @@
 local Constants = {}
 
 -- Constants.DEBUG_LOGGING = {TurnOrder = true, RealTime = true, Swarm = false, Pause = true, Actions = false, Pick = false, AI = false, Movement = false, Listeners = true, Resources = false, Quests = false}
-Constants.DEBUG_LOGGING = true
+Constants.DEBUG_LOGGING = false
 Constants.INITIAL_PULSE_ACTION_DELAY = 600
 Constants.ACTION_INTERVAL_RESCALING = 0.3
 Constants.MINIMUM_ACTION_INTERVAL = 1000
@@ -431,8 +431,6 @@ Constants.TELEPORTS = {
 Constants.TOT_ENEMY_TIERS = {"low", "mid", "high", "ultra", "epic", "legendary", "mythical", "divine", "avatar"}
 Constants.EXCLUDED_ENEMY_TIMEOUT = 5000
 Constants.MAGIC_MISSILE_PATHFIND_UUID = "7bff57fa-fd21-4ab3-9384-83fb14237690"
-Constants.PLAYER_INITIATIVE_BOOST = "Initiative(1234)"
-Constants.ALLY_INITIATIVE_BOOST = "Initiative(600)"
 Constants.TIME_BETWEEN_ACTIONS = 750
 Constants.ACTION_MAX_TIME = 6000
 Constants.MOVEMENT_MAX_TIME = 8000

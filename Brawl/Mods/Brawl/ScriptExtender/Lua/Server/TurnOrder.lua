@@ -68,10 +68,6 @@ local function setInitiativeRoll(uuid, roll)
     end
 end
 
--- Compute the mean initiative once per combat (the first time it's called
--- with no cached value) and store it. Subsequent calls are no-ops, so the
--- value can be used as a stable baseline for offset-based bumping without
--- the recursive inflation we'd see by recomputing each round.
 local function setPartyInitiativeRollToMean()
     if State.Session.MeanInitiativeRoll then
         return
@@ -83,15 +79,52 @@ local function setPartyInitiativeRollToMean()
     end
 end
 
--- Force every party member's InitiativeRoll to the cached mean.  Used in Swarm mode to keep all party members on the same TurnOrder.Groups team; without
--- this, any party member whose natural d20 roll differs from the others ends up in their own single-member group/lumped with same-init NPCs, which manifests
--- as that character never going active when the player phase begins.  Not used in RT mode (bumpInitiativeRolls there overwrites party init to maxEnemy+1).
+-- -100 = engine "not yet rolled" / dead. -99 = bugged value
+local function isValidInitRoll(roll)
+    return roll ~= nil and roll ~= -100 and roll ~= -99
+end
+
+local function getNaturalInitiativeCache()
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    modVars.NaturalInitiative = modVars.NaturalInitiative or {}
+    return modVars.NaturalInitiative
+end
+
+local function cacheNaturalInitiativeIfMissing(uuid)
+    local cache = getNaturalInitiativeCache()
+    if cache[uuid] then return end
+    local roll = getInitiativeRoll(uuid)
+    if isValidInitRoll(roll) then
+        cache[uuid] = roll
+    end
+end
+
+local function restoreNaturalInitiative()
+    for uuid, roll in pairs(getNaturalInitiativeCache()) do
+        if isValidInitRoll(roll) and Utils.isAliveAndCanFight(uuid) then
+            setInitiativeRoll(uuid, roll)
+        end
+    end
+end
+
+local function clearNaturalInitiativeFor(uuid)
+    local cache = getNaturalInitiativeCache()
+    cache[uuid] = nil
+end
+
+local function clearAllNaturalInitiative()
+    local modVars = Ext.Vars.GetModVariables(ModuleUUID)
+    modVars.NaturalInitiative = nil
+end
+
+-- Captures pre-mutate values into the natural-init cache before forcing the mean
 local function equalizePartyInitiative()
     if not State.Session.MeanInitiativeRoll then
         return
     end
     for uuid, _ in pairs(State.Session.Players) do
         if Utils.isAliveAndCanFight(uuid) then
+            cacheNaturalInitiativeIfMissing(uuid)
             setInitiativeRoll(uuid, State.Session.MeanInitiativeRoll)
         end
     end
@@ -100,6 +133,7 @@ end
 local function bumpNpcInitiativeRoll(uuid)
     local initiativeRoll = getInitiativeRoll(uuid)
     if initiativeRoll then
+        cacheNaturalInitiativeIfMissing(uuid)
         local bumpedInitiativeRoll = math.random() > 0.5 and initiativeRoll + 1 or initiativeRoll - 1
         debugPrint(M.Utils.getDisplayName(uuid), "might split group, bumping roll", initiativeRoll, "->", bumpedInitiativeRoll)
         setInitiativeRoll(uuid, bumpedInitiativeRoll)
@@ -259,6 +293,11 @@ local function bumpInitiativeRolls(intendedSet)
     local maxEnemy = calculateMaxEnemyInitiativeRoll()
     if not maxEnemy then
         debugPrint("[bumpInitiativeRolls] skipped (no enemy init found)")
+        return
+    end
+    -- Skip if maxEnemy is a known sentinel (-100, -99, -20); bumping would propagate garbage to the party.
+    if not isValidInitRoll(maxEnemy) then
+        debugPrint(string.format("[bumpInitiativeRolls] skipped (maxEnemy=%d is sentinel)", maxEnemy))
         return
     end
     local target = maxEnemy + 1
@@ -511,6 +550,9 @@ return {
     calculateActionInterval = calculateActionInterval,
     setInitiativeRoll = setInitiativeRoll,
     setPartyInitiativeRollToMean = setPartyInitiativeRollToMean,
+    restoreNaturalInitiative = restoreNaturalInitiative,
+    clearNaturalInitiativeFor = clearNaturalInitiativeFor,
+    clearAllNaturalInitiative = clearAllNaturalInitiative,
     equalizePartyInitiative = equalizePartyInitiative,
     bumpNpcInitiativeRolls = bumpNpcInitiativeRolls,
     setPlayersSwarmGroup = setPlayersSwarmGroup,

@@ -219,7 +219,9 @@ function Loot.dropEncounterPile(host, rolls)
         return 0
     end
 
-    Utils.showNotification(host, "Encounter complete!", 4)
+    -- Broadcast notification directly. showNotification's isPlayerControllingDirectly gate fails
+    -- during cinematics that release direct control.
+    Ext.ServerNet.BroadcastMessage("Notification", Ext.Json.Stringify({text = "Encounter complete!", duration = 4}))
 
     local interval = math.max(120, 300 - (#picks * 2))
     local i = 0

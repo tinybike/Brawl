@@ -164,11 +164,24 @@ local LoadoutsContentHandle = nil  -- Child container inside the tab; destroyed 
 local LatestLoadoutsData = nil  -- Cached server payload for the Loadouts tab; rendered when tab/window opens or refreshed
 local LoadoutsExpandedByUuid = {}  -- Persisted expanded/collapsed state of each character's section, survives destroy/rebuild
 local LoadoutsLastActiveUuid = nil  -- Tracks active char so we can force-open the section on a switch
+local AutoSpawnEncounterCheckbox = nil  -- handle, refreshed when server replies
+local AutoSpawnEncounterState = false  -- cache, primes checkbox before server reply
+local HostileToAllEncounterCheckbox = nil
+local HostileToAllEncounterState = false
+local AutoSpawnPerRoundCheckbox = nil
+local AutoSpawnPerRoundState = false
+local AutoSpawnPerRoundChanceInput = nil
+local AutoSpawnPerRoundChance = 5
+local WildEncountersCheckbox = nil
+local WildEncountersState = false
+local WildEncountersChanceInput = nil
+local WildEncountersChance = 5
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
 local lightBlue = {0.6, 0.8, 1, 1}
 local lightRed = {1, 0.8, 0.8, 1}
+local mediumGrey = {0.5, 0.5, 0.5, 0.7}
 
 -- Keybinding stuff from https://github.com/AtilioA/BG3-MCM & modified/re-used with permission
 
@@ -880,7 +893,7 @@ local function refreshLoadoutsTab()
     end
 end
 
-local function showLeaderboard(data)
+local function showLeaderboard(payload)
     if LeaderboardWindow then
         LeaderboardWindow:Destroy()
         cellRefs.party = {}
@@ -888,6 +901,8 @@ local function showLeaderboard(data)
         LoadoutsTabHandle = nil
         LoadoutsContentHandle = nil
     end
+    local data = payload.board or {}
+    local leaderboardEnabled = payload.enabled == true
     local damageWidth, takenWidth, killsWidth, healingWidth, receivedWidth = #"Damage", #"Taken", #"Kills", #"Healing", #"Healed"
     local nameWidth, partyCount, enemyCount = 0, 0, 0
     for uuid, stats in pairs(data) do
@@ -917,30 +932,50 @@ local function showLeaderboard(data)
     cellRefs.partyTable = partyTable
     do
         local hdr = partyTable:AddRow()
-        hdr:AddCell():AddText("")
+        local btnToggle = hdr:AddCell():AddButton(leaderboardEnabled and "Disable" or "Enable")
+        btnToggle.OnClick = function()
+            Ext.ClientNet.PostMessageToServer("LeaderboardSetEnabled", tostring(not leaderboardEnabled))
+        end
         hdr:AddCell():AddText("Damage"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Taken"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Kills"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Healing"):SetColor("Text", mediumYellow)
         hdr:AddCell():AddText("Healed"):SetColor("Text", mediumYellow)
     end
+    local nameColor = leaderboardEnabled and lightBlue or mediumGrey
+    local enemyNameColor = leaderboardEnabled and lightRed or mediumGrey
     local party = {}
     for uuid, stats in pairs(data) do
         if isPartyMember(uuid) then
             party[#party + 1] = {uuid = uuid, stats = stats}
         end
     end
+    -- Match in-game sidebar order; fall back to damageDone for party members missing from the portrait list.
+    local portraitOrder = getPartyPortraitOrder()
     table.sort(party, function (a, b)
+        local ai = portraitOrder[a.uuid]
+        local bi = portraitOrder[b.uuid]
+        if ai and bi then return ai < bi end
+        if ai then return true end
+        if bi then return false end
         return (a.stats.damageDone or 0) > (b.stats.damageDone or 0)
     end)
+    local function applyDisabledColor(cell)
+        if not leaderboardEnabled then cell:SetColor("Text", mediumGrey) end
+    end
     for _, e in ipairs(party) do
         local row = partyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightBlue)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", nameColor)
         local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
         local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        applyDisabledColor(dmgCell)
+        applyDisabledColor(takenCell)
+        applyDisabledColor(killsCell)
+        applyDisabledColor(healCell)
+        applyDisabledColor(recvCell)
         cellRefs.party[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
     leaderboardTab:AddSeparator()
@@ -957,12 +992,17 @@ local function showLeaderboard(data)
     end)
     for _, e in ipairs(enemy) do
         local row = enemyTable:AddRow()
-        row:AddCell():AddText(e.stats.name):SetColor("Text", lightRed)
+        row:AddCell():AddText(e.stats.name):SetColor("Text", enemyNameColor)
         local dmgCell = row:AddCell():AddText(tostring(e.stats.damageDone or 0))
         local takenCell = row:AddCell():AddText(tostring(e.stats.damageTaken or 0))
         local killsCell = row:AddCell():AddText(tostring(e.stats.kills or 0))
         local healCell = row:AddCell():AddText(tostring(e.stats.healingDone or 0))
         local recvCell = row:AddCell():AddText(tostring(e.stats.healingTaken or 0))
+        applyDisabledColor(dmgCell)
+        applyDisabledColor(takenCell)
+        applyDisabledColor(killsCell)
+        applyDisabledColor(healCell)
+        applyDisabledColor(recvCell)
         cellRefs.enemy[e.uuid] = {damage = dmgCell, taken = takenCell, kills = killsCell, healing = healCell, received = recvCell}
     end
     LoadoutsTabHandle = tabs:AddTabItem("Loadouts")
@@ -971,14 +1011,68 @@ local function showLeaderboard(data)
     postRequestLoadouts()
 
     local encountersTab = tabs:AddTabItem("Encounters")
-    encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    local cbAutoSpawn = encountersTab:AddCheckbox("Spawn an encounter at the beginning of every fight")
+    cbAutoSpawn.Checked = AutoSpawnEncounterState
+    cbAutoSpawn.OnChange = function()
+        AutoSpawnEncounterState = cbAutoSpawn.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnOnCombatStart", tostring(cbAutoSpawn.Checked))
+    end
+    AutoSpawnEncounterCheckbox = cbAutoSpawn
+    local cbPerRound = encountersTab:AddCheckbox("Chance to spawn an encounter each round")
+    cbPerRound.Checked = AutoSpawnPerRoundState
+    cbPerRound.OnChange = function()
+        AutoSpawnPerRoundState = cbPerRound.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnPerRoundEnabled", tostring(cbPerRound.Checked))
+    end
+    AutoSpawnPerRoundCheckbox = cbPerRound
+    local chanceInput = encountersTab:AddInputText("##perRoundChance", tostring(AutoSpawnPerRoundChance) .. "%")
+    chanceInput.SameLine = true
+    chanceInput.EnterReturnsTrue = true
+    chanceInput.OnChange = function(c)
+        local n = tonumber((c.Text or ""):match("%d+")) or 0
+        if n < 0 then n = 0 elseif n > 100 then n = 100 end
+        AutoSpawnPerRoundChance = n
+        c.Text = tostring(n) .. "%"
+        Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnPerRoundChance", tostring(n))
+    end
+    AutoSpawnPerRoundChanceInput = chanceInput
+    local cbWild = encountersTab:AddCheckbox("Chance to spawn random encounters in the wild (per ~20m walked)")
+    cbWild.Checked = WildEncountersState
+    cbWild.OnChange = function()
+        WildEncountersState = cbWild.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetRandomEncountersInWildEnabled", tostring(cbWild.Checked))
+    end
+    WildEncountersCheckbox = cbWild
+    local wildChanceInput = encountersTab:AddInputText("##wildChance", tostring(WildEncountersChance) .. "%")
+    wildChanceInput.SameLine = true
+    wildChanceInput.EnterReturnsTrue = true
+    wildChanceInput.OnChange = function(c)
+        local n = tonumber((c.Text or ""):match("%d+")) or 0
+        if n < 0 then n = 0 elseif n > 100 then n = 100 end
+        WildEncountersChance = n
+        c.Text = tostring(n) .. "%"
+        Ext.ClientNet.PostMessageToServer("Encounters.SetRandomEncountersInWildChance", tostring(n))
+    end
+    WildEncountersChanceInput = wildChanceInput
     local cbHostileToAll = encountersTab:AddCheckbox("Hostile to all nearby NPCs (not just party)")
-    cbHostileToAll.Checked = false
+    cbHostileToAll.Checked = HostileToAllEncounterState
+    cbHostileToAll.OnChange = function()
+        HostileToAllEncounterState = cbHostileToAll.Checked
+        Ext.ClientNet.PostMessageToServer("Encounters.SetHostileToAll", tostring(cbHostileToAll.Checked))
+    end
+    HostileToAllEncounterCheckbox = cbHostileToAll
     local btnSpawn = encountersTab:AddButton("Fight!")
     btnSpawn.OnClick = function()
         local payload = Ext.Json.Stringify({difficultyOffset = 0, hostileToAll = cbHostileToAll.Checked})
         Ext.ClientNet.PostMessageToServer("Encounters.SpawnAtPlayer", payload)
     end
+    encountersTab:AddText("Click to spawn some level-appropriate enemies at your location."):SetColor("Text", mediumYellow)
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnState", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestHostileToAllState", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnPerRoundEnabled", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestAutoSpawnPerRoundChance", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestRandomEncountersInWildEnabled", "")
+    Ext.ClientNet.PostMessageToServer("Encounters.RequestRandomEncountersInWildChance", "")
 end
 
 local function updateLeaderboard(data)
@@ -1069,6 +1163,38 @@ local function onNetMessage(data)
     elseif data.Channel == "Loadouts" then
         LatestLoadoutsData = Ext.Json.Parse(data.Payload)
         refreshLoadoutsTab()
+    elseif data.Channel == "Encounters.AutoSpawnState" then
+        AutoSpawnEncounterState = (data.Payload == "true")
+        if AutoSpawnEncounterCheckbox then
+            pcall(function() AutoSpawnEncounterCheckbox.Checked = AutoSpawnEncounterState end)
+        end
+    elseif data.Channel == "Encounters.HostileToAllState" then
+        HostileToAllEncounterState = (data.Payload == "true")
+        if HostileToAllEncounterCheckbox then
+            pcall(function() HostileToAllEncounterCheckbox.Checked = HostileToAllEncounterState end)
+        end
+    elseif data.Channel == "Encounters.AutoSpawnPerRoundEnabledState" then
+        AutoSpawnPerRoundState = (data.Payload == "true")
+        if AutoSpawnPerRoundCheckbox then
+            pcall(function() AutoSpawnPerRoundCheckbox.Checked = AutoSpawnPerRoundState end)
+        end
+    elseif data.Channel == "Encounters.AutoSpawnPerRoundChanceState" then
+        local n = tonumber(data.Payload) or 5
+        AutoSpawnPerRoundChance = n
+        if AutoSpawnPerRoundChanceInput then
+            pcall(function() AutoSpawnPerRoundChanceInput.Text = tostring(n) .. "%" end)
+        end
+    elseif data.Channel == "Encounters.RandomEncountersInWildEnabledState" then
+        WildEncountersState = (data.Payload == "true")
+        if WildEncountersCheckbox then
+            pcall(function() WildEncountersCheckbox.Checked = WildEncountersState end)
+        end
+    elseif data.Channel == "Encounters.RandomEncountersInWildChanceState" then
+        local n = tonumber(data.Payload) or 5
+        WildEncountersChance = n
+        if WildEncountersChanceInput then
+            pcall(function() WildEncountersChanceInput.Text = tostring(n) .. "%" end)
+        end
     elseif data.Channel == "DisableDynamicCombatCamera" then
         disableDynamicCombatCamera()
     -- elseif data.Channel == "NextCombatRound" then
@@ -1233,17 +1359,6 @@ local function onSessionLoaded()
     -- APoCS settling signal: ecl::camera component is client-only, so listen here and ping server.
     Ext.Entity.OnCreateDeferred("CameraArriveWatcher", function(entity)
         Ext.ClientNet.PostMessageToServer("APoCSCameraReady", "")
-    end)
-    -- Diagnostic mirror of server-side ClientControl logging.
-    Ext.Entity.OnCreateDeferred("ClientControl", function(entity)
-        local t = Ext.Utils.MonotonicTime()
-        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
-        print(string.format("[Brawl/Client] [%dms] ClientControl CREATE entity=%s", t, tostring(euuid)))
-    end)
-    Ext.Entity.OnDestroy("ClientControl", function(entity)
-        local t = Ext.Utils.MonotonicTime()
-        local euuid = entity and entity.Uuid and entity.Uuid.EntityUuid or "?"
-        print(string.format("[Brawl/Client] [%dms] ClientControl DESTROY entity=%s", t, tostring(euuid)))
     end)
 end
 

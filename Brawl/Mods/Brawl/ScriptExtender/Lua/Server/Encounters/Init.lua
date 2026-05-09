@@ -2,10 +2,87 @@ Encounters = Encounters or {}
 
 local debugPrint = Utils.debugPrint
 
--- Vanilla "Evil_NPC" faction. Applied AFTER the engine has merged the spawn-time splinter combats into the host's combat
--- (see applyFactionWhenMerged). Applying it earlier triggers proximity-aggro that splinters combat groups, which causes a
--- start/stop loop under AutoPauseOnCombatStart. Persistent faction is what keeps spawned enemies hostile across camp/rest.
+local function getAutoSpawnOnCombatStart()
+    return Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterOnCombatStart == true
+end
+
+local function setAutoSpawnOnCombatStart(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterOnCombatStart = (enabled == true)
+end
+
+local function getHostileToAllEncounter()
+    return Ext.Vars.GetModVariables(ModuleUUID).HostileToAllEncounter == true
+end
+
+local function setHostileToAllEncounter(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).HostileToAllEncounter = (enabled == true)
+end
+
+local function getAutoSpawnPerRoundEnabled()
+    return Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundEnabled == true
+end
+
+local function setAutoSpawnPerRoundEnabled(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundEnabled = (enabled == true)
+end
+
+local function getAutoSpawnPerRoundChance()
+    local v = Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundChance
+    if type(v) ~= "number" then return 5 end
+    return math.max(0, math.min(100, math.floor(v)))
+end
+
+local function setAutoSpawnPerRoundChance(value)
+    local n = tonumber(value) or 0
+    Ext.Vars.GetModVariables(ModuleUUID).AutoSpawnEncounterPerRoundChance = math.max(0, math.min(100, math.floor(n)))
+end
+
+local function getRandomEncountersInWildEnabled()
+    return Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildEnabled == true
+end
+
+local function setRandomEncountersInWildEnabled(enabled)
+    Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildEnabled = (enabled == true)
+end
+
+local function getRandomEncountersInWildChance()
+    local v = Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildChance
+    if type(v) ~= "number" then return 5 end
+    return math.max(0, math.min(100, math.floor(v)))
+end
+
+local function setRandomEncountersInWildChance(value)
+    local n = tonumber(value) or 0
+    Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildChance = math.max(0, math.min(100, math.floor(n)))
+end
+
+Encounters.getAutoSpawnOnCombatStart = getAutoSpawnOnCombatStart
+Encounters.setAutoSpawnOnCombatStart = setAutoSpawnOnCombatStart
+Encounters.getHostileToAllEncounter = getHostileToAllEncounter
+Encounters.setHostileToAllEncounter = setHostileToAllEncounter
+Encounters.getAutoSpawnPerRoundEnabled = getAutoSpawnPerRoundEnabled
+Encounters.setAutoSpawnPerRoundEnabled = setAutoSpawnPerRoundEnabled
+Encounters.getAutoSpawnPerRoundChance = getAutoSpawnPerRoundChance
+Encounters.setAutoSpawnPerRoundChance = setAutoSpawnPerRoundChance
+Encounters.getRandomEncountersInWildEnabled = getRandomEncountersInWildEnabled
+Encounters.setRandomEncountersInWildEnabled = setRandomEncountersInWildEnabled
+Encounters.getRandomEncountersInWildChance = getRandomEncountersInWildChance
+Encounters.setRandomEncountersInWildChance = setRandomEncountersInWildChance
+
+-- Vanilla "Evil_NPC" faction. Normally applied via applyFactionWhenMerged (deferred to avoid splinter/autopause loop);
+-- hostileToAll spawns apply it immediately because the merge wait never resolves and the late SetFaction breaks bystander hostility.
 local ENEMY_FACTION = "64321d50-d516-b1b2-cfac-2eb773de1ff6"
+
+local function applyFactionImmediately(guids)
+    local applied = 0
+    for _, g in ipairs(guids) do
+        if Osi.IsDead(g) ~= 1 then
+            Osi.SetFaction(g, ENEMY_FACTION)
+            applied = applied + 1
+        end
+    end
+    debugPrint(string.format("[Encounters] hostileToAll: SetFaction applied immediately to %d/%d", applied, #guids))
+end
 
 local function applyFactionWhenMerged(guids, host)
     if not guids or #guids == 0 or not host then return end
@@ -110,28 +187,39 @@ function Encounters.spawnWave(templateUuid, count, radius)
     return guids
 end
 
-local function makeHostileToAll(spawnedGuids, hostUuid, radius)
-    radius = radius or 50
+local ENGAGEMENT_RANGE_M = 7  -- engine's flat engagement range; per-enemy search radius for hostile-to-all pull-in
+
+local function makeHostileToAll(spawnedGuids)
     local spawnedSet = {}
     for _, guid in ipairs(spawnedGuids) do spawnedSet[guid] = true end
 
-    local nearby = Utils.getNearby(hostUuid, radius)
-    local engaged = 0
-    for _, nearbyUuid in ipairs(nearby) do
-        if not spawnedSet[nearbyUuid]
-                and Osi.IsPartyMember(nearbyUuid, 1) ~= 1
-                and not Utils.isCombatHelper(nearbyUuid)
-                and Osi.IsDead(nearbyUuid) ~= 1 then
-            for _, spawnedGuid in ipairs(spawnedGuids) do
-                Osi.SetRelationTemporaryHostile(spawnedGuid, nearbyUuid)
-                Osi.SetRelationTemporaryHostile(nearbyUuid, spawnedGuid)
-                Osi.EnterCombat(spawnedGuid, nearbyUuid)
-                Osi.EnterCombat(nearbyUuid, spawnedGuid)
-                engaged = engaged + 1
+    local bystanderSet = {}
+    for _, spawnedGuid in ipairs(spawnedGuids) do
+        for _, candidateUuid in ipairs(Utils.getNearby(spawnedGuid, ENGAGEMENT_RANGE_M)) do
+            if not spawnedSet[candidateUuid]
+                    and not bystanderSet[candidateUuid]
+                    and Osi.IsPartyMember(candidateUuid, 1) ~= 1
+                    and not Utils.isCombatHelper(candidateUuid)
+                    and Osi.IsDead(candidateUuid) ~= 1 then
+                bystanderSet[candidateUuid] = true
             end
         end
     end
-    debugPrint(string.format("[Encounters] hostileToAll: engaged %d pairs (%dm radius)", engaged, radius))
+
+    local bystanderCount = 0
+    for _ in pairs(bystanderSet) do bystanderCount = bystanderCount + 1 end
+
+    local engaged = 0
+    for bystanderUuid in pairs(bystanderSet) do
+        for _, spawnedGuid in ipairs(spawnedGuids) do
+            Osi.SetRelationTemporaryHostile(spawnedGuid, bystanderUuid)
+            Osi.SetRelationTemporaryHostile(bystanderUuid, spawnedGuid)
+            Osi.EnterCombat(spawnedGuid, bystanderUuid)
+            Osi.EnterCombat(bystanderUuid, spawnedGuid)
+            engaged = engaged + 1
+        end
+    end
+    debugPrint(string.format("[Encounters] hostileToAll: %d bystanders, %d pairs engaged", bystanderCount, engaged))
 end
 
 function Encounters.spawnAtPlayer(opts)
@@ -149,18 +237,23 @@ function Encounters.spawnAtPlayer(opts)
         return
     end
 
-    local anchorCount = opts.anchorCount or math.max(3, math.min(#picks, 6))
-    local radius = opts.radius or 14
-    local jitterM = opts.jitterM or 2
+    local anchorCount = opts.anchorCount or math.max(3, #picks)  -- one anchor per pick, no shared spawn positions
+    local maxRadius = opts.maxRadius or opts.radius or 11
+    local minRadius = opts.minRadius or 5
+    local jitterM = opts.jitterM or 0
 
     debugPrint(string.format("[Encounters] spawnAtPlayer: playerLevel=%d (eff=%d) budget=%d → %d picks hostileToAll=%s",
         playerLevel, effLevel, budget, #picks, tostring(hostileToAll)))
 
-    local anchors = SpawnPoints.ringAround(host, anchorCount, radius)
+    local anchors = SpawnPoints.ringAround(host, anchorCount, maxRadius, minRadius)
     if #anchors == 0 then
         debugPrint("[Encounters] spawnAtPlayer: no valid anchors generated")
         return
     end
+
+    -- Suppress the resulting CombatStarted from re-triggering auto-spawn. Timer auto-clears if no event fires.
+    Encounters.SuppressNextAutoSpawn = true
+    Ext.Timer.WaitFor(5000, function() Encounters.SuppressNextAutoSpawn = false end)
 
     local guids = {}
     for slot, entry in ipairs(picks) do
@@ -179,10 +272,12 @@ function Encounters.spawnAtPlayer(opts)
 
     debugPrint(string.format("[Encounters] spawn: %d/%d enemies spawned", #guids, #picks))
     Spawn.ensureInCombat(guids, host)
-    applyFactionWhenMerged(guids, host)
 
     if hostileToAll and #guids > 0 then
-        Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids, host) end)
+        applyFactionImmediately(guids)
+        Ext.Timer.WaitFor(2500, function() makeHostileToAll(guids) end)
+    else
+        applyFactionWhenMerged(guids, host)
     end
 
     return guids
@@ -199,5 +294,163 @@ Ext.RegisterNetListener("Encounters.SpawnAtPlayer", function(channel, payload, u
             opts = {difficultyOffset = tonumber(payload) or 0}
         end
     end
+    -- MP: spawn at the requesting user's controlled character, not always the host's
+    if not opts.host then
+        local player = State.getPlayerByUserId(Utils.peerToUserId(userId))
+        if player and player.uuid then opts.host = player.uuid end
+    end
     Encounters.spawnAtPlayer(opts)
 end)
+
+Ext.RegisterNetListener("Encounters.SetAutoSpawnOnCombatStart", function(channel, payload, userId)
+    setAutoSpawnOnCombatStart(payload == "true")
+    debugPrint(string.format("[Encounters] AutoSpawnOnCombatStart = %s", tostring(getAutoSpawnOnCombatStart())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnState", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnState", tostring(getAutoSpawnOnCombatStart()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetHostileToAll", function(channel, payload, userId)
+    setHostileToAllEncounter(payload == "true")
+    debugPrint(string.format("[Encounters] HostileToAllEncounter = %s", tostring(getHostileToAllEncounter())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestHostileToAllState", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.HostileToAllState", tostring(getHostileToAllEncounter()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetAutoSpawnPerRoundEnabled", function(channel, payload, userId)
+    setAutoSpawnPerRoundEnabled(payload == "true")
+    debugPrint(string.format("[Encounters] AutoSpawnPerRoundEnabled = %s", tostring(getAutoSpawnPerRoundEnabled())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnPerRoundEnabled", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnPerRoundEnabledState", tostring(getAutoSpawnPerRoundEnabled()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetAutoSpawnPerRoundChance", function(channel, payload, userId)
+    setAutoSpawnPerRoundChance(payload)
+    debugPrint(string.format("[Encounters] AutoSpawnPerRoundChance = %d", getAutoSpawnPerRoundChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestAutoSpawnPerRoundChance", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.AutoSpawnPerRoundChanceState", tostring(getAutoSpawnPerRoundChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetRandomEncountersInWildEnabled", function(channel, payload, userId)
+    setRandomEncountersInWildEnabled(payload == "true")
+    debugPrint(string.format("[Encounters] RandomEncountersInWildEnabled = %s", tostring(getRandomEncountersInWildEnabled())))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestRandomEncountersInWildEnabled", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.RandomEncountersInWildEnabledState", tostring(getRandomEncountersInWildEnabled()))
+end)
+
+Ext.RegisterNetListener("Encounters.SetRandomEncountersInWildChance", function(channel, payload, userId)
+    setRandomEncountersInWildChance(payload)
+    debugPrint(string.format("[Encounters] RandomEncountersInWildChance = %d", getRandomEncountersInWildChance()))
+end)
+
+Ext.RegisterNetListener("Encounters.RequestRandomEncountersInWildChance", function(channel, payload, userId)
+    Ext.ServerNet.PostMessageToUser(userId, "Encounters.RandomEncountersInWildChanceState", tostring(getRandomEncountersInWildChance()))
+end)
+
+-- Auto-spawn fires once per combat on the first party-member EnteredCombat (NPC-on-NPC fights don't trigger).
+Encounters.AutoSpawnedCombats = Encounters.AutoSpawnedCombats or {}
+
+Ext.Osiris.RegisterListener("EnteredCombat", 2, "after", function(entityGuid, combatGuid)
+    if not getAutoSpawnOnCombatStart() then return end
+    if Encounters.AutoSpawnedCombats[combatGuid] then return end
+    if Osi.IsPartyMember(entityGuid, 1) ~= 1 then return end
+    if Encounters.SuppressNextAutoSpawn then
+        Encounters.SuppressNextAutoSpawn = false
+        Encounters.AutoSpawnedCombats[combatGuid] = true
+        return
+    end
+    Encounters.AutoSpawnedCombats[combatGuid] = true
+    local host = M.Osi.GetUUID(entityGuid) or Osi.GetHostCharacter()
+    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+end)
+
+Ext.Osiris.RegisterListener("CombatEnded", 1, "after", function(combatGuid)
+    Encounters.AutoSpawnedCombats[combatGuid] = nil
+end)
+
+Ext.Osiris.RegisterListener("LongRestFinished", 0, "after", function()
+    Encounters.Tracking.removeAllSurvivors()
+end)
+
+-- Per-round dice roll: at every CombatRoundStarted of the host's combat, X% chance to spawn an encounter.
+Ext.Osiris.RegisterListener("CombatRoundStarted", 2, "after", function(combatGuid, round)
+    if not getAutoSpawnPerRoundEnabled() then return end
+    local chance = getAutoSpawnPerRoundChance()
+    if chance <= 0 then return end
+    local host = Osi.GetHostCharacter()
+    if not host then return end
+    if Osi.CombatGetGuidFor(host) ~= combatGuid then return end  -- only the host's combat
+    if math.random(1, 100) > chance then return end
+    debugPrint(string.format("[Encounters] per-round roll succeeded (chance=%d%%, round=%s) -- spawning", chance, tostring(round)))
+    Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+end)
+
+-- Wilderness random encounter: poll host position, accumulate distance walked, roll every 5m, only if no peaceful NPC within 30m.
+local WILD_TICK_MS = 10000
+local WILD_METERS_PER_ROLL = 20
+local WILD_RADIUS_M = 30
+local WILD_TELEPORT_THRESHOLD_M = 50
+local wildLastPos = nil
+local wildDistanceAccum = 0
+
+local function isInWilderness(host)
+    local nearby = Utils.getNearby(host, WILD_RADIUS_M)
+    for _, uuid in ipairs(nearby) do
+        if uuid ~= host
+                and Osi.IsPartyMember(uuid, 1) ~= 1
+                and not Utils.isCombatHelper(uuid)
+                and Osi.IsEnemy(host, uuid) == 0 then
+            return false  -- a peaceful non-party character is nearby = not wild
+        end
+    end
+    return true
+end
+
+local function wildernessTick()
+    Ext.Timer.WaitFor(WILD_TICK_MS, wildernessTick)
+    if not getRandomEncountersInWildEnabled() then
+        wildLastPos = nil
+        wildDistanceAccum = 0
+        return
+    end
+    local host = Osi.GetHostCharacter()
+    if not host then return end
+    if Osi.IsInCombat(host) == 1 then
+        wildLastPos = nil
+        wildDistanceAccum = 0
+        return
+    end
+    local px, py, pz = Osi.GetPosition(host)
+    if not px then return end
+    if wildLastPos then
+        local dx = px - wildLastPos[1]
+        local dy = py - wildLastPos[2]
+        local dz = pz - wildLastPos[3]
+        local d = math.sqrt(dx*dx + dy*dy + dz*dz)
+        if d > 0 and d < WILD_TELEPORT_THRESHOLD_M then  -- ignore teleports / level loads
+            wildDistanceAccum = wildDistanceAccum + d
+        end
+    end
+    wildLastPos = {px, py, pz}
+    while wildDistanceAccum >= WILD_METERS_PER_ROLL do
+        wildDistanceAccum = wildDistanceAccum - WILD_METERS_PER_ROLL
+        local chance = getRandomEncountersInWildChance()
+        if chance > 0 and isInWilderness(host) and math.random(1, 100) <= chance then
+            debugPrint(string.format("[Encounters] wilderness roll succeeded (chance=%d%%) -- spawning", chance))
+            wildDistanceAccum = 0
+            Encounters.spawnAtPlayer({hostileToAll = getHostileToAllEncounter(), host = host})
+            return
+        end
+    end
+end
+
+Ext.Timer.WaitFor(WILD_TICK_MS, wildernessTick)

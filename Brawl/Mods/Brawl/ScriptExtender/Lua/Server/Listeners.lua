@@ -111,6 +111,8 @@ local function onCombatEnded(combatGuid)
     debugPrint("CombatEnded", combatGuid)
     State.Session.StoryActionIDs = {}
     State.Session.MeanInitiativeRoll = nil
+    TurnOrder.clearAllNaturalInitiative()
+    Encounters.Tracking.pruneDead()
     Movement.removeAllDashSpeedBoosts()
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onCombatEnded()
@@ -180,6 +182,10 @@ end
 local function onDied(entityGuid)
     debugPrint("Died", entityGuid)
     local entityUuid = M.Osi.GetUUID(entityGuid)
+    -- Drop the cached natural init so a rezzed unit's fresh roll is captured by the next equalize/bumpNpc.
+    if entityUuid then
+        TurnOrder.clearNaturalInitiativeFor(entityUuid)
+    end
     if State.Settings.TurnBasedSwarmMode then
         Swarm.Listeners.onDied(entityUuid)
     else

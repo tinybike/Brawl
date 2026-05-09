@@ -626,6 +626,26 @@ local function getCombatEntity()
     end
 end
 
+-- Add uuid to a specific combat via ServerEnterRequest, bypassing Osi.EnterCombat's create-or-merge ambiguity.
+-- combatGuid optional; without it, joins the first combat entity (Brawl's primary tracked combat).
+local function joinCombat(uuid, combatGuid)
+    local entity = Ext.Entity.Get(uuid)
+    if not entity then return false end
+    if M.Osi.CanJoinCombat(uuid) ~= 1 then return false end
+    local candidates = Ext.Entity.GetAllEntitiesWithComponent("ServerEnterRequest")
+    if not candidates then return false end
+    for _, ce in ipairs(candidates) do
+        if ce.ServerEnterRequest and ce.ServerEnterRequest.EnterRequests then
+            local match = combatGuid == nil or (ce.CombatState and ce.CombatState.MyGuid == combatGuid)
+            if match then
+                ce.ServerEnterRequest.EnterRequests[entity] = true
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function hasStatus(entity, targetStatus)
     if entity and entity.StatusContainer and entity.StatusContainer.Statuses then
         for _, status in pairs(entity.StatusContainer.Statuses) do
@@ -783,6 +803,29 @@ local function repairCanJoinCombatInRegion()
     return count
 end
 
+-- Force-reset every party member's CombatParticipant.InitiativeRoll to the "not yet rolled" sentinel (-100).
+-- For salvaging old saves where stuck/garbage init values (-99 etc) are persisting across combats. Engine re-rolls on next combat.
+local function resetPartyInitiatives()
+    local count = 0
+    for _, pm in pairs(Osi.DB_PartyMembers:Get(nil)) do
+        local pmUuid = pm[1]
+        if pmUuid then
+            local entity = Ext.Entity.Get(pmUuid)
+            if entity and entity.CombatParticipant then
+                entity.CombatParticipant.InitiativeRoll = -100
+                if entity.CombatParticipant.CombatHandle and entity.CombatParticipant.CombatHandle.CombatState and entity.CombatParticipant.CombatHandle.CombatState.Initiatives then
+                    entity.CombatParticipant.CombatHandle.CombatState.Initiatives[entity] = -100
+                    entity.CombatParticipant.CombatHandle:Replicate("CombatState")
+                end
+                entity:Replicate("CombatParticipant")
+                count = count + 1
+            end
+        end
+    end
+    _P("resetPartyInitiatives: reset", count, "party member init rolls to -100")
+    return count
+end
+
 local function getOriginatorPrototype(spellName, stats)
     if not stats or not stats.RootSpellID or stats.RootSpellID == "" then
         return spellName
@@ -864,6 +907,7 @@ return {
     getFTBEntity = getFTBEntity,
     getNarrativeCombatLabel = getNarrativeCombatLabel,
     getCombatEntity = getCombatEntity,
+    joinCombat = joinCombat,
     hasStatus = hasStatus,
     hasPassive = hasPassive,
     getAbility = getAbility,
@@ -876,6 +920,7 @@ return {
     getSpellNameBySlot = getSpellNameBySlot,
     getCurrentRegion = getCurrentRegion,
     repairCanJoinCombatInRegion = repairCanJoinCombatInRegion,
+    resetPartyInitiatives = resetPartyInitiatives,
     createUuid = createUuid,
     isCounterspell = isCounterspell,
     removeNegativeStatuses = removeNegativeStatuses,
