@@ -47,7 +47,7 @@ end
 
 local function getRandomEncountersInWildChance()
     local v = Ext.Vars.GetModVariables(ModuleUUID).RandomEncountersInWildChance
-    if type(v) ~= "number" then return 1 end
+    if type(v) ~= "number" then return 5 end
     return math.max(0, math.min(100, math.floor(v)))
 end
 

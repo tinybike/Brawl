@@ -4,11 +4,12 @@ Encounters.Tracking.spawned = {}             -- { [uuid] = { tier = "..." } }
 Encounters.Tracking.pendingPileScore = 0     -- accumulated tier value of slain tracked enemies
 
 local debugPrint = Utils.debugPrint
+local trace = function(s) print("[EncTrack] " .. s) end  -- always-on; volume is tiny per encounter
 
 function Encounters.Tracking.add(guid, tier)
     if guid and guid ~= "" then
         Encounters.Tracking.spawned[guid] = { tier = tier }
-        debugPrint(string.format("[Encounters] Tracking.add: %s tier=%s (count=%d)", tostring(guid), tostring(tier), Encounters.Tracking.count()))
+        trace(string.format("add %s tier=%s count=%d", tostring(guid), tostring(tier), Encounters.Tracking.count()))
     end
 end
 
@@ -31,12 +32,12 @@ local function creditKill(uuid)
     Loot.dropOnKill(uuid)
     Encounters.Tracking.pendingPileScore = Encounters.Tracking.pendingPileScore + Compositions.tierValue(rec.tier)
     Encounters.Tracking.spawned[uuid] = nil
-    debugPrint(string.format("[Encounters] tracked kill: %s tier=%s pileScore=%d remaining=%d",
+    trace(string.format("kill %s tier=%s pileScore=%d remaining=%d",
         tostring(uuid), tostring(rec.tier), Encounters.Tracking.pendingPileScore, Encounters.Tracking.count()))
     if Encounters.Tracking.count() == 0 then
         local rolls = Encounters.Tracking.pendingPileScore
         Encounters.Tracking.pendingPileScore = 0
-        debugPrint(string.format("[Encounters] all encounter enemies down -- pile rolls=%d", rolls))
+        trace(string.format("all down -- pile rolls=%d", rolls))
         Loot.dropEncounterPile(nil, rolls)
     end
 end
@@ -59,7 +60,9 @@ function Encounters.Tracking.pruneDead()
         removed = removed + 1
     end
     if removed > 0 then
-        debugPrint(string.format("[Encounters] pruneDead: removed %d", removed))
+        trace(string.format("pruneDead removed=%d remaining=%d", removed, Encounters.Tracking.count()))
+    elseif Encounters.Tracking.count() > 0 then
+        trace(string.format("pruneDead noop -- %d still alive in spawned", Encounters.Tracking.count()))
     end
 end
 
@@ -73,7 +76,7 @@ function Encounters.Tracking.removeAllSurvivors()
         end
     end
     if removed > 0 then
-        debugPrint(string.format("[Encounters] removeAllSurvivors: removed %d", removed))
+        trace(string.format("removeAllSurvivors removed=%d", removed))
     end
     Encounters.Tracking.clear()
 end

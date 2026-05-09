@@ -175,7 +175,7 @@ local AutoSpawnPerRoundChance = 5
 local WildEncountersCheckbox = nil
 local WildEncountersState = false
 local WildEncountersChanceInput = nil
-local WildEncountersChance = 1
+local WildEncountersChance = 5
 local cellRefs = {party = {}, enemy = {}}
 local lightYellow = {1, 1, 0.8, 1}
 local mediumYellow = {0.9, 0.9, 0.6, 0.9}
@@ -1018,7 +1018,7 @@ local function showLeaderboard(payload)
         Ext.ClientNet.PostMessageToServer("Encounters.SetAutoSpawnOnCombatStart", tostring(cbAutoSpawn.Checked))
     end
     AutoSpawnEncounterCheckbox = cbAutoSpawn
-    local cbPerRound = encountersTab:AddCheckbox("Chance to spawn an encounter every round")
+    local cbPerRound = encountersTab:AddCheckbox("Chance to spawn an encounter each round")
     cbPerRound.Checked = AutoSpawnPerRoundState
     cbPerRound.OnChange = function()
         AutoSpawnPerRoundState = cbPerRound.Checked
@@ -1190,7 +1190,7 @@ local function onNetMessage(data)
             pcall(function() WildEncountersCheckbox.Checked = WildEncountersState end)
         end
     elseif data.Channel == "Encounters.RandomEncountersInWildChanceState" then
-        local n = tonumber(data.Payload) or 1
+        local n = tonumber(data.Payload) or 5
         WildEncountersChance = n
         if WildEncountersChanceInput then
             pcall(function() WildEncountersChanceInput.Text = tostring(n) .. "%" end)
